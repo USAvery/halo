@@ -242,6 +242,7 @@ char action_wait_perform(int actor_handle)
 {
   int actor;
   int prop;
+  int new_var;
 
   actor = (int)datum_get(actor_data, actor_handle);
   if (((actor_t *)actor)->field_04c == '\0') {
@@ -263,7 +264,8 @@ char action_wait_perform(int actor_handle)
     *(char *)(actor + 0x9c) = 1;
     goto LAB_0001bf35;
   }
-  *(char *)(actor + 0x9c) = 1;
+  new_var = actor + 0x9c;
+  *(char *)new_var = 1;
   if (((actor_t *)actor)->field_1d0 == -1) {
     goto LAB_0001bf35;
   }
