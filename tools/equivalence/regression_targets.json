@@ -306,7 +306,7 @@
     },
     {
       "addr": "0x1d6d0",
-      "name": "actor_action_try_to_panic",
+      "name": "actor_get_action_priority_flag",
       "obj": "actions.obj",
       "seeds": 20,
       "flags": [
