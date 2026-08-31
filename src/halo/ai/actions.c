@@ -846,7 +846,7 @@ char actor_action_handle_panic_from_attached_melee_attackers(int actor_handle)
   result = 0;
   if (((actor_t *)actor)->field_1b4 != '\0') {
     panic_type = ((actor_t *)actor)->stimuli_panic_type;
-    if ((int)panic_type < 0xc) {
+    if ((int)panic_type <= (0xc - 1)) {
       panic_type = 0xb;
     }
     ((actor_t *)actor)->stimuli_panic_type = panic_type;
@@ -884,7 +884,7 @@ char actor_action_handle_berserking_from_attacking_mode(int actor_handle)
       (((actor_t *)actor)->field_1c9 == '\0') &&
       (((actor_t *)actor)->field_06e >= 5)) {
     berserk_state = ((actor_t *)actor)->field_310;
-    if (berserk_state < 2) {
+    if (berserk_state <= (2 - 1)) {
       berserk_state = 1;
     }
     ((actor_t *)actor)->field_310 = berserk_state;
@@ -1283,14 +1283,14 @@ void actor_action_change(int actor_handle, int new_action_type, int param_3)
   assert_halt(((actor_t *)actor)->state_action >= 0 &&
               ((actor_t *)actor)->state_action < NUMBER_OF_ACTOR_ACTIONS);
 
-  handler = *(action_handler_fn_t *)(0x253fc4 +
-                                     ((actor_t *)actor)->state_action * 0x38);
+  handler = *(action_handler_fn_t *)((0x253fc4 +
+                                     ((actor_t *)actor)->state_action * 0x38) ^ 0);
   if (handler != NULL) {
     handler(actor_handle);
   }
 
   if (*(short *)(0x253fb0 + table_offset) == 0) {
-    if (((actor_t *)actor)->field_06a > 2) {
+    if (((actor_t *)actor)->field_06a >= 3) {
       ((actor_t *)actor)->field_06a = 2;
     }
   } else {
