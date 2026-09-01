@@ -2911,7 +2911,7 @@ bool ui_widget_multiplayer_level_list_dispose(void *widget, void *event_data,
 /* join network game (event handler, 0x0ea900) — asserts event_data is
  * non-NULL, then, if a network game client exists and its state
  * (network_game_client_get_state) is 2, walks the client's 16-slot player
- * table (index_base from FUN_0012a0a0, records at index_base+0x226, stride
+ * table (index_base from network_game_get_game, records at index_base+0x226, stride
  * 0x20 — same table network_game_client_local_player_quit walks) looking
  * for a valid record whose machine-index byte (+0x242, relative to
  * index_base+i*0x20) matches this client's local machine index
@@ -2951,7 +2951,7 @@ bool FUN_000ea900(void *widget, void *event_data, bool *widget_deleted)
   if (client != NULL) {
     state = network_game_client_get_state(client, &state_out);
     if (state == 2) {
-      index_base = FUN_0012a0a0();
+      index_base = network_game_get_game();
       local_machine_index = network_game_client_get_local_machine_index();
 
       if (index_base == 0) {
