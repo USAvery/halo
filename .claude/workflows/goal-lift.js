@@ -16,7 +16,12 @@ export const meta = {
 // the existing project-memory-enabled profiles.
 
 const GOAL         = (args && args.goal) || 20
-const STOP_ON_FAIL = (args && args.stopOnFail) || 3
+// Raised 3→6 2026-09-01: structural caps (rungCapped/treatAsCapped) counted
+// as fails even though they're deterministic, not model error — starved
+// runs early on TUs with a cluster of capped fns. Both cap branches now try
+// equivalence-commit first (capEquivCommit) and skip the fail-counter on a
+// confirmed high-confidence cap either way.
+const STOP_ON_FAIL = (args && args.stopOnFail) || 6
 const DRY_RUN      = !!(args && args.dryRun)
 // --improve: skip Select/Research/Lift over the frontier; instead drain the
 // parked ledger (artifacts/parked/), re-lifting sub-bar functions with the
@@ -154,6 +159,13 @@ const LIFT_REG_ARGS = !!(args && args.liftRegArgs)
 // in reviewThenCommit (default 85, the historical lane). Set 88 to enforce
 // "no sub-88 equiv-backed commits" policy.
 const MIN_COMMIT = Number((args && args.minCommitScore) || 85)
+// --minCappedCommitScore: floor for capEquivCommit — the equivalence-backed
+// commit path for structurally-capped lifts (rungCapped/treatAsCapped) that
+// never reach reviewThenCommit because their score sits under 85. Added
+// 2026-09-01: investigation found the 65-84% cap band had NO equivalence
+// fallback anywhere in the pipeline, so every capped lift in that band
+// parked even when equivalence would have confirmed it correct.
+const MIN_CAPPED_COMMIT_SCORE = Number((args && args.minCappedCommitScore) || 65)
 const runTokenStart = budget.spent()
 const phaseTokens = { select: 0, research: 0, lift: 0, improve: 0, report: 0 }
 const cacheMetrics = { hits: 0, misses: 0, ghidra_builds: 0 }
@@ -401,6 +413,12 @@ const SHA_SCHEMA = {
   type: 'object',
   properties: { sha: { type: 'string' } },
   required: ['sha'],
+}
+
+const GHIDRA_PREFLIGHT_SCHEMA = {
+  type: 'object',
+  properties: { ok: { type: 'boolean' }, detail: { type: 'string' } },
+  required: ['ok', 'detail'],
 }
 
 // ── Prompt builders ───────────────────────────────────────────────────────────
@@ -1031,6 +1049,28 @@ async function reviewThenCommit(brief, score, srcFile, path, phaseTitle, preEqui
   return { committed: true, verdict: 'AUTO_ACCEPT', rationale: path }
 }
 
+// Equivalence-backed commit fallback for structurally-capped lifts (score
+// stuck in [65,84], deterministic cap confirmed) that never reach
+// reviewThenCommit — its gate only fires for score>=85 bands. Added
+// 2026-09-01: journal evidence showed capped fns in this band are often
+// behaviorally correct (the cap is a byte-match ceiling, e.g. frame-shape or
+// /Os-vs-/Ot codegen, not a logic bug) but had NO equivalence path anywhere
+// in the pipeline, so every one parked unconditionally. Mirrors
+// reviewThenCommit's mechanical NEEDS_RUNTIME+equiv rule, minus the review
+// agent (a capped lift already has a documented reason for its ceiling; a
+// reviewer pass adds no new information the cap classification didn't have).
+async function capEquivCommit(brief, score, srcFile, path, phaseTitle, capReason) {
+  if (score < MIN_CAPPED_COMMIT_SCORE) return { committed: false, rationale: 'below_min_capped_commit_score' }
+  const eq = await agent(equivalencePrompt(brief.name), { label: `equiv-for-cap:${brief.name}`, phase: phaseTitle, ...M.mechanical, schema: EQUIV_SCHEMA })
+  if (!eq || !eq.passes || !(eq.confidence === 'high' || eq.confidence === 'moderate')) {
+    return { committed: false, rationale: eq ? `equiv_${eq.passes ? 'weak_confidence' : 'failed'}` : 'equiv_agent_returned_null' }
+  }
+  const note = `${path}${equivNote(eq.confidence, eq.reason)} [structural_cap: ${capReason}]`
+  if (DRY_RUN) return { committed: false, rationale: 'dry-run: would have committed', dryRun: true }
+  await agent(commitPrompt(brief.name, srcFile, note), { label: `commit:${brief.name}`, phase: phaseTitle, ...M.commit })
+  return { committed: true, rationale: note }
+}
+
 // The commit gate. The user cares about VC71 byte-accuracy %, not a prose code
 // review, so a clean high-% lift commits on a cheap mechanical check alone; the
 // Opus-high reviewer fires ONLY for the ambiguous/flagged band. Mechanical
@@ -1147,6 +1187,25 @@ or {"ok":false,"reason":"<what went wrong, and current git log --oneline ${runSt
   }
   log(`Squashed ${plan.squashed} object-stretch(es) of commits into one each`)
   return plan
+}
+
+// ── Ghidra MCP preflight ─────────────────────────────────────────────────────
+// Added 2026-09-01: an MCP outage for the whole run window went undetected
+// until each individual lift agent stalled ~165s waiting on a dead bridge,
+// burning budget on every target before failing. Check once, up front, and
+// abort the whole run (Select/Research/Lift and Improve alike) instead.
+{
+  const ghidraCheck = await agent(
+    `Run: python3 tools/audit/check_ghidra_mcp.py
+Report {"ok":true,"detail":"..."} if it exits 0 (Ghidra MCP bridge reachable),
+or {"ok":false,"detail":"<exact failure output>"} if it exits non-zero or the
+command itself fails to run. Do not attempt any fix — just report the result.`,
+    { label: 'ghidra-mcp-preflight', phase: 'Select', ...M.mechanical, schema: GHIDRA_PREFLIGHT_SCHEMA })
+  if (!ghidraCheck || !ghidraCheck.ok) {
+    log(`✗ Ghidra MCP preflight failed — aborting run: ${ghidraCheck ? ghidraCheck.detail : 'agent_null'}`)
+    return { committed: 0, promoted: 0, reason: 'ghidra_mcp_down', detail: ghidraCheck ? ghidraCheck.detail : 'agent_null' }
+  }
+  log('✓ Ghidra MCP preflight ok')
 }
 
 // ── Improve pass ────────────────────────────────────────────────────────────
@@ -1486,42 +1545,25 @@ log(`Selected ${targets.length} candidates across ${new Set(targets.map(t => t.o
 // them in 6 Opus research agents that drift. Saves the research tokens entirely.
 const CRT_LO = 0x1d0000, CRT_HI = 0x1de000
 const codeSkips = []
-// Attempts (from the park.py ledger) after which a walled target stops being
-// served to a cold lift. 2 = "tried twice, same wall both times".
-const PARKED_ATTEMPT_CAP = 2
-// ...and only when its best score is below this. Calibrated on outcomes, not
-// intuition: FUN_00173b40 landed at 90.3% on attempt 7 with a parked best of
-// 88.0, so a 90 floor would have suppressed a real success. See the pre-screen.
-const PARKED_WALL_PCT = 85
 targets = targets.filter(t => {
   const a = parseInt((t.addr || '0').replace(/^0x/i, ''), 16)
   const pinnedAddr = ADDRS && ADDRS.has(a)
-  // Repeat-resistant target: several attempts already made and the best of
-  // them is still FAR from the 90% bar -- a real wall, not a near miss.
-  // parse_string has 7 attempts at best 50.7%; FUN_000f5660 has 4 at 74.4%.
-  // The right lane for those is the IMPROVE pass, which warm-starts from the
-  // parked best patch and varies the model, not another cold lift.
-  //
-  // The floor is 85, NOT 90, on direct evidence: FUN_00173b40 sat at best 88.0%
-  // after SIX attempts (81.8 -> 84.3 -> 84.5 -> 88.0 -> 77.7 -> 84.7) and looked
-  // exactly like a hopeless target -- then attempt 7 landed it at 90.3%. A
-  // <90 floor would have blocked that. Above ~85 the next attempt can still
-  // cross the bar, so only a target that has repeatedly failed to get CLOSE is
-  // worth dropping. Pinned addrs always bypass -- an explicit --addrs is an
-  // operator override.
   // Confirmed structural cap: never re-serve to a cold lift, even in the
   // 85-89 near-miss band. shader_environment_texture_animation_evaluate sat
   // at 86.2% x10 because the 85 wall treated the fucompp-assert cap as
-  // recoverable. Improve-pass cannot move these either.
+  // recoverable. Improve-pass cannot move these either. Pinned addrs always
+  // bypass -- an explicit --addrs is an operator override.
+  //
+  // Removed 2026-09-01: skip_parked_repeat (attempts>=2 & best<85% skip).
+  // tools/llm_auto_lift.py's own selector docs (lines ~1379-1385) say this
+  // signal doesn't separate parked-forever from later-promoted targets — it
+  // already applies a -15 ranking penalty upstream, which is the correct
+  // place for this signal to act. The code-side hard skip additionally
+  // starved the IMPROVE pass of targets and, per FUN_00173b40 (90.3% on
+  // attempt 7 after 6 sub-88% attempts), can suppress genuine late successes.
   if (!pinnedAddr && !IMPROVE &&
       (t.parked_status === 'capped_confirmed' || t.parked_status === 'confirmed_cap')) {
     codeSkips.push({ ...t, status: 'skipped', reason: `skip_confirmed_cap (best ${t.parked_best_score}%)` })
-    return false
-  }
-  if (!pinnedAddr && !IMPROVE && t.parked_status === 'parked' &&
-      (t.parked_attempts || 0) >= PARKED_ATTEMPT_CAP &&
-      Number.isFinite(t.parked_best_score) && t.parked_best_score < PARKED_WALL_PCT) {
-    codeSkips.push({ ...t, status: 'skipped', reason: `skip_parked_repeat (${t.parked_attempts} attempts, best ${t.parked_best_score}% < 90 — use the improve pass)` })
     return false
   }
   if (t.has_reg_args === true && !LIFT_REG_ARGS) { codeSkips.push({ ...t, status: 'skipped', reason: 'skip_reg_args (selector: @reg-defined prologue → sub-bar)' }); return false }
@@ -1532,7 +1574,7 @@ targets = targets.filter(t => {
   if (!pinned && t.lane && t.lane !== 'auto-lift' && t.lane !== 'cache-context') { codeSkips.push({ ...t, status: 'skipped', reason: `lane=${t.lane} (not auto-liftable)` }); return false }
   return true
 })
-if (codeSkips.length) log(`Code pre-screen dropped ${codeSkips.length} before research (${codeSkips.filter(s => s.reason.startsWith('skip_parked_repeat')).length} parked-repeat, ${codeSkips.filter(s => s.reason.startsWith('skip_confirmed_cap')).length} confirmed-cap, ${codeSkips.filter(s => s.reason.startsWith('skip_reg_args')).length} reg-args, ${codeSkips.filter(s => s.reason.startsWith('skip_nt_import')).length} CRT/SEH, ${codeSkips.filter(s => s.reason.startsWith('lane=')).length} lane)`)
+if (codeSkips.length) log(`Code pre-screen dropped ${codeSkips.length} before research (${codeSkips.filter(s => s.reason.startsWith('skip_confirmed_cap')).length} confirmed-cap, ${codeSkips.filter(s => s.reason.startsWith('skip_reg_args')).length} reg-args, ${codeSkips.filter(s => s.reason.startsWith('skip_nt_import')).length} CRT/SEH, ${codeSkips.filter(s => s.reason.startsWith('lane=')).length} lane)`)
 if (targets.length === 0) {
   log('No viable targets after code pre-screen')
   return { committed: 0, goal: GOAL, reached_goal: false, skipped: codeSkips.length, reverted: 0, reason: 'empty_queue_after_prescreen' }
@@ -1719,9 +1761,16 @@ while (true) {
   // score: an unmeasured function is either absent from the bounds table or its
   // TU does not compile under VC71 — both need a human, not another agent turn.
   // Park WITHOUT counting a consecutive failure, same as before.
+  // Broadened 2026-09-01: originally gated on status === 'needs_verify', but
+  // journal evidence showed score===0 lifts landing under OTHER status labels
+  // (build_failed/skipped mislabels) that re-measured at 95.9/88.6/94.1% —
+  // real ports, not below_65pct fails. A score of exactly 0 with
+  // vc71_measured !== true is never a genuine match result (real 0% matches
+  // still set vc71_measured === true), so treat it as unmeasured regardless
+  // of status.
   const verifySkipped =
-    a1.status === 'needs_verify' &&
-    (a1.vc71_measured === false || (score === 0 && a1.vc71_measured !== true))
+    a1.vc71_measured === false ||
+    (score === 0 && a1.vc71_measured !== true)
   if (verifySkipped) {
     log(`  ${brief.name}: VC71 never measured — bounds-table entry missing or VC71 compile failed`)
     await parkBuilt(brief, srcFile, 0, lastME, 'verify_skipped_no_ref', 'VC71 unmeasured: no bounds entry (tools/verify/function_bounds.json) or the TU failed to compile under VC71; not a lift failure', 'Lift', a1.reason || '')
@@ -1840,21 +1889,35 @@ while (true) {
       }
     }
     if (rungCapped) {
-      // Optimizer hit a documented ceiling (its own classify_cap equivalent) —
-      // treat exactly like the attempt-1 structural-cap path.
-      log(`  ${brief.name} ${score}% capped [fingerprinted-mechanical:optimizer]: ${capReason} — parked, no further escalation`)
+      // Optimizer hit a documented ceiling (its own classify_cap equivalent).
+      // Before parking, try an equivalence-backed commit — a confirmed cap is
+      // deterministic (not model error), so it never counts as a fail either way.
+      log(`  ${brief.name} ${score}% capped [fingerprinted-mechanical:optimizer]: ${capReason} — trying equivalence before parking`)
+      const ce = await capEquivCommit(brief, score, srcFile, 'escalated+optimize', 'Lift', capReason)
+      if (ce.committed) {
+        log(`  ${brief.name} ${score}% — capped but equivalence-confirmed, committed: ${ce.rationale}`)
+        results.push({ addr: brief.addr, name: brief.name, obj: brief.obj, status: 'committed', vc71_score: score, reason: ce.rationale })
+        continue
+      }
+      log(`  ${brief.name} ${score}% capped [fingerprinted-mechanical:optimizer]: ${capReason} — parked (${ce.rationale}), no further escalation`)
       await parkBuilt(brief, srcFile, score, lastME, 'structural_cap', capReason, 'Lift', lift.reason || '')
-      consecutiveFails++
-      results.push({ addr: brief.addr, name: brief.name, obj: brief.obj, status: 'parked', vc71_score: score, reason: `structural_cap[fingerprinted-mechanical:optimizer]: ${capReason}` })
+      results.push({ addr: brief.addr, name: brief.name, obj: brief.obj, status: 'parked', vc71_score: score, reason: `structural_cap[fingerprinted-mechanical:optimizer]: ${capReason} (${ce.rationale})` })
       continue
     }
   } else if (band === 'fail_check_cap' && treatAsCapped) {
-    // Structural cap — a future model may still beat it, so PARK (with the cap
-    // hypothesis) rather than discard. Not confirm-cap: that would end retries.
-    log(`  ${brief.name} ${score}% capped [${capProvenance}]: ${a1.cap_reason || 'unclassified'} — parked, no escalation`)
+    // Structural cap — try equivalence-backed commit first (see capEquivCommit);
+    // only park (with the cap hypothesis, for a future model to retry) if that
+    // doesn't pass. Not confirm-cap: that would end retries.
+    log(`  ${brief.name} ${score}% capped [${capProvenance}]: ${a1.cap_reason || 'unclassified'} — trying equivalence before parking`)
+    const ce = await capEquivCommit(brief, score, srcFile, path, 'Lift', a1.cap_reason || 'unclassified')
+    if (ce.committed) {
+      log(`  ${brief.name} ${score}% — capped but equivalence-confirmed, committed: ${ce.rationale}`)
+      results.push({ addr: brief.addr, name: brief.name, obj: brief.obj, status: 'committed', vc71_score: score, reason: ce.rationale })
+      continue
+    }
+    log(`  ${brief.name} ${score}% capped [${capProvenance}]: ${a1.cap_reason || 'unclassified'} — parked (${ce.rationale}), no escalation`)
     await parkBuilt(brief, srcFile, score, M.reason, 'structural_cap', a1.cap_reason || 'unclassified', 'Lift', a1.reason || '')
-    consecutiveFails++
-    results.push({ addr: brief.addr, name: brief.name, obj: brief.obj, status: 'parked', vc71_score: score, reason: `structural_cap[${capProvenance}]: ${a1.cap_reason || 'unclassified'}` })
+    results.push({ addr: brief.addr, name: brief.name, obj: brief.obj, status: 'parked', vc71_score: score, reason: `structural_cap[${capProvenance}]: ${a1.cap_reason || 'unclassified'} (${ce.rationale})` })
     continue
   }
 
