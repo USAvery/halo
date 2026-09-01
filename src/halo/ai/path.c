@@ -718,9 +718,6 @@ char FUN_0005ff70(unsigned int *param_1)
 {
   char cVar1;
   short uVar2;
-  unsigned int *puVar4;
-  unsigned int *puVar5;
-  int iVar3;
   char local_5;
 
   local_5 = 0;
