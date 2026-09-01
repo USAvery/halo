@@ -1470,6 +1470,10 @@ def _write_score_context(pack: dict) -> Path:
 # 40-80pp). FUN_000425c0 36.1% (/O2) -> 79.5% (/Od).
 _PER_FUNCTION_OPT: dict[str, dict[str, str]] = {
     "ai/ai.c": {"FUN_000425c0": "/Od"},
+    # get_ui_argb_white: reference keeps a 0x10-byte frame and spills the
+    # struct-copy temps to EBP slots before overwriting 3 of them with the
+    # RGB constants -- classic /Od codegen. 65.1% (/O2) -> 82.4% (/Od).
+    "halo/interface/ui_widget.c": {"get_ui_argb_white": "/Od"},
 }
 
 

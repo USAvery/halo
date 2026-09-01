@@ -9385,6 +9385,10 @@
       "kind": "function",
       "status": "ported"
     },
+    "0xe19c0": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0xe1c70": {
       "kind": "function",
       "status": "ported"
@@ -9419,6 +9423,14 @@
       "name": "progress_bar_set_quad_texcoords"
     },
     "0xe2040": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0xe21e0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0xe2470": {
       "kind": "function",
       "status": "ported"
     },
@@ -9565,11 +9577,23 @@
       "kind": "function",
       "status": "ported"
     },
+    "0xe3da0": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0xe3e10": {
       "kind": "function",
       "status": "ported"
     },
     "0xe4310": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0xe4330": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0xe4370": {
       "kind": "function",
       "status": "ported"
     },
@@ -9612,6 +9636,10 @@
         "summary": "Checks whether a deferred UI error should be shown once the main menu is ready, then routes through the existing error display path."
       }
     },
+    "0xe4590": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0xe45d0": {
       "kind": "function",
       "status": "ported",
@@ -9637,6 +9665,10 @@
       "status": "ported"
     },
     "0xe4770": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0xe4800": {
       "kind": "function",
       "status": "ported"
     },
@@ -9688,6 +9720,14 @@
       "kind": "function",
       "status": "ported"
     },
+    "0xe54e0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0xe5530": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0xe5620": {
       "kind": "function",
       "status": "ported",
@@ -9706,6 +9746,10 @@
       "uncertain": [
         "The relationship between the root widget at 0x46cc20[i] and the list at 0x46cc30[i] is unclear; the root is closed via ui_widget_close while the list nodes are only deallocated from the pool without closure."
       ]
+    },
+    "0xe59e0": {
+      "kind": "function",
+      "status": "ported"
     },
     "0xe5a40": {
       "kind": "function",
@@ -9881,11 +9925,27 @@
       "kind": "function",
       "status": "ported"
     },
+    "0xe9bd0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0xe9cb0": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0xe9fd0": {
       "kind": "function",
       "status": "ported"
     },
+    "0xea100": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0xea1f0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0xea810": {
       "kind": "function",
       "status": "ported"
     },
@@ -14680,6 +14740,14 @@
         "kb.json assigns 0x184610 to render.obj but the assert __FILE__ string is c:\\\\halo\\\\SOURCE\\\\rasterizer\\\\rasterizer_transparent_geometry.c, so render.c is a mixed-TU aggregate for this address cluster."
       ]
     },
+    "0x1848d0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x184b60": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0x184b80": {
       "kind": "function",
       "status": "ported"
@@ -14705,6 +14773,14 @@
       "status": "ported"
     },
     "0x184dc0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x184de0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x184e50": {
       "kind": "function",
       "status": "ported"
     },

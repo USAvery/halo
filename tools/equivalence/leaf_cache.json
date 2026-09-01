@@ -31348,6 +31348,11 @@
     "confidence": "high",
     "coverage_pct": 100.0
   },
+  "0xe3da0": {
+    "class": "non_leaf",
+    "confidence": "moderate",
+    "coverage_pct": 36.3
+  },
   "0xe4890": {
     "class": "non_leaf",
     "confidence": "moderate",
@@ -31357,8 +31362,18 @@
     "class": "leaf",
     "z3_proven": true
   },
+  "0xe4d40": {
+    "class": "non_leaf",
+    "confidence": "moderate",
+    "coverage_pct": 93.1
+  },
   "0xe4f20": {
     "class": "non_leaf"
+  },
+  "0xe59e0": {
+    "class": "non_leaf",
+    "confidence": "moderate",
+    "coverage_pct": 52.7
   },
   "0xe6890": {
     "class": "non_leaf",

@@ -96,6 +96,29 @@ void ui_widget_debug_show_path(unsigned char value)
   *(uint8_t *)0x46cc84 = value;
 }
 
+/* widget_instance_count_children (0xe3cb0) — counts widget's children by
+ * walking the next_sibling chain (+0x2c) starting from first_child (+0x34),
+ * the same fields widget_instance_get_nth_child below walks. Unlike that
+ * function, this one does NOT assert on a NULL widget: a NULL widget or an
+ * empty first_child both just return 0. */
+int widget_instance_count_children(void *widget)
+{
+  int count;
+  void *child;
+
+  count = 0;
+  if (widget != NULL) {
+    child = *(void **)((char *)widget + 0x34);
+    if (child != NULL) {
+      do {
+        child = *(void **)((char *)child + 0x2c);
+        count = count + 1;
+      } while (child != NULL);
+    }
+  }
+  return count;
+}
+
 /* widget_instance_get_nth_child — walks the first_child linked list of
  * widget (offset +0x34) following next_sibling (+0x2c) n times, returning
  * the widget reached (or NULL if the chain runs out before n steps).
@@ -183,6 +206,51 @@ void ui_widget_set_events_suppressed(bool suppress)
   *(uint8_t *)0x46cc85 = (uint8_t)suppress;
 }
 
+/* ui_widget_get_last_child (0xe4310) — walks the parent chain (field +0x30,
+ * the same field walked by ui_widget_apply_focus/ui_widget_set_focus above
+ * and by the inline root-walk at ui_widget_close(ui_widget_get_last_child(w))
+ * below) from widget up to the top-most ancestor with no parent, and returns
+ * that root. 0xe4313-0xe432a: MOV EAX,[EBP+8]; MOV ECX,[EAX+0x30]; TEST/JZ;
+ * loop MOV EAX,ECX; MOV ECX,[EAX+0x30]; TEST/JNZ while ECX!=0; RET EAX. */
+void *ui_widget_get_last_child(void *widget)
+{
+  void *parent;
+
+  parent = *(void **)((char *)widget + 0x30);
+  while (parent != NULL) {
+    widget = parent;
+    parent = *(void **)((char *)parent + 0x30);
+  }
+
+  return widget;
+}
+
+/* widget_instance_set_visibility_recursive (0xe4370) — sets widget's
+ * visible flag (+0x10, the same flag checked by the text-box render path
+ * above as "return early if 0") to `visible`, then recurses over every
+ * child in the first_child (+0x34) / next_sibling (+0x2c) list, same
+ * fields widget_instance_count_children/widget_instance_get_nth_child
+ * walk above. Asserts widget is non-NULL (same "widget" tag / file /
+ * halt=true display_assert call as widget_instance_get_nth_child). */
+void widget_instance_set_visibility_recursive(void *widget, bool visible)
+{
+  void *child;
+
+  if (widget == NULL) {
+    display_assert("widget", "c:\\halo\\SOURCE\\interface\\ui_widget.c", 0x743,
+                   true);
+    system_exit(-1);
+  }
+
+  *(uint8_t *)((char *)widget + 0x10) = (uint8_t)visible;
+
+  child = *(void **)((char *)widget + 0x34);
+  while (child != NULL) {
+    widget_instance_set_visibility_recursive(child, visible);
+    child = *(void **)((char *)child + 0x2c);
+  }
+}
+
 /* main_menu_active — sets or clears the "main menu active" byte at 0x46cc88,
  * checked by ui_widget_is_main_menu_loaded() (below) and main_menu_is_active()
  * (0xe43e0). Called from main.c's main_menu_unload/main_menu_load
@@ -199,8 +267,6 @@ bool main_menu_is_active(void)
 {
   return (bool)(*(uint8_t *)0x46cc88);
 }
-
-void *ui_widget_get_last_child(void *widget);
 
 bool ui_widget_is_main_menu_loaded(void)
 {
@@ -248,6 +314,28 @@ void display_error_when_main_menu_loaded(int16_t error_handle)
   }
   error(2, "there is already an error message queued for display at the "
            "main menu; ignoring this one");
+}
+
+/* display_error_abort_to_dashboard_deferred (0xe4590) — queues a single
+ * "abort to dashboard" error (the error_handle/allow_abort pair consumed
+ * by ui_widget_load_error_screen(), whose "error_abort_to_dashboard"
+ * widget name this function's name mirrors) for the deferred-dispatch
+ * check on the next per-frame widget update (word at 0x46cc68 == -1
+ * means "slot empty", byte at 0x46cc6a is the paired allow_abort flag).
+ * If the slot is already occupied, the request is dropped with a
+ * priority-2 warning, same "queue is full, ignore" shape as
+ * display_error_when_main_menu_loaded() above. Only caller found in the
+ * binary is FUN_001c5560 (0x1c55d8, unconditional call). */
+void display_error_abort_to_dashboard_deferred(int16_t error_handle,
+                                               uint8_t allow_abort)
+{
+  if (*(int16_t *)0x46cc68 == -1) {
+    *(int16_t *)0x46cc68 = error_handle;
+    *(uint8_t *)0x46cc6a = allow_abort;
+    return;
+  }
+  error(2, "there is already a deferred dashbaord error queued; ignoring "
+           "this one!");
 }
 
 /* ui_widget_start_title_music — starts the main menu looping music track.
@@ -372,6 +460,159 @@ int *ui_widget_find_by_tag(int *widget, int tag_handle)
   return result;
 }
 
+/* FUN_000e4980 (0xe4980) — widget ancestor-chain check, called from
+ * ui_widget_pending_load_apply (0xe5090). Returns false immediately if the
+ * widget is disabled (+0x12 != 0). Otherwise walks up the parent chain
+ * (+0x30 — the same field ui_widget_apply_focus and ui_widget_set_focus use
+ * to climb to the root widget) starting at the widget's immediate parent.
+ * For each ancestor, looks up its DeLa tag definition
+ * (tag_get(0x44654c61, ancestor[0])) and requires either the *previous*
+ * ancestor's tag definition to have bit 0 of field_0x2c set, or the
+ * *current* ancestor's type field (+0xe) to be 2 or 3 (list types — same
+ * values ui_widget_apply_focus tests). The first ancestor that fails this
+ * check stops the walk and yields false; running out of ancestors (or
+ * having none at all) yields true. */
+bool FUN_000e4980(void *widget)
+{
+  int *w;
+  int *parent;
+  void *prev_tag;
+  void *cur_tag;
+  bool result;
+
+  w = (int *)widget;
+
+  if (*(uint8_t *)((char *)w + 0x12) != 0) {
+    return false;
+  }
+
+  parent = *(int **)((char *)w + 0x30);
+  if (parent == NULL) {
+    return true;
+  }
+
+  prev_tag = tag_get(0x44654c61, *parent);
+  result = true;
+
+  while (parent != NULL && result) {
+    cur_tag = tag_get(0x44654c61, *parent);
+    if ((*(uint8_t *)((char *)prev_tag + 0x2c) & 1) == 0 &&
+        *(int16_t *)((char *)parent + 0xe) != 2 &&
+        *(int16_t *)((char *)parent + 0xe) != 3) {
+      result = false;
+    } else {
+      result = true;
+    }
+    parent = *(int **)((char *)parent + 0x30);
+    prev_tag = cur_tag;
+  }
+
+  return result;
+}
+
+/* FUN_000e4a80 (0xe4a80) — linear case-insensitive search of the 0x28-entry
+ * (40) wide-string table at 0x31e098 (Ghidra label PTR_u_a_button_0031e098)
+ * for an entry matching the implicit @<ebx> argument. Comparison is
+ * __wcsnicmp(name, table[i], _wcslen(table[i])) — i.e. name only needs to
+ * match table[i]'s full length as a prefix. Returns the matching table
+ * index (0..0x27), or -1 if none of the 0x28 entries match. Table
+ * contents/semantics not otherwise evidenced by this bundle; name kept
+ * mechanical. Callers: FUN_000e4ce0, FUN_000e5de0, FUN_000e4da0 (x4) — none
+ * ported yet, so caller-side intent is not available as corroboration. */
+int16_t FUN_000e4a80(const wchar_t *name)
+{
+  const wchar_t *entry;
+  size_t entry_length;
+  int16_t index;
+
+  index = 0;
+  do {
+    entry = *(const wchar_t **)(0x31e098 + (int)index * 4);
+    entry_length = _wcslen(entry);
+    if (__wcsnicmp(name, entry, entry_length) == 0) {
+      break;
+    }
+    index = index + 1;
+  } while (index < 0x28);
+
+  if (index == 0x28) {
+    return -1;
+  }
+  return index;
+}
+
+/* FUN_000e4c70 (0xe4c70) — draws text into dst_rect using the indent
+ * difference between src_rect and dst_rect (row 1, e.g. "top"), then copies
+ * src_rect back into dst_rect. A negative computed indent is clamped to 0
+ * and reported via error() with the message "initial_indent<0 in
+ * render_state_text() and was about to explode" — the same wording used by
+ * render_state_text(), so this is presumably an extracted final-draw step of
+ * that routine. Sole caller is draw_string_and_hack_in_icons (FUN_000e5de0,
+ * unconditional call), which is not yet ported, so caller-side register
+ * setup is not available as corroboration; the @ebx/@edi roles and the
+ * dst_rect/src_rect naming are taken directly from this function's own
+ * disassembly (matches FUN_0019cdb0's out_rect/in_rect argument order) and
+ * from the structurally identical draw_string_set_indents/FUN_0019cdb0/
+ * rasterizer_draw_string sequence already lifted as FUN_000d4470's non-icon
+ * path in hud_messaging.c. The incoming ESI register (PUSH ESI at entry,
+ * POP ESI at exit) is a callee-saved scratch register the original compiler
+ * reused for the indent computation, not a real argument: its low 16 bits
+ * are unconditionally overwritten by the indent subtraction before any read,
+ * and the surviving high 16 bits are only ever pushed as the padding half of
+ * a stack dword for a `short` parameter (draw_string_set_indents), which the
+ * callee never reads — so its incoming value has no observable effect.
+ * ABI: @ebx=dst_rect, @edi=src_rect, stack: text */
+void FUN_000e4c70(short *dst_rect, void *text, short *src_rect)
+{
+  short indent;
+  short local_bounds[4];
+
+  indent = (short)((int)(unsigned short)src_rect[1] -
+                   (int)(unsigned short)dst_rect[1]);
+  if (indent < 0) {
+    error(2,
+          "initial_indent<0 in render_state_text() and was about to explode");
+    if (indent < 0) {
+      indent = 0;
+    }
+  }
+  draw_string_set_indents(indent, 0);
+  FUN_0019cdb0(dst_rect, text, local_bounds, src_rect);
+  src_rect[1] = src_rect[1] - 3;
+  local_bounds[1] = dst_rect[1];
+  rasterizer_draw_string(local_bounds, NULL, NULL, 0, (unsigned short *)text);
+  *dst_rect = *src_rect;
+}
+
+/* FUN_000e4d40 (0xe4d40) — evaluates whether a local player's input
+ * preferences select control scheme 1 or 3. If local_player_index is -1
+ * (unspecified), resolves it via local_player_get_next(-1) first. Builds a
+ * 0x18-byte zeroed preferences block on the stack, fills it via
+ * input_abstraction_get_local_player_preferences() when a valid local
+ * player was found, then tests the int16 field at buffer offset 0x14
+ * against 1 and 3. field_14: offset is accessed, meaning unproven.
+ * Callers: FUN_000e4da0 (x2, both unconditional calls per xrefs_to). */
+bool FUN_000e4d40(int16_t local_player_index)
+{
+  uint8_t preferences[0x18];
+  int16_t control_scheme;
+
+  if (local_player_index == -1) {
+    local_player_index = local_player_get_next(-1);
+  }
+
+  csmemset(preferences, 0, 0x18);
+
+  if (local_player_index != -1) {
+    input_abstraction_get_local_player_preferences(local_player_index,
+                                                   preferences);
+  }
+
+  control_scheme = *(int16_t *)(preferences + 0x14);
+
+  return (control_scheme == 1) || (control_scheme == 3);
+}
+
 /* ui_widget_apply_focus — applies focus to target_widget within the root's
  * focus chain. Walks to the top-most parent (+0x30), snapshots the current
  * focused-descendant chain head (+0x38), optionally retargets when the input
@@ -473,6 +714,68 @@ void ui_widget_update_list_selection(void *widget, void *definition);
 void ui_widget_list_prev(void *widget);
 
 void ui_widget_list_next(void *widget);
+
+/* Local shape-only float4, not a claimed Bungie struct: mirrors the
+ * reference's whole-struct copy (see get_ui_argb_white below) so the
+ * compiler spills/overwrites the same EBP slots the original does. */
+typedef struct {
+  float f0, f1, f2, f3;
+} get_ui_argb_white_color_t;
+
+/* get_ui_argb_white (0xe5530) — writes an ARGB-style float[4] color into
+ * out_color: [0] is the alpha carried over from the shared default-color
+ * pointer at 0x2ee6c4 (points to the all-ones {1,1,1,1} color at 0x267700 —
+ * the same global player_effects.c and render_sprite.c read as a colour);
+ * [1..3] are the RGB white constants at 0x31e148/0x31e14c/0x31e150.
+ * Disassembly does a whole-struct copy from *default_color first (word0
+ * stays resident in a register; word1/word2/word3 spill to EBP-relative
+ * temps), then overwrites 3 of those temps with the RGB constants in
+ * 1,3,2 order, then stores the local back through out_color once. */
+float *get_ui_argb_white(float *out_color)
+{
+  get_ui_argb_white_color_t local_color;
+
+  local_color = **(get_ui_argb_white_color_t **)0x2ee6c4;
+  local_color.f1 = *(float *)0x31e148;
+  local_color.f3 = *(float *)0x31e150;
+  local_color.f2 = *(float *)0x31e14c;
+
+  *(get_ui_argb_white_color_t *)out_color = local_color;
+
+  return out_color;
+}
+
+/* FUN_000e5590 (0xe5590) — saved-game filesystem-check thread procedure.
+ * Registered with thread_new as the background thread entry point by
+ * ui_widget_begin_filesystem_checks, and also invoked directly (synchronously,
+ * with param_1 = 0) if thread creation fails. `RET 0x4` marks it __stdcall
+ * with one unused thread-proc parameter (the Win32 thread lpParameter slot).
+ * Calls saved_game_perform_file_system_checks and stores its bool/short
+ * result to the filesystem-check result word at 0x46cc80 (read back by
+ * ui_widget_close_and_reload's caller as 1 == "no saved games", 2 == "disk
+ * error"). Only on success (result == 0) does it run the two saved-game
+ * enumeration helpers at 0x1c26b0/0x1c0d50 (each takes -1 plus out-params
+ * pointing at two EBP locals shared between both calls: local_4 is
+ * pre-initialized to 1 before the first call so the callee can read a caller
+ * default; local_8 is left uninitialized for the callee to fill) and the
+ * profile-index getter, whose return value is unused here. */
+void __stdcall FUN_000e5590(int param_1)
+{
+  int local_4;
+  int local_8;
+  int16_t result;
+
+  (void)param_1;
+
+  result = saved_game_perform_file_system_checks();
+  *(int16_t *)0x46cc80 = result;
+  if (result == 0) {
+    local_4 = 1;
+    FUN_001c26b0(-1, &local_4, &local_8);
+    FUN_001c0d50(-1, &local_4, &local_8, 1);
+    player_ui_get_player1_last_used_profile_index();
+  }
+}
 
 /* ui_widget_close — tears down a single UI widget and frees its memory.
  * Handles the "widget deleted" event handlers (type 0x19) from the widget's
@@ -665,6 +968,35 @@ void ui_widgets_close_all(void)
   } while ((int)list_heads < 0x46cc40);
 }
 
+/* ui_widgets_pop_stack — drains one pending queued entry from the
+ * pending-load list at 0x46cc30[local_player_index] (see
+ * ui_widget_pending_load_pop / ui_widget_pending_load_push_internal above).
+ * local_player_index == -1 is treated as player 0; otherwise it must be in
+ * [0, MAXIMUM_NUMBER_OF_LOCAL_PLAYERS). The popped record is discarded --
+ * this only drains one node, it does not apply it. */
+void ui_widgets_pop_stack(int16_t local_player_index)
+{
+  unsigned char record[12]; /* sizeof(ui_widget_pending_load_t); output is
+                                discarded by this caller, so no need for the
+                                named struct which is defined later in this
+                                TU */
+
+  if (local_player_index == -1) {
+    local_player_index = 0;
+  } else if ((local_player_index < 0) ||
+             (local_player_index >= MAXIMUM_NUMBER_OF_LOCAL_PLAYERS)) {
+    display_assert("(local_player_index>=0) && "
+                   "(local_player_index<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS)",
+                   "c:\\halo\\SOURCE\\interface\\ui_widget.c", 0x4b4, true);
+    system_exit(-1);
+  }
+
+  if (*(int *)(0x46cc30 + (int)local_player_index * 4) != 0) {
+    ui_widget_pending_load_pop((int *)(0x46cc30 + (int)local_player_index * 4),
+                               (void *)&record);
+  }
+}
+
 /* main_screen_shell_begin_fade — starts the shell's screen-fade-out on each
  * of the 4 UI root widget stacks (0x46cc20..2c) whose root is not in
  * "in_game_mode" (+0x15, see render_ui_widgets above). Stops attract mode,
@@ -706,6 +1038,47 @@ void main_screen_shell_begin_fade(int duration_ms)
     }
     root_slots++;
   } while ((int)root_slots < 0x46cc30);
+}
+
+/* ui_play_audio_feedback_sound (0xe5ab0) — plays one of four canned UI
+ * feedback sounds selected by sound_selector: 1=cursor, 2=forward, 3=back,
+ * 4=flag_failure. DEC EAX / CMP EAX,3 / JA default in the disassembly
+ * matches switch(1..4); any other value falls straight through to the
+ * default arm and does nothing. Resolves the sound tag via
+ * tag_loaded('snd!', path) and, if found (result != -1), starts it at
+ * full volume via sound_impulse_start(tag_index, 1.0f). Same
+ * tag_loaded/sound_impulse_start pattern as the inline sound-selector
+ * switch inside the event handler above (~line 1830), but exposed here
+ * as its own callable — many UI event handlers below call it directly
+ * (see xrefs). */
+void ui_play_audio_feedback_sound(short sound_selector)
+{
+  int sound_tag_index;
+
+  switch (sound_selector) {
+  case 1:
+    sound_tag_index =
+      tag_loaded(0x736e6421 /* 'snd!' */, "sound\\sfx\\ui\\cursor");
+    break;
+  case 2:
+    sound_tag_index =
+      tag_loaded(0x736e6421 /* 'snd!' */, "sound\\sfx\\ui\\forward");
+    break;
+  case 3:
+    sound_tag_index =
+      tag_loaded(0x736e6421 /* 'snd!' */, "sound\\sfx\\ui\\back");
+    break;
+  case 4:
+    sound_tag_index =
+      tag_loaded(0x736e6421 /* 'snd!' */, "sound\\sfx\\ui\\flag_failure");
+    break;
+  default:
+    return;
+  }
+
+  if (sound_tag_index != -1) {
+    sound_impulse_start(sound_tag_index, 1.0f);
+  }
 }
 
 /* render_text_box_widget (0xe6140) — refreshes and draws a text-box widget.
@@ -973,6 +1346,57 @@ int ui_widget_list_prev_item(void *widget, void *event_data,
 void ui_widget_handle_event_handler(void *widget, void *definition,
                                     void *event_data, void *event_handler,
                                     char *widget_deleted);
+
+/* FUN_000e76b0 — called from the widget-tree recursive render helper at
+ * 0xe73c0 (xref 0xe75e9; that function is itself still unported — the
+ * calls below reach its original binary code through the kb.json redirect
+ * thunk). Two independent steps:
+ *   1. If widget+0x48 ("target") is non-NULL, accumulates a scale/alpha
+ *      value starting from widget+0x24 and multiplying in +0x24 of every
+ *      ancestor reached by following the +0x30 "parent" chain, stores the
+ *      product into target+0x24, then re-renders target via 0xe73c0.
+ *   2. If param_2's flag byte at +0x150 has bit 0 set, walks widget's child
+ *      list (head at +0x34, next-link at +0x2c) and renders up to +0x44
+ *      children via 0xe73c0, flagging the child at index +0x3c as the
+ *      last one (bool arg 5).
+ * Clears widget+0x3e (a pending-count field) on every exit path. */
+void FUN_000e76b0(int widget, int param_2, viewport_bounds_t *bounds,
+                  int param_4, int param_5)
+{
+  int target;
+  float scale;
+  int parent;
+  int child;
+  int index;
+  int is_last;
+
+  target = *(int *)(widget + 0x48);
+  if (target != 0) {
+    scale = *(float *)(widget + 0x24);
+    parent = *(int *)(widget + 0x30);
+    while (parent != 0) {
+      scale *= *(float *)(parent + 0x24);
+      parent = *(int *)(parent + 0x30);
+    }
+    *(float *)(target + 0x24) = scale;
+    FUN_000e73c0(target, bounds, param_4, 0, 1);
+  }
+
+  if ((*(unsigned char *)(param_2 + 0x150) & 1) != 0) {
+    child = *(int *)(widget + 0x34);
+    index = 0;
+    while (child != 0) {
+      if (index >= (int)*(uint16_t *)(widget + 0x44))
+        break;
+      is_last = (index == (int)*(int16_t *)(widget + 0x3c));
+      FUN_000e73c0(child, bounds, param_4, param_5, is_last);
+      child = *(int *)(child + 0x2c);
+      index++;
+    }
+  }
+
+  *(uint16_t *)(widget + 0x3e) = 0;
+}
 
 /* render_ui_widgets — renders all active UI widget stacks and an optional
  * screen fade overlay. For each of the 4 widget root slots (0x46cc20..2c),
@@ -2314,6 +2738,34 @@ bool ui_widget_dispose_single_player_level_list(void *widget, void *event_data,
   return true;
 }
 
+/* join controller to multiplayer game (event handler table index ??,
+ * 0x0e9cb0) — the widget's local_player_index field (+0x8) must already be
+ * resolved to a specific gamepad (not NONE/-1); asserts and exits otherwise.
+ * Forwards the (zero/sign-extended) index to
+ * player_ui_local_player_joined_multiplayer_game and always returns true. */
+bool ui_widget_join_controller_to_multiplayer_game(void *widget,
+                                                   void *event_data,
+                                                   bool *widget_deleted)
+{
+  char *local_player_index_ptr;
+
+  (void)event_data;
+  (void)widget_deleted;
+
+  local_player_index_ptr = (char *)widget + 8;
+  if (*(int16_t *)local_player_index_ptr == -1) {
+    display_assert(
+      "need a specific local player index when joining a multiplayer game",
+      "c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 0x369,
+      true);
+    system_exit(-1);
+  }
+
+  player_ui_local_player_joined_multiplayer_game(
+    *(int16_t *)local_player_index_ptr);
+  return true;
+}
+
 /* start network game server if not already advertised (event handler table
  * index 17, 0x0e9d40) — disposes any existing server, clears the cached
  * multiplayer variant UI text, and re-enables incoming connections. If no
@@ -2386,6 +2838,66 @@ bool ui_widget_dispose_network_game_server_list(void *widget, void *event_data,
   return true;
 }
 
+/* mp level list initialize (event handler table entry at data 0x31e1c0,
+ * 0x0ea100) — validates that `widget` itself is a spinner-list tag with
+ * exactly 3 items ("multiplayer level list", same assert-file/line
+ * pattern as the profile-list siblings above), points its list
+ * pointer/count at the built-in level_name_table (13 entries) at
+ * +0x40/+0x44 — the inverse of ui_widget_multiplayer_level_list_dispose
+ * (0x0ea1f0) below, which clears the same two fields — then, if there is
+ * a remembered last-used multiplayer map, linearly scans the table for a
+ * case-insensitive name match and leaves the matching index selected at
+ * +0x3c (reset to 0 if no match is found; left untouched if no map was
+ * remembered). Always returns true. */
+bool ui_widget_multiplayer_level_list_initialize(void *widget, void *event_data,
+                                                 bool *widget_deleted)
+{
+  short *list_tag;
+  char saved_map_name[256];
+  int16_t index;
+
+  (void)event_data;
+  (void)widget_deleted;
+
+  list_tag = (short *)tag_get(0x44654c61 /* 'DeLa' */, *(int *)widget);
+  if (*list_tag != 2) {
+    display_assert(
+      "expected a spinner list widget for 'multiplayer level list' widget",
+      "c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 0x4cc,
+      1);
+    system_exit(-1);
+  }
+
+  if (*(int *)((char *)list_tag + 0x3e0) != 3) {
+    display_assert(
+      "expected 3 list items for 'multiplayer level list' widget",
+      "c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 0x4cd,
+      1);
+    system_exit(-1);
+  }
+
+  *(int *)((char *)widget + 0x40) =
+    0x31e4c8; /* level_name_table (DAT_0031e4c8), 13 entries */
+  *(int16_t *)((char *)widget + 0x44) = 13;
+
+  if (saved_game_file_retrieve_last_used_multiplayer_map(saved_map_name)) {
+    *(int16_t *)((char *)widget + 0x3c) = 0;
+    do {
+      index = *(int16_t *)((char *)widget + 0x3c);
+      if (crt_stricmp(saved_map_name, ((char **)0x31e4c8)[index]) == 0) {
+        break;
+      }
+      *(int16_t *)((char *)widget + 0x3c) = (int16_t)(index + 1);
+    } while (*(int16_t *)((char *)widget + 0x3c) < 13);
+
+    if (*(int16_t *)((char *)widget + 0x3c) == 13) {
+      *(int16_t *)((char *)widget + 0x3c) = 0;
+    }
+  }
+
+  return true;
+}
+
 /* mp level list dispose (event handler table index 27, 0x0ea1f0) — drops the
  * widget's cached list pointer/count at +0x40/+0x44. */
 bool ui_widget_multiplayer_level_list_dispose(void *widget, void *event_data,
@@ -2393,5 +2905,85 @@ bool ui_widget_multiplayer_level_list_dispose(void *widget, void *event_data,
 {
   *(int *)((char *)widget + 0x40) = 0;
   *(int16_t *)((char *)widget + 0x44) = 0;
+  return true;
+}
+
+/* join network game (event handler, 0x0ea900) — asserts event_data is
+ * non-NULL, then, if a network game client exists and its state
+ * (network_game_client_get_state) is 2, walks the client's 16-slot player
+ * table (index_base from FUN_0012a0a0, records at index_base+0x226, stride
+ * 0x20 — same table network_game_client_local_player_quit walks) looking
+ * for a valid record whose machine-index byte (+0x242, relative to
+ * index_base+i*0x20) matches this client's local machine index
+ * (network_game_client_get_local_machine_index) and whose controller-index
+ * byte (+0x243) matches the event's controller_index (event_data+2, same
+ * field event_controller_index_compatible_with_widget reads above) — if
+ * found, the player is already present and the function returns
+ * immediately. Otherwise it asks the client to add the player via
+ * network_game_client_add_player(client, controller_index), logging
+ * "failed to send join request" via network_game_log on failure. Always
+ * returns true; widget and widget_deleted are unused. */
+bool FUN_000ea900(void *widget, void *event_data, bool *widget_deleted)
+{
+  void *client;
+  int16_t state;
+  int state_out;
+  int index_base;
+  short local_machine_index;
+  short i;
+  char *player_slot;
+  char *record;
+  int16_t controller_index;
+  bool added;
+
+  (void)widget;
+  (void)widget_deleted;
+
+  if (event_data == NULL) {
+    display_assert(
+      "event",
+      "c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 0x652,
+      true);
+    system_exit(-1);
+  }
+
+  client = network_game_client_get();
+  if (client != NULL) {
+    state = network_game_client_get_state(client, &state_out);
+    if (state == 2) {
+      index_base = FUN_0012a0a0();
+      local_machine_index = network_game_client_get_local_machine_index();
+
+      if (index_base == 0) {
+        display_assert(
+          "game",
+          "c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c",
+          0x65b, true);
+        system_exit(-1);
+      }
+
+      controller_index = *(int16_t *)((char *)event_data + 2);
+
+      if (local_machine_index != -1) {
+        for (i = 0; i < 0x10; i++) {
+          player_slot = (char *)index_base + 0x226 + i * 0x20;
+          if (network_player_is_valid(player_slot)) {
+            record = (char *)index_base + i * 0x20;
+            if (*(record + 0x242) == local_machine_index &&
+                *(record + 0x243) == controller_index) {
+              return true;
+            }
+          }
+        }
+      }
+
+      added =
+        network_game_client_add_player(client, (uint16_t)controller_index);
+      if (!added) {
+        network_game_log("failed to send join request");
+      }
+    }
+  }
+
   return true;
 }
