@@ -2264,14 +2264,14 @@ game_variant_t *game_engine_stalker_default(game_variant_t *variant)
   *(int32_t *)((char *)&v + 0x30) = 0x96;
   *(int32_t *)((char *)&v + 0x34) = 0x96;
   *(int32_t *)((char *)&v + 0x60) = 1;
-  *(int16_t *)((char *)&v + 0x64) = 1;
+  *(int32_t *)((char *)&v + 0x54) = 1;
   *(int32_t *)((char *)&v + 0x18) = 3;
   *(int32_t *)((char *)&v + 0x58) = 3;
-  *(int32_t *)((char *)&v + 0x54) = 1;
   *(int32_t *)((char *)&v + 0x48) = 2;
   *(int32_t *)((char *)&v + 0x5c) = 2;
   *(int32_t *)((char *)&v + 0x50) = 2;
   *(int32_t *)((char *)&v + 0x24) = 0;
+  *(int16_t *)((char *)&v + 0x64) = 1;
   *(int32_t *)((char *)&v + 0x3c) = 0x3f800000;
   *(int32_t *)((char *)&v + 0x38) = 0;
   *(uint8_t *)((char *)&v + 0x28) = 0;
