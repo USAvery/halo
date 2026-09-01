@@ -279,7 +279,8 @@ bool FUN_00130270(void *server, void *buffer, int size, void *addr)
   }
   category = (unsigned char)(msg[0] >> 2) & 3;
   if ((msg[0] & 3) == 0) {
-    if (category == 3) {
+    switch (category) {
+    case 3:
       packet_version = 1;
       packet_type = *((char *)msg + (short)(unsigned short)size - 1);
       size -= 2;
@@ -339,7 +340,8 @@ bool FUN_00130270(void *server, void *buffer, int size, void *addr)
                          transport_address_to_string(addr));
         break;
       }
-    } else if (category == 1) {
+      break;
+    case 1:
       if ((unsigned short)size >= 0x83) {
         network_game_log("server received low-level error message: error= #%d "
                          "(%s); sender= '%s'",
@@ -350,14 +352,17 @@ bool FUN_00130270(void *server, void *buffer, int size, void *addr)
                          "'%s'",
                          transport_address_to_string(addr));
       }
-    } else if (category == 2) {
+      break;
+    case 2:
       network_game_log("server received a bad message type (_message_type_data); "
                        "sender= '%s'",
                        transport_address_to_string(addr));
-    } else {
+      break;
+    default:
       network_game_log("server received a datagram with an unknown message type "
                        "(#%d); sender= '%s'",
                        category, transport_address_to_string(addr));
+      break;
     }
   } else {
     network_game_log("server received a datagram with invalid flags; sender= "
@@ -393,7 +398,8 @@ bool FUN_00130580(void *server, void *machine, void *buffer, int size)
     network_game_log("server received client message with invalid flags");
     return 1;
   }
-  if (category == 1) {
+  switch (category) {
+  case 1:
     if ((unsigned short)size < 0x83) {
       network_game_log("server received a malformed/damaged message from a "
                        "client");
@@ -403,13 +409,13 @@ bool FUN_00130580(void *server, void *machine, void *buffer, int size)
                      "error= #%d (%s)",
                      ((unsigned char *)msg)[0x80], (char *)(msg + 1));
     return 1;
-  }
-  if (category == 2) {
+  case 2:
     network_game_log("server received a bad message type from a client "
                      "(_message_type_data)");
     return 1;
-  }
-  if (category != 3) {
+  case 3:
+    break;
+  default:
     network_game_log("server received a client message with an unknown message "
                      "type (#%d)",
                      category);

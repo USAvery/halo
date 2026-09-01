@@ -69,8 +69,6 @@ bool convex_hull2d_test_vector(int16_t num_verts, float *polygon2d,
   float denom;
   float num;
   float t;
-  float new_tmin;
-  float new_tmax;
   float *pts_iy;
   int16_t i;
   int cur;
@@ -100,25 +98,13 @@ bool convex_hull2d_test_vector(int16_t num_verts, float *polygon2d,
         }
       } else {
         t = num / denom;
-        if (denom <= *(float *)0x2533c0) {
-          /* entering half-plane -> candidate tmax */
-          new_tmax = t;
-          new_tmin = tmin;
-          if (tmax <= t) {
-            new_tmax = tmax;
-            new_tmin = tmin;
-          }
+        if (*(float *)0x2533c0 >= denom) {
+          if (t < tmax)
+            tmax = t;
         } else {
-          /* leaving half-plane -> candidate tmin */
-          new_tmax = tmax;
-          new_tmin = t;
-          if (t <= tmin) {
-            new_tmax = tmax;
-            new_tmin = tmin;
-          }
+          if (t > tmin)
+            tmin = t;
         }
-        tmin = new_tmin;
-        tmax = new_tmax;
         if (tmax < tmin) {
           return 0;
         }
@@ -156,7 +142,6 @@ int16_t convex_polygon2d_clip_to_plane(int16_t count, float *points,
   float *previous_point;
   float *current_point;
   float distance;
-  float t;
   float clamped_t;
   float dx;
   float dy;
@@ -221,16 +206,13 @@ int16_t convex_polygon2d_clip_to_plane(int16_t count, float *points,
 
       dx = previous_point[0] - current_point[0];
       dy = previous_point[1] - current_point[1];
-      t =
+      clamped_t =
         -((line[0] * current_point[0] + current_point[1] * line[1]) - line[2]) /
         (dy * line[1] + dx * line[0]);
-
-      clamped_t = *(float *)0x2533c0;
-      if (*(float *)0x2533c0 <= t) {
-        clamped_t = t;
-        if (*(float *)0x2533c8 < t) {
-          clamped_t = *(float *)0x2533c8;
-        }
+      if (clamped_t < *(float *)0x2533c0) {
+        clamped_t = *(float *)0x2533c0;
+      } else if (*(float *)0x2533c8 < clamped_t) {
+        clamped_t = *(float *)0x2533c8;
       }
 
       out_points[(int)out_count * 2] = clamped_t * dx + current_point[0];
@@ -241,14 +223,14 @@ int16_t convex_polygon2d_clip_to_plane(int16_t count, float *points,
 
       if (out_count != 1) {
         out_idx = (int)out_count;
-        if (((float)fabs(out_points[out_idx * 2 - 2] - out_points[0]) <
-               epsilon &&
-             (float)fabs(out_points[out_idx * 2 - 1] - out_points[1]) <
-               epsilon) ||
-            ((float)fabs(out_points[out_idx * 2 - 2] -
-                         out_points[out_idx * 2 - 4]) < epsilon &&
-             (float)fabs(out_points[out_idx * 2 - 1] -
-                         out_points[out_idx * 2 - 3]) < epsilon)) {
+        if ((epsilon > (float)fabs(out_points[out_idx * 2 - 2] -
+                                   out_points[0]) &&
+             epsilon > (float)fabs(out_points[out_idx * 2 - 1] -
+                                   out_points[1])) ||
+            (epsilon > (float)fabs(out_points[out_idx * 2 - 2] -
+                                   out_points[out_idx * 2 - 4]) &&
+             epsilon > (float)fabs(out_points[out_idx * 2 - 1] -
+                                   out_points[out_idx * 2 - 3]))) {
           out_count -= 1;
         }
       }
@@ -272,14 +254,14 @@ int16_t convex_polygon2d_clip_to_plane(int16_t count, float *points,
 
       if (out_count != 1) {
         out_idx = (int)out_count;
-        if (((float)fabs(out_points[out_idx * 2 - 2] - out_points[0]) <
-               epsilon &&
-             (float)fabs(out_points[out_idx * 2 - 1] - out_points[1]) <
-               epsilon) ||
-            ((float)fabs(out_points[out_idx * 2 - 2] -
-                         out_points[out_idx * 2 - 4]) < epsilon &&
-             (float)fabs(out_points[out_idx * 2 - 1] -
-                         out_points[out_idx * 2 - 3]) < epsilon)) {
+        if ((epsilon > (float)fabs(out_points[out_idx * 2 - 2] -
+                                   out_points[0]) &&
+             epsilon > (float)fabs(out_points[out_idx * 2 - 1] -
+                                   out_points[1])) ||
+            (epsilon > (float)fabs(out_points[out_idx * 2 - 2] -
+                                   out_points[out_idx * 2 - 4]) &&
+             epsilon > (float)fabs(out_points[out_idx * 2 - 1] -
+                                   out_points[out_idx * 2 - 3]))) {
           out_count -= 1;
         }
       }
@@ -538,7 +520,7 @@ bool FUN_00106f50(int16_t point_count, float *points, int16_t vertices_capacity,
         scan = scan + 3;
       } while ((int16_t)i < point_count);
 
-      if ((int16_t)far_index != -1 && 0.01f <= best) {
+      if ((int16_t)far_index != -1 && best >= 0.01f) {
         p1 = points + (int16_t)far_index * 3;
 
         /* Pass 3: find the point farthest from the p0-p1 line. */
@@ -568,7 +550,7 @@ bool FUN_00106f50(int16_t point_count, float *points, int16_t vertices_capacity,
           scan = scan + 3;
         } while ((int16_t)i < point_count);
 
-        if ((int16_t)line_index != -1 && 0.01f <= best) {
+        if ((int16_t)line_index != -1 && best >= 0.01f) {
           /* Pass 4: plane through (p0,p1,p2); find the farthest point. */
           best_dist = 0.0f;
           FUN_001037b0(plane, p0, p1, points + (int16_t)line_index * 3);
@@ -587,8 +569,8 @@ bool FUN_00106f50(int16_t point_count, float *points, int16_t vertices_capacity,
             scan = scan + 3;
           } while ((int16_t)i < point_count);
 
-          if ((int16_t)plane_index != -1 && 0.01f <= fabs(best_dist)) {
-            if (0.0f < best_dist) {
+          if ((int16_t)plane_index != -1 && fabs(best_dist) >= 0.01f) {
+            if (best_dist > 0.0f) {
               far_index = line_index;
               line_index = saved_far;
             }

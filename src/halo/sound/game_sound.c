@@ -360,7 +360,7 @@ void unattached_impulse_sound_new(int sound_tag_index, void *location,
                    1);
     system_exit(-1);
   }
-  if (scale < 0.0f || !(scale <= 1.0f)) {
+  if (!(scale >= 0.0f) || !(scale <= 1.0f)) {
     error(2, "DIAG scale OOB in 0x1c73d0: scale=%f tag=0x%x", (double)scale,
           sound_tag_index);
     display_assert("scale>=0.f && scale<=1.f",
@@ -368,13 +368,7 @@ void unattached_impulse_sound_new(int sound_tag_index, void *location,
     system_exit(-1);
   }
 
-  {
-    int *dst = (int *)(sound_params + 0x0c);
-    int *src = (int *)location;
-    int i;
-    for (i = 0; i < 11; i++)
-      dst[i] = src[i];
-  }
+  qmemcpy(sound_params + 0x0c, location, 0x2c);
   *(float *)(sound_params + 0x04) = scale;
   *(int16_t *)(sound_params + 0x00) = 1;
   *(float *)(sound_params + 0x08) = 1.0f;
@@ -797,7 +791,7 @@ int object_impulse_sound_new(int object_handle, int tag_index, int16_t marker,
                    "c:\\halo\\SOURCE\\sound\\game_sound.c", 0x12c, 1);
     system_exit(-1);
   }
-  if (scale < 0.0f || scale > 1.0f) {
+  if (!(scale >= 0.0f) || !(scale <= 1.0f)) {
     error(2, "DIAG scale OOB in 0x1c7e70: scale=%f obj=0x%x tag=0x%x marker=%d",
           (double)scale, object_handle, tag_index, (int)marker);
     error(2, "DIAG pos=(%f,%f,%f) fwd=(%f,%f,%f)", (double)position[0],
@@ -892,6 +886,7 @@ void game_sound_update(float dt)
   /* 8-byte location struct returned by object_get_location (cluster_index etc.)
    */
   int location[2]; /* [EBP-0x14] */
+  volatile int new_var;
 
   int looping_sounds_handle;
   void *entry;
@@ -931,7 +926,7 @@ void game_sound_update(float dt)
     if (music_handle == -1) {
       /* Start a new music looping sound for this environment. */
       music_handle =
-        ((int (*)(int, int, int))0x1c7710)(sound_env_tag_index, -1, 0x3f800000);
+        unattached_looping_sound_start(sound_env_tag_index, -1, 0x3f800000);
       *(int *)(*(int *)0x5054e0 + 4) = music_handle;
     } else {
       /* Check whether the environment changed. */
@@ -940,14 +935,15 @@ void game_sound_update(float dt)
         /* Environment changed: stop old music and start new. */
         entry = datum_get(*(data_t **)0x5054e4, music_handle);
         *(uint32_t *)((char *)entry + 4) |= 2; /* set stop flag */
-        music_handle = ((int (*)(int, int, int))0x1c7710)(sound_env_tag_index,
-                                                          -1, 0x3f800000);
+        music_handle = unattached_looping_sound_start(sound_env_tag_index, -1,
+                                                      0x3f800000);
         *(int *)(*(int *)0x5054e0 + 4) = music_handle;
       }
     }
   }
 
   /* --- Per-entry update loop -------------------------------------------- */
+  new_var = *(int *)0x5054e0;
   object_looping_sounds = *(int *)0x5054e4;
 
   looping_sounds_handle = data_next_index((data_t *)object_looping_sounds, -1);
@@ -991,7 +987,7 @@ void game_sound_update(float dt)
   }
 
   /* Increment global tick counter. */
-  *(int *)(*(int *)0x5054e0) += 1;
+  *(int *)new_var += 1;
 }
 
 /* sound_compute_source_obstruction (0x1c8310)
@@ -1020,6 +1016,7 @@ void game_sound_update(float dt)
 void sound_compute_source_obstruction(int channel_index, void *source,
                                       float sqrt_dist)
 {
+  char *new_var;
   float *camera;
   int16_t source_cluster;
   float direction[3];
@@ -1051,7 +1048,7 @@ void sound_compute_source_obstruction(int channel_index, void *source,
   /* Default gain and obstruction factor.
    * These stores are placed before the assert in the original binary
    * (MSVC instruction scheduling interleaves them with the CMP/JZ). */
-  *(float *)((char *)source + 0x38) = 0.6f;
+  *(float *)((char *)source + 0x38) = 0.6f * 1.0f;
   *(float *)((char *)source + 0x3c) = 1.0f;
 
   assert_halt_msg(
@@ -1062,6 +1059,7 @@ void sound_compute_source_obstruction(int channel_index, void *source,
   if (source_cluster != -1 && *(int16_t *)((char *)camera + 0x10) != -1) {
     /* Query cluster sound path encoding between camera and source clusters. */
     bsp = scenario_get();
+    new_var = (char *)source + 0x38;
     sound_encoding = structure_bsp_cluster_sound_encoding(
       bsp, *(int16_t *)((char *)camera + 0x10), source_cluster);
     encoding_bits = (uint32_t)(sound_encoding & 0x7f);
@@ -1078,7 +1076,7 @@ void sound_compute_source_obstruction(int channel_index, void *source,
       /* Check if the source cluster is audible from the camera cluster. */
       if ((audibility[source_cluster_int >> 5] &
            (1u << ((uint8_t)source_cluster_int & 0x1f))) != 0) {
-        *(float *)((char *)source + 0x38) = 0.45f;
+        *(float *)new_var = 0.45f;
 
         /* Raycast from camera to source to check line of sight. */
         direction[0] = *(float *)((char *)source + 0x0c) - camera[0];
@@ -1087,13 +1085,13 @@ void sound_compute_source_obstruction(int channel_index, void *source,
 
         if (!FUN_0014df70(0xc0e1, camera, direction, -1, collision_result)) {
           /* No line of sight — fully occluded. */
-          *(float *)((char *)source + 0x38) = 0.0f;
+          *(float *)new_var = 0.0f;
           *(float *)((char *)source + 0x3c) = 0.0f;
         }
       }
 
       /* Compute obstruction factor if gain is non-zero. */
-      if (*(float *)((char *)source + 0x38) != *(float *)0x2533c0) {
+      if (*(float *)new_var != *(float *)0x2533c0) {
         obstruction =
           *(float *)0x2533c8 - sqrt_dist / (cluster_distance + sqrt_dist);
         *(float *)((char *)source + 0x3c) = obstruction;

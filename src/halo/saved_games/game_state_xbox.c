@@ -181,11 +181,11 @@ char game_state_read_header_from_persistent_storage(void *header,
                                                     int buffer_size,
                                                     char *flags)
 {
-  static char scratch_buffer[0x20000]; /* 128KB — avoids _chkstk */
+  char scratch_buffer[0x20000]; /* Reference frame: _chkstk(0x20114). */
   char path_buffer[0x100];
 
   int file_handle;
-  char result;
+  volatile char result;
   int bytes_transferred;
   uint32_t checksum;
   uint32_t saved_checksum;

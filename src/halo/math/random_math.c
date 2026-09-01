@@ -76,7 +76,9 @@ void FUN_0010aa60(short type_index, void *buffer)
   float phase_var;
   float range;
   float p;
+  float v;
   unsigned char *out;
+  float *sample_ptr;
   int i;
   int byte_val;
   int k;
@@ -164,8 +166,9 @@ void FUN_0010aa60(short type_index, void *buffer)
     range = max_val - min_val;
 
   out = (unsigned char *)buffer;
-  for (k = 0; k < 0x400; k++) {
-    float v = sample_scratch[k];
+  sample_ptr = sample_scratch;
+  for (k = 0x400; k != 0; k--, sample_ptr++, out++) {
+    v = *sample_ptr;
     if (range != *(float *)0x2533c0) {
       v = (v - min_val) / range;
     }
@@ -175,7 +178,7 @@ void FUN_0010aa60(short type_index, void *buffer)
       byte_val = 0;
     if (byte_val > 0xff)
       byte_val = 0xff;
-    out[k] = (unsigned char)byte_val;
+    *out = (unsigned char)byte_val;
   }
 }
 
@@ -201,7 +204,7 @@ void FUN_0010aa60(short type_index, void *buffer)
  */
 void periodic_functions_initialize(void)
 {
-  int i;
+  int16_t i;
   void *buf;
   int *tables;
 
@@ -497,14 +500,11 @@ void random_seed_debug_log(bool a1)
  */
 void random_math_initialize(void)
 {
-  unsigned int seed;
   void *tag;
   int16_t i;
-  vector3_t *src;
-  vector3_t *dst;
 
-  seed = system_seconds() ^ system_milliseconds() ^ (unsigned int)rand();
-  *(unsigned int *)0x46e3f8 = seed;
+  *(unsigned int *)0x46e3f8 =
+    system_seconds() ^ system_milliseconds() ^ (unsigned int)rand();
 
   tag = FUN_001087b0(0x10);
   if (!tag) {
@@ -518,10 +518,9 @@ void random_math_initialize(void)
     "c:\\halo\\SOURCE\\math\\random_math.c", 0xb0);
   *(int16_t *)0x46e3ec = *(int16_t *)((char *)tag + 0xc);
 
-  src = *(vector3_t **)((char *)tag + 4);
-  dst = *(vector3_t **)0x46e3e8;
   for (i = 0; i < *(int16_t *)((char *)tag + 0xc); i++) {
-    dst[i] = src[i];
+    (*(vector3_t **)0x46e3e8)[i] =
+      (*(vector3_t **)((char *)tag + 4))[i];
   }
 
   FUN_001056e0(tag);
@@ -692,7 +691,9 @@ void random_direction3d(int *seed, float *forward, float zero, float angle,
 
   /* Pick a random direction from the precomputed sphere table.
    * Inlines: index = random_range(seed, 0, table_size) then table lookup. */
-  index = random_range((unsigned int *)seed, 0, *(int16_t *)0x46e3ec);
+  *seed = (int)((unsigned int)*seed * 0x19660d + 0x3c6ef35f);
+  index = (int16_t)(((int)*(int16_t *)0x46e3ec *
+                     (int)((unsigned int)*seed >> 16)) >> 16);
   random_direction_table_get_element(index, random_vec);
 
   /* Cross product: cross = random_vec x forward */
@@ -701,7 +702,7 @@ void random_direction3d(int *seed, float *forward, float zero, float angle,
   cross[2] = random_vec[1] * forward[0] - random_vec[0] * forward[1];
 
   /* Normalize the rotation axis; bail if degenerate (parallel vectors) */
-  if (normalize3d(cross) <= *(float *)0x2533c0)
+  if (!(normalize3d(cross) > *(float *)0x2533c0))
     return;
 
   /* Random rotation angle in [zero, angle] (inlines random_real_range) */
@@ -914,12 +915,10 @@ float FUN_0010c510(float *v1, float *v2)
     volatile float prod_mem = product;
     cos2theta = 2.0f * (dot_mem / prod_mem) * dot_mem - 1.0f;
   }
-  if (cos2theta <= -1.0f)
-    cos2theta = -1.0f;
-  else if (cos2theta >= 1.0f)
-    cos2theta = 1.0f;
-  else if (cos2theta != cos2theta)
-    return 0.0f;
+    if (cos2theta < -1.0f)
+        cos2theta = -1.0f;
+    else if (cos2theta > 1.0f)
+        cos2theta = 1.0f;
 
   half_angle = acosf(cos2theta) * 0.5f;
 

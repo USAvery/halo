@@ -329,12 +329,12 @@ int FUN_00064570(int *iter)
 
   handle = iter[1];
   iter[0] = handle;
-  if (handle == -1) {
-    return 0;
+  if (handle != -1) {
+    prop = (char *)datum_get(prop_data, handle);
+    iter[1] = *(int *)(prop + 8);
+    return (int)prop;
   }
-  prop = (char *)datum_get(prop_data, handle);
-  iter[1] = *(int *)(prop + 8);
-  return (int)prop;
+  return 0;
 }
 
 /* 0x645a0 — prop_new_unacknowledged.

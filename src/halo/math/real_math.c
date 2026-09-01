@@ -1975,8 +1975,8 @@ void yaw_vectors(float *v1, float *axis, float scale1, float scale2)
   cross1 = v1[0] * axis[2] - axis[0] * v1[2];
   cross2 = v1[1] * axis[0] - v1[0] * axis[1];
   v1[0] = cross0 * scale1 + scale2 * v1[0];
-  v1[1] = cross1 * scale1 + scale2 * v1[1];
   v1[2] = cross2 * scale1 + scale2 * v1[2];
+  v1[1] = cross1 * scale1 + scale2 * v1[1];
 }
 
 /* 0x10c700 — Rotate two 3D vectors around an axis: rotate v1 toward v2 and v2
@@ -6207,7 +6207,7 @@ int FUN_00112590(int param_1, int param_2, int param_3, int param_4,
   int w_size;
   int lit_bufsize;
 
-  if (param_7 == (char *)0 || *param_7 != **(char **)0x31fc70 ||
+  if (param_7 == (char *)0 || **(char **)0x31fc70 != *param_7 ||
       param_8 != 0x38)
     return -6;
   if (param_1 == 0)
