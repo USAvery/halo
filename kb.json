@@ -19882,7 +19882,7 @@
     },
     {
      "addr": "0xf8410",
-     "decl": "int projectile_aim_linear(float speed, float *origin, float *target, float *aim_vector, float *out_speed, float *out_t, float *out_dist);",
+     "decl": "bool projectile_aim_linear(float speed, float *origin, float *target, float *aim_vector, float *out_speed, float *out_t, float *out_dist);",
      "ported": true
     },
     {
@@ -19912,7 +19912,7 @@
     },
     {
      "addr": "0xf8d30",
-     "decl": "int projectile_new(int projectile_handle);",
+     "decl": "bool projectile_new(int projectile_handle);",
      "ported": true
     },
     {
