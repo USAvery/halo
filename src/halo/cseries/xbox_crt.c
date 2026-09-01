@@ -392,16 +392,34 @@ int strncmp(const char *s1, const char *s2, unsigned int n)
  * and directly from cseries.c/console.c. */
 int crt_tolower(int c)
 {
-  if (c >= 'A' && c <= 'Z')
-    return c + ('a' - 'A');
-  return c;
+  int is_lowerable;
+  int result;
+
+  if (*(int *)0x3317bc > 1) {
+    is_lowerable = __isctype(c, 1);
+  } else {
+    is_lowerable = (*(unsigned char **)0x3317b4)[c * 2] & 1;
+  }
+  result = c + 0x20;
+  if (is_lowerable == 0)
+    result = c;
+  return result;
 }
 
 int crt_toupper(int c)
 {
-  if (c >= 'a' && c <= 'z')
-    return c - ('a' - 'A');
-  return c;
+  int is_upperable;
+  int result;
+
+  if (*(int *)0x3317bc > 1) {
+    is_upperable = __isctype(c, 2);
+  } else {
+    is_upperable = (*(unsigned char **)0x3317b4)[c * 2] & 2;
+  }
+  result = c - 0x20;
+  if (is_upperable == 0)
+    result = c;
+  return result;
 }
 
 /* crt_stricmp (0x1dd801) — provided here since it is internal to the original
@@ -444,25 +462,124 @@ int __strnicmp(const char *s1, const char *s2, unsigned int count)
   return 0;
 }
 
-/* crt_strchr (0x1d95d0) — provided here since it is internal to the original
- * LIBCMT and not exported from the XBE import table. Behaviorally equivalent
- * to the standard strchr. */
+/* crt_strchr (0x1d95c0/0x1d95d0) — provided here since it is internal to the
+ * original LIBCMT and not exported from the XBE import table. The original
+ * is a hand-rolled SWAR (word-at-a-time) scanner using the classic
+ * "haszero" bit trick, not a byte-at-a-time loop; transliterated
+ * instruction-for-instruction from the reference disassembly to match VC71
+ * codegen shape. Behaviorally equivalent to the standard strchr.
+ *
+ * structural_cap: hand_asm. Confirmed (not inferred) hand-written MASM, not
+ * VC71 compiler output: dead PUSH EBX/POP EBX (compilers never save an
+ * unused register), a lazy/non-uniform register-save prologue (EDI/ESI
+ * pushed mid-function instead of one upfront prologue), and live code at
+ * 0x1d95c0 preceding this function's own entry symbol (0x1d95d0), reached
+ * by a backward JZ. VC71 byte-match has a hard ceiling here (57.0% as of
+ * this writing, 86/86 insn count match) — no C89 source restructuring can
+ * close it further; inline asm is banned by project rules. The volatile
+ * locals below (k1, t2sign) are load-bearing for the current score — they
+ * force the 0x7efefeff magic constant and the sign-test result to spill to
+ * memory instead of staying register-resident, matching the reference's
+ * actual store/reload shape; removing them was tried and measured a
+ * regression (57.0% -> 55.0%, new IMM-WARN). Independently confirmed by a
+ * second-opinion review pass (2026-09-01). See also crt_strstr (single-char
+ * fast path tail-jumps into this function's body, reusing its exact stack
+ * frame) and strrchr (raw REPNE SCASB/STD, no C equivalent at all) below —
+ * same ceiling class. */
 char *crt_strchr(const char *str, int c)
 {
-  char ch;
-  ch = (char)c;
-  for (;;) {
-    if (*str == ch)
-      return (char *)str;
-    if (*str == '\0')
+  unsigned int cb; /* holds the byte value 0..255 during the alignment loop,
+                     * then broadened in place into the 4-way broadcast mask
+                     * -- matches the reference's single-register (EBX) reuse. */
+  const unsigned char *p;
+  unsigned int w, t1, t1sum, esi_val;
+
+  cb = (unsigned char)c;
+  p = (const unsigned char *)str;
+
+  if (((uint32_t)(uintptr_t)p & 3) == 0)
+    goto aligned;
+
+align_loop:
+  {
+    unsigned char ch;
+    ch = *p;
+    p++;
+    if (ch == (unsigned char)cb)
+      return (char *)(p - 1);
+    if (ch == 0)
       return NULL;
-    str++;
   }
+  if (((uint32_t)(uintptr_t)p & 3) != 0)
+    goto align_loop;
+
+aligned:
+  cb = cb | (cb << 8);
+  cb = cb | (cb << 16);
+
+main_loop:
+  w = *(const unsigned int *)p;
+  p += 4;
+
+  t1 = w ^ cb;
+  {
+    volatile unsigned int k1;
+    k1 = 0x7efefeffu;
+    esi_val = k1 + w;
+    t1sum = k1 + t1;
+  }
+  t1 = (~t1) ^ t1sum;
+  w = (~w) ^ esi_val;
+
+  t1 &= 0x81010100u;
+  if (t1 != 0)
+    goto backtrack;
+
+  w &= 0x81010100u;
+  if (w == 0)
+    goto main_loop;
+  if ((w & 0x01010100u) != 0)
+    return NULL;
+  {
+    volatile unsigned int t2sign;
+    t2sign = esi_val & 0x80000000u;
+    if (t2sign != 0)
+      goto main_loop;
+  }
+  return NULL;
+
+backtrack:
+  w = *(const unsigned int *)(p - 4);
+  if ((unsigned char)w == (unsigned char)cb)
+    return (char *)(p - 4);
+  if ((unsigned char)w == 0)
+    return NULL;
+  if ((unsigned char)(w >> 8) == (unsigned char)cb)
+    return (char *)(p - 3);
+  if ((unsigned char)(w >> 8) == 0)
+    return NULL;
+  w >>= 16;
+  if ((unsigned char)w == (unsigned char)cb)
+    return (char *)(p - 2);
+  if ((unsigned char)w == 0)
+    return NULL;
+  if ((unsigned char)(w >> 8) == (unsigned char)cb)
+    return (char *)(p - 1);
+  if ((unsigned char)(w >> 8) == 0)
+    return NULL;
+  goto main_loop;
 }
 
 /* strrchr (0x1d9710) — provided here since it is internal to the original
  * LIBCMT and not exported from the XBE import table. Behaviorally equivalent
- * to the standard strrchr. */
+ * to the standard strrchr.
+ *
+ * structural_cap: hand_asm. Confirmed hand-written MASM: raw REPNE SCASB /
+ * STD (direction-flag reverse scan) with no C-level equivalent at all —
+ * inline asm is banned by project rules, so this is an unfixable ceiling
+ * (48.6% as of this writing). See crt_strchr above for the fuller evidence
+ * writeup; independently confirmed by a second-opinion review pass
+ * (2026-09-01). */
 char *strrchr(const char *str, int c)
 {
   const char *last;
@@ -481,27 +598,77 @@ char *strrchr(const char *str, int c)
 
 /* crt_strstr (0x1d9690) — provided here since it is internal to the original
  * LIBCMT and not exported from the XBE import table. Behaviorally equivalent
- * to the standard strstr. */
+ * to the standard strstr.
+ *
+ * structural_cap: hand_asm. Confirmed hand-written MASM (see crt_strchr
+ * above for the full evidence writeup). The single-char-needle fast path
+ * tail-jumps (JMP 0x1d95d6) directly into crt_strchr's body, reusing the
+ * caller's exact stack frame — reproduced here as a genuine C function call
+ * to crt_strchr(), which is an unavoidable, accepted divergence from the
+ * reference shape. VC71 ceiling 50.8% as of this writing. Independently
+ * confirmed by a second-opinion review pass (2026-09-01). */
 char *crt_strstr(const char *haystack, const char *needle)
 {
-  const char *h;
-  const char *n;
-  const char *start;
+  const char *n;      /* needle cursor, advances by 2 per accepted pair */
+  const char *anchor; /* last accepted match-start candidate */
+  const char *scan;   /* haystack scan cursor */
+  char c0, c1;         /* needle[0], needle[1] (constant) */
+  char a, b;           /* scratch */
 
-  if (*needle == '\0')
-    return (char *)haystack;
+  n = needle;
+  c0 = *n;
+  anchor = (char *)haystack;
+  if (c0 == '\0')
+    return (char *)anchor;
 
-  for (start = haystack; *start != '\0'; start++) {
-    h = start;
+  c1 = n[1];
+  if (c1 == '\0')
+    return crt_strchr(anchor, c0);
+
+  for (;;) {
+    scan = anchor;
     n = needle;
-    while (*h != '\0' && *n != '\0' && *h == *n) {
-      h++;
-      n++;
+    a = *anchor;
+    scan++;
+    if (a == c0)
+      goto matched_first;
+    if (a == '\0')
+      return NULL;
+
+    for (;;) {
+      a = *scan;
+      scan++;
+find_first_test:
+      if (a == c0)
+        goto matched_first;
+      if (a == '\0')
+        return NULL;
     }
-    if (*n == '\0')
-      return (char *)start;
+
+matched_first:
+    a = *scan;
+    scan++;
+    if (a != c1)
+      goto find_first_test;
+    anchor = (char *)(scan - 1);
+
+    for (;;) {
+      b = n[2];
+      if (b == '\0')
+        return (char *)(anchor - 1);
+      a = *scan;
+      scan += 2;
+      if (a != b)
+        break;
+      b = n[3];
+      if (b == '\0')
+        return (char *)(anchor - 1);
+      a = scan[-1];
+      n += 2;
+      if (a != b)
+        break;
+    }
   }
-  return NULL;
 }
 
 /* fabs and __chkstk are clang-build-only helpers using GCC-style inline asm /

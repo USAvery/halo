@@ -1004,10 +1004,17 @@ def compile_vc71(source: Path, output: Path, regcall_elide: bool = False, opt: s
     src_inc = wsl_to_win(REPO_ROOT / "src")
     tp_xbox_inc = wsl_to_win(REPO_ROOT / "third_party" / "xbox")
 
+    opt_flags = opt.split()
+    # /Oy- (keep frame pointer) is the default -- matches the production clang
+    # build's -fno-omit-frame-pointer requirement (see CMakeLists.txt). A
+    # per-function override that explicitly requests /Oy (omit frame pointer)
+    # must win instead of being silently overridden by a trailing /Oy-.
+    frame_flag = ["/Oy-"] if "/Oy" not in opt_flags else []
+
     cmd = [
         VC71_CL_WSL,
         "/nologo", "/c", "/TC",
-        *opt.split(), "/Oy-", "/GF", "/Gy", "/Gd",
+        *opt_flags, *frame_flag, "/GF", "/Gy", "/Gd",
         "/W0", "/Zl", "/X",
         "/DMSVC", "/DXDK_BUILD", "/DHDATA=",
         f"/FI{fi_win}",
@@ -1474,6 +1481,11 @@ _PER_FUNCTION_OPT: dict[str, dict[str, str]] = {
     # struct-copy temps to EBP slots before overwriting 3 of them with the
     # RGB constants -- classic /Od codegen. 65.1% (/O2) -> 82.4% (/Od).
     "halo/interface/ui_widget.c": {"get_ui_argb_white": "/Od"},
+    # crt_tolower/crt_toupper: reference has NO EBP frame at all (leaf CRT
+    # helper); default /Oy- forces one. crt_localtime in the same TU scores
+    # 100% at /Oy- so this must stay per-function, not a TU-wide flip.
+    # 83.7% (/O1 /Oy-) -> ~90% (/O1 /Oy).
+    "cseries/xbox_crt.c": {"crt_tolower": "/O1 /Oy", "crt_toupper": "/O1 /Oy"},
 }
 
 

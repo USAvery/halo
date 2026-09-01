@@ -1713,7 +1713,8 @@
     },
     {
      "addr": "0x1e153d",
-     "decl": "void FUN_001e153d(void);"
+     "decl": "int __isctype(int c, int mask);",
+     "name": "__isctype"
     },
     {
      "addr": "0x1e155e",
