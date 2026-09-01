@@ -140,7 +140,7 @@ void path_state_new(void *param_1, void *param_2, void *param_3)
   *(void **)((char *)param_2 + 0x64) = scenario_get();
   /* Copy 0x48 bytes from param_1 into param_2 at offset 0 (MOVSD.REP ECX=0x12)
    */
-  csmemcpy(param_2, param_1, 0x48);
+  qmemcpy(param_2, param_1, 0x48);
   *(void **)((char *)param_2 + 0x48) = param_3;
   return;
 }
@@ -747,13 +747,8 @@ char FUN_0005ff70(unsigned int *param_1)
     }
   }
   if (*(unsigned int *)((char *)param_1 + 0x48) != 0) {
-    puVar4 = param_1;
-    puVar5 = (unsigned int *)(*(unsigned int *)((char *)param_1 + 0x48) + 0x14);
-    for (iVar3 = 0x5023; iVar3 != 0; iVar3 = iVar3 - 1) {
-      *puVar5 = *puVar4;
-      puVar4 = puVar4 + 1;
-      puVar5 = puVar5 + 1;
-    }
+    qmemcpy((char *)(*(unsigned int *)((char *)param_1 + 0x48) + 0x14),
+            param_1, 0x1408c);
     uVar2 = global_structure_bsp_index_get();
     *(short *)(*(unsigned int *)((char *)param_1 + 0x48) + 0xe) = uVar2;
     if (*(short *)(*(unsigned int *)((char *)param_1 + 0x48) + 0x10) == 0) {

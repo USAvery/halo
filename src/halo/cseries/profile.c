@@ -356,13 +356,13 @@ void FUN_000907c0(char *substring /* @<edi> */, unsigned char active)
         int offset = (int)name - (int)p;
 
         do {
-          if (c != p[offset]) {
+          if (*p != p[offset]) {
             matched = 0;
             break;
           }
           c = p[1];
           p = p + 1;
-        } while (c != '\0');
+        } while (*p != '\0');
       }
     } else {
       matched = (crt_strstr(name, substring) != NULL);
