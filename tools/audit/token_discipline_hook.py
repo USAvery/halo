@@ -107,9 +107,16 @@ def _prune_state_dir() -> None:
 def _save_state(session_id: str, state: dict) -> None:
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     p = _state_path(session_id)
-    tmp = p.with_suffix(".tmp")
-    tmp.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
-    tmp.replace(p)
+    # Per-process tmp name: concurrent hook invocations for the same session
+    # (parallel tool calls fire this hook concurrently) must not share a tmp
+    # path, or one process's replace() can race ahead of another's, leaving
+    # the second replace() targeting an already-renamed-away tmp file.
+    tmp = p.with_name(f"{p.name}.{os.getpid()}.tmp")
+    try:
+        tmp.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+        tmp.replace(p)
+    except OSError:
+        tmp.unlink(missing_ok=True)
     _prune_state_dir()
 
 
