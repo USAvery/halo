@@ -5,13 +5,17 @@
  * XBE source: c:\halo\SOURCE\interface\progress_bar.c
  *
  * Re-implemented functions (by XBE address, ascending):
+ *   0xe19c0  tgaLoad
  *   0xe1c70  progress_bar_initialize
  *   0xe1c80  progress_bar_dispose
  *   0xe1c90  progress_bar_begin
  *   0xe1cc0  progress_bar_end
  *   0xe1ce0  ui_automation_is_active
  *   0xe1db0  progress_bar_compute_screen_rect
+ *   0xe1f00  FUN_000e1f00
+ *   0xe1f20  FUN_000e1f20
  *   0xe2040  progress_bar_draw_fullscreen_overlay
+ *   0xe2470  SetTextureStageStateSmart
  *   0xe24e0  progress_bar_decode_texture
  *   0xe2580  progress_bar_generate_gradient_texture
  *   0xe26c0  progress_bar_draw_loading_bar
@@ -46,6 +50,26 @@ static float *progress_bar_start_progress(void)
 static char *progress_bar_rendering_enabled(void)
 {
   return (char *)0x30f030;
+}
+
+/*
+ * tgaLoad @ 0xe19c0 — dead D3D8 inline-wrapper instantiation of
+ * IDirect3DDevice8::CreateTexture: format/pool/ppTexture arrive in
+ * EDX/ECX/EAX, the device argument (s1) is ignored, width/height/levels/
+ * usage (s2-s5) are on the stack. EAX passes through from the callee (no
+ * explicit return). No callers found (xrefs_to empty); RET 0x14. Duplicate
+ * template instantiation of FUN_00155380 (rasterizer_xbox.c) and
+ * FUN_00168230 (rasterizer_xbox_hardware_bitmaps.c) — same body, same
+ * @<reg> assignment, confirmed against those two already-ported instances.
+ * The kb.json name "tgaLoad" predates this lift; nothing in the
+ * disassembly performs TGA decoding, so the name is not evidence of
+ * different behavior — only the CreateTexture forwarding is implemented.
+ */
+/* 0xe19c0 */
+void tgaLoad(int r1, int r2, int r3, int s1, int s2, int s3, int s4, int s5)
+{
+  (void)s1;
+  D3DDevice_CreateTexture(s2, s3, s4, s5, r3, r2, (void *)r1);
 }
 
 /* progress_bar_initialize — no-op stub. */
@@ -162,6 +186,63 @@ void progress_bar_compute_screen_rect(float *input_rect, float *output_rect)
 }
 
 /*
+ * FUN_000e1f00 @ 0xe1f00 — dead D3D8 inline-wrapper instantiation of
+ * IDirect3DDevice8::SetVertexData2f, byte-identical instruction-for-
+ * instruction to the already-ported FUN_0016de60 (0x16de60), FUN_001703f0
+ * (0x1703f0), FUN_00172650 (0x172650), and their other siblings in
+ * rasterizer.c: push ebp/mov ebp,esp; mov eax,[ebp+0x10]; mov ecx,[ebp+0xc];
+ * push eax; push ecx; push edx; call 0x1ed280 (D3DDevice_SetVertexData2f,
+ * __stdcall); xor eax,eax; pop ebp; ret 0xc. No callers found
+ * (xrefs_to empty).
+ *
+ * RET 0xc => __stdcall with three stack args at +8/+0xc/+0x10. The first
+ * (+8, the device pointer of the inline member instantiation) is never
+ * read; it stays in the signature so the callee-cleans immediate is
+ * correct. PUSH EDX at 0xe1f0b with no prior write to EDX anywhere in the
+ * function => the D3D register index is an implicit register input,
+ * @<edx> in kb.json, not a stack slot. XOR EAX,EAX => returns S_OK.
+ * Both floats are forwarded as raw dwords through EAX/ECX with no
+ * FLD/FSTP, a pure bit passthrough, so they are typed `float`, matching
+ * the callee's kb.json declaration.
+ *
+ * Argument order into the callee is from the push sequence — last push is
+ * the first argument — so SetVertexData2f(reg, a, b) with a=[EBP+0xc],
+ * b=[EBP+0x10].
+ *
+ * The C impl is cdecl, not __stdcall, even though kb.json records the
+ * original as __stdcall: knowledge.py strips the convention from any
+ * @<reg> declaration when generating decl.h, because the generated thunk
+ * presents a cdecl interface to C, and patch.py's reverse thunk restores
+ * the original RET 0xc contract for the original callers.
+ */
+int FUN_000e1f00(void *device, uint32_t reg, float a, float b)
+{
+  (void)device;
+  D3DDevice_SetVertexData2f(reg, a, b);
+  return 0;
+}
+
+/*
+ * FUN_000e1f20 @ 0xe1f20 — dead D3D8 inline-wrapper instantiation of
+ * IDirect3DDevice8::SetVertexData4f, same template as the already-ported
+ * FUN_0016de80 (rasterizer.c): reg/a/b/c/d arrive in ECX/EAX/EDX/ECX/EAX,
+ * the device argument ([ebp+0x8]) is never read, RET 0x18 (six stack
+ * dwords) so this is __stdcall, and XOR EAX,EAX before the epilogue is a
+ * real `return 0`. No callers found (xrefs_to empty).
+ * Push order confirms callee(reg, a, b, c, d):
+ *   PUSH [ebp+0x1c] (d), PUSH [ebp+0x18] (c), PUSH [ebp+0x14] (b),
+ *   PUSH [ebp+0x10] (a), PUSH [ebp+0xc] (reg) — last pushed is first arg.
+ */
+/* 0xe1f20 */
+int __stdcall FUN_000e1f20(void *device, uint32_t reg, float a, float b,
+                           float c, float d)
+{
+  (void)device;
+  D3DDevice_SetVertexData4f(reg, a, b, c, d);
+  return 0;
+}
+
+/*
  * progress_bar_set_quad_texcoords — emit texture coordinates for all four
  * texture stages of a single quad vertex, offset by a 0.1 texel margin.
  *
@@ -230,6 +311,114 @@ void progress_bar_draw_fullscreen_overlay(float x, float y, float alpha)
   D3DDevice_SetVertexData4f(0xffffffff, x0, y1, 0.5f, 1.0f);
 
   D3DDevice_End();
+}
+
+/*
+ * FUN_000e21b0 — thin register-arg forwarding wrapper for D3DTexture_LockRect.
+ *
+ * Sibling of the (untracked) EAX/ECX/EDX-forwarding wrapper at 0xe21a0 that
+ * forwards straight into D3DTexture_GetLevelDesc (0x1edc10, cited in the
+ * progress_bar_decode_texture comment below) — same shape, one D3D call
+ * later in the object.
+ *
+ * Confirmed by disassembly: PUSH EBP/MOV EBP,ESP; PUSH EAX/PUSH ECX/PUSH EDX
+ * (entry-time register values, unmodified) interleaved with MOV EAX,[EBP+0xC]
+ * and MOV ECX,[EBP+8] (stack args), then PUSH EAX/PUSH ECX (the stack args)
+ * before CALL 0x1edc70 (D3DTexture_LockRect). Five dwords land on the stack
+ * for the call, matching D3DTexture_LockRect's "ret 0x14" (5 stack params);
+ * "ret 8" here cleans only this wrapper's own 2 stack params, confirming the
+ * other 3 are register-passed. Push order (right-to-left) maps: last-pushed
+ * stack arg (ECX@[EBP+8]) = texture, prior stack arg (EAX@[EBP+0xC]) = level,
+ * then entry EDX = locked_rect, entry ECX = rect, entry EAX = flags — matching
+ * D3DTexture_LockRect(texture, level, locked_rect, rect, flags) order exactly.
+ * XOR EAX,EAX before RET is dead (function is void; return value unused).
+ */
+/* 0xe21b0 */
+void FUN_000e21b0(unsigned int flags, void *rect, void *locked_rect,
+                  void *texture, unsigned int level)
+{
+  D3DTexture_LockRect(texture, level, locked_rect, rect, flags);
+}
+
+/*
+ * D3DXMatrixIdentity — set a 4x4 matrix (row-major, pout[row*4+col]) to the
+ * identity matrix. Leaf function, no CALLs, single stack arg (no register
+ * args): disassembly at 0xe21e0-0xe221e (62 bytes) loads pout from [ebp+8]
+ * and never overwrites EAX afterward, so EAX==pout at RET (D3DXMATRIX*
+ * return, matches the D3DX8 SDK signature).
+ *
+ * Confirmed store order from disassembly reproduces the D3DX8 SDK source's
+ * chained-assignment shape exactly: 12 off-diagonal cells zeroed in ascending
+ * index order (1,2,3,4,6,7,8,9,11,12,13,14 — rightmost stores first under
+ * right-associative chained assignment, giving store order 14..1, which is
+ * what the bytes show), then the 4 diagonal cells set to 1.0f in ascending
+ * order (0,5,10,15 — store order 15,10,5,0). The diagonal's zero-stores from
+ * a naive 16-cell chain are dead (immediately overwritten by the second
+ * statement) and are absent from the disassembly — the compiler elided them,
+ * leaving 12+4 stores instead of 16+4.
+ */
+/* 0xe21e0 */
+float *D3DXMatrixIdentity(float *pout)
+{
+  pout[1] = pout[2] = pout[3] = pout[4] = pout[6] = pout[7] = pout[8] =
+    pout[9] = pout[11] = pout[12] = pout[13] = pout[14] = 0.0f;
+
+  pout[0] = pout[5] = pout[10] = pout[15] = 1.0f;
+
+  return pout;
+}
+
+/*
+ * SetTextureStageStateSmart — dispatches a D3DTEXTURESTAGESTATETYPE token to
+ * the matching per-state wrapper instead of a single opaque
+ * SetTextureStageState call, so the Xbox implementation can special-case the
+ * few states whose real storage/args differ from the generic path.
+ *
+ * Disassembly (0xe2470-0xe24d9), verified instruction-by-instruction:
+ *   CMP EDX,0x16 ; JGE - state<0x16 loads ECX=stage, pushes value, falls into
+ *     D3DDevice_SetTextureStageState(stage@ECX, state@EDX, value stack arg)
+ *     unmodified (0x1e9410, kb-existing @<ecx>/@<edx>).
+ *   CMP EDX,0x1c ; JNZ - state==0x1c: PUSH value; PUSH stage; CALL 0x1e9ae0
+ *     (RET 0x8, 2 plain stack args, no register args) ->
+ *     D3DDevice_SetTextureState_TexCoordIndex(stage, value).
+ *   CMP EDX,0x1d ; JNZ - state==0x1d: PUSH value; PUSH stage; CALL 0x1e9c20
+ *     (kb-existing, 2 stack args) -> D3DDevice_SetTextureState_BorderColor
+ *     (stage, value).
+ *   CMP EDX,0x1e ; JNZ - state==0x1e: PUSH value; PUSH stage; CALL 0x1e9c60
+ *     (RET 0x8, 2 plain stack args) ->
+ *     D3DDevice_SetTextureState_ColorKeyColor(stage, value).
+ *   CMP EDX,0x1b ; JG-skip - reached only for state in [0x16,0x1b] (0x1c-0x1e
+ *     already handled/returned above): PUSH value; PUSH state(original EDX);
+ *     reload EDX=stage; PUSH stage; CALL 0x1e9bc0 (RET 0xc, 3 plain stack
+ *     args) -> D3DDevice_SetTextureState_BumpEnv(stage, state, value). Last
+ *     pushed = first arg in each call, confirmed per push instruction (not
+ *     assumed from callee naming).
+ * Every branch after the first returns immediately (POP EBP; RET); the
+ * BumpEnv branch is the function's final statement, matching the original's
+ * fall-through-to-epilogue with no branch after it.
+ */
+/* 0xe2470 */
+void SetTextureStageStateSmart(int stage, int state, int value)
+{
+  if (state < 0x16) {
+    D3DDevice_SetTextureStageState(stage, state, value);
+    return;
+  }
+  if (state == 0x1c) {
+    D3DDevice_SetTextureState_TexCoordIndex(stage, value);
+    return;
+  }
+  if (state == 0x1d) {
+    D3DDevice_SetTextureState_BorderColor(stage, value);
+    return;
+  }
+  if (state == 0x1e) {
+    D3DDevice_SetTextureState_ColorKeyColor(stage, value);
+    return;
+  }
+  if (state <= 0x1b) {
+    D3DDevice_SetTextureState_BumpEnv(stage, state, value);
+  }
 }
 
 /*

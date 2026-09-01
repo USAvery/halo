@@ -9951,7 +9951,7 @@
     },
     {
      "addr": "0x1c0d50",
-     "decl": "void FUN_001c0d50(void);"
+     "decl": "void FUN_001c0d50(int, int *, int *, int);"
     },
     {
      "addr": "0x1c0d70",
@@ -14646,7 +14646,8 @@
     },
     {
      "addr": "0x1258a0",
-     "decl": "void network_game_client_add_player(void);"
+     "decl": "bool network_game_client_add_player(void *client, uint16_t player_index);",
+     "name": "network_game_client_add_player"
     },
     {
      "addr": "0x125a90",
@@ -20023,7 +20024,8 @@
     },
     {
      "addr": "0xe19c0",
-     "decl": "void tgaLoad(void);"
+     "decl": "void tgaLoad(int r1@<eax>, int r2@<ecx>, int r3@<edx>, int s1, int s2, int s3, int s4, int s5);",
+     "ported": true
     },
     {
      "addr": "0xe1a10",
@@ -20035,11 +20037,15 @@
     },
     {
      "addr": "0xe1f00",
-     "decl": "void FUN_000e1f00(void);"
+     "decl": "int __stdcall FUN_000e1f00(void *device, uint32_t reg@<edx>, float a, float b);",
+     "ported": true,
+     "source_path": "src/halo/interface/progress_bar.c"
     },
     {
      "addr": "0xe1f20",
-     "decl": "void FUN_000e1f20(void);"
+     "decl": "int __stdcall FUN_000e1f20(void *device, uint32_t reg, float a, float b, float c, float d);",
+     "ported": true,
+     "source_path": "src/halo/interface/progress_bar.c"
     },
     {
      "addr": "0xe2170",
@@ -20047,11 +20053,13 @@
     },
     {
      "addr": "0xe21b0",
-     "decl": "void FUN_000e21b0(void);"
+     "decl": "void FUN_000e21b0(unsigned int flags@<eax>, void *rect@<ecx>, void *locked_rect@<edx>, void *texture, unsigned int level);",
+     "ported": true
     },
     {
      "addr": "0xe21e0",
-     "decl": "void D3DXMatrixIdentity(void);"
+     "decl": "float *D3DXMatrixIdentity(float *pout);",
+     "ported": true
     },
     {
      "addr": "0xe2220",
@@ -20059,7 +20067,8 @@
     },
     {
      "addr": "0xe2470",
-     "decl": "void SetTextureStageStateSmart(int stage, int state, int value);"
+     "decl": "void SetTextureStageStateSmart(int stage, int state, int value);",
+     "ported": true
     },
     {
      "addr": "0xe2650",
@@ -22838,7 +22847,8 @@
     },
     {
      "addr": "0x184e50",
-     "decl": "void *rendered_cluster_get(int rendered_cluster_index);"
+     "decl": "void *rendered_cluster_get(int rendered_cluster_index);",
+     "ported": true
     },
     {
      "addr": "0x184ea0",
@@ -23207,7 +23217,7 @@
     },
     {
      "addr": "0x1c26b0",
-     "decl": "void FUN_001c26b0(void);"
+     "decl": "void FUN_001c26b0(int, int *, int *);"
     },
     {
      "addr": "0x1c26f0",
@@ -23252,7 +23262,7 @@
     },
     {
      "addr": "0x1c2b20",
-     "decl": "void saved_game_perform_file_system_checks(void);"
+     "decl": "int16_t saved_game_perform_file_system_checks(void);"
     },
     {
      "addr": "0x1c2bf0",
@@ -23280,7 +23290,7 @@
     },
     {
      "addr": "0x1c3080",
-     "decl": "void saved_game_file_retrieve_last_used_multiplayer_map(void);"
+     "decl": "bool saved_game_file_retrieve_last_used_multiplayer_map(char *map_name);"
     },
     {
      "addr": "0x1c3160",
@@ -26471,7 +26481,9 @@
     },
     {
      "addr": "0xe3cb0",
-     "decl": "void widget_instance_count_children(void);"
+     "decl": "int widget_instance_count_children(void *widget);",
+     "name": "widget_instance_count_children",
+     "ported": true
     },
     {
      "addr": "0xe3cd0",
@@ -26515,7 +26527,7 @@
     {
      "addr": "0xe4310",
      "decl": "void *ui_widget_get_last_child(void *widget);",
-     "ported": false
+     "ported": true
     },
     {
      "addr": "0xe4330",
@@ -26523,7 +26535,9 @@
     },
     {
      "addr": "0xe4370",
-     "decl": "void widget_instance_set_visibility_recursive(void);"
+     "decl": "void widget_instance_set_visibility_recursive(void *widget, bool visible);",
+     "name": "widget_instance_set_visibility_recursive",
+     "ported": true
     },
     {
      "addr": "0xe43d0",
@@ -26565,7 +26579,8 @@
     },
     {
      "addr": "0xe4590",
-     "decl": "void display_error_abort_to_dashboard_deferred(void);"
+     "decl": "void display_error_abort_to_dashboard_deferred(int16_t error_handle, uint8_t allow_abort);",
+     "ported": true
     },
     {
      "addr": "0xe45d0",
@@ -26617,7 +26632,8 @@
     },
     {
      "addr": "0xe4980",
-     "decl": "void FUN_000e4980(void);"
+     "decl": "bool FUN_000e4980(void *widget@<eax>);",
+     "ported": true
     },
     {
      "addr": "0xe4a40",
@@ -26625,7 +26641,8 @@
     },
     {
      "addr": "0xe4a80",
-     "decl": "void FUN_000e4a80(void);"
+     "decl": "int16_t FUN_000e4a80(const wchar_t *name@<ebx>);",
+     "ported": true
     },
     {
      "addr": "0xe4ad0",
@@ -26633,7 +26650,8 @@
     },
     {
      "addr": "0xe4c70",
-     "decl": "void FUN_000e4c70(void);"
+     "decl": "void FUN_000e4c70(short *dst_rect @<ebx>, void *text, short *src_rect @<edi>);",
+     "ported": true
     },
     {
      "addr": "0xe4ce0",
@@ -26641,7 +26659,8 @@
     },
     {
      "addr": "0xe4d40",
-     "decl": "void FUN_000e4d40(void);"
+     "decl": "bool FUN_000e4d40(int16_t local_player_index@<eax>);",
+     "ported": true
     },
     {
      "addr": "0xe4da0",
@@ -26682,11 +26701,13 @@
     },
     {
      "addr": "0xe5530",
-     "decl": "float *get_ui_argb_white(float *out_color);"
+     "decl": "float *get_ui_argb_white(float *out_color);",
+     "ported": true
     },
     {
      "addr": "0xe5590",
-     "decl": "void FUN_000e5590(void);"
+     "decl": "void __stdcall FUN_000e5590(int param_1);",
+     "ported": true
     },
     {
      "addr": "0xe55e0",
@@ -26708,7 +26729,8 @@
     },
     {
      "addr": "0xe59e0",
-     "decl": "void ui_widgets_pop_stack(int16_t local_player_index);"
+     "decl": "void ui_widgets_pop_stack(int16_t local_player_index);",
+     "ported": true
     },
     {
      "addr": "0xe5a40",
@@ -26717,7 +26739,8 @@
     },
     {
      "addr": "0xe5ab0",
-     "decl": "void ui_play_audio_feedback_sound(int sound_selector);"
+     "decl": "void ui_play_audio_feedback_sound(short sound_selector);",
+     "ported": true
     },
     {
      "addr": "0xe5b10",
@@ -26773,11 +26796,14 @@
     },
     {
      "addr": "0xe73c0",
-     "decl": "void FUN_000e73c0(void);"
+     "decl": "void FUN_000e73c0(int widget, viewport_bounds_t *bounds, int arg3, int arg4, int arg5);"
     },
     {
      "addr": "0xe76b0",
-     "decl": "void FUN_000e76b0(void);"
+     "decl": "void FUN_000e76b0(int widget, int param_2, viewport_bounds_t *bounds, int param_4, int param_5);",
+     "ported": true,
+     "name": "FUN_000e76b0",
+     "source_path": "src/halo/interface/ui_widget.c"
     },
     {
      "addr": "0xe7760",
@@ -26861,7 +26887,8 @@
     },
     {
      "addr": "0xe9cb0",
-     "decl": "bool ui_widget_join_controller_to_multiplayer_game(void *widget, void *event_data, bool *widget_deleted);"
+     "decl": "bool ui_widget_join_controller_to_multiplayer_game(void *widget, void *event_data, bool *widget_deleted);",
+     "ported": true
     },
     {
      "addr": "0xe9d40",
@@ -26883,7 +26910,8 @@
     },
     {
      "addr": "0xea100",
-     "decl": "void FUN_000ea100(void);"
+     "decl": "bool ui_widget_multiplayer_level_list_initialize(void *widget, void *event_data, bool *widget_deleted);",
+     "ported": true
     },
     {
      "addr": "0xea1f0",
@@ -26912,7 +26940,8 @@
     },
     {
      "addr": "0xea900",
-     "decl": "void FUN_000ea900(void);"
+     "decl": "bool FUN_000ea900(void *widget, void *event_data, bool *widget_deleted);",
+     "ported": true
     },
     {
      "addr": "0xeaa10",
@@ -27854,9 +27883,9 @@
      "ported": false
     },
     {
-      "addr": "0x1a2290",
-      "decl": "char FUN_001a2290(int unit_handle@<edi>);",
-      "ported": true
+     "addr": "0x1a2290",
+     "decl": "char FUN_001a2290(int unit_handle@<edi>);",
+     "ported": true
     },
     {
      "addr": "0x1a2440",
@@ -39742,11 +39771,11 @@
     },
     {
      "addr": "0x001e9bc0",
-     "decl": "void D3DDevice_SetTextureState_BumpEnv(void);"
+     "decl": "void __stdcall D3DDevice_SetTextureState_BumpEnv(uint32_t stage, uint32_t state, uint32_t value);"
     },
     {
      "addr": "0x001e9c60",
-     "decl": "void D3DDevice_SetTextureState_ColorKeyColor(void);"
+     "decl": "void __stdcall D3DDevice_SetTextureState_ColorKeyColor(uint32_t stage, uint32_t value);"
     },
     {
      "addr": "0x001e9cb0",
