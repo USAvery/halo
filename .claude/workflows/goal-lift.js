@@ -570,6 +570,13 @@ STEPS:
 
 2. CALLEE PREP — for any callee with has_reg_args=true and in_kb=false:
    add to kb.json with @<reg> + update tools/kb_reg_baseline.json.
+   BEFORE writing any fresh blocker analysis for an un-registerable callee
+   (or skipping this target over one), run:
+     rtk python3 tools/lift/park.py followups --check <callee addr>
+   If it returns an entry, that callee's blocker is ALREADY diagnosed — cite
+   the entry's action in ONE line as your skip_reason instead of re-deriving
+   the ABI analysis (repeat analyses of the same callee have burned 100+
+   agent passes; the queue is the single source of truth).
 
 3. IMPLEMENT — C89 in ${brief.source_path} at address-ordered position.
    Rules: C89 only, no inline ASM, preserve control flow + side-effect order.
@@ -1378,7 +1385,11 @@ rtk python3 tools/verify/vc71_verify.py ${refreshSrc} -f ${rec.name} --no-cache 
 
 | function | addr | was% | now% | action | reason |
 |---|---|---|---|---|---|
-${improved.map(r => `| ${r.name} | ${r.addr || '-'} | ${r.best_score ?? '-'} | ${r.vc71_score ?? '-'} | ${r.status} | ${r.reason || ''} |`).join('\n')}`,
+${improved.map(r => `| ${r.name} | ${r.addr || '-'} | ${r.best_score ?? '-'} | ${r.vc71_score ?? '-'} | ${r.status} | ${r.reason || ''} |`).join('\n')}
+
+Then regenerate the actionable-unblock queue:
+rtk python3 tools/lift/park.py followups --write --limit 50
+Report its "wrote N follow-up(s)" line.`,
     { label: 'improve-log', phase: 'Report', ...M.mechanical })
 
   phaseTokens.improve = Math.max(0, budget.spent() - runTokenStart)
@@ -2016,7 +2027,12 @@ await agent(
 
 | function | addr | obj | vc71 | action | reason |
 |---|---|---|---|---|---|
-${measuredResults.map(r => `| ${r.name} | ${r.addr} | ${r.obj || '-'} | ${r.vc71_score ?? '-'} | ${r.status} | ${r.reason || ''} [cohort=${r.retrieval_cohort}] |`).join('\n')}`,
+${measuredResults.map(r => `| ${r.name} | ${r.addr} | ${r.obj || '-'} | ${r.vc71_score ?? '-'} | ${r.status} | ${r.reason || ''} [cohort=${r.retrieval_cohort}] |`).join('\n')}
+
+Then regenerate the actionable-unblock queue from this run's park/skip reasons
+(dedupes callee-ABI blockers and untried score levers across all runs):
+rtk python3 tools/lift/park.py followups --write --limit 50
+Report its "wrote N follow-up(s)" line.`,
   { label: 'progress-log', phase: 'Report', ...M.mechanical }
 )
 

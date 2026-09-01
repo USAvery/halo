@@ -7747,3 +7747,15 @@ AUTOLIFT_REVIEW: NEEDS_RUNTIME |
 | FUN_000a55e0 | 0xa55e0 | cheats.obj | 0 | parked | below_65pct [cohort=retrieval] |
 
 **Summary:** 9/12 committed (stop_on_fail_reached); 2 build_failed (disk-full/infra: G: drive 100% full at 0 bytes, OSError EIO on write); 4 parked (0%, 0%, 0%, 0% scores — all below 65% gate); 8 skipped (6 repeated attempts below 90%, 2 reg-args).
+
+## Goal-lift run — 0/20 committed (stop_on_fail_reached) — 2026-09-01
+
+| function | addr | obj | vc71 | action | reason |
+|---|---|---|---|---|---|
+| FUN_00057330 | 0x57330 | encounters.obj | - | skipped | skip_parked_repeat (2 attempts, best 75.8% < 90 — use the improve pass) [cohort=none] |
+| FUN_00057b40 | 0x57b40 | encounters.obj | - | skipped | skip_reg_args (selector: @reg-defined prologue → sub-bar) [cohort=none] |
+| FUN_00053f40 | 0x53f40 | encounters.obj | - | skipped | skip_parked_repeat (3 attempts, best 83.6% < 90 — use the improve pass) [cohort=none] |
+| encounter_get_actor_starting_location | 0x5c3a0 | encounters.obj | - | skipped | skip_reg_args (selector: @reg-defined prologue → sub-bar) [cohort=none] |
+| encounter_mark_examined_pursuit_position | 0x5b5e0 | encounters.obj | 0 | parked | below_65pct [cohort=retrieval] |
+| FUN_00057380 | 0x57380 | encounters.obj | 81.8 | parked | escalation_exhausted [cohort=retrieval] |
+| FUN_0005c680 | 0x5c680 | encounters.obj | 82.5 | parked | escalation_exhausted [cohort=retrieval] |

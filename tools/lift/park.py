@@ -786,6 +786,167 @@ def cmd_stats(args: argparse.Namespace) -> int:
     return 0
 
 
+# ── follow-up queue (actionable park/skip reasons → executable tasks) ──────────
+#
+# Motivation (2026-09-01): goal_progress.md accumulated 6+ near-identical skip
+# rows for FUN_00057380, each independently re-proving callee 0x57330's
+# register ABI and ending "fix kb.json first" — and FUN_00053f40's park record
+# named its untried score lever verbatim. Nothing consumed either diagnosis:
+# parked/skipped was terminal in practice. This extracts the actionable step
+# out of park/skip reasons into a deduplicated queue so a later pass EXECUTES
+# the unblock instead of re-deriving it.
+
+_FU_CALLEE_RE = re.compile(r"[Cc]allee\s+FUN_0*([0-9a-f]{4,6})")
+_FU_FUN_ADDR_RE = re.compile(r"FUN_0*([0-9a-f]{4,6})")
+_FU_ABI_HINT_RE = re.compile(
+    r"@<reg>|@e?[abcds][ixlh]\b|register argument|REGISTER arg|regparm"
+    r"|annotat\w+ in kb\.json|kb\.json .{0,40}annotat", re.I)
+_FU_LEVER_RE = re.compile(
+    r"STILL UNTRIED|untried lever|escalation pass should start"
+    r"|use the improve pass", re.I)
+_FU_UNBLOCK_RE = re.compile(r"[Uu]nblock path:?\s*(.{1,300})")
+
+
+def classify_followup(text: str) -> Optional[dict]:
+    """Map a park/skip reason to an actionable follow-up, or None.
+
+    Pure function. Returns {kind, blocker_addr, action, snippet}:
+      callee_abi    — a named callee needs its real signature/@<reg> registered
+                      in kb.json before the target can be lifted. blocker_addr
+                      is the CALLEE address (dedup key across many targets).
+      untried_lever — the reason records a specific unexecuted score lever;
+                      route to a targeted optimizer pass.
+      unblock_path  — the reason spells out its own "Unblock path: ..." step.
+    """
+    if not text:
+        return None
+    snippet = " ".join(text.split())[:240]
+    m = _FU_CALLEE_RE.search(text)
+    if m and _FU_ABI_HINT_RE.search(text):
+        addr = f"0x{m.group(1)}"
+        return {"kind": "callee_abi", "blocker_addr": addr,
+                "action": f"Register callee {addr}'s real signature (stack params "
+                          f"+ @<reg> annotations + return type) in kb.json, then "
+                          f"re-queue the blocked target(s).",
+                "snippet": snippet}
+    m = _FU_UNBLOCK_RE.search(text)
+    if m:
+        return {"kind": "unblock_path", "blocker_addr": "",
+                "action": " ".join(m.group(1).split()), "snippet": snippet}
+    if _FU_LEVER_RE.search(text):
+        return {"kind": "untried_lever", "blocker_addr": "",
+                "action": "Run a targeted vc71-match-optimizer pass applying the "
+                          "lever recorded in the reason (see snippet).",
+                "snippet": snippet}
+    return None
+
+
+def _fu_norm(addr: str) -> str:
+    a = (addr or "").strip().lower()
+    if a.startswith("0x"):
+        a = a[2:]
+    return "0x" + a.lstrip("0") if a.lstrip("0") else ""
+
+
+def _fu_add(queue: dict, item: dict, target: dict) -> None:
+    """Merge one classified reason into the dedup queue (in place)."""
+    key = (item["kind"], item["blocker_addr"] or _fu_norm(target.get("addr", ""))
+           or target.get("name", ""))
+    ent = queue.get(key)
+    if ent is None:
+        queue[key] = {
+            "kind": item["kind"], "blocker_addr": item["blocker_addr"],
+            "action": item["action"], "snippet": item["snippet"],
+            "targets": [], "seen_count": 0,
+        }
+        ent = queue[key]
+    ent["seen_count"] += 1
+    tgt = {k: target.get(k, "") for k in ("name", "addr", "obj")}
+    if tgt not in ent["targets"]:
+        ent["targets"].append(tgt)
+    # Latest snippet wins — the newest wording tends to be the most refined.
+    ent["snippet"] = item["snippet"]
+
+
+_FU_PROGRESS_ROW_RE = re.compile(
+    r"^\|\s*(?P<name>[^|]+?)\s*\|\s*(?P<addr>0x[0-9a-fA-F]+)\s*\|\s*(?P<obj>[^|]*?)\s*\|"
+    r"\s*[^|]*\|\s*(?P<status>skipped|parked)\s*\|\s*(?P<reason>.*?)\s*\|\s*$")
+
+
+def followups_from_progress(md_text: str) -> list[tuple[dict, dict]]:
+    """Extract (target, classified) pairs from goal_progress.md table rows."""
+    out = []
+    for line in md_text.splitlines():
+        m = _FU_PROGRESS_ROW_RE.match(line)
+        if not m:
+            continue
+        item = classify_followup(m.group("reason"))
+        if item:
+            # Row names can carry annotations like "x (kb: FUN_...)"; keep short.
+            name = m.group("name").split(" (")[0].strip()
+            out.append(({"name": name, "addr": _fu_norm(m.group("addr")),
+                         "obj": m.group("obj").split(" (")[0].strip()}, item))
+    return out
+
+
+def build_followup_queue(recs: list[dict], progress_text: str = "") -> list[dict]:
+    """Deduplicated, most-repeated-first follow-up queue. Pure function."""
+    queue: dict = {}
+    for rec in recs:
+        if rec.get("status") not in ("parked", "capped_confirmed"):
+            continue
+        target = {"name": rec.get("name", ""), "addr": _fu_norm(rec.get("addr", "")),
+                  "obj": rec.get("obj", "")}
+        for a in rec.get("attempts", []):
+            text = " ".join(filter(None, (a.get("reason"), a.get("cap_hypothesis"),
+                                          a.get("notes"))))
+            item = classify_followup(text)
+            if item:
+                _fu_add(queue, item, target)
+    if progress_text:
+        for target, item in followups_from_progress(progress_text):
+            _fu_add(queue, item, target)
+    return sorted(queue.values(), key=lambda e: (-e["seen_count"], e["kind"]))
+
+
+def cmd_followups(args: argparse.Namespace) -> int:
+    root = repo_root()
+    store = Store(store_base(root, args.parked_dir))
+    progress_text = ""
+    if args.progress:
+        p = Path(args.progress)
+        if not p.is_absolute():
+            p = root / p
+        try:
+            progress_text = p.read_text(errors="replace")
+        except OSError as e:
+            print(f"warning: could not read --progress {p}: {e}", file=sys.stderr)
+    entries = build_followup_queue(store.all(), progress_text)
+    if args.kind:
+        entries = [e for e in entries if e["kind"] == args.kind]
+    if args.obj:
+        entries = [e for e in entries
+                   if any(t.get("obj") == args.obj for t in e["targets"])]
+    if args.check:
+        want = _fu_norm(args.check)
+        entries = [e for e in entries
+                   if e["blocker_addr"] == want
+                   or any(t.get("addr") == want for t in e["targets"])]
+        print(json.dumps(entries, indent=2))
+        return 0 if entries else 1
+    if args.limit:
+        entries = entries[:args.limit]
+    if args.write:
+        store.base.mkdir(parents=True, exist_ok=True)
+        out = store.base / "followups.json"
+        out.write_text(json.dumps(
+            {"generated": _now(), "entries": entries}, indent=2) + "\n")
+        print(f"wrote {len(entries)} follow-up(s) to {out}")
+    if args.json or not args.write:
+        print(json.dumps(entries, indent=2))
+    return 0
+
+
 # ── self-test (no git) ──────────────────────────────────────────────────────────
 
 def _self_test() -> int:
@@ -1027,6 +1188,53 @@ def _self_test() -> int:
     check(view["attempts"][0]["has_notes"] is True and view["attempts"][1]["has_notes"] is False,
           "list view: has_notes reflects which attempts actually had notes")
 
+    # Follow-up extraction: callee-ABI blockers dedupe by CALLEE address.
+    abi_reason = ("Callee FUN_00057330 (0x57330) takes register arguments that "
+                  "are NOT annotated in kb.json: no @<reg> and no stack params.")
+    fu = classify_followup(abi_reason)
+    check(fu is not None and fu["kind"] == "callee_abi"
+          and fu["blocker_addr"] == "0x57330",
+          "followups: callee-ABI reason classified with callee addr")
+    check(classify_followup("mechanical gate: 95.5% clean (pass1)") is None,
+          "followups: a committed/clean reason yields no follow-up")
+    lever = classify_followup("(b) STILL UNTRIED, where an escalation pass "
+                              "should start — sentinel result-local form")
+    check(lever is not None and lever["kind"] == "untried_lever",
+          "followups: untried-lever reason classified")
+    unblock = classify_followup("cannot lift yet. Unblock path: add @esi/@ax "
+                                "annotations plus the 3 stack params first.")
+    check(unblock is not None and unblock["kind"] == "unblock_path"
+          and unblock["action"].startswith("add @esi/@ax"),
+          "followups: explicit unblock path captured as the action")
+
+    recs_fu = [
+        {"name": "FUN_00057380", "addr": "0x57380", "obj": "encounters.obj",
+         "status": "parked",
+         "attempts": [{"reason": abi_reason, "cap_hypothesis": "", "notes": ""}]},
+        {"name": "FUN_00099999", "addr": "0x99999", "obj": "encounters.obj",
+         "status": "parked",
+         "attempts": [{"reason": abi_reason, "cap_hypothesis": "", "notes": ""}]},
+        {"name": "FUN_00012345", "addr": "0x12345", "obj": "x.obj",
+         "status": "promoted",
+         "attempts": [{"reason": abi_reason, "cap_hypothesis": "", "notes": ""}]},
+    ]
+    progress_md = ("| FUN_00057380 | 0x57380 | encounters.obj | - | skipped | "
+                   + abi_reason.replace("|", "/") + " |\n"
+                   "| FUN_00053f40 | 0x53f40 | encounters.obj | - | skipped | "
+                   "skip_parked_repeat (2 attempts, best 83.6% < 90 — use the "
+                   "improve pass) |\n")
+    q = build_followup_queue(recs_fu, progress_md)
+    abi_entries = [e for e in q if e["kind"] == "callee_abi"]
+    check(len(abi_entries) == 1 and abi_entries[0]["blocker_addr"] == "0x57330",
+          "followups: one deduped callee-ABI entry across ledger + progress rows")
+    check(abi_entries[0]["seen_count"] == 3
+          and len(abi_entries[0]["targets"]) == 2,
+          "followups: seen_count counts repeats, targets dedupe (promoted rec skipped)")
+    check(any(e["kind"] == "untried_lever"
+              and e["targets"] == [{"name": "FUN_00053f40", "addr": "0x53f40",
+                                    "obj": "encounters.obj"}] for e in q),
+          "followups: skip_parked_repeat row becomes an untried_lever entry")
+
     return 0 if ok else 1
 
 
@@ -1117,6 +1325,25 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("stats", help="Summary counts")
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_stats)
+
+    p = sub.add_parser("followups",
+                       help="Extract a deduplicated queue of actionable unblock "
+                            "steps from park/skip reasons (callee-ABI fixes, "
+                            "untried score levers, explicit unblock paths)")
+    p.add_argument("--progress", default="artifacts/auto_lift/goal_progress.md",
+                   help="Also mine skip/park rows from this goal-progress "
+                        "markdown (pass '' to use the ledger only)")
+    p.add_argument("--kind", choices=["callee_abi", "untried_lever", "unblock_path"])
+    p.add_argument("--obj", help="Only follow-ups with a target in this object")
+    p.add_argument("--check", metavar="ADDR",
+                   help="Print follow-ups matching this blocker/target address "
+                        "and exit 0 if any exist (1 if none) — run this BEFORE "
+                        "re-deriving a blocker analysis")
+    p.add_argument("--limit", type=int, help="Cap the number of entries printed")
+    p.add_argument("--write", action="store_true",
+                   help="Save the queue to <ledger>/followups.json")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_followups)
     return ap
 
 
