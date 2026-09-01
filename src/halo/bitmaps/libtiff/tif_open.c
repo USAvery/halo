@@ -2130,7 +2130,7 @@ int TIFFGetMode(void *tif)
  */
 int TIFFIsTiled(void *tif)
 {
-  return (((tiff_t *)tif)->field_0a.b & 0x80u) >> 7;
+  return ((tiff_t *)tif)->field_0a.b & 0x80u;
 }
 
 /**

@@ -209,9 +209,9 @@ void FUN_0011c7c0(int cache, int block)
 {
   int size = *(int *)(block + 0xc);
   if ((*(int *)(block + 4) != 0x52626c6b) || (size < 0) ||
-      (*(int *)(cache + 0x2c) <= size) ||
+      (size >= *(int *)(cache + 0x2c)) ||
       (*(unsigned int *)(block + 8) < *(unsigned int *)(cache + 0x24)) ||
-      (*(unsigned int *)(cache + 0x28) < *(unsigned int *)(block + 8) + size)) {
+      (*(unsigned int *)(cache + 0x28) <= *(unsigned int *)(block + 8) + size)) {
     display_assert(csprintf((char *)0x5ab100,
                             "lrar cache %s @%p block @%p appears to be corrupt",
                             cache, cache, block),
@@ -228,8 +228,8 @@ void FUN_0011c7c0(int cache, int block)
 void lruv_update_function_pointers(int cache)
 {
   if ((*(int *)(cache + 0x44) != 0x6c726172) ||
-      (*(unsigned int *)(cache + 0x28) <= *(unsigned int *)(cache + 0x24)) ||
-      (*(int *)(cache + 0x2c) < 1) || (*(short *)(cache + 0x38) < 1)) {
+      (*(unsigned int *)(cache + 0x24) >= *(unsigned int *)(cache + 0x28)) ||
+      (*(int *)(cache + 0x2c) <= 0) || (*(short *)(cache + 0x38) <= 0)) {
     display_assert(csprintf((char *)0x5ab100,
                             "lrar cache %s @%p appears to be corrupt", cache,
                             cache),
@@ -287,7 +287,7 @@ void *lrar_cache_new(const char *name, unsigned int minimum_address,
                    "c:\\halo\\SOURCE\\memory\\lrar_cache.c", 0x67, 1);
     system_exit(-1);
   }
-  if (block_count < 1) {
+  if (block_count <= 0) {
     display_assert("block_count>0", "c:\\halo\\SOURCE\\memory\\lrar_cache.c",
                    0x68, 1);
     system_exit(-1);
@@ -296,27 +296,28 @@ void *lrar_cache_new(const char *name, unsigned int minimum_address,
   if (cache != 0) {
     blocks = debug_malloc((int)block_count << 4, 0,
                           "c:\\halo\\SOURCE\\memory\\lrar_cache.c", 0x6c);
-    if (blocks == 0) {
+    if (blocks != 0) {
+      csmemset(cache, 0, 0x48);
+      csmemset(blocks, 0, (int)block_count << 4);
+      csstrncpy(cache, name, 0x1f);
+      *(unsigned int *)(cache + 0x24) = minimum_address;
+      *(unsigned int *)(cache + 0x28) = maximum_address;
+      *(short *)(cache + 0x22) = boundary_bit;
+      *(unsigned short *)(cache + 0x34) = 0xffff;
+      *(unsigned short *)(cache + 0x36) = 0xffff;
+      *(short *)(cache + 0x20) = alignment_bit;
+      *(void (**)(short *, short))(cache + 0x3c) = lock_proc;
+      *(unsigned char *)(cache + 0x1f) = 0;
+      *(unsigned int *)(cache + 0x2c) = maximum_address - minimum_address;
+      *(void **)(cache + 0x30) = blocks;
+      *(short *)(cache + 0x38) = block_count;
+      *(void (**)(short *))(cache + 0x40) = unlock_proc;
+      *(unsigned int *)(cache + 0x44) = 0x6c726172;
+      lruv_update_function_pointers((int)cache);
+    } else {
       debug_free(cache, "c:\\halo\\SOURCE\\memory\\lrar_cache.c", 0x8a);
-      return 0;
+      cache = 0;
     }
-    csmemset(cache, 0, 0x48);
-    csmemset(blocks, 0, (int)block_count << 4);
-    csstrncpy(cache, name, 0x1f);
-    *(unsigned int *)(cache + 0x24) = minimum_address;
-    *(unsigned int *)(cache + 0x28) = maximum_address;
-    *(short *)(cache + 0x22) = boundary_bit;
-    *(unsigned short *)(cache + 0x34) = 0xffff;
-    *(unsigned short *)(cache + 0x36) = 0xffff;
-    *(short *)(cache + 0x20) = alignment_bit;
-    *(void (**)(short *, short))(cache + 0x3c) = lock_proc;
-    *(unsigned char *)(cache + 0x1f) = 0;
-    *(unsigned int *)(cache + 0x2c) = maximum_address - minimum_address;
-    *(void **)(cache + 0x30) = blocks;
-    *(short *)(cache + 0x38) = block_count;
-    *(void (**)(short *))(cache + 0x40) = unlock_proc;
-    *(unsigned int *)(cache + 0x44) = 0x6c726172;
-    lruv_update_function_pointers((int)cache);
   }
 
   return cache;
@@ -874,16 +875,14 @@ void FUN_0011d2a0(int cache)
   FUN_0011d090(cache);
   entry = *(int **)(cache + 0x34);
   index = 0;
-  if (*(int *)(cache + 0x40) < 1) {
-    *(int *)(cache + 0x40) = 0;
-    return;
+  if (*(int *)(cache + 0x40) > 0) {
+    do {
+      FUN_0011d010(cache, entry);
+      (*(void (**)(int))(cache + 0x30))(*entry);
+      index = index + 1;
+      entry = (int *)((int)entry + *(int *)(cache + 0x24));
+    } while (index < *(int *)(cache + 0x40));
   }
-  do {
-    FUN_0011d010(cache, entry);
-    (*(void (**)(int))(cache + 0x30))(*entry);
-    index = index + 1;
-    entry = (int *)((int)entry + *(int *)(cache + 0x24));
-  } while (index < *(int *)(cache + 0x40));
   *(int *)(cache + 0x40) = 0;
 }
 
@@ -989,9 +988,12 @@ void *FUN_0011d320(int cache, int value)
  */
 void FUN_0011d3f0(int cache, int block)
 {
+  unsigned int *status;
+
+  status = (unsigned int *)(block - 0xc);
   FUN_0011d090(cache);
   FUN_0011d010(cache, (void *)(block - 0x10));
-  *(unsigned int *)(block - 0xc) |= 1;
+  *status |= 1;
 }
 
 /* 0x11d420: lru_cache entry release helper (mirror of FUN_0011d3f0).
@@ -1189,23 +1191,23 @@ void lruv_block_delete(void *cache, int block_index)
   }
 
   /* Unlink from previous neighbor */
-  if (block->previous_block_index == NONE) {
-    assert_halt(c->first_block_index == block_index);
-    c->first_block_index = block->next_block_index;
-  } else {
+  if (block->previous_block_index != NONE) {
     lruv_cache_block_t *prev =
       (lruv_cache_block_t *)datum_get(c->blocks, block->previous_block_index);
     prev->next_block_index = block->next_block_index;
+  } else {
+    assert_halt(c->first_block_index == block_index);
+    c->first_block_index = block->next_block_index;
   }
 
   /* Unlink from next neighbor */
-  if (block->next_block_index == NONE) {
-    assert_halt(c->last_block_index == block_index);
-    c->last_block_index = block->previous_block_index;
-  } else {
+  if (block->next_block_index != NONE) {
     lruv_cache_block_t *next =
       (lruv_cache_block_t *)datum_get(c->blocks, block->next_block_index);
     next->previous_block_index = block->previous_block_index;
+  } else {
+    assert_halt(c->last_block_index == block_index);
+    c->last_block_index = block->previous_block_index;
   }
 
   datum_delete(c->blocks, block_index);

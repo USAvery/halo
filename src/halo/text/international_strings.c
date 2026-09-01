@@ -56,52 +56,55 @@ void set_language_code(short code)
  * as multibyte regardless of the encoding setting. */
 bool unicode_is_multibyte(const uint8_t *p)
 {
-  uint8_t b0 = p[0];
-  uint8_t b1 = p[1];
+  uint8_t b0;
+  uint8_t b1;
+  bool result;
 
-  if (b0 == 0)
-    return 0;
-
-  /* '|' escape-sequence prefix */
-  if (b0 == 0x7c && b1 != 0 && crt_strchr("ibukprlctn", (int)b1) != (char *)0x0)
-    return 1;
-
-  switch (*(int16_t *)0x4d9be0) {
-  case 1: /* Shift-JIS */
-    if (!((b0 >= 0x81 && b0 <= 0x9f) || (b0 >= 0xe0 && b0 <= 0xfe)))
-      return 0;
-    if (b1 < 0x40 || b1 > 0xfc || b1 == 0x7f)
-      return 0;
-    return 1;
-  case 2: /* Big5 */
-    if (b0 < 0xa1 || b0 > 0xfe)
-      return 0;
-    if (b1 < 0xa1 || b1 > 0xfe)
-      return 0;
-    return 1;
-  case 3: /* GBK */
-    if (b0 < 0x81 || b0 > 0xfe)
-      return 0;
-    if ((b1 >= 0x40 && b1 <= 0x7e) || (b1 >= 0xa1 && b1 <= 0xfe))
-      return 1;
-    return 0;
-  case 4: /* Johab-like */
-    if (b0 < 0x81 || b0 > 0xfe)
-      return 0;
-    if ((b1 >= 0x41 && b1 <= 0x5a) || (b1 >= 0x61 && b1 <= 0x7a) ||
-        (b1 >= 0x81 && b1 <= 0xfe))
-      return 1;
-    return 0;
-  case 5: /* Thai-like */
-    if (!((b0 >= 0x84 && b0 <= 0xd3) || (b0 >= 0xd8 && b0 <= 0xde) ||
-          (b0 >= 0xe0 && b0 <= 0xf9)))
-      return 0;
-    if ((b1 >= 0x41 && b1 <= 0x7e) || (b1 >= 0x81 && b1 <= 0xfe))
-      return 1;
-    return 0;
-  default:
-    return 0;
+  b0 = p[0];
+  b1 = p[1];
+  result = 0;
+  if (b0 != 0) {
+    if (b0 == 0x7c && b1 != 0 &&
+        crt_strchr("ibukprlctn", (int)b1) != (char *)0x0) {
+      result = 1;
+    } else {
+      switch (*(int16_t *)0x4d9be0) {
+      case 1:
+        if ((b0 >= 0x81 && b0 <= 0x9f) ||
+            (b0 >= 0xe0 && b0 <= 0xfe)) {
+          if (b1 >= 0x40 && b1 <= 0xfc && b1 != 0x7f)
+            result = 1;
+        }
+        break;
+      case 2:
+        if (b0 >= 0xa1 && b0 <= 0xfe && b1 >= 0xa1 && b1 <= 0xfe)
+          result = 1;
+        break;
+      case 3:
+        if (b0 >= 0x81 && b0 <= 0xfe &&
+            ((b1 >= 0x40 && b1 <= 0x7e) ||
+             (b1 >= 0xa1 && b1 <= 0xfe)))
+          result = 1;
+        break;
+      case 4:
+        if (b0 >= 0x81 && b0 <= 0xfe &&
+            ((b1 >= 0x41 && b1 <= 0x5a) ||
+             (b1 >= 0x61 && b1 <= 0x7a) ||
+             (b1 >= 0x81 && b1 <= 0xfe)))
+          result = 1;
+        break;
+      case 5:
+        if (((b0 >= 0x84 && b0 <= 0xd3) ||
+             (b0 >= 0xd8 && b0 <= 0xde) ||
+             (b0 >= 0xe0 && b0 <= 0xf9)) &&
+            ((b1 >= 0x41 && b1 <= 0x7e) ||
+             (b1 >= 0x81 && b1 <= 0xfe)))
+          result = 1;
+        break;
+      }
+    }
   }
+  return result;
 }
 
 /* 0x19d1b0 — Read the character at *cursor and advance cursor forward.

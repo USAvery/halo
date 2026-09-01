@@ -1666,7 +1666,7 @@ char FUN_00038370(int actor_handle)
 
   /* Target max range check */
   if (prop != 0 &&
-      *(float *)(prop + 0x11c) < *(float *)(firing_variant + 0xa0)) {
+      *(float *)(firing_variant + 0xa0) > *(float *)(prop + 0x11c)) {
     goto exit_1;
   }
 
@@ -3208,7 +3208,7 @@ void *FUN_0003a600(short actor_type /* @<ax> */)
   void **actor_type_definitions = (void **)0x2c86a8;
   char *def;
 
-  if (actor_type < 0 || actor_type > 0xf) {
+  if (actor_type < 0 || actor_type >= 0x10) {
     display_assert("actor_type>=0 && actor_type<NUMBER_OF_ACTOR_TYPES",
                    "c:\\halo\\source\\ai\\actor_type_definitions.h", 0x2e, 1);
     system_exit(-1);
@@ -3229,19 +3229,19 @@ void *FUN_0003a600(short actor_type /* @<ax> */)
                    "c:\\halo\\source\\ai\\actor_type_definitions.h", 0x33, 1);
     system_exit(-1);
   }
-  if (*(short *)(def + 6) > 2) {
+  if (*(short *)(def + 6) >= 3) {
     display_assert("actor_type_definitions[actor_type]->when_to_search_at_"
                    "target < NUMBER_OF_ACTOR_PURSUIT_SETTINGS",
                    "c:\\halo\\source\\ai\\actor_type_definitions.h", 0x35, 1);
     system_exit(-1);
   }
-  if (*(short *)(def + 8) > 2) {
+  if (*(short *)(def + 8) >= 3) {
     display_assert("actor_type_definitions[actor_type]->when_to_pursue < "
                    "NUMBER_OF_ACTOR_PURSUIT_SETTINGS",
                    "c:\\halo\\source\\ai\\actor_type_definitions.h", 0x35, 1);
     system_exit(-1);
   }
-  if (*(short *)(def + 10) > 2) {
+  if (*(short *)(def + 10) >= 3) {
     display_assert("actor_type_definitions[actor_type]->when_to_search_pursuit "
                    "< NUMBER_OF_ACTOR_PURSUIT_SETTINGS",
                    "c:\\halo\\source\\ai\\actor_type_definitions.h", 0x37, 1);
@@ -6040,7 +6040,8 @@ char actor_get_running_blind_vector(int actor_handle, float *vector_out)
  * 0x3cf6e. Confirmed: actor_detach_from_unit(actor_handle) at 0x3cfdb.
  * Confirmed: actor_delete(actor_handle, 1) at 0x3cf92.
  * Confirmed: encounter_update_status(encounter_handle) at 0x3cfa0 if != -1. */
-void actor_kill(int actor_handle, char by_player, char no_delete)
+__declspec(noinline) void actor_kill(int actor_handle, char by_player,
+                                     char no_delete)
 {
   char *actor;
   char *unit;
@@ -6389,7 +6390,7 @@ void actor_handle_unit_effect(int actor_handle, int prop_handle,
 {
   char *actor;
   char *prop;
-  char flag; /* local_1 */
+  volatile char flag; /* local_1 */
 
   actor = (char *)datum_get(actor_data, actor_handle);
   prop = (char *)datum_get(prop_data, prop_handle);
@@ -6407,7 +6408,7 @@ void actor_handle_unit_effect(int actor_handle, int prop_handle,
   }
 
   if (*(int16_t *)(prop + 0x66) == (int16_t)-1 ||
-      unit_effect >= *(int16_t *)(prop + 0x66)) {
+      *(int16_t *)(prop + 0x66) <= unit_effect) {
     *(int16_t *)(prop + 0x66) = unit_effect;
     *(int16_t *)(prop + 0x68) =
       (unit_effect == 3) ? (int16_t)0x96 : (int16_t)0x1e;

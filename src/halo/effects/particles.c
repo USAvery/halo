@@ -8,7 +8,9 @@ int FUN_000a1210(int tag_index, float *position, float *velocity,
   int handle;
   char *datum;
   char local_buf[12];
+  float trans_vel_y;
 
+  trans_vel_y = ((float *)ext_data)[1];
   handle = data_new_at_index(particle_system_header_data);
   if (handle != -1) {
     datum = (char *)datum_get(particle_system_header_data, handle);
@@ -24,7 +26,7 @@ int FUN_000a1210(int tag_index, float *position, float *velocity,
     *(float *)(datum + 0x34) = velocity[2];
 
     *(float *)(datum + 0x38) = ((float *)ext_data)[0];
-    *(float *)(datum + 0x3c) = ((float *)ext_data)[1];
+    *(float *)(datum + 0x3c) = trans_vel_y;
     *(float *)(datum + 0x40) = ((float *)ext_data)[2];
     *(float *)(datum + 0x44) = ((float *)ext_data)[3];
 
@@ -998,7 +1000,7 @@ void particles_update(float delta_time)
     if (render - *(int *)(datum + 0x10) < 0x10) {
       new_lifetime = delta_time + *(float *)(datum + 0x14);
       *(float *)(datum + 0x14) = new_lifetime;
-      if (new_lifetime < *(float *)(datum + 0x18) || just_created ||
+      if (!(new_lifetime >= *(float *)(datum + 0x18)) || just_created ||
           *(int16_t *)(tag + 0x9e) != 0) {
         if (FUN_000a1b60(datum_handle, delta_time))
           FUN_000a1c30(datum_handle, delta_time);
