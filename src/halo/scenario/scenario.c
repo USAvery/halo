@@ -3902,44 +3902,35 @@ void scenario_get_sound_environment(int32_t *out_datum, void **out_env,
 void FUN_0018fb20(float *position, const float *target, float max_delta)
 {
   float delta;
-  float neg_max;
   float clamped;
 
-  neg_max = -max_delta;
-
-  /* Branch polarity matches the original (TEST AH,0x5; JP = `delta <
-   * neg_max` with the jump path taken on >= or unordered): NaN deltas take
-   * the else path and propagate, exactly like the x87 code. */
   delta = target[0] - position[0];
-  if (delta < neg_max) {
-    clamped = neg_max;
+  if (delta < -max_delta) {
+    clamped = -max_delta;
+  } else if (delta > max_delta) {
+    clamped = max_delta;
   } else {
     clamped = delta;
-    if (max_delta < delta) {
-      clamped = max_delta;
-    }
   }
   position[0] = clamped + position[0];
 
   delta = target[1] - position[1];
-  if (delta < neg_max) {
-    clamped = neg_max;
+  if (delta < -max_delta) {
+    clamped = -max_delta;
+  } else if (delta > max_delta) {
+    clamped = max_delta;
   } else {
     clamped = delta;
-    if (max_delta < delta) {
-      clamped = max_delta;
-    }
   }
   position[1] = clamped + position[1];
 
   delta = target[2] - position[2];
-  if (delta < neg_max) {
-    clamped = neg_max;
+  if (delta < -max_delta) {
+    clamped = -max_delta;
+  } else if (delta > max_delta) {
+    clamped = max_delta;
   } else {
     clamped = delta;
-    if (max_delta < delta) {
-      clamped = max_delta;
-    }
   }
   position[2] = clamped + position[2];
 }
