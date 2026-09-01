@@ -43,7 +43,7 @@
 void ai_communication_initialize(void)
 {
   int16_t i;
-  int16_t count;
+  int count;
 
   /* --- count comm dialogue entries (stride 0x28, sentinel = -1 at [0]) */
   count = 0;
@@ -292,23 +292,24 @@ bool FUN_00042d80(int param_1, int param_2, int param_3)
 {
   int prop_index;
   char *prop;
+  char result;
 
   (void)param_2;
 
-  if (param_3 == -1) {
-    return false;
-  }
-  prop_index = FUN_00064b40(param_3, param_1, 1, 1);
-  if (prop_index == -1) {
-    return false;
-  }
-  prop = (char *)datum_get(prop_data, prop_index);
-  if (*(float *)(prop + 0x11c) < *(float *)0x254cc4) {
-    if (*(int16_t *)(prop + 0x38) == 0 || *(int16_t *)(prop + 0x38) == 1) {
-      return true;
+  result = 0;
+  if (param_3 != -1) {
+    prop_index = FUN_00064b40(param_3, param_1, 1, 1);
+    if (prop_index != -1) {
+      prop = (char *)datum_get(prop_data, prop_index);
+      if (*(float *)(prop + 0x11c) < *(float *)0x254cc4) {
+        if (*(int16_t *)(prop + 0x38) == 0 ||
+            *(int16_t *)(prop + 0x38) == 1) {
+          result = 1;
+        }
+      }
     }
   }
-  return false;
+  return result;
 }
 
 /* FUN_00042df0 (0x42df0) — bool predicate over the same (object_handle,
@@ -357,24 +358,23 @@ bool FUN_00042df0(int param_1, int param_2, int param_3)
 {
   int prop_index;
   char *prop;
+  char result;
 
   (void)param_2;
 
-  if (param_3 == -1) {
-    return false;
+  result = 0;
+  if (param_3 != -1) {
+    prop_index = FUN_00064b40(param_3, param_1, 1, 1);
+    if (prop_index != -1) {
+      prop = (char *)datum_get(prop_data, prop_index);
+      if (*(float *)(prop + 0x11c) > *(float *)0x254cc4 ||
+          (*(int16_t *)(prop + 0x38) != 0 &&
+           *(int16_t *)(prop + 0x38) != 1)) {
+        result = 1;
+      }
+    }
   }
-  prop_index = FUN_00064b40(param_3, param_1, 1, 1);
-  if (prop_index == -1) {
-    return false;
-  }
-  prop = (char *)datum_get(prop_data, prop_index);
-  if (*(float *)(prop + 0x11c) > *(float *)0x254cc4) {
-    return true;
-  }
-  if (*(int16_t *)(prop + 0x38) == 0 || *(int16_t *)(prop + 0x38) == 1) {
-    return false;
-  }
-  return true;
+  return result;
 }
 
 /* FUN_00042e60 (0x42e60): cdecl predicate with three 32-bit stack
