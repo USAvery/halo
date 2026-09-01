@@ -3874,7 +3874,7 @@ char accelerate_to_velocity3d(float *param_1, float *param_2, float max_length)
   delta[0] = param_2[0] - param_1[0];
   delta[1] = param_2[1] - param_1[1];
   delta[2] = param_2[2] - param_1[2];
-  if (FUN_000a57b0(delta, max_length) != 0) {
+  if ((char)FUN_000a57b0(delta, max_length) != 0) {
     param_1[0] = delta[0] + param_1[0];
     param_1[1] = delta[1] + param_1[1];
     param_1[2] = delta[2] + param_1[2];
