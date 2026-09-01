@@ -1416,13 +1416,13 @@ def generate_html(report: dict, output_path: str, history_path: str = None):
                 <table>
                     <thead>
                         <tr>
-                            <th data-col="0">Unit Name <span class="sort-arrow"></span></th>
-                            <th data-col="1">Source Path <span class="sort-arrow"></span></th>
-                            <th data-col="2" class="num">Functions <span class="sort-arrow"></span></th>
-                            <th data-col="3" class="num">Ported <span class="sort-arrow"></span></th>
-                            <th data-col="4" class="num">Progress <span class="sort-arrow"></span></th>
-                            <th data-col="5" class="num">Bytes <span class="sort-arrow"></span></th>
-                            <th data-col="6" class="num">Match % <span class="sort-arrow"></span></th>
+                            <th data-col="0" title="Translation unit name; click it to open the unit's function list.">Unit Name <span class="sort-arrow"></span></th>
+                            <th data-col="1" title="Source file path for this translation unit.">Source Path <span class="sort-arrow"></span></th>
+                            <th data-col="2" class="num" title="Number of functions in this translation unit.">Functions <span class="sort-arrow"></span></th>
+                            <th data-col="3" class="num" title="Functions currently ported into the reimplementation.">Ported <span class="sort-arrow"></span></th>
+                            <th data-col="4" class="num" title="Ported functions as a percentage of all functions in the unit.">Progress <span class="sort-arrow"></span></th>
+                            <th data-col="5" class="num" title="Ported function bytes / total function bytes in this unit.">Bytes <span class="sort-arrow"></span></th>
+                            <th data-col="6" class="num" title="Byte-weighted VC71 match for the unit: how closely its compiled code matches the original. The per-function op score is shown in the detail view and is advisory.">Match % <span class="sort-arrow"></span></th>
                         </tr>
                     </thead>
                     <tbody id="table-body"></tbody>
@@ -1479,12 +1479,12 @@ def generate_html(report: dict, output_path: str, history_path: str = None):
                     <table>
                         <thead>
                             <tr>
-                                <th data-fcol="0">Address <span class="sort-arrow"></span></th>
-                                <th data-fcol="1">Function Name <span class="sort-arrow"></span></th>
-                                <th data-fcol="2" class="num">Size <span class="sort-arrow"></span></th>
-                                <th data-fcol="3" class="num">Status <span class="sort-arrow"></span></th>
-                                <th data-fcol="4" class="num">Match % <span class="sort-arrow"></span></th>
-                                <th data-fcol="5" class="num" title="Verified: VC71 &ge;90%, equiv high-conf, snapshot pass, or runtime oracle pass">Verified <span class="sort-arrow"></span></th>
+                                <th data-fcol="0" title="Address of the function in the original Xbox binary.">Address <span class="sort-arrow"></span></th>
+                                <th data-fcol="1" title="Recovered source-level name of the function.">Function Name <span class="sort-arrow"></span></th>
+                                <th data-fcol="2" class="num" title="Function size in bytes in the original binary.">Size <span class="sort-arrow"></span></th>
+                                <th data-fcol="3" class="num" title="Whether this function is ported into the reimplementation.">Status <span class="sort-arrow"></span></th>
+                                <th data-fcol="4" class="num" title="VC71 byte-match: the percentage of compiled instructions matching the original. The separate op score compares operand shapes after normalizing constants and offsets; it is advisory.">Match % <span class="sort-arrow"></span></th>
+                                <th data-fcol="5" class="num" title="Verified means at least one trusted check passed: VC71 &ge;90%, high-confidence equivalence, snapshot, or runtime oracle.">Verified <span class="sort-arrow"></span></th>
                             </tr>
                         </thead>
                         <tbody id="func-table-body"></tbody>
