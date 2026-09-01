@@ -70081,16 +70081,16 @@
     "network_game_invalidate_machine": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 93.1,
+      "abi_modeled_mnemonic_pct": 97.4,
       "addr": "0x12acb0",
       "end": "0x12ad5d",
       "kind": "auto",
       "n_r": 59,
-      "opnd_percent": 77.6,
-      "raw_mnemonic_pct": 93.1,
+      "opnd_percent": 71.8,
+      "raw_mnemonic_pct": 97.4,
       "ref": "synth",
       "ref_sha": "19e34785c1d6635c",
-      "score": 93.1,
+      "score": 97.4,
       "source": "src/halo/networking/network_game_manager.c"
     },
     "network_game_is_splitscreen_local": {

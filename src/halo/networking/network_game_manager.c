@@ -163,20 +163,21 @@ void network_game_invalidate_machine(void *game, uint16_t machine_index)
   char *g = (char *)game;
   int i;
   char *controller_ptr;
+  uint16_t m = machine_index;
 
-  if (g == NULL || machine_index >= 4) {
+  if (g == NULL || m >= 4) {
     display_assert("game && (machine_index<MAXIMUM_NETWORK_MACHINE_COUNT)",
                    "c:\\halo\\SOURCE\\networking\\network_game_manager.c", 0x40,
                    1);
     system_exit(-1);
   }
 
-  g[0x154 + machine_index * 0x44] = (char)0xff;
-  *(short *)(g + 0x114 + machine_index * 0x44) = 0;
+  g[0x154 + m * 0x44] = (char)0xff;
+  *(short *)(g + 0x114 + m * 0x44) = 0;
 
   controller_ptr = g + 0x226 + 0x1d;
   for (i = 0; i < 16; i++) {
-    if ((uint16_t)(char)controller_ptr[-1] == machine_index) {
+    if ((signed char)controller_ptr[-1] == (int)m) {
       if (controller_ptr - 0x1d == NULL) {
         display_assert("player",
                        "c:\\halo\\SOURCE\\networking\\network_game_manager.c",
