@@ -23748,7 +23748,7 @@
     },
     {
      "addr": "0x18b010",
-     "decl": "int FUN_0018b010(int object_handle @<esi>);",
+     "decl": "int FUN_0018b010(int object_handle@<esi>);",
      "ported": true
     },
     {
@@ -23758,7 +23758,7 @@
     },
     {
      "addr": "0x18b130",
-     "decl": "float FUN_0018b130(int object_handle @<esi>);",
+     "decl": "float FUN_0018b130(int object_handle@<esi>);",
      "ported": true
     },
     {
@@ -23768,37 +23768,37 @@
     },
     {
      "addr": "0x18b610",
-     "decl": "void FUN_0018b610(float *param_1 @<ecx>, float *param_2 @<edx>, float param_3);",
+     "decl": "void FUN_0018b610(float *param_1@<ecx>, float *param_2@<edx>, float param_3);",
      "ported": true
     },
     {
      "addr": "0x18b6b0",
-     "decl": "void FUN_0018b6b0(float *param_1 @<ecx>, float *param_2 @<edx>, float param_3);",
+     "decl": "void FUN_0018b6b0(float *param_1@<ecx>, float *param_2@<edx>, float param_3);",
      "ported": true
     },
     {
      "addr": "0x18b780",
-     "decl": "void FUN_0018b780(float *param_1 @<ecx>, float *param_2 @<edx>, float param_3);",
+     "decl": "void FUN_0018b780(float *param_1@<ecx>, float *param_2@<edx>, float param_3);",
      "ported": true
     },
     {
      "addr": "0x18b830",
-     "decl": "char FUN_0018b830(void *ctx @<esi>, float fade);",
+     "decl": "char FUN_0018b830(void *ctx@<esi>, float fade);",
      "ported": true
     },
     {
      "addr": "0x18b930",
-     "decl": "void FUN_0018b930(float *plane @<eax>, float *flipped @<ecx>, float *normal @<edx>, float *point);",
+     "decl": "void FUN_0018b930(float *plane@<eax>, float *flipped@<ecx>, float *normal@<edx>, float *point);",
      "ported": true
     },
     {
      "addr": "0x18b990",
-     "decl": "void FUN_0018b990(void *volume @<ecx>);",
+     "decl": "void FUN_0018b990(void *volume@<ecx>);",
      "ported": true
     },
     {
      "addr": "0x18bc60",
-     "decl": "void FUN_0018bc60(int render_state_index @<eax>, int object_handle, float lod, char force_rebuild);",
+     "decl": "void FUN_0018bc60(int render_state_index@<eax>, int object_handle, float lod, char force_rebuild);",
      "ported": true
     },
     {
@@ -23818,7 +23818,7 @@
     },
     {
      "addr": "0x18c370",
-     "decl": "void FUN_0018c370(void *record @<eax>);",
+     "decl": "void FUN_0018c370(void *record@<eax>);",
      "ported": true
     },
     {
@@ -23853,12 +23853,12 @@
     },
     {
      "addr": "0x18cf10",
-     "decl": "void FUN_0018cf10(void *data @<ebx>, float *untransformed_origin @<esi>, float *untransformed_direction @<edi>, uint8_t flags, float *transformed_origin, float *transformed_direction);",
+     "decl": "void FUN_0018cf10(void *data@<ebx>, float *untransformed_origin@<esi>, float *untransformed_direction@<edi>, uint8_t flags, float *transformed_origin, float *transformed_direction);",
      "ported": true
     },
     {
      "addr": "0x18d040",
-     "decl": "void FUN_0018d040(void *state @<eax>, float *value @<ecx>, int16_t p1, int p2, void *src, void *info);",
+     "decl": "void FUN_0018d040(void *state@<eax>, float *value@<ecx>, int16_t p1, int p2, void *src, void *info);",
      "ported": true
     },
     {
@@ -23868,7 +23868,7 @@
     },
     {
      "addr": "0x18d140",
-     "decl": "int16_t FUN_0018d140(void *data @<esi>, int bitmap);",
+     "decl": "int16_t FUN_0018d140(void *data@<esi>, int bitmap);",
      "ported": true
     },
     {
@@ -23883,7 +23883,7 @@
     },
     {
      "addr": "0x18d490",
-     "decl": "void FUN_0018d490(float *basis @<eax>, void *data @<ecx>, float *direction @<ebx>, int16_t sprite_type, int unused, float *origin);",
+     "decl": "void FUN_0018d490(float *basis@<eax>, void *data@<ecx>, float *direction@<ebx>, int16_t sprite_type, int unused, float *origin);",
      "ported": true
     },
     {
@@ -24019,7 +24019,7 @@
     },
     {
      "addr": "0x18fb20",
-     "decl": "void FUN_0018fb20(float *position @<ecx>, const float *target @<edx>, float max_delta);",
+     "decl": "void FUN_0018fb20(float *position@<ecx>, const float *target@<edx>, float max_delta);",
      "ported": true
     },
     {
