@@ -1335,141 +1335,6 @@ void FUN_000572c0(int param_1)
 }
 
 /*
- * ai_scripting_command_list_status — worst AI command-list "wait" status across the children
- * of parent_handle (iterated via FUN_000ce450/FUN_000ce320). For each
- * child object (type mask 3): resolve an actor from child_obj->field_0x1a4
- * (primary) or, if that is NONE, child_obj->field_0x1a8 (fallback), then
- * compute a per-child status:
- *   - primary actor (field_0x1a4): assert !actor->meta.swarm (+6). If
- *     actor->field_0x6c (type) == 0xb, look up the scenario tag block at
- *     scenario+0x438, element actor->field_0x9c, then within it a
- *     sub-element indexed by actor->field_0xa4; status is derived from
- *     actor->field_0xa8 bits (2 or 3) when the sub-element exists, else 1.
- *   - fallback actor (field_0x1a8): assert actor->meta.swarm. If
- *     actor->field_0x6c == 0xb, resolve actor->field_0x28 (swarm handle),
- *     find the swarm member matching this child, and if its swarm
- *     component has flag 0x8 set, call FUN_00057330 with the same
- *     firing-position lookup using the component's field_0x1c/field_0x20
- *     byte pair (mirrors the primary-actor inline computation above).
- *   - if the above yields 0, fall back to a recency check: status = 1 if
- *     actor->field_0x94 != -1 and actor->field_0x94 + 0x96 >= the current
- *     game time (game_time_get(), sampled once up front).
- * worst_status = max(status) across all children. Returns worst_status.
- * 0x57380 / encounters.obj
- */
-short ai_scripting_command_list_status(int parent_handle)
-{
-  int current_time;
-  int iter_state;
-  int child_handle;
-  char *child_obj;
-  char *actor;
-  int field_1a4;
-  int field_1a8;
-  int status;
-  int worst_status;
-  int16_t idx;
-  char *scenario_elem;
-  char *sub_elem;
-  int count;
-  int swarm_handle;
-  char *swarm;
-  int16_t swarm_count;
-  int16_t member_index;
-  int component_handle;
-  char *swarm_component;
-  int field_94;
-
-  worst_status = 0;
-  current_time = game_time_get();
-  child_handle = FUN_000ce450(parent_handle, &iter_state);
-
-  while (child_handle != -1) {
-    child_obj = (char *)object_try_and_get_and_verify_type(child_handle, 3);
-    if (child_obj != NULL) {
-      status = 0;
-      field_1a4 = *(int *)(child_obj + 0x1a4);
-      if (field_1a4 != -1) {
-        actor = (char *)datum_get(*(data_t **)0x6325a4, field_1a4);
-        if (*(char *)(actor + 6) != 0) {
-          display_assert("!actor->meta.swarm",
-                         "c:\\halo\\SOURCE\\ai\\ai_script.c", 0xa80, 1);
-          system_exit(-1);
-        }
-        if (*(int16_t *)(actor + 0x6c) == 0xb) {
-          idx = *(int16_t *)(actor + 0x9c);
-          scenario_elem = (char *)tag_block_get_element(
-            (char *)global_scenario_get() + 0x438, idx, 0x60);
-          count = *(int *)(scenario_elem + 0x30);
-          if ((unsigned char)actor[0xa4] < count) {
-            sub_elem = (char *)tag_block_get_element(
-              scenario_elem + 0x30, (unsigned char)actor[0xa4], 0x20);
-          } else {
-            sub_elem = NULL;
-          }
-          status = (sub_elem != NULL) ?
-                     ((~(unsigned char)actor[0xa8] & 0x10) | 0x20) >> 4 :
-                     1;
-        }
-        if (status != 0)
-          goto merge;
-        goto tail;
-      }
-
-      field_1a8 = *(int *)(child_obj + 0x1a8);
-      if (field_1a8 == -1)
-        goto merge; /* status stays 0 */
-
-      actor = (char *)datum_get(*(data_t **)0x6325a4, field_1a8);
-      if (*(char *)(actor + 6) == 0) {
-        display_assert("actor->meta.swarm", "c:\\halo\\SOURCE\\ai\\ai_script.c",
-                       0xa8d, 1);
-        system_exit(-1);
-      }
-      if (*(int16_t *)(actor + 0x6c) == 0xb) {
-        swarm_handle = *(int *)(actor + 0x28);
-        if (swarm_handle != -1) {
-          swarm = (char *)datum_get(*(data_t **)0x6325a0, swarm_handle);
-          swarm_count = *(int16_t *)(swarm + 2);
-          member_index = 0;
-          if (swarm_count > 0) {
-            while (*(int *)(swarm + (int)member_index * 4 + 0x18) !=
-                   child_handle) {
-              member_index++;
-              if (member_index >= swarm_count)
-                break;
-            }
-          }
-          if (member_index < swarm_count) {
-            component_handle = *(int *)(swarm + (int)member_index * 4 + 0x58);
-            swarm_component =
-              (char *)datum_get(*(data_t **)0x63259c, component_handle);
-            if ((*(unsigned char *)(swarm_component + 2) & 8) != 0) {
-              idx = *(int16_t *)(actor + 0x9c);
-              status = FUN_00057330(idx, swarm_component + 0x1c, field_1a8,
-                                    child_handle, 0);
-            }
-          }
-        }
-      }
-      if (status != 0)
-        goto merge;
-
-    tail:
-      field_94 = *(int *)(actor + 0x94);
-      if (field_94 != -1 && field_94 + 0x96 >= current_time)
-        status = 1;
-
-    merge:
-      if (status > worst_status)
-        worst_status = status;
-    }
-    child_handle = FUN_000ce320(parent_handle, &iter_state);
-  }
-  return (short)worst_status;
-}
-
-/*
  * FUN_000575d0 — free (detach) all actors from an encounter (ai_free).
  * Logs "[thread]: ai_free [encounter]", then for each actor in the
  * encounter asserts encounter_index != NONE, then calls
@@ -6335,9 +6200,22 @@ void encounter_post_combat_assign_behaviors(int encounter_handle)
  *   squad definition (stride 0xe8) +0x88 | int16 | tested > 0
  *   squad definition +0x8c / +0x90 | float | min/max fed to random_real_range
  *
+ * Return value (added when FUN_0005c680 was lifted and needed it):
+ *   CONFIRMED by disassembly — every RET path (the ai_active guard-fail JZ
+ *   at 0x5c521, the starting-location-fail JZ at 0x5c53c, and the natural
+ *   fall-through after the full spawn body) converges on the single shared
+ *   epilogue at 0x5c61b, which does "XOR AL,AL" unconditionally before
+ *   RET. So this function's caller-visible return is ALWAYS 0/false,
+ *   independent of whether a spawn actually happened; modeled here as a
+ *   single trailing `return 0` matching that shared epilogue exactly, kept
+ *   as `bool` (not void) so callers that check it (FUN_0005c680) compile
+ *   to the same AL-based TEST/JZ shape as the reference. The pre-existing
+ *   caller (ai_profile.c:990) already discards the result as a statement,
+ *   so this is behavior-preserving there.
+ *
  * 0x5c510 / encounters.obj
  */
-void encounter_spawn_actor(int profile_index, int squad_index)
+bool encounter_spawn_actor(int profile_index, int squad_index)
 {
   char *encounter;
   char *encounter_def;
@@ -6379,6 +6257,7 @@ void encounter_spawn_actor(int profile_index, int squad_index)
                        TICKS_PER_SECOND);
     }
   }
+  return 0;
 }
 
 /* encounter_set_respawn (0x5c630) — Set an encounter's respawn flag
@@ -6421,6 +6300,237 @@ void encounter_set_respawn(int encounter_handle, char flag)
     encounter = (char *)datum_get(*(data_t **)0x5ab270, encounter_handle);
     *(int16_t *)(encounter + 0xe) = 0x96;
     FUN_0005a4e0(encounter_handle /* @<eax> */);
+  }
+}
+
+/* FUN_0005c680 (0x5c680) — per-tick squad recruit-spawn attempt for one
+ * encounter. Called from FUN_0005de80's per-encounter dispatch
+ * (encounters.c:7245).
+ *
+ * Confirmed (0x18 bytes locals, EBP frame, no _chkstk):
+ *   - Gated on encounter+0x3c (recruit-management flag, byte); if zero,
+ *     returns immediately with no side effects.
+ *   - encounter+0x3e is a 16-bit "ticks until next check" cooldown: while
+ *     it is > 0xf the function only decrements it by 0xf and returns
+ *     (0x5c6b6-0x5c6c2). Once <= 0xf, the cooldown is reset to 0
+ *     (0x5c6eb) and the full pass below runs.
+ *   - encounter_def is scenario->encounters[handle & 0xffff] (0xb0-stride
+ *     tag block at scenario+0x42c), the same lookup encounter_spawn_actor
+ *     uses.
+ *   - recruit_bitmap (8-byte local, csmemset-zeroed) is a bitfield over
+ *     squad index: one bit per squad flagged "wants to spawn more" this
+ *     tick, consumed by pass 2.
+ *
+ * IMPORTANT (0x5c510 disassembly, decompile_function): every RET path of
+ * encounter_spawn_actor converges on the single shared epilogue at
+ * 0x5c61b, which does "XOR AL,AL" unconditionally before RET — reached
+ * both by its two early-out JZs (0x5c521, 0x5c53c) and by falling through
+ * after the full body runs. So encounter_spawn_actor's caller-visible
+ * return is ALWAYS 0/false at runtime, independent of whether it actually
+ * spawned; encounter_spawn_actor was re-declared bool (was void) and given
+ * an explicit trailing `return 0` to model this. Both call sites below
+ * (0x5c790, 0x5c8bb) are therefore dynamically dead on their "success" arm
+ * (the while(true) retry never re-loops past a call, and the "randomly
+ * selected to spawn" early-return at 0x5c904-0x5c92e never runs) — but the
+ * ORIGINAL COMPILER could not know that (encounter_spawn_actor's constant
+ * return is a fact about its own body, invisible across the call), so its
+ * .text still contains both arms in full. This lift reproduces the real
+ * source shape (both arms present, normal `if (encounter_spawn_actor(...))`
+ * checks) rather than folding the always-taken arm to match the *dynamic*
+ * behavior — matching what the reference compiler actually emitted.
+ *
+ * Pass 1 (0x5c710-0x5c849): for squad 0..encounter_def->squads.count-1:
+ *   squad = encounter_get_squad(encounter, i)      (runtime squad record)
+ *   squad_def = tag_block_get_element(&encounter_def->squads, i, 0xe8)
+ *              (static squad definition, same 0xe8 stride as
+ *               encounter_spawn_actor)
+ *   if (squad->0xc > 0):  { squad's "desired recruits" countdown is live }
+ *     while (squad_def->0x84 [min] > squad->0x18 [population]): one spawn
+ *       attempt, then always break (see the always-false-return note
+ *       above — the retry/continue arm is dynamically unreachable).
+ *     squad->0xc/0x18 are re-read fresh afterward (so any real side
+ *     effect from the attempt is observed) — if still (0xc>0 &&
+ *     0x18<squad_def->0x86 [max]): mark bit i in recruit_bitmap
+ *     (clearing squad->0xe/0xf, recruit_count++) when squad->0xe < 0x10,
+ *     else squad->0xe -= 0xf.
+ *
+ * Pass 2 (0x5c84f-0x5c92e), only when recruit_count > 0 and
+ * encounter->0x3e == 0 (always true here, since pass 1 just reset it):
+ *   recruit_count = random_range(seed, 0, recruit_count)   (budget, reuses
+ *                                                            the same slot)
+ *   for each squad i with bit i set in recruit_bitmap (0..encounter->0x6-1):
+ *     if (budget < 1): one spawn attempt, early-return with a "randomly
+ *       selected to spawn" log only on the dynamically-unreachable success
+ *       arm (see note above); else budget--.
+ *
+ * Call-site verification (first PUSH is the last argument):
+ *   0x5c692 datum_get | PUSH EDI(handle) ; PUSH EAX([0x5ab270]) | match
+ *   0x5c6d0 global_scenario_get | no args | match
+ *   0x5c6db tag_block_get_element | PUSH EAX(scenario+0x42c) ; PUSH EDI
+ *     (handle&0xffff, staged before the scenario_get call) ; PUSH 0xb0
+ *     (staged earlier still) | match
+ *   0x5c6f2 csmemset | PUSH ECX(&recruit_bitmap) ; PUSH EDI(0) ; PUSH 0x8
+ *     | match
+ *   0x5c718 encounter_get_squad | PUSH ESI(encounter) ; PUSH EDX(i)
+ *     | match
+ *   0x5c72f tag_block_get_element | PUSH EAX(&encounter_def->squads) ;
+ *     PUSH EAX(i) ; PUSH 0xe8 | match
+ *   0x5c790/0x5c8bb encounter_spawn_actor | PUSH ECX(handle) ; PUSH
+ *     EAX/EDI(squad index) | match
+ *   0x5c872 random_range | PUSH EAX(seed, staged after the two
+ *     get_global_random_seed_address-adjacent pushes 0/recruit_count)
+ *     -> random_range(seed, 0, recruit_count) | match
+ *
+ * Store-offset table (runtime squad record, from encounter_get_squad):
+ *   +0x0c        | int16 | read only here (mutated by encounter_spawn_actor)
+ *   +0x0e / 0x0f | int16 | cleared to 0 when a desire-to-spawn bit is set,
+ *                          else -= 0xf
+ *   +0x18        | int16 | read only here (population)
+ *
+ * Store-offset table (encounter record):
+ *   +0x3e/0x3f | int16 | -= 0xf while cooling down; reset to 0 once the
+ *                        full pass runs
+ *
+ * 0x5c680 / encounters.obj
+ */
+void FUN_0005c680(int encounter_handle)
+{
+  char *encounter;
+  char *encounter_def;
+  char *squad;
+  char *squad_def;
+  unsigned int recruit_bitmap[2];
+  short recruit_count;
+  short squad_pop;
+  short squad_min;
+  int i;
+  short j; /* pass-2 loop index: the reference keeps it in DI and compares it
+            * 16-bit against encounter+0x6 (cmp di, word [edx+6]), so it is a
+            * distinct short variable, not a reuse of pass 1's int i. */
+  volatile int idx; /* redundant (int16_t)i copy, mirrors the reference's separate
+            * EBP-0x8 stack slot (local_c) used for the squad_def index and
+            * the recruit_bitmap bit position -- kept distinct from i so the
+            * frame size matches (score-context frame_mismatch: cand
+            * sub esp,0x14 vs ref sub esp,0x18). */
+
+  encounter = (char *)datum_get(*(data_t **)0x5ab270, encounter_handle);
+  if (encounter[0x3c] == '\0') {
+    return;
+  }
+  if (*(int16_t *)(encounter + 0x3e) > 0xf) {
+    *(int16_t *)(encounter + 0x3e) = *(int16_t *)(encounter + 0x3e) - 0xf;
+    return;
+  }
+
+  encounter_def = (char *)tag_block_get_element(
+    (char *)global_scenario_get() + 0x42c,
+    (int)((unsigned int)encounter_handle & 0xffff), 0xb0);
+  *(int16_t *)(encounter + 0x3e) = 0;
+  recruit_count = 0;
+  csmemset(recruit_bitmap, 0, 8);
+
+  if (((encounter_definition *)encounter_def)->squads.count > 0) {
+    i = 0;
+    idx = 0;
+    do {
+      squad = (char *)encounter_get_squad(encounter, (int16_t)i);
+      squad_def = (char *)tag_block_get_element(
+        &((encounter_definition *)encounter_def)->squads, idx, 0xe8);
+
+      if (*(int16_t *)(squad + 0xc) > 0) {
+        for (;;) {
+          /* The reference loads both operands into AX/CX at the loop head and
+           * re-uses them as the console_printf arguments (0x5c750-0x5c776), so
+           * they are source-level locals, not repeated memory operands. */
+          squad_pop = *(int16_t *)(squad + 0x18);
+          squad_min = *(int16_t *)(squad_def + 0x84);
+          if (squad_pop >= squad_min) {
+            break;
+          }
+          if (*(char *)0x5aca4d != '\0') {
+            console_printf(0, "%s/%s: current %d < min %d -> spawn (%d left)",
+                           encounter_def, squad_def, (int)squad_pop,
+                           (int)squad_min,
+                           (int)*(volatile int16_t *)(squad + 0xc));
+          }
+          if (!encounter_spawn_actor(encounter_handle, i)) {
+            if (*(char *)0x5aca4d != '\0') {
+              console_printf(0,
+                             "%s/%s: unable to spawn, out of starting points",
+                             encounter_def, squad_def);
+            }
+            break;
+          }
+          /* Reference bottom test is `cmp word [esi+0xc],0 ; jg top ; jmp
+           * exit` (0x5c79c) -- an explicit continue, not a break on the
+           * negation, which makes VC71 duplicate the loop-head test. */
+          if (*(int16_t *)(squad + 0xc) > 0) {
+            continue;
+          }
+          break;
+        }
+
+        if (*(int16_t *)(squad + 0xc) > 0 &&
+            *(int16_t *)(squad + 0x18) < *(int16_t *)(squad_def + 0x86)) {
+          if (*(int16_t *)(squad + 0xe) > 0xf) {
+            *(int16_t *)(squad + 0xe) = *(int16_t *)(squad + 0xe) - 0xf;
+          } else {
+            recruit_count = recruit_count + 1;
+            *(int16_t *)(squad + 0xe) = 0;
+            recruit_bitmap[idx >> 5] |= (unsigned int)1 << (idx & 0x1f);
+          }
+          if (*(char *)0x5aca4d != '\0') {
+            console_printf(0, "%s/%s: current %d < max %d -> desire spawn",
+                           encounter_def, squad_def,
+                           (int)*(int16_t *)(squad + 0x18),
+                           (int)*(int16_t *)(squad_def + 0x86));
+          }
+        }
+      }
+      i = i + 1;
+      idx = (int16_t)i;
+      /* Reference compares the sign-extended value already in EAX (0x5c841
+       * movsx / 0x5c844 cmp) and only then stores it to the idx slot, so the
+       * loop test must not re-read the volatile idx. */
+    } while ((int16_t)i < ((encounter_definition *)encounter_def)->squads.count);
+
+    if (recruit_count > 0 && *(int16_t *)(encounter + 0x3e) == 0) {
+      recruit_count =
+        random_range((unsigned int *)get_global_random_seed_address(), 0,
+                     (int16_t)recruit_count);
+
+      j = 0;
+      if (*(int16_t *)(encounter + 0x6) > j) {
+        do {
+          if ((recruit_bitmap[j >> 5] & ((unsigned int)1 << (j & 0x1f))) != 0) {
+            /* Reference tests `cmp word [ebp-0xc],0 ; jle <spawn>` (0x5c8aa),
+             * i.e. the decrement is the fall-through arm. */
+            if (recruit_count > 0) {
+              recruit_count = recruit_count - 1;
+            } else {
+              if (encounter_spawn_actor(encounter_handle, j)) {
+                if (*(char *)0x5aca4d == '\0') {
+                  return;
+                }
+                squad_def = (char *)tag_block_get_element(
+                  &((encounter_definition *)encounter_def)->squads, j, 0xe8);
+                console_printf(0, "%s/%s: randomly selected to spawn",
+                               encounter_def, squad_def);
+                return;
+              }
+              if (*(char *)0x5aca4d != '\0') {
+                squad_def = (char *)tag_block_get_element(
+                  &((encounter_definition *)encounter_def)->squads, j, 0xe8);
+                console_printf(0,
+                               "%s/%s: unable to spawn, out of starting points",
+                               encounter_def, squad_def);
+              }
+            }
+          }
+          j = j + 1;
+        } while (j < *(int16_t *)(encounter + 0x6));
+      }
+    }
   }
 }
 

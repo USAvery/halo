@@ -7065,21 +7065,6 @@
       "score": 100.0,
       "source": "src/halo/ai/encounters.c"
     },
-    "FUN_00057380": {
-      "abi_model": "raw",
-      "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 4.1,
-      "addr": "0x57380",
-      "end": "0x575ce",
-      "kind": "auto",
-      "n_r": 188,
-      "opnd_percent": 3.1,
-      "raw_mnemonic_pct": 4.1,
-      "ref": "synth",
-      "ref_sha": "c9cd36c8bc465c88",
-      "score": 4.1,
-      "source": "src/halo/unported_thunks.c"
-    },
     "FUN_000575d0": {
       "abi_model": "raw",
       "abi_model_items": 0,
@@ -7695,21 +7680,6 @@
       "score": 100.0,
       "source": "src/halo/ai/encounters.c"
     },
-    "FUN_00059b50": {
-      "abi_model": "raw",
-      "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 84.6,
-      "addr": "0x59b50",
-      "end": "0x59bee",
-      "kind": "auto",
-      "n_r": 63,
-      "opnd_percent": 75.4,
-      "raw_mnemonic_pct": 84.6,
-      "ref": "synth",
-      "ref_sha": "c63382cbc58b9b61",
-      "score": 84.6,
-      "source": "src/halo/ai/encounters.c"
-    },
     "FUN_00059bf0": {
       "abi_model": "regparam_stripped",
       "abi_model_items": 1,
@@ -7923,17 +7893,17 @@
     "FUN_0005c680": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 3.3,
+      "abi_modeled_mnemonic_pct": 99.1,
       "addr": "0x5c680",
       "end": "0x5c935",
       "kind": "auto",
       "n_r": 235,
-      "opnd_percent": 2.5,
-      "raw_mnemonic_pct": 3.3,
+      "opnd_percent": 96.6,
+      "raw_mnemonic_pct": 99.1,
       "ref": "synth",
       "ref_sha": "8c66ad5a5a571f9b",
-      "score": 3.3,
-      "source": "src/halo/unported_thunks.c"
+      "score": 99.1,
+      "source": "src/halo/ai/encounters.c"
     },
     "FUN_0005c940": {
       "abi_model": "raw",
@@ -20386,16 +20356,16 @@
     "FUN_000c27d0": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 93.6,
+      "abi_modeled_mnemonic_pct": 100.0,
       "addr": "0xc27d0",
       "end": "0xc2805",
       "kind": "auto",
       "n_r": 24,
-      "opnd_percent": 93.6,
-      "raw_mnemonic_pct": 93.6,
+      "opnd_percent": 100.0,
+      "raw_mnemonic_pct": 100.0,
       "ref": "synth",
       "ref_sha": "9b5428305788e235",
-      "score": 93.6,
+      "score": 100.0,
       "source": "src/halo/hs/hs.c"
     },
     "FUN_000c2810": {
@@ -48943,6 +48913,21 @@
       "score": 92.3,
       "source": "src/halo/ai/actors.c"
     },
+    "actor_iterator_next": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 84.6,
+      "addr": "0x59b50",
+      "end": "0x59bee",
+      "kind": "auto",
+      "n_r": 63,
+      "opnd_percent": 75.4,
+      "raw_mnemonic_pct": 84.6,
+      "ref": "synth",
+      "ref_sha": "c63382cbc58b9b61",
+      "score": 84.6,
+      "source": "src/halo/ai/encounters.c"
+    },
     "actor_kill": {
       "abi_model": "raw",
       "abi_model_items": 0,
@@ -51388,6 +51373,21 @@
       "score": 100.0,
       "source": "src/halo/ai/ai_profile.c"
     },
+    "ai_scripting_command_list_status": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 88.8,
+      "addr": "0x57380",
+      "end": "0x575ce",
+      "kind": "auto",
+      "n_r": 188,
+      "opnd_percent": 76.3,
+      "raw_mnemonic_pct": 88.8,
+      "ref": "synth",
+      "ref_sha": "c9cd36c8bc465c88",
+      "score": 88.8,
+      "source": "src/halo/ai/ai_script.c"
+    },
     "ai_scripting_follow_distance": {
       "abi_model": "raw",
       "abi_model_items": 0,
@@ -51401,7 +51401,7 @@
       "ref": "synth",
       "ref_sha": "b1c24ccf25d96932",
       "score": 96.6,
-      "source": "src/halo/ai/encounters.c"
+      "source": "src/halo/ai/ai_script.c"
     },
     "ai_test_ballistic_line_of_fire": {
       "abi_model": "raw",
@@ -58651,16 +58651,16 @@
     "encounter_link_activation": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 85.2,
+      "abi_modeled_mnemonic_pct": 94.4,
       "addr": "0x5a5a0",
       "end": "0x5a634",
       "kind": "auto",
       "n_r": 56,
-      "opnd_percent": 79.6,
-      "raw_mnemonic_pct": 85.2,
+      "opnd_percent": 88.9,
+      "raw_mnemonic_pct": 94.4,
       "ref": "synth",
       "ref_sha": "42f95b72b9f59e37",
-      "score": 85.2,
+      "score": 94.4,
       "source": "src/halo/ai/encounters.c"
     },
     "encounter_mark_examined_pursuit_position": {
@@ -58781,6 +58781,21 @@
       "ref": "synth",
       "ref_sha": "9e833500d8c07a4c",
       "score": 86.3,
+      "source": "src/halo/ai/encounters.c"
+    },
+    "encounter_spawn_actor": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 93.6,
+      "addr": "0x5c510",
+      "end": "0x5c622",
+      "kind": "auto",
+      "n_r": 89,
+      "opnd_percent": 83.0,
+      "raw_mnemonic_pct": 93.6,
+      "ref": "synth",
+      "ref_sha": "2f93c171a0601d85",
+      "score": 93.6,
       "source": "src/halo/ai/encounters.c"
     },
     "encounter_squad_timer_expire": {

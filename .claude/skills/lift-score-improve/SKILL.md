@@ -465,6 +465,36 @@ or doesn't explain the remaining gap.
    declared width/signedness against its disassembly load/store width in
    one pass rather than one variable at a time. Unquantified in pp terms.
 
+6. **GPR-allocation steering: `volatile int` on a loop index.** Signature:
+   candidate and reference hold the SAME values in DIFFERENT callee-saved
+   registers — e.g. candidate gives EBX to the loop index and spills a
+   struct pointer to the stack, the reference does the reverse. The diff
+   shows ~parity in instruction count but a barrage of reload pairs
+   (`mov reg,[ebp-N]`) around the loop body that the reference doesn't
+   have. Declaring the index `volatile int` forces it to a stack slot,
+   which frees the register for the pointer and kills the reload pairs.
+   Companion fix: keep the loop-exit test on a separate non-volatile
+   `short` copy so the test doesn't re-read the volatile slot.
+   **Recovered +6.7pp (86.3% → 93.0%) plus +1.0pp for the companion on
+   FUN_0005c680 (0x5c680).** The integer twin of the `volatile float`
+   lever in `frame_mismatch` #1.
+
+7. **`volatile` read to break a candidate-only CSE.** Signature: VC71
+   hoists a repeated memory field read (e.g. `squad+0xc`) into a register
+   and reuses it at several sites, where the reference re-reads memory
+   every time. Read the field through a `volatile int16_t *` cast at those
+   sites (or a `volatile` local per site). **Recovered +2.7pp
+   (96.4% → 99.1%) on FUN_0005c680.**
+
+**Triage note (measured 2026-09-01):** an empty classification array on a
+function scoring ~78-92% with candidate insn count within ~3% of the
+reference is the register-allocation/ordering band — usually FULLY
+recoverable with levers 6-7 plus arm-order/control-flow swaps
+(FUN_0005c680: 82.5% → 99.1%, zero rules fired). Do NOT trust a
+`structural_cap` park verdict for this band when its confidence comes from
+`ledger_prior_cap` — that replays an earlier attempt's own judgment and is
+circular, not binary evidence.
+
 ---
 
 ## Step — measure after each lever (fast single-function path)
