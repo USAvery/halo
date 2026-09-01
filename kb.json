@@ -4447,8 +4447,8 @@
     },
     {
      "addr": "0x7d0d0",
-          "decl": "uint32_t bitmap_format_to_a8r8g8b8(short format, void *mipmap_address, int pixel_index);",
-          "ported": true
+     "decl": "uint32_t bitmap_format_to_a8r8g8b8(short format, void *mipmap_address, int pixel_index);",
+     "ported": true
     },
     {
      "addr": "0x7d300",
@@ -26726,7 +26726,8 @@
     },
     {
      "addr": "0xe5910",
-     "decl": "void FUN_000e5910(void);"
+     "decl": "void ui_widgets_close_for_local_player(int16_t local_player_index);",
+     "ported": true
     },
     {
      "addr": "0xe59e0",
@@ -26857,7 +26858,7 @@
     {
      "addr": "0xe9320",
      "decl": "void *ui_widget_spawn_from_event_handler(void *widget, int tag_index);",
-     "ported": false
+     "ported": true
     },
     {
      "addr": "0xe9450",
@@ -26907,7 +26908,8 @@
     },
     {
      "addr": "0xea010",
-     "decl": "void FUN_000ea010(void);"
+     "decl": "bool FUN_000ea010(void);",
+     "ported": true
     },
     {
      "addr": "0xea100",
@@ -26929,7 +26931,8 @@
     },
     {
      "addr": "0xea540",
-     "decl": "void FUN_000ea540(void);"
+     "decl": "bool FUN_000ea540(void *widget, void *event_data, bool *widget_deleted);",
+     "ported": true
     },
     {
      "addr": "0xea570",
@@ -26950,7 +26953,8 @@
     },
     {
      "addr": "0xeab70",
-     "decl": "void FUN_000eab70(void);"
+     "decl": "bool FUN_000eab70(void *widget, void *event_data, bool *widget_deleted);",
+     "ported": true
     },
     {
      "addr": "0xeaba0",
@@ -26966,7 +26970,8 @@
     },
     {
      "addr": "0xeb020",
-     "decl": "void FUN_000eb020(void);"
+     "decl": "bool FUN_000eb020(void *widget, void *event_data, bool *widget_deleted);",
+     "ported": true
     },
     {
      "addr": "0xeb150",
@@ -27002,7 +27007,8 @@
     },
     {
      "addr": "0xecd50",
-     "decl": "void FUN_000ecd50(void);"
+     "decl": "bool ui_widget_game_data_select_game_engine_item(void *widget);",
+     "ported": true
     },
     {
      "addr": "0xece10",
@@ -30004,9 +30010,9 @@
     },
     {
      "addr": "0x1827c0",
-          "decl": "void rasterizer_swizzle_interleave_bits(short param_1, short param_2, short param_3, unsigned int param_4, unsigned int param_5, unsigned int param_6, unsigned int *param_7);",
-          "name": "rasterizer_swizzle_interleave_bits",
-          "ported": true
+     "decl": "void rasterizer_swizzle_interleave_bits(short param_1, short param_2, short param_3, unsigned int param_4, unsigned int param_5, unsigned int param_6, unsigned int *param_7);",
+     "name": "rasterizer_swizzle_interleave_bits",
+     "ported": true
     },
     {
      "addr": "0x182840",
@@ -33810,7 +33816,10 @@
     },
     {
      "addr": "0x49300",
-     "decl": "void ai_debug_render_surface(void);"
+     "decl": "void ai_debug_render_surface(void *structure_bsp @<eax>, int surface_index, float scale, void *color);",
+     "name": "ai_debug_render_surface",
+     "ported": true,
+     "src": "src/halo/ai/ai_debug.c"
     },
     {
      "addr": "0x493b0",
@@ -34648,11 +34657,12 @@
     },
     {
      "addr": "0x57330",
-     "decl": "void FUN_00057330(void);"
+     "decl": "short FUN_00057330(int16_t scenario_index@<eax>, void *record@<esi>, int field_1a8_val, int child_handle, int reserved);"
     },
     {
      "addr": "0x57380",
-     "decl": "short FUN_00057380(int value);"
+     "decl": "short ai_scripting_command_list_status(int parent_handle);",
+     "ported": true
     },
     {
      "addr": "0x575d0",
@@ -34979,10 +34989,10 @@
      "ported": true
     },
     {
-      "addr": "0x5a5a0",
-      "decl": "char encounter_link_activation(int encounter_handle, short link_encounter_index);",
-      "name": "encounter_link_activation",
-      "ported": true
+     "addr": "0x5a5a0",
+     "decl": "char encounter_link_activation(int encounter_handle, short link_encounter_index);",
+     "name": "encounter_link_activation",
+     "ported": true
     },
     {
      "addr": "0x5a640",
@@ -36738,7 +36748,8 @@
     },
     {
      "addr": "0x120710",
-     "decl": "void animation_get_x_offsets(int anim_entry, int tick_out, int damage_time_out);"
+     "decl": "void animation_get_x_offsets(int anim_entry, int tick_out, int damage_time_out);",
+     "ported": true
     },
     {
      "addr": "0x120790",

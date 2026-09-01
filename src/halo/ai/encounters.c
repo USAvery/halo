@@ -139,27 +139,26 @@ void FUN_00053bf0(void)
  * spelled as a literal to avoid an IMM mismatch against a DAT_ reference.
  *
  * MSVC frame layout (SUB ESP,0x38):
- *   [EBP-0x38] iter          0x18 bytes — actor_iterator_next writes the current
- *                            actor handle to iter+0x14 (EBP-0x24), so this must
- *                            be one contiguous buffer, not two locals.
- *   [EBP-0x1c] head_position 3 floats — out buffer for unit_get_head_position
- *   [EBP-0x10] point         3 floats — camera-offset point, passed by LEA
- *   [EBP-0x04] draw_flag     char (only the low byte is stored; the original
- *                            pushes the whole dword slot)
+ *   [EBP-0x38] iter          0x18 bytes — actor_iterator_next writes the
+ * current actor handle to iter+0x14 (EBP-0x24), so this must be one contiguous
+ * buffer, not two locals. [EBP-0x1c] head_position 3 floats — out buffer for
+ * unit_get_head_position [EBP-0x10] point         3 floats — camera-offset
+ * point, passed by LEA [EBP-0x04] draw_flag     char (only the low byte is
+ * stored; the original pushes the whole dword slot)
  *
  * Confirmed: `PUSH EAX(flag); PUSH ECX(&iter)` at the 0x59b10 call — cdecl, so
  * the argument order is (iter, flag).  The `ADD ESP,0xc` there is a merged
- * cleanup covering that 2-arg call plus the following 1-arg actor_iterator_next; the
- * second actor_iterator_next site at 0x53d7e cleans with `ADD ESP,4`, proving the
- * 1-arg declaration is correct (the argument-count audit's report of 3 args is
- * a false positive).
- * Confirmed: the dispatch is a DEC/DEC chain (`MOVSX EAX,[0x5abaa2]; DEC EAX;
- * JZ; DEC EAX; JNZ`), i.e. a switch lowering, not an if/else-if chain.
- * Confirmed: in the multi-unit loop the next-link is read from the pointer
- * returned by object_get_and_verify_type (EDI), NOT from the actor record —
- * Ghidra reuses one variable for both, which is register-aliasing noise.
- * Confirmed: `ADD ESP,0x20` after FUN_00189270 in that loop cleans 4 + 2 + 2
- * stack args (0x189270 + unit_get_head_position + object_get_and_verify_type).
+ * cleanup covering that 2-arg call plus the following 1-arg
+ * actor_iterator_next; the second actor_iterator_next site at 0x53d7e cleans
+ * with `ADD ESP,4`, proving the 1-arg declaration is correct (the
+ * argument-count audit's report of 3 args is a false positive). Confirmed: the
+ * dispatch is a DEC/DEC chain (`MOVSX EAX,[0x5abaa2]; DEC EAX; JZ; DEC EAX;
+ * JNZ`), i.e. a switch lowering, not an if/else-if chain. Confirmed: in the
+ * multi-unit loop the next-link is read from the pointer returned by
+ * object_get_and_verify_type (EDI), NOT from the actor record — Ghidra reuses
+ * one variable for both, which is register-aliasing noise. Confirmed: `ADD
+ * ESP,0x20` after FUN_00189270 in that loop cleans 4 + 2 + 2 stack args
+ * (0x189270 + unit_get_head_position + object_get_and_verify_type).
  */
 void FUN_00053c50(void)
 {
@@ -1336,6 +1335,141 @@ void FUN_000572c0(int param_1)
 }
 
 /*
+ * ai_scripting_command_list_status — worst AI command-list "wait" status across the children
+ * of parent_handle (iterated via FUN_000ce450/FUN_000ce320). For each
+ * child object (type mask 3): resolve an actor from child_obj->field_0x1a4
+ * (primary) or, if that is NONE, child_obj->field_0x1a8 (fallback), then
+ * compute a per-child status:
+ *   - primary actor (field_0x1a4): assert !actor->meta.swarm (+6). If
+ *     actor->field_0x6c (type) == 0xb, look up the scenario tag block at
+ *     scenario+0x438, element actor->field_0x9c, then within it a
+ *     sub-element indexed by actor->field_0xa4; status is derived from
+ *     actor->field_0xa8 bits (2 or 3) when the sub-element exists, else 1.
+ *   - fallback actor (field_0x1a8): assert actor->meta.swarm. If
+ *     actor->field_0x6c == 0xb, resolve actor->field_0x28 (swarm handle),
+ *     find the swarm member matching this child, and if its swarm
+ *     component has flag 0x8 set, call FUN_00057330 with the same
+ *     firing-position lookup using the component's field_0x1c/field_0x20
+ *     byte pair (mirrors the primary-actor inline computation above).
+ *   - if the above yields 0, fall back to a recency check: status = 1 if
+ *     actor->field_0x94 != -1 and actor->field_0x94 + 0x96 >= the current
+ *     game time (game_time_get(), sampled once up front).
+ * worst_status = max(status) across all children. Returns worst_status.
+ * 0x57380 / encounters.obj
+ */
+short ai_scripting_command_list_status(int parent_handle)
+{
+  int current_time;
+  int iter_state;
+  int child_handle;
+  char *child_obj;
+  char *actor;
+  int field_1a4;
+  int field_1a8;
+  int status;
+  int worst_status;
+  int16_t idx;
+  char *scenario_elem;
+  char *sub_elem;
+  int count;
+  int swarm_handle;
+  char *swarm;
+  int16_t swarm_count;
+  int16_t member_index;
+  int component_handle;
+  char *swarm_component;
+  int field_94;
+
+  worst_status = 0;
+  current_time = game_time_get();
+  child_handle = FUN_000ce450(parent_handle, &iter_state);
+
+  while (child_handle != -1) {
+    child_obj = (char *)object_try_and_get_and_verify_type(child_handle, 3);
+    if (child_obj != NULL) {
+      status = 0;
+      field_1a4 = *(int *)(child_obj + 0x1a4);
+      if (field_1a4 != -1) {
+        actor = (char *)datum_get(*(data_t **)0x6325a4, field_1a4);
+        if (*(char *)(actor + 6) != 0) {
+          display_assert("!actor->meta.swarm",
+                         "c:\\halo\\SOURCE\\ai\\ai_script.c", 0xa80, 1);
+          system_exit(-1);
+        }
+        if (*(int16_t *)(actor + 0x6c) == 0xb) {
+          idx = *(int16_t *)(actor + 0x9c);
+          scenario_elem = (char *)tag_block_get_element(
+            (char *)global_scenario_get() + 0x438, idx, 0x60);
+          count = *(int *)(scenario_elem + 0x30);
+          if ((unsigned char)actor[0xa4] < count) {
+            sub_elem = (char *)tag_block_get_element(
+              scenario_elem + 0x30, (unsigned char)actor[0xa4], 0x20);
+          } else {
+            sub_elem = NULL;
+          }
+          status = (sub_elem != NULL) ?
+                     ((~(unsigned char)actor[0xa8] & 0x10) | 0x20) >> 4 :
+                     1;
+        }
+        if (status != 0)
+          goto merge;
+        goto tail;
+      }
+
+      field_1a8 = *(int *)(child_obj + 0x1a8);
+      if (field_1a8 == -1)
+        goto merge; /* status stays 0 */
+
+      actor = (char *)datum_get(*(data_t **)0x6325a4, field_1a8);
+      if (*(char *)(actor + 6) == 0) {
+        display_assert("actor->meta.swarm", "c:\\halo\\SOURCE\\ai\\ai_script.c",
+                       0xa8d, 1);
+        system_exit(-1);
+      }
+      if (*(int16_t *)(actor + 0x6c) == 0xb) {
+        swarm_handle = *(int *)(actor + 0x28);
+        if (swarm_handle != -1) {
+          swarm = (char *)datum_get(*(data_t **)0x6325a0, swarm_handle);
+          swarm_count = *(int16_t *)(swarm + 2);
+          member_index = 0;
+          if (swarm_count > 0) {
+            while (*(int *)(swarm + (int)member_index * 4 + 0x18) !=
+                   child_handle) {
+              member_index++;
+              if (member_index >= swarm_count)
+                break;
+            }
+          }
+          if (member_index < swarm_count) {
+            component_handle = *(int *)(swarm + (int)member_index * 4 + 0x58);
+            swarm_component =
+              (char *)datum_get(*(data_t **)0x63259c, component_handle);
+            if ((*(unsigned char *)(swarm_component + 2) & 8) != 0) {
+              idx = *(int16_t *)(actor + 0x9c);
+              status = FUN_00057330(idx, swarm_component + 0x1c, field_1a8,
+                                    child_handle, 0);
+            }
+          }
+        }
+      }
+      if (status != 0)
+        goto merge;
+
+    tail:
+      field_94 = *(int *)(actor + 0x94);
+      if (field_94 != -1 && field_94 + 0x96 >= current_time)
+        status = 1;
+
+    merge:
+      if (status > worst_status)
+        worst_status = status;
+    }
+    child_handle = FUN_000ce320(parent_handle, &iter_state);
+  }
+  return (short)worst_status;
+}
+
+/*
  * FUN_000575d0 — free (detach) all actors from an encounter (ai_free).
  * Logs "[thread]: ai_free [encounter]", then for each actor in the
  * encounter asserts encounter_index != NONE, then calls
@@ -1541,8 +1675,8 @@ void FUN_00057900(int param_1, char param_2)
  * Then iterates actors in the encounter via
  * ai_index_actor_iterator_new/ai_index_actor_iterator_next. For each actor,
  * writes the return_state into actor+0x62. If actor+0x6e == 0 and the result of
- * actor_get_action_priority_flag is 0, 1, or 2, calls actor_action_set_default_state
- * with -1. 0x579d0 / encounters.obj
+ * actor_get_action_priority_flag is 0, 1, or 2, calls
+ * actor_action_set_default_state with -1. 0x579d0 / encounters.obj
  */
 void FUN_000579d0(int encounter_handle, short return_state)
 {

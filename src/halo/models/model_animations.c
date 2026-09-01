@@ -415,6 +415,88 @@ const char *FUN_001205f0(void *string_table, int16_t index)
   return result;
 }
 
+/* animation_get_x_offsets (0x120710) — Accumulate the first float of every
+ * frame's translation record across the whole animation, and separately
+ * capture that running total at one specific frame (tick_index).
+ *
+ * anim_entry+0x22 = frame_count (int16; same field asserted
+ * "animation->frame_count" by FUN_00120500/FUN_00120590 above). anim_entry+
+ * 0x26 = translation-record discriminator (int16; same field
+ * animation_frame_get_xy_translation below checks against 1), selecting a
+ * per-frame stride of 2/3/4 floats (0x8/0xc/0x10 bytes); any other value
+ * skips the accumulate and pointer advance for that frame. anim_entry+0x34 =
+ * tick_index (int16; confirmed by unit_get_melee_range_and_ticks in units.c,
+ * which stores this same anim_tag+0x34 into *out_tick_count). anim_entry+
+ * 0x54 = float* to the raw per-frame translation stream — accessed only
+ * here, meaning otherwise unproven (not the tag_data_get_pointer path
+ * FUN_00120590 uses via +0x48).
+ *
+ * Confirmed: cdecl, 3 args. Confirmed: FLD [0x2533c0] (the global 0.0f
+ * constant used throughout this codebase, e.g. actor_combat.c) initializes
+ * the accumulator unconditionally at 0x120717, before the frame_count>0
+ * test. Confirmed: the discriminator (+0x26) and tick_index (+0x34) are each
+ * read from memory exactly ONCE, at 0x120735/0x120739, only on the
+ * frame_count>0 path, and held in registers (EBX/CX) for every loop
+ * iteration — not re-read per frame. Confirmed: do-while loop
+ * 0x120740-0x12076a; the running accumulator is snapshotted into local_8 via
+ * FST (no pop) at 0x120763 when frame_index==tick_index, checked AFTER that
+ * frame's accumulate/advance. Confirmed: damage_time_out (param_3,
+ * [EBP+0x10]) receives the final accumulator via FSTP at 0x120776 (or a bare
+ * FSTP ST0 pop-and-discard at 0x12077a if NULL); tick_out (param_2,
+ * [EBP+0xc]) receives local_8 via a plain MOV dword copy at
+ * 0x120783/0x120786 (not an FPU store — matches the original exactly).
+ */
+void animation_get_x_offsets(int anim_entry, int tick_out, int damage_time_out)
+{
+  char *anim;
+  float *data;
+  int16_t frame_count;
+  int16_t translation_type;
+  int16_t tick_index;
+  int16_t frame_index;
+  float accum;
+  float tick_value;
+
+  anim = (char *)anim_entry;
+  data = *(float **)(anim + 0x54);
+  frame_index = 0;
+  tick_value = 0.0f;
+  accum = *(float *)0x2533c0;
+  frame_count = *(int16_t *)(anim + 0x22);
+
+  if (frame_count > 0) {
+    translation_type = *(int16_t *)(anim + 0x26);
+    tick_index = *(int16_t *)(anim + 0x34);
+    do {
+      switch (translation_type) {
+      case 1:
+        accum = accum + *data;
+        data += 2;
+        break;
+      case 2:
+        accum = accum + *data;
+        data += 3;
+        break;
+      case 3:
+        accum = accum + *data;
+        data += 4;
+        break;
+      }
+      if (frame_index == tick_index) {
+        tick_value = accum;
+      }
+      frame_index = frame_index + 1;
+    } while (frame_index < frame_count);
+  }
+
+  if (damage_time_out != 0) {
+    *(float *)damage_time_out = accum;
+  }
+  if (tick_out != 0) {
+    *(float *)tick_out = tick_value;
+  }
+}
+
 /* animation_set_frame_size (0x120790) — Compute and store the per-frame byte
  * stride for a compressed animation from its per-node data-presence flags.
  *
@@ -563,8 +645,8 @@ void quaternion_decompress_6byte_renormalized(void *compressed_data,
   sphere_intersects_rectangle3d(dest);
 }
 
-/* animation_graph_get_animation_by_name (0x120cb0) — Look up an animation by name in an 'antr'
- * (model_animations) tag's animation block.
+/* animation_graph_get_animation_by_name (0x120cb0) — Look up an animation by
+ * name in an 'antr' (model_animations) tag's animation block.
  *
  * Walks the tag_block at antr+0x74 (element stride 0xb4) comparing `name`
  * case-insensitively against each element's name field at element+0x0, and
@@ -584,7 +666,8 @@ void quaternion_decompress_6byte_renormalized(void *compressed_data,
  *            (MOV ECX,[ESI] at 0x120cf1); it is not hoisted into a register.
  * Confirmed: not-found path is OR AX,0xffff (-1); found path is MOV AX,DI.
  */
-short animation_graph_get_animation_by_name(int animation_graph_tag_index, const char *name)
+short animation_graph_get_animation_by_name(int animation_graph_tag_index,
+                                            const char *name)
 {
   char *antr_tag;
   int *animation_block;

@@ -968,6 +968,49 @@ void ui_widgets_close_all(void)
   } while ((int)list_heads < 0x46cc40);
 }
 
+/* ui_widgets_close_for_local_player (0xe5910) — like ui_widgets_close_all
+ * above, but only tears down the one root-widget stack (of the 4 at
+ * 0x46cc20..2c / 0x46cc30..3c) whose root widget's local_player_index field
+ * (+8) matches local_player_index: closes that root via ui_widget_close
+ * (0xe5620), then drains its pending-close list at 0x46cc30[i] (linked
+ * through +0xc) back to the stack memory pool at [0x31e04c]. Asserts
+ * local_player_index is in [0,4) -- unlike ui_widgets_pop_stack below,
+ * -1 is NOT special-cased to player 0 here. */
+void ui_widgets_close_for_local_player(int16_t local_player_index)
+{
+  int *list_heads;
+  int root;
+  int widget;
+  int next;
+  void *pool;
+
+  if (local_player_index < 0 || local_player_index >= 4) {
+    display_assert("expected a valid local_player_index",
+                   "c:\\halo\\SOURCE\\interface\\ui_widget.c", 0x482, true);
+    system_exit(-1);
+  }
+
+  list_heads = (int *)0x46cc30;
+  do {
+    root = list_heads[-4];
+    if (root != 0 && *(int16_t *)(root + 8) == local_player_index) {
+      ui_widget_close((void *)root);
+
+      widget = *list_heads;
+      if (widget != 0) {
+        while (widget != 0) {
+          pool = *(void **)0x31e04c;
+          next = *(int *)(widget + 0xc);
+          *list_heads = next;
+          stack_memory_pool_deallocate(pool, (void *)widget);
+          widget = *list_heads;
+        }
+      }
+    }
+    list_heads++;
+  } while ((int)list_heads < 0x46cc40);
+}
+
 /* ui_widgets_pop_stack — drains one pending queued entry from the
  * pending-load list at 0x46cc30[local_player_index] (see
  * ui_widget_pending_load_pop / ui_widget_pending_load_push_internal above).
@@ -2504,7 +2547,120 @@ bool ui_widgets_process_pause(void)
   return handled;
 }
 
-void *ui_widget_spawn_from_event_handler(void *widget, int tag_index);
+/* ui_widget_spawn_from_event_handler — creates a new widget from an event
+ * handler's spawn tag_index (called from ui_widget_close when a "widget
+ * deleted" handler has the spawn bit set). Looks up the DeLa (UI widget
+ * definition) tag for tag_index and resolves the target widget_stack slot
+ * from the tag's own controller_index field (offset +2, same field/values
+ * switched on in ui_widget_load_by_name_or_tag): if the definition's
+ * "explicit controller" flag (+0x2c & 0x1000) is set, cases 0-3 select
+ * that stack directly and case 4 means "no specific player" (-1); if the
+ * flag is clear, cases 0-3 are identical but case 4 instead inherits the
+ * spawning widget's own local_player_index (+8). Any other
+ * controller_index value halts (two separate halt sites, one per flag
+ * branch, hence the two different line numbers below). Then walks up the
+ * spawning widget's parent chain (+0x30) to find the root ancestor, and
+ * searches the immediate parent's child list (+0x34 first_child, +0x2c
+ * next_sibling) for the spawning widget's own index among its siblings.
+ * Finally loads the new widget via ui_widget_load_by_name_or_tag, passing
+ * the root ancestor's tag_index, the immediate parent's tag_index (or -1
+ * if there is no parent), and the sibling index (or -1 if not found). */
+void *ui_widget_spawn_from_event_handler(void *widget, int tag_index)
+{
+  int tag_data;
+  int widget_stack;
+  int *parent;
+  int *walker;
+  int *root;
+  int immediate_parent_tag_index;
+  int sibling_index;
+  void *child;
+  int index;
+  void *new_widget;
+
+  tag_data = (int)tag_get(0x44654c61, tag_index);
+
+  if ((*(uint32_t *)(tag_data + 0x2c) & 0x1000) != 0) {
+    switch (*(int16_t *)(tag_data + 2)) {
+    case 0:
+      widget_stack = 0;
+      break;
+    case 1:
+      widget_stack = 1;
+      break;
+    case 2:
+      widget_stack = 2;
+      break;
+    case 3:
+      widget_stack = 3;
+      break;
+    case 4:
+      widget_stack = -1;
+      break;
+    default:
+      display_assert("invalid widget controller index specified",
+                     "c:\\halo\\SOURCE\\interface\\ui_widget.c", 0x1504, true);
+      system_exit(-1);
+      break;
+    }
+  } else {
+    switch (*(int16_t *)(tag_data + 2)) {
+    case 0:
+      widget_stack = 0;
+      break;
+    case 1:
+      widget_stack = 1;
+      break;
+    case 2:
+      widget_stack = 2;
+      break;
+    case 3:
+      widget_stack = 3;
+      break;
+    case 4:
+      widget_stack = *(int16_t *)((char *)widget + 8);
+      break;
+    default:
+      display_assert("invalid widget controller index specified",
+                     "c:\\halo\\SOURCE\\interface\\ui_widget.c", 0x1510, true);
+      system_exit(-1);
+      break;
+    }
+  }
+
+  parent = *(int **)((char *)widget + 0x30);
+  root = (int *)widget;
+  walker = parent;
+  while (walker != NULL) {
+    root = walker;
+    walker = (int *)walker[0xc];
+  }
+
+  immediate_parent_tag_index = (parent == NULL) ? -1 : *parent;
+
+  sibling_index = -1;
+  if (parent != NULL && (child = (void *)parent[0xd]) != NULL) {
+    index = 0;
+    do {
+      sibling_index = index;
+      if (child == widget) {
+        break;
+      }
+      child = *(void **)((char *)child + 0x2c);
+      index++;
+      sibling_index = -1;
+    } while (child != NULL);
+  }
+
+  new_widget =
+    ui_widget_load_by_name_or_tag(NULL, tag_index, 0, widget_stack, *root,
+                                  immediate_parent_tag_index, sibling_index);
+  if (new_widget == NULL) {
+    error(2, "event handler failed to spawn widget");
+  }
+
+  return new_widget;
+}
 
 typedef struct ui_widget_process_data {
   int16_t unk0;
@@ -2838,6 +2994,51 @@ bool ui_widget_dispose_network_game_server_list(void *widget, void *event_data,
   return true;
 }
 
+/* start split-screen game networking (0x0ea010, single data xref at
+ * 0x31e1ac) — counterpart to FUN_000E9D40's "failed to initiate a
+ * multiplayer game server" path, but for split screen: disallows remote
+ * connections, then if no network game server exists yet, spins one up
+ * via the game engine playlist and switches the connection to server
+ * mode (2); bails out immediately on playlist-begin failure without
+ * ever probing the client. If a server already existed (or was just
+ * created), then checks for an existing client and creates one if
+ * needed. On any failure, tears down both client and server, clears
+ * the multiplayer variant, and reports the error. Returns true on
+ * success. */
+bool FUN_000ea010(void)
+{
+  void *server;
+  void *client;
+  bool result;
+
+  network_game_set_accept_remote_connections(0);
+  server = network_game_server_get();
+  if (server == NULL) {
+    game_engine_playlist_initialize();
+    result = FUN_0012a890();
+    if (!result) {
+      goto fail;
+    }
+    game_engine_playlist_begin();
+    set_game_connection(2);
+  }
+  result = true;
+  client = network_game_client_get();
+  if (client == NULL) {
+    result = FUN_0012a250();
+  }
+  if (result) {
+    return result;
+  }
+
+fail:
+  dispose_global_network_game_client();
+  dispose_global_network_game_server();
+  player_ui_clear_multiplayer_variant();
+  error(2, "failed to initiate split screen game networking");
+  return result;
+}
+
 /* mp level list initialize (event handler table entry at data 0x31e1c0,
  * 0x0ea100) — validates that `widget` itself is a spinner-list tag with
  * exactly 3 items ("multiplayer level list", same assert-file/line
@@ -2908,11 +3109,34 @@ bool ui_widget_multiplayer_level_list_dispose(void *widget, void *event_data,
   return true;
 }
 
+/* dispose owned list (event handler, 0x0ea540; single data xref at
+ * 0x31e1d0) — if the widget's cached list pointer at +0x40 is non-NULL,
+ * frees it via widget_free and clears the pointer; always clears the
+ * 16-bit count at +0x44. Unlike the static-table list-dispose siblings
+ * above (mp level list dispose, sp level list dispose, dispose net game
+ * server list, ...), this variant owns and frees its buffer. event_data
+ * and widget_deleted are unused. Always returns true. */
+bool FUN_000ea540(void *widget, void *event_data, bool *widget_deleted)
+{
+  void *list_ptr;
+
+  (void)event_data;
+  (void)widget_deleted;
+
+  list_ptr = *(void **)((char *)widget + 0x40);
+  if (list_ptr != NULL) {
+    widget_free(list_ptr);
+    *(void **)((char *)widget + 0x40) = NULL;
+  }
+  *(int16_t *)((char *)widget + 0x44) = 0;
+  return true;
+}
+
 /* join network game (event handler, 0x0ea900) — asserts event_data is
  * non-NULL, then, if a network game client exists and its state
  * (network_game_client_get_state) is 2, walks the client's 16-slot player
- * table (index_base from network_game_get_game, records at index_base+0x226, stride
- * 0x20 — same table network_game_client_local_player_quit walks) looking
+ * table (index_base from network_game_get_game, records at index_base+0x226,
+ * stride 0x20 — same table network_game_client_local_player_quit walks) looking
  * for a valid record whose machine-index byte (+0x242, relative to
  * index_base+i*0x20) matches this client's local machine index
  * (network_game_client_get_local_machine_index) and whose controller-index
@@ -2986,4 +3210,191 @@ bool FUN_000ea900(void *widget, void *event_data, bool *widget_deleted)
   }
 
   return true;
+}
+
+/* dispose owned list, duplicate table entry (event handler, 0x0eab70; data
+ * xref at 0x31e1e4, 0x14 bytes after FUN_000ea540's 0x31e1d0 entry) —
+ * byte-identical body to FUN_000ea540 above: if the widget's cached list
+ * pointer at +0x40 is non-NULL, frees it via widget_free and clears the
+ * pointer; always clears the 16-bit count at +0x44. event_data and
+ * widget_deleted are unused. Always returns true. */
+bool FUN_000eab70(void *widget, void *event_data, bool *widget_deleted)
+{
+  void *list_ptr;
+
+  (void)event_data;
+  (void)widget_deleted;
+
+  list_ptr = *(void **)((char *)widget + 0x40);
+  if (list_ptr != NULL) {
+    widget_free(list_ptr);
+    *(void **)((char *)widget + 0x40) = NULL;
+  }
+  *(int16_t *)((char *)widget + 0x44) = 0;
+  return true;
+}
+
+/* apply selected game engine item (event handler, data xref 0x31e1f8,
+ * 0x14 bytes after FUN_000eab70's 0x31e1e4 entry, same
+ * ui_widget_event_handler_fn pointer array as the select_game_engine_item
+ * table entry at 0x31e220) — 0xeb020. Runs the inverse of
+ * ui_widget_game_data_select_game_engine_item's (0xecd50) profile-to-widget
+ * table: fetches the in-progress playlist-profile edit copy
+ * (player_ui_get_edit_playlist_profile, called unconditionally first,
+ * before the parent-widget check — order preserved), then asserts the
+ * widget's PARENT (+0x30, not widget itself) is a column-list widget
+ * (+0xe == 3), same "expected column list" display_assert/system_exit(-1)
+ * shape as the sibling handlers.
+ *
+ * If no playlist profile is being edited, logs error(2, "failed to
+ * retrieve editable game variant") and returns false.
+ *
+ * Otherwise remaps the parent's selected-index field (+0x3c, sign-extended
+ * per the original's MOVSX) through the table 0 -> 1, 1 -> 4, 2 -> 2,
+ * 3 -> 3, 4 -> 5 (exactly the inverse of select_game_engine_item's
+ * default -> 0, 2 -> 2, 3 -> 3, 4 -> 1, 5 -> 4 pairing) into a local. Any
+ * other value logs error(2, "unknown game engine option selected") and
+ * falls back to the profile's current value at +0x18 (a self-comparison
+ * no-op, preserved verbatim from the disassembly's MOV ESI,[EDI+0x18]
+ * reload on the default arm). If the remapped value differs from the
+ * profile's current dword field at +0x18 (unproven — pointed-to type of
+ * the profile is void* upstream, same offset select_game_engine_item
+ * reads), clears 0x18 bytes at profile+0x4c (csmemset) before storing the
+ * new value into profile+0x18. Always returns true on the profile-found
+ * path; event_data and widget_deleted are unused, same "3-arg handler
+ * typedef pushed by the dispatcher regardless" shape noted at
+ * select_game_engine_item. */
+bool FUN_000eb020(void *widget, void *event_data, bool *widget_deleted)
+{
+  void *profile;
+  void *parent;
+  int16_t selected;
+  int new_value;
+
+  (void)event_data;
+  (void)widget_deleted;
+
+  profile = player_ui_get_edit_playlist_profile();
+  parent = *(void **)((char *)widget + 0x30);
+
+  if (parent == NULL || *(int16_t *)((char *)parent + 0xe) != 3) {
+    display_assert(
+      "expected column list for game engine type list",
+      "c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 0x7a6,
+      true);
+    system_exit(-1);
+  }
+
+  if (profile != NULL) {
+    selected = *(int16_t *)((char *)parent + 0x3c);
+    switch (selected) {
+    case 0:
+      new_value = 1;
+      break;
+    case 1:
+      new_value = 4;
+      break;
+    case 2:
+      new_value = 2;
+      break;
+    case 3:
+      new_value = 3;
+      break;
+    case 4:
+      new_value = 5;
+      break;
+    default:
+      error(2, "unknown game engine option selected");
+      new_value = *(int *)((char *)profile + 0x18);
+      break;
+    }
+
+    if (new_value != *(int *)((char *)profile + 0x18)) {
+      csmemset((char *)profile + 0x4c, 0, 0x18);
+    }
+    *(int *)((char *)profile + 0x18) = new_value;
+
+    return true;
+  }
+
+  error(2, "failed to retrieve editable game variant");
+  return false;
+}
+
+/* select game engine item (event handler table index 50, data xref
+ * 0x31e220 in the same ui_widget_event_handler_fn pointer array
+ * ui_widget_event_handler_dispatch indexes at 0x31e158; single-param
+ * shape matches ui_widget_game_data_select_difficulty_item (0xf0640,
+ * table index 99) — the 3-arg handler typedef is pushed by the
+ * dispatcher regardless, event_data/widget_deleted are simply not read
+ * here) — 0xecd50. Fetches the in-progress playlist-profile edit copy
+ * (player_ui_get_edit_playlist_profile, called unconditionally first,
+ * before widget is even loaded — order preserved) then asserts widget
+ * is a column-list widget (+0xe == 3, same "expected a column list"
+ * display_assert/system_exit(-1) shape as the difficulty-item sibling).
+ *
+ * If no playlist profile is being edited, logs error(2, "failed to
+ * retrieve editable game variant") and returns false.
+ *
+ * Otherwise remaps the profile's dword field at +0x18 (unproven —
+ * pointed-to type of the profile is void* upstream, offset falls in
+ * game_variant_t's un-split unk_2[] padding) through a fixed table
+ * into the widget's selected-index field (+0x3c, the same "selected
+ * list item" slot ui_widget_game_data_select_difficulty_item uses):
+ * profile field 1 (and anything outside [1,5], unsigned) -> 0, 2 -> 2,
+ * 3 -> 3, 4 -> 1, 5 -> 4. This exact case/value pairing is Ghidra's
+ * resolved jump-table decode (0xecd95 JMP [EAX*4+0xecdf0]) and is not
+ * re-derivable from the visible disassembly text alone, so the mapping
+ * is taken verbatim from the decompiler's switch rather than assumed
+ * sequential.
+ *
+ * Reloads the just-stored selected index from +0x3c (sign-extended,
+ * matching the original's MOVSX reload instead of reusing a cached
+ * value) to call widget_instance_get_nth_child(widget, index), and
+ * stores the resulting child pointer at the selected-child field
+ * (+0x38, paired with +0x3c the same way across this widget family).
+ * Always returns true on the profile-found path. */
+bool ui_widget_game_data_select_game_engine_item(void *widget)
+{
+  void *profile;
+  void *child;
+
+  profile = player_ui_get_edit_playlist_profile();
+
+  if (*(int16_t *)((char *)widget + 0xe) != 3) {
+    display_assert(
+      "expected a column list for the list of available game engines",
+      "c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 0xab2,
+      true);
+    system_exit(-1);
+  }
+
+  if (profile != NULL) {
+    switch (*(int *)((char *)profile + 0x18)) {
+    default:
+      *(int16_t *)((char *)widget + 0x3c) = 0;
+      break;
+    case 2:
+      *(int16_t *)((char *)widget + 0x3c) = 2;
+      break;
+    case 3:
+      *(int16_t *)((char *)widget + 0x3c) = 3;
+      break;
+    case 4:
+      *(int16_t *)((char *)widget + 0x3c) = 1;
+      break;
+    case 5:
+      *(int16_t *)((char *)widget + 0x3c) = 4;
+      break;
+    }
+
+    child = widget_instance_get_nth_child(widget,
+      *(int16_t *)((char *)widget + 0x3c));
+    *(void **)((char *)widget + 0x38) = child;
+
+    return true;
+  }
+
+  error(2, "failed to retrieve editable game variant");
+  return false;
 }
