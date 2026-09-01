@@ -5775,36 +5775,6 @@
       "score": 95.4,
       "source": "src/halo/ai/ai_debug.c"
     },
-    "FUN_0004b2b0": {
-      "abi_model": "raw",
-      "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 90.5,
-      "addr": "0x4b2b0",
-      "end": "0x4b31b",
-      "kind": "auto",
-      "n_r": 21,
-      "opnd_percent": 61.9,
-      "raw_mnemonic_pct": 90.5,
-      "ref": "synth",
-      "ref_sha": "e48c8eb45369e46d",
-      "score": 90.5,
-      "source": "src/halo/ai/ai_debug.c"
-    },
-    "FUN_0004b670": {
-      "abi_model": "regparam_stripped_saves",
-      "abi_model_items": 4,
-      "abi_modeled_mnemonic_pct": 93.3,
-      "addr": "0x4b670",
-      "end": "0x4b766",
-      "kind": "auto",
-      "n_r": 89,
-      "opnd_percent": 62.9,
-      "raw_mnemonic_pct": 92.3,
-      "ref": "synth",
-      "ref_sha": "9b65cbadaef61a76",
-      "score": 93.3,
-      "source": "src/halo/ai/ai_debug.c"
-    },
     "FUN_0004b7a0": {
       "abi_model": "raw",
       "abi_model_items": 0,
@@ -50923,6 +50893,21 @@
       "score": 100.0,
       "source": "src/halo/ai/ai_debug.c"
     },
+    "ai_debug_drawstack": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 90.5,
+      "addr": "0x4b2b0",
+      "end": "0x4b31b",
+      "kind": "auto",
+      "n_r": 21,
+      "opnd_percent": 61.9,
+      "raw_mnemonic_pct": 90.5,
+      "ref": "synth",
+      "ref_sha": "e48c8eb45369e46d",
+      "score": 90.5,
+      "source": "src/halo/ai/ai_debug.c"
+    },
     "ai_debug_get_last_path": {
       "abi_model": "raw",
       "abi_model_items": 0,
@@ -51131,6 +51116,21 @@
       "ref": "synth",
       "ref_sha": "c16d64b68f7c4ad8",
       "score": 100.0,
+      "source": "src/halo/ai/ai_debug.c"
+    },
+    "ai_debug_render_surface": {
+      "abi_model": "regparam_stripped",
+      "abi_model_items": 1,
+      "abi_modeled_mnemonic_pct": 99.3,
+      "addr": "0x49300",
+      "end": "0x493a9",
+      "kind": "auto",
+      "n_r": 70,
+      "opnd_percent": 96.5,
+      "raw_mnemonic_pct": 98.6,
+      "ref": "synth",
+      "ref_sha": "b957cf8cb1f8351c",
+      "score": 99.3,
       "source": "src/halo/ai/ai_debug.c"
     },
     "ai_debug_select_actor": {
