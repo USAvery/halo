@@ -43,7 +43,8 @@ void projectile_make_tracer(int projectile_handle)
  * physics integrator.  Leaf function, no callees. */
 float projectile_get_ballistic_acceleration(int projectile_tag)
 {
-  return -(*(float *)0x32512c * *(float *)(projectile_tag + 0x1cc));
+  float grav = *(float *)0x32512c;
+  return -(grav * *(float *)(projectile_tag + 0x1cc));
 }
 
 /* Compute a normalized value for a projectile tag field at offset 0x1e4.
@@ -54,11 +55,14 @@ float projectile_get_ballistic_acceleration(int projectile_tag)
  * guarding against division by zero or a zero/unset field. */
 float projectile_estimate_time_to_target(void *proj_tag, float value)
 {
-  float field = *(float *)((char *)proj_tag + 0x1e4);
-  float zero = *(float *)0x2533c0;
-  if (field > zero)
-    return value / field;
-  return zero;
+  float result;
+
+  result = *(const float *)0x2533c0;
+  if (*(float *)((char *)proj_tag + 0x1e4) > *(const float *)0x2533c0) {
+    result = value / *(float *)((char *)proj_tag + 0x1e4);
+  }
+
+  return result;
 }
 
 /* Return true if any projectile object (type 0x20) exists in the world.
@@ -143,7 +147,7 @@ void projectile_export_function_values(int projectile_handle)
   char *tag;
   int16_t *sel_ptr;
   float *out_ptr;
-  float value; /* local_8 */
+  float value;
   int16_t sel;
   int counter;
 
@@ -157,24 +161,28 @@ void projectile_export_function_values(int projectile_handle)
   do {
     sel = *sel_ptr;
     if (sel != 0) {
-      if (sel == 1) {
-        if (*(float *)(tag + 0x1c8) == 0.0f) {
-          value = 0.0f;
-        } else {
+      switch (sel) {
+      case 1:
+        if (*(float *)(tag + 0x1c8) != 0.0f) {
           value = *(float *)(proj + 0x200) / *(float *)(tag + 0x1c8);
+        } else {
+          value = 0.0f;
         }
-      } else if (sel == 2) {
+        break;
+      case 2:
         value = *(float *)(proj + 0x1f0);
-      } else if (sel == 3) {
+        break;
+      case 3:
         if (*(uint8_t *)(proj + 0x1dc) & 0x2) {
           value = 1.0f;
         } else {
           value = 0.0f;
         }
-      } else {
+        break;
+      default:
         display_assert(0, "c:\\halo\\SOURCE\\items\\projectiles.c", 0x622, 1);
         system_exit(-1);
-        value = 0.0f;
+        break;
       }
       *out_ptr = value;
     }
@@ -194,14 +202,11 @@ void projectile_export_function_values(int projectile_handle)
  * detonation-effect distribution along the projectile's travel path. */
 float FUN_000f7fa0(void *tag, float range_begin, float range_end)
 {
-  float zero = *(float *)0x2533c0;
-  float r1 = *(float *)((char *)tag + 0x1e4);
-  float r2 = *(float *)((char *)tag + 0x1e8);
-
   range_end -= range_begin;
-  if (r1 == r2 || range_end == zero)
-    return zero;
-  return (r1 * r1 - r2 * r2) / (range_end + range_end);
+  if (*(float *)((char *)tag + 0x1e4) == *(float *)((char *)tag + 0x1e8) || range_end == *(float *)0x2533c0)
+    return *(float *)0x2533c0;
+  return (*(float *)((char *)tag + 0x1e4) * *(float *)((char *)tag + 0x1e4) -
+          *(float *)((char *)tag + 0x1e8) * *(float *)((char *)tag + 0x1e8)) / (range_end + range_end);
 }
 
 /* Arm a projectile and detach it from its parent object.
@@ -331,7 +336,7 @@ char projectile_aim_ballistic(float speed, float gravity, float *origin,
   float t_min;  /* local_14, EBP-0x10; disc_base then t_min */
   float c4;  /* local_10, EBP-0x0c */
   float b;  /* local_c, EBP-0x08 */
-  char ok;  /* local_5, EBP-0x01 */
+  volatile char ok;  /* local_5, EBP-0x01 */
   float a; /* quadratic coeff a = a_coeff^2 * 0.25 */
   float a_coeff; /* effective gravity: max(0, per_tick*gravity) */
   float V; /* chosen launch speed, then V_out at output stage */
@@ -372,7 +377,7 @@ char projectile_aim_ballistic(float speed, float gravity, float *origin,
    * Two-step to force dist_sq*a before *4.0 (matches MSVC operand order). */
   tmp_f = dist_sq * a;
   c4 = tmp_f * *(float *)0x2533d8;
-  if (c4 <= *(float *)0x2533c0) {
+  if (!(c4 > *(const float *)0x2533c0)) {
     display_assert("4.0f * a * c > 0.0f",
                    "c:\\halo\\SOURCE\\items\\projectiles.c", 0x2f8, 1);
     system_exit(-1);
@@ -384,7 +389,7 @@ char projectile_aim_ballistic(float speed, float gravity, float *origin,
 
   /* t_sq_max = -disc_base / two_a; assert >= 0. */
   V = -t_min / two_a;
-  if (V < *(float *)0x2533c0) {
+  if (!(V >= *(const float *)0x2533c0)) {
     display_assert("t_squared_max >= 0.0f",
                    "c:\\halo\\SOURCE\\items\\projectiles.c", 0x2fc, 1);
     system_exit(-1);
@@ -409,7 +414,7 @@ char projectile_aim_ballistic(float speed, float gravity, float *origin,
       tmp_f2 = t_max * *param_6;
       tmp_f2 = tmp_f2 * tmp_f2;
       tmp_f = b - -(tmp_f2 * a + dist_sq / tmp_f2);
-      if (tmp_f <= *(float *)0x2533c0) {
+      if (!(tmp_f > *(const float *)0x2533c0)) {
         display_assert("v_desired_sq > 0.0f",
                        "c:\\halo\\SOURCE\\items\\projectiles.c", 0x326, 1);
         system_exit(-1);
@@ -514,9 +519,9 @@ LAB_output:
  * optional: travel time = dist / speed; 0.0 if speed <= 0.0 Returns 1 (bool
  * true) unconditionally. Source ref: c:\halo\SOURCE\items\projectiles.c line
  * 0x399 (921). */
-int projectile_aim_linear(float speed, float *origin, float *target,
-                          float *aim_vector, float *out_speed, float *out_t,
-                          float *out_dist)
+bool projectile_aim_linear(float speed, float *origin, float *target,
+                           float *aim_vector, float *out_speed, float *out_t,
+                           float *out_dist)
 {
   float local_vec[3];
   float dist;
@@ -528,10 +533,10 @@ int projectile_aim_linear(float speed, float *origin, float *target,
 
   dist = normalize3d(local_vec);
 
-  if (speed <= *(float *)0x2533c0) {
-    t = 0.0f;
-  } else {
+  if (speed > *(const float *)0x2533c0) {
     t = dist / speed;
+  } else {
+    t = 0.0f;
   }
 
   if (aim_vector == NULL) {
@@ -554,7 +559,7 @@ int projectile_aim_linear(float speed, float *origin, float *target,
     *out_t = t;
   }
 
-  return 1;
+  return true;
 }
 
 /* Resolve the launch speed for a projectile and compute its aim direction.
@@ -625,31 +630,26 @@ char projectile_aim(int projectile_tag, int param_2, int param_3, void *param_4,
 void FUN_000f8590(int projectile_handle)
 {
   char *obj;
-  float vx, vy, vz;
   float speed;
   float inv_speed;
-  uint32_t flags;
 
   obj = (char *)object_get_and_verify_type(projectile_handle, 0x20);
 
-  vx = *(float *)(obj + 0x3c);
-  vy = *(float *)(obj + 0x40);
-  vz = *(float *)(obj + 0x44);
-  speed = sqrtf(vx * vx + vy * vy + vz * vz);
+  speed = sqrtf(*(float *)(obj + 0x3c) * *(float *)(obj + 0x3c) +
+                *(float *)(obj + 0x40) * *(float *)(obj + 0x40) +
+                *(float *)(obj + 0x44) * *(float *)(obj + 0x44));
 
-  flags = *(uint32_t *)(obj + 0x1dc);
-
-  if (speed != 0.0f) {
+  if (speed != *(const float *)0x2533c0) {
     inv_speed = 1.0f / speed;
-    *(uint32_t *)(obj + 0x1dc) = flags | 0x1u;
-    *(float *)(obj + 0x214) = inv_speed * vx;
-    *(float *)(obj + 0x218) = inv_speed * vy;
-    *(float *)(obj + 0x21c) = inv_speed * vz;
+    *(uint32_t *)(obj + 0x1dc) |= 0x1u;
+    *(float *)(obj + 0x214) = inv_speed * *(float *)(obj + 0x3c);
+    *(float *)(obj + 0x218) = inv_speed * *(float *)(obj + 0x40);
+    *(float *)(obj + 0x21c) = inv_speed * *(float *)(obj + 0x44);
     *(float *)(obj + 0x220) = x87_fsin(speed);
     *(float *)(obj + 0x224) = x87_fcos(speed);
   } else {
-    *(uint32_t *)(obj + 0x1dc) = flags & ~0x1u;
-    *(float *)(obj + 0x220) = 0.0f;
+    *(uint32_t *)(obj + 0x1dc) &= ~0x1u;
+    *(float *)(obj + 0x220) = *(const float *)0x2533c0;
     *(float *)(obj + 0x224) = 1.0f;
   }
 }
@@ -681,8 +681,6 @@ void FUN_000f8640(int projectile_handle)
 {
   char *proj;
   char *tag_def;
-  float range_begin;
-  float ratio;
 
   proj = (char *)object_get_and_verify_type(projectile_handle, 0x20);
   tag_def = (char *)tag_get(0x70726f6a, *(int *)proj);
@@ -692,19 +690,21 @@ void FUN_000f8640(int projectile_handle)
     *(float *)(proj + 0x20c) = FUN_000f7fa0(
       tag_def, *(float *)(tag_def + 0x1dc), *(float *)(tag_def + 0x1e0));
     *(int *)(proj + 0x210) = *(int *)(tag_def + 0x1e0);
-    range_begin = *(float *)(tag_def + 0x1dc);
+
+    if (*(float *)(tag_def + 0x1dc) > *(float *)0x2533c0) {
+      *(float *)(proj + 0x208) = *(float *)(tag_def + 0x1dc) / *(float *)(tag_def + 0x1e4);
+      return;
+    }
   } else {
     /* non-detonating branch: use tag offsets 0x1d0/0x1d4 */
     *(float *)(proj + 0x20c) = FUN_000f7fa0(
       tag_def, *(float *)(tag_def + 0x1d0), *(float *)(tag_def + 0x1d4));
-    *(int *)(proj + 0x210) = *(int *)(tag_def + 0x1d4);
-    range_begin = *(float *)(tag_def + 0x1d0);
-  }
+    *(int *)(proj + 0x210) = *(int *)(tag_def + 0x1e0);
 
-  if (range_begin > *(float *)0x2533c0) {
-    ratio = range_begin / *(float *)(tag_def + 0x1e4);
-    *(float *)(proj + 0x208) = ratio;
-    return;
+    if (*(float *)(tag_def + 0x1d0) > *(float *)0x2533c0) {
+      *(float *)(proj + 0x208) = *(float *)(tag_def + 0x1d0) / *(float *)(tag_def + 0x1e4);
+      return;
+    }
   }
 
   *(float *)(proj + 0x204) = 1.0f;
@@ -757,14 +757,13 @@ bool FUN_000f8720(int projectile_handle, float *new_pos,
   float *proj_pos; /* &obj->position (float[3] at proj+0xc) */
   float *up_vec;
   float *fwd_vec;
-  float dx, dy, dz; /* movement delta: new_pos - proj_pos */
   float radius;
-  /* cross direction: cross(up_vec, delta), stored in dir1 then normalized */
-  float delta[3]; /* movement direction for centre-line cast */
+  float dx, dy, dz;
+  /* cross direction: cross(delta, up_vec), stored in dir1 then normalized */
   float dir1[3]; /* normalized cross direction; later reused as sweep dir */
-  /* positive-side origin: proj_pos + radius * cross */
+  /* positive-side origin: proj_pos + radius * cross (also reused for initial centre-line delta) */
   float origin1[3];
-  /* positive-side endpoint (x,y); z held on FPU and used directly */
+  /* positive-side endpoint (x,y,z) */
   float pt_b1x, pt_b1y, pt_b1z;
   /* negative-side origin: proj_pos - radius * cross */
   float pt_a2[3];
@@ -780,10 +779,10 @@ bool FUN_000f8720(int projectile_handle, float *new_pos,
   dz = new_pos[2] - proj_pos[2];
 
   /* 1. Centre-line collision test (flags 0x1000e9). */
-  delta[0] = dx;
-  delta[1] = dy;
-  delta[2] = dz;
-  if (FUN_0014df70(0x1000e9, proj_pos, delta, *(int *)(proj + 0x1e4),
+  origin1[0] = dx;
+  origin1[1] = dy;
+  origin1[2] = dz;
+  if (FUN_0014df70(0x1000e9, proj_pos, origin1, *(int *)(proj + 0x1e4),
                    collision_result)) {
     return 1;
   }
@@ -794,7 +793,7 @@ bool FUN_000f8720(int projectile_handle, float *new_pos,
     return 0;
   }
 
-  /* Compute cross direction: cross(up_vec, delta). */
+  /* Compute cross direction: cross(delta, up_vec). */
   up_vec = *(float **)0x31fc44;
   dir1[0] = dy * up_vec[2] - dz * up_vec[1];
   dir1[1] = dz * up_vec[0] - dx * up_vec[2];
@@ -897,12 +896,8 @@ void FUN_000f8920(int projectile_handle, char has_hit_count, float current_time)
   float parent_pos[3]; /* parent world position (local_b8) */
   float saved_vel[3]; /* saved proj object position at 0xc..0x14 */
 
-  /* damage params for area damage (0xac bytes as in damage_data_new) */
-  char damage_params[0xac];
-  float fwd2[3]; /* forward buf for area-damage object_get_orientation
-                    ([EBP-0x74]) */
-  float pos2[3]; /* world pos for area-damage object_get_world_position
-                    ([EBP-0x8c]) */
+  /* damage params for area damage (0x54 bytes as in damage_data_new) */
+  char damage_params[0x54];
 
   /* secondary detonation effect */
   short det_idx; /* proj->detonation_effect_index at proj+0x1e2 */
@@ -1042,18 +1037,15 @@ void FUN_000f8920(int projectile_handle, char has_hit_count, float current_time)
     *(uint32_t *)(damage_params + 4) |= 8u;
 
     /* Forward only (no up needed). */
-    object_get_orientation(projectile_handle, fwd2, (float *)0);
+    object_get_orientation(projectile_handle, (float *)(damage_params + 0x34), (float *)0);
 
-    /* Get world position for damage origin. */
-    object_get_world_position(projectile_handle, (vector3_t *)pos2);
+    /* Get world position for damage origin into damage_params+0x1c. */
+    object_get_world_position(projectile_handle, (vector3_t *)(damage_params + 0x1c));
 
-    /* Store position into damage_params (offsets from disasm:
-     * [EBP-0x80] = damage_params+0x28, [EBP-0x7c] = +0x2c, [EBP-0x78] = +0x30).
-     * Confirmed by: MOV [EBP-0x80],EDX; MOV [EBP-0x7c],EAX; MOV [EBP-0x78],ECX
-     * where damage_params base = [EBP-0xa8]. */
-    *(float *)(damage_params + 0x28) = pos2[0];
-    *(float *)(damage_params + 0x2c) = pos2[1];
-    *(float *)(damage_params + 0x30) = pos2[2];
+    /* Copy position from +0x1c to +0x28. */
+    *(float *)(damage_params + 0x28) = *(float *)(damage_params + 0x1c);
+    *(float *)(damage_params + 0x2c) = *(float *)(damage_params + 0x20);
+    *(float *)(damage_params + 0x30) = *(float *)(damage_params + 0x24);
 
     /* Object-index and team fields.
      * [EBP-0x9c] = damage_params+0x0c = obj+0x74 (object index).
@@ -1076,13 +1068,11 @@ void FUN_000f8920(int projectile_handle, char has_hit_count, float current_time)
   det_idx = *(short *)(proj + 0x1e2);
 
   if (det_idx != (short)-1) {
-    if (det_idx < 0) {
-      det_entry = (void *)0x31ed08u;
-    } else if ((int)det_idx >= *(int *)(proj_tag + 0x240)) {
-      det_entry = (void *)0x31ed08u;
-    } else {
+    if (det_idx >= 0 && (int)det_idx < *(int *)(proj_tag + 0x240)) {
       det_entry =
         tag_block_get_element((void *)(proj_tag + 0x240), (int)det_idx, 0xa0);
+    } else {
+      det_entry = (void *)0x31ed08u;
     }
 
     det_effect = *(int *)((char *)det_entry + 0x74);
@@ -1145,7 +1135,7 @@ void FUN_000f8920(int projectile_handle, char has_hit_count, float current_time)
  * Disasm-verified: call at 0x000f8eaf passes handle in EAX (FUN_000f8590);
  * call at 0x000f8ebf passes handle in EAX (FUN_000f8640).
  * All cdecl stack args confirmed from PUSH/ADD-ESP pairs. */
-int projectile_new(int projectile_handle)
+bool projectile_new(int projectile_handle)
 {
   char *proj; /* projectile object base (type 0x20) */
   char *proj_tag; /* projectile tag data ('proj') */
@@ -1155,7 +1145,7 @@ int projectile_new(int projectile_handle)
   int root_parent; /* result of object_get_root_parent */
   void *mat_block; /* material response block element pointer */
   int mat_count; /* number of material response entries */
-  int mat_idx; /* loop index into material response block */
+  int16_t mat_idx; /* loop index into material response block */
   int *seed; /* random seed pointer from get_global_random_seed_address */
 
   proj = (char *)object_get_and_verify_type(projectile_handle, 0x20);
@@ -1241,7 +1231,7 @@ int projectile_new(int projectile_handle)
   /* Set active + detonating-armed flag bits. */
   *(uint32_t *)(proj + 0x4) |= 0xc0000u;
 
-  return 1;
+  return true;
 }
 
 /*
@@ -1272,61 +1262,53 @@ int projectile_new(int projectile_handle)
 void projectile_accelerate(int projectile_handle, float *acceleration)
 {
   char *proj; /* projectile object base (type 0x20) */
-  char *vel; /* pointer to proj+0x18 (translational velocity xyz) */
-  float *seed; /* engine-wide random seed pointer */
+  float *vel; /* pointer to proj+0x18 (translational velocity xyz) */
   float dir[3]; /* random unit direction from random_seed_get_direction3d */
-  float sq_mag; /* squared magnitude of acceleration vector */
-  float magnitude; /* magnitude of acceleration vector */
-  float rand_real; /* random float in [0,1) from random_math_real */
+  float magnitude; /* squared magnitude, then magnitude of acceleration vector */
   float scale; /* scatter scale: rand_real * magnitude * (PI/2) */
-  float *acc;
 
-  acc = acceleration;
   proj = (char *)object_get_and_verify_type(projectile_handle, 0x20);
   tag_get(0x70726f6a, *(int *)proj);
-  if (!real_vector3d_valid(acc)) {
-    csprintf((char *)0x5ab100, "%s: assert_valid_real_vector2d(%f, %f, %f)",
-             "acceleration", (double)acc[0], (double)acc[1], (double)acc[2]);
-    display_assert((char *)0x5ab100, "c:\\halo\\SOURCE\\items\\projectiles.c",
-                   0x3ef, 1);
+  if (!(bool)real_vector3d_valid(acceleration)) {
+    display_assert(
+      csprintf((char *)0x5ab100, "%s: assert_valid_real_vector2d(%f, %f, %f)",
+               "acceleration", (double)acceleration[0], (double)acceleration[1], (double)acceleration[2]),
+      "c:\\halo\\SOURCE\\items\\projectiles.c", 0x3ef, 1);
     system_exit(-1);
   }
 
   /* Only apply acceleration when the projectile has no parent. */
   if (*(int *)(proj + 0xcc) == -1) {
-    vel = proj + 0x18;
+    vel = (float *)(proj + 0x18);
 
-    if (!real_vector3d_valid((float *)vel)) {
-      csprintf((char *)0x5ab100, "%s: assert_valid_real_vector2d(%f, %f, %f)",
-               "&projectile->object.translational_velocity",
-               (double)*(float *)(proj + 0x18), (double)*(float *)(proj + 0x1c),
-               (double)*(float *)(proj + 0x20));
-      display_assert((char *)0x5ab100, "c:\\halo\\SOURCE\\items\\projectiles.c",
-                     0x3f3, 1);
+    if (!(bool)real_vector3d_valid(vel)) {
+      display_assert(
+        csprintf((char *)0x5ab100, "%s: assert_valid_real_vector2d(%f, %f, %f)",
+                 "&projectile->object.translational_velocity",
+                 (double)vel[0], (double)vel[1], (double)vel[2]),
+        "c:\\halo\\SOURCE\\items\\projectiles.c", 0x3f3, 1);
       system_exit(-1);
     }
 
     /* Add acceleration to object translational velocity (proj+0x18..0x20). */
-    *(float *)(proj + 0x18) += acc[0];
-    *(float *)(proj + 0x1c) += acc[1];
-    *(float *)(proj + 0x20) += acc[2];
+    vel[0] += acceleration[0];
+    vel[1] += acceleration[1];
+    vel[2] += acceleration[2];
 
     /* Get a random direction vector into dir[3]. */
-    seed = (float *)get_global_random_seed_address();
-    random_seed_get_direction3d((unsigned int *)seed, dir);
+    random_seed_get_direction3d((unsigned int *)get_global_random_seed_address(), dir);
 
     /* Compute squared magnitude, then scale = sqrt(sq_mag) * rand * PI/2. */
-    sq_mag = acc[0] * acc[0] + acc[1] * acc[1] + acc[2] * acc[2];
+    magnitude = acceleration[0] * acceleration[0] + acceleration[1] * acceleration[1] + acceleration[2] * acceleration[2];
 
-    seed = (float *)get_global_random_seed_address();
-    rand_real = random_math_real((unsigned int *)seed);
-    magnitude = sqrtf(sq_mag);
-    scale = rand_real * magnitude * *(float *)0x2568bc;
+    scale = random_math_real((unsigned int *)get_global_random_seed_address()) * sqrtf(magnitude) * *(float *)0x2568bc;
 
-    /* Add random scatter to projectile impulse velocity (proj+0x3c..0x44). */
-    *(float *)(proj + 0x3c) += dir[0] * scale;
-    *(float *)(proj + 0x40) += dir[1] * scale;
-    *(float *)(proj + 0x44) += dir[2] * scale;
+    dir[0] *= scale;
+    dir[1] *= scale;
+    dir[2] *= scale;
+    *(float *)(proj + 0x3c) += dir[0];
+    *(float *)(proj + 0x40) += dir[1];
+    *(float *)(proj + 0x44) += dir[2];
 
     /* Rebuild velocity direction cache. */
     FUN_000f8590(projectile_handle);
@@ -1334,13 +1316,12 @@ void projectile_accelerate(int projectile_handle, float *acceleration)
     /* Clear object flag bit 5 ("motion-pending" or similar). */
     *(uint32_t *)(proj + 0x4) &= ~0x20u;
 
-    if (!real_vector3d_valid((float *)vel)) {
-      csprintf((char *)0x5ab100, "%s: assert_valid_real_vector2d(%f, %f, %f)",
-               "&projectile->object.translational_velocity",
-               (double)*(float *)(proj + 0x18), (double)*(float *)(proj + 0x1c),
-               (double)*(float *)(proj + 0x20));
-      display_assert((char *)0x5ab100, "c:\\halo\\SOURCE\\items\\projectiles.c",
-                     0x405, 1);
+    if (!(bool)real_vector3d_valid(vel)) {
+      display_assert(
+        csprintf((char *)0x5ab100, "%s: assert_valid_real_vector2d(%f, %f, %f)",
+                 "&projectile->object.translational_velocity",
+                 (double)vel[0], (double)vel[1], (double)vel[2]),
+        "c:\\halo\\SOURCE\\items\\projectiles.c", 0x405, 1);
       system_exit(-1);
     }
   }
@@ -1442,8 +1423,8 @@ void FUN_000f90d0(int projectile_handle, float *hit_pos, float param_3,
   short sTemp;
   float *seed;
 
-  /* Damage params buffer (0xac bytes; see damage_data_new). */
-  char damage_params[0xac];
+  /* Damage params buffer (0x54 bytes; see damage_data_new). */
+  char damage_params[0x54];
 
   /* Marker/position arrays for effect_new_attached_from_markers /
    * effect_new_unattached_from_markers. MSVC stack overlap: marker_count=5 but
@@ -1458,10 +1439,6 @@ void FUN_000f90d0(int projectile_handle, float *hit_pos, float param_3,
   /* Surface-decompose buffers for result type 2 (deflect). */
   float proj_component[3];
   float perp_component[3];
-
-  /* Copy of col_result position at [ESI+0xc..0x10]. */
-  float col_pos[3];
-  float col_pos2[3];
 
   /* Velocity copy passed to normalize / normalised direction. */
   float vel_local[3];
@@ -1536,18 +1513,18 @@ void FUN_000f90d0(int projectile_handle, float *hit_pos, float param_3,
     *(int *)(damage_params + 0x0c) = *(int *)((char *)proj + 0x74);
     *(short *)(damage_params + 0x10) = *(short *)((char *)proj + 0x68);
     *(float *)(damage_params + 0x40) = det_frac;
-    /* Copy marker positions from col_result. */
-    col_pos[0] = *(float *)((char *)col_result + 0x18);
-    col_pos[1] = *(float *)((char *)col_result + 0x1c);
-    col_pos[2] = *(float *)((char *)col_result + 0x20); /* buf-alias-ok */
-    col_pos2[0] = *(float *)((char *)col_result + 0x18);
-    col_pos2[1] = *(float *)((char *)col_result + 0x1c);
-    col_pos2[2] = *(float *)((char *)col_result + 0x20); /* buf-alias-ok */
-    /* vel_local = in_velocity copy, then normalize. */
-    vel_local[0] = in_velocity[0];
-    vel_local[1] = in_velocity[1];
-    vel_local[2] = in_velocity[2];
-    normalize3d(vel_local);
+    *(float *)(damage_params + 0x1c) = *(float *)((char *)col_result + 0x18);
+    *(float *)(damage_params + 0x20) = *(float *)((char *)col_result + 0x1c);
+    *(float *)(damage_params + 0x24) =
+      *(float *)((char *)col_result + 0x20); /* buf-alias-ok */
+    *(float *)(damage_params + 0x28) = *(float *)((char *)col_result + 0x18);
+    *(float *)(damage_params + 0x2c) = *(float *)((char *)col_result + 0x1c);
+    *(float *)(damage_params + 0x30) =
+      *(float *)((char *)col_result + 0x20); /* buf-alias-ok */
+    *(float *)(damage_params + 0x34) = in_velocity[0];
+    *(float *)(damage_params + 0x38) = in_velocity[1];
+    *(float *)(damage_params + 0x3c) = in_velocity[2];
+    normalize3d((float *)(damage_params + 0x34));
     /* Call area damage.  Last arg is the impact direction (ESI+0x24) — the
      * normalized velocity computed just above. */
     object_cause_damage(damage_params, *(int *)((char *)col_result + 0x38),
@@ -2329,20 +2306,18 @@ bool FUN_000f9c40(int projectile_handle)
       }
       FUN_001a9520(*(int *)(proj + 0x1e8), &target_pos_x);
       time_tick = game_time_get();
-      target_dist =
-        (float)(time_tick + (projectile_handle >> 0x10) * 7 & 0xffff);
+      tmp_int = (time_tick + (projectile_handle >> 16) * 7) & 0xffff;
       {
         float angle_noise1 =
-          (float)FUN_0010a5e0(10, (float)(int)target_dist * *(float *)0x26f2e0);
-        angles_out[0] = (float)(angle_noise1 * *(float *)0x255a54);
+          FUN_0010a5e0(10, (float)tmp_int * *(float *)0x26f2e0);
+        angles_out[0] = angle_noise1 * *(float *)0x255a54;
         time_tick = game_time_get();
-        target_dist =
-          (float)(time_tick + (projectile_handle >> 0x10) * 3 & 0xffff);
+        tmp_int = (time_tick + (projectile_handle >> 16) * 3) & 0xffff;
         {
-          float angle_noise2 = (float)FUN_0010a5e0(10, (float)(int)target_dist *
-                                                         *(float *)0x26f2e0);
+          float angle_noise2 =
+            FUN_0010a5e0(10, (float)tmp_int * *(float *)0x26f2e0);
           angles_out[2] =
-            (float)(*(float *)0x256980 - angle_noise2 * *(float *)0x2568bc);
+            *(float *)0x256980 - angle_noise2 * *(float *)0x2568bc;
         }
       }
       angles_out[1] = angles_out[0];
@@ -2801,24 +2776,24 @@ float FUN_000fac20(int weapon_tag_index, float *out_field8)
     *out_field8 = *(float *)(trigger_elem + 0x8);
   }
   proj_ref = *(int *)(trigger_elem + 0xa0);
-  if (proj_ref == -1) {
-    return local_float;
+  if (proj_ref != -1) {
+    proj_tag = (char *)tag_get(0x70726f6a, proj_ref);
+    jpt_ref = *(int *)(proj_tag + 0x230);
+    if (jpt_ref != -1) {
+      jpt_tag = (char *)tag_get(0x6a707421, jpt_ref);
+      local_float = (*(float *)(jpt_tag + 0x1d8) + *(float *)(jpt_tag + 0x1d4)) *
+                    *(float *)0x253398;
+    }
+    jpt_ref = *(int *)(proj_tag + 0x220);
+    if (jpt_ref != -1) {
+      jpt_tag = (char *)tag_get(0x6a707421, jpt_ref);
+      return (*(float *)(jpt_tag + 0x1d8) + *(float *)(jpt_tag + 0x1d4)) *
+               *(float *)0x253398 +
+             local_float;
+    }
   }
-  proj_tag = (char *)tag_get(0x70726f6a, proj_ref);
-  jpt_ref = *(int *)(proj_tag + 0x230);
-  if (jpt_ref != -1) {
-    jpt_tag = (char *)tag_get(0x6a707421, jpt_ref);
-    local_float = (*(float *)(jpt_tag + 0x1d8) + *(float *)(jpt_tag + 0x1d4)) *
-                  *(float *)0x253398;
-  }
-  jpt_ref = *(int *)(proj_tag + 0x220);
-  if (jpt_ref == -1) {
-    return local_float;
-  }
-  jpt_tag = (char *)tag_get(0x6a707421, jpt_ref);
-  return (*(float *)(jpt_tag + 0x1d8) + *(float *)(jpt_tag + 0x1d4)) *
-           *(float *)0x253398 +
-         local_float;
+
+  return local_float;
 }
 
 /*
