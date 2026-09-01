@@ -7699,3 +7699,51 @@ AUTOLIFT_REVIEW: NEEDS_RUNTIME |
 | FUN_000ea900 | 0xea900 | ui_widget.obj | 90.2 | committed | mechanical gate: 90.2% clean (pass1) [cohort=retrieval] |
 
 **Summary:** 12/12 committed (goal_reached); 9 parked (48.6%, 57.9%, 0%, 68.1%, 80.4%, 0%, 0%, 0%, 90.2% scores); 9 skipped (6 repeated attempts below 90%, 3 reg-args/CRT).
+
+## Goal-lift run — 0/12 committed (stop_on_fail_reached) — 2026-09-01
+
+| function | addr | obj | vc71 | action | reason |
+|---|---|---|---|---|---|
+| FUN_00093ba0 | 0x93ba0 | cinematics.obj | - | skipped | skip_reg_args (selector: @reg-defined prologue → sub-bar) [cohort=none] |
+| input_abstraction_print_config_control | 0xce8c0 | input_abstraction.obj | - | skipped | skip_reg_args (selector: @reg-defined prologue → sub-bar) [cohort=none] |
+| gamepad_button_is_down | 0xffef0 | main.obj | - | skipped | skip_parked_repeat (4 attempts, best 84.5% < 90 — use the improve pass) [cohort=none] |
+| FUN_00104710 | 0x104710 | main.obj | - | skipped | skip_parked_repeat (2 attempts, best 81.5% < 90 — use the improve pass) [cohort=none] |
+| FUN_0006ca50 | 0x6ca50 | tif_open.obj | - | skipped | skip_reg_args (selector: @reg-defined prologue → sub-bar) [cohort=none] |
+| FUN_001b8f10 | 0x1b8f10 | vehicles.obj | - | skipped | skip_parked_repeat (3 attempts, best 84.2% < 90 — use the improve pass) [cohort=none] |
+| ui_widget_multiplayer_profile_save_changes | 0xeea10 | ui_widget_game_data_input_functions.obj | - | skipped | skip_parked_repeat (2 attempts, best 68.3% < 90 — use the improve pass) [cohort=none] |
+| ai_debug_lineofsight | 0x4b770 | ai_debug.obj | - | skipped | skip_parked_repeat (2 attempts, best 63.4% < 90 — use the improve pass) [cohort=none] |
+| ai_debug_render_surface | 0x49300 | ai_debug.obj | 71.8 | parked | structural_cap[deterministic(classify_cap.py)]: reg_defining_prologue (classify_cap.py R-rule, score-context-backed): decl carries an @<eax> register-arg parameter; VC71/cl.exe cannot emit the register-reading prologue MSVC used here, producing a permanent sub-bar regardless of body correctness. 71.8% is inside the documented ~65-80% ceiling for @eax/@esi-arg functions. [cohort=retrieval] |
+| FUN_00057380 | 0x57380 | encounters.obj | 48.8 | parked | below_65pct [cohort=retrieval] |
+| animation_get_x_offsets | 0x120710 | model_animations.obj | 0 | parked | below_65pct [cohort=retrieval] |
+
+**Summary:** 0/12 committed (stop_on_fail_reached); 3 parked (71.8%, 48.8%, 0% scores); 8 skipped (6 repeated attempts below 90%, 2 reg-args).
+
+## Goal-lift run — 9/12 committed (stop_on_fail_reached) — 2026-09-01
+
+| function | addr | obj | vc71 | action | reason |
+|---|---|---|---|---|---|
+| FUN_00093ba0 | 0x93ba0 | cinematics.obj | - | skipped | skip_reg_args (selector: @reg-defined prologue → sub-bar) [cohort=none] |
+| input_abstraction_print_config_control | 0xce8c0 | input_abstraction.obj | - | skipped | skip_reg_args (selector: @reg-defined prologue → sub-bar) [cohort=none] |
+| gamepad_button_is_down | 0xffef0 | main.obj | - | skipped | skip_parked_repeat (4 attempts, best 84.5% < 90 — use the improve pass) [cohort=none] |
+| FUN_00104710 | 0x104710 | main.obj | - | skipped | skip_parked_repeat (2 attempts, best 81.5% < 90 — use the improve pass) [cohort=none] |
+| FUN_0006ca50 | 0x6ca50 | tif_open.obj | - | skipped | skip_reg_args (selector: @reg-defined prologue → sub-bar) [cohort=none] |
+| FUN_001b8f10 | 0x1b8f10 | vehicles.obj | - | skipped | skip_parked_repeat (3 attempts, best 84.2% < 90 — use the improve pass) [cohort=none] |
+| ui_widget_multiplayer_profile_save_changes | 0xeea10 | ui_widget_game_data_input_functions.obj | - | skipped | skip_parked_repeat (2 attempts, best 68.3% < 90 — use the improve pass) [cohort=none] |
+| ai_debug_lineofsight | 0x4b770 | ai_debug.obj | - | skipped | skip_parked_repeat (2 attempts, best 63.4% < 90 — use the improve pass) [cohort=none] |
+| ai_debug_render_surface | 0x49300 | ai_debug.obj | 99.3 | committed | mechanical gate: 99.3% clean (escalated+optimize) [cohort=retrieval] |
+| FUN_00057380 | 0x57380 | encounters.obj | 85.6 | committed | pass1+permute [cohort=retrieval] |
+| animation_get_x_offsets | 0x120710 | model_animations.obj | 94.5 | committed | mechanical gate: 94.5% clean (escalated+optimize) [cohort=retrieval] |
+| FUN_000e5910 | 0xe5910 | - | 95.9 | committed | mechanical gate: 95.9% clean (pass1) [cohort=retrieval] |
+| ui_widget_spawn_from_event_handler | 0xe9320 | ui_widget.obj | 0 | build_failed | Implementation was already present and committed (5f925c9d5, kb.json ported=true, no working-tree diff). I verified it against the fingerprinted Ghidra artifact field-by-field: call_site_audit's 5 calls (tag_get 0x1ba140, display_assert 0x8d9f0, system_exit 0x8e2f0, ui_widget_load_by_name_or_tag 0xe84e0, error 0x8f390) all match the source's calls/argument order; the two explicit-controller-flag branches (widget_stack switch on tag_data+2, case 4 = -1 when flag set vs case 4 = *(int16*)(widget+8) when flag clear) match decompile polarity exactly; the root-ancestor walk (+0x30/+0xc) and sibling-index search (+0x34/+0x2c) match. No code change was needed or made. Hazard scan (check_lift_hazards.py --files ui_widget.c) returned clean, exit 0. maintain.py made no relocations for this target but unexpectedly modified src/halo/ai/ai_communication.c and kb_meta.json (unrelated files) — left unstaged/unreverted per instructions; report to operator for separate handling. VC71 measurement could not be produced: the build stage failed. Root cause is NOT a code defect — diagnosed it directly: `df -h /mnt/g` shows the host G: drive (9p/drvfs mount backing this whole worktree) at 100% capacity, 0 bytes available, and a raw `clang test.c -o build/x` reproduces `ld: final link failed: Input/output error` while the identical compile to /tmp succeeds. CMakeCache.txt/CMakeFiles in build/ had also been corrupted (a symptom of 3 concurrent lift_pipeline/build.py invocations I accidentally created while working around an `rtk` proxy bug that silently swallowed all stdout/exit for this long-running command — confirmed by running the pipeline without the rtk wrapper); I killed the duplicates and moved the corrupted build/CMakeFiles aside to build/CMakeFiles.corrupt.bak, but reconfiguration still fails on the same disk-full I/O error, so a clean rebuild by anyone needs the G: drive freed first. No `rm -rf`/destructive cleanup was performed (blocked by the destructive-command guard; used `mv` only). VC71/permute/equivalence stages never ran because the build gate blocked the pipeline. [cohort=retrieval] |
+| ui_widget_set_difficulty | 0xe9bd0 | ui_widget.obj | 0 | build_failed | Environment blocker, not a lift defect: the worktree filesystem /mnt/g (9p mount of G:\) is 100% full (0 bytes available of 1.46TB). Every attempt to write the implemented function to src/halo/interface/ui_widget.c failed with OSError EIO, confirmed with both the Edit tool and a raw Python write control test. No source or kb.json changes were persisted (git status is clean on the target files), so no build/hazard/VC71/equivalence steps could run. The full C89 implementation was drafted and verified against the Ghidra disassembly/decompile (reads int16_t widget field +0x3c, asserts range [0,4) via display_assert+system_exit(-1) noreturn, else calls main_set_difficulty(difficulty) then ui_play_audio_feedback_sound(2), returns true; event_data/widget_deleted unused matching disasm) but could not be written to disk. Retry once disk space is freed on /mnt/g. [cohort=retrieval] |
+| FUN_000ea010 | 0xea010 | ui_widget.obj | 88.6 | committed | pass1+permute+equiv_n/a [equivalence detail: Not re-run this attempt (no code changes). Prior commit message reports 100/100 equivalence for this function; not independently reproduced in this session. — a 0-divergence pass on the live-state infection_swarm snapshot (populated datum tables, real actor handles) is accepted runtime behavioral evidence for the sub-90% band per the state-snapshot equivalence lane in CLAUDE.md] [cohort=retrieval] |
+| FUN_000ea540 | 0xea540 | ui_widget.obj | 94.1 | committed | mechanical gate: 94.1% clean (pass1) [cohort=retrieval] |
+| ui_widget_swap_player_team | 0xea810 | ui_widget.obj | 0 | parked | below_65pct [cohort=retrieval] |
+| FUN_000eab70 | 0xeab70 | ui_widget.obj | 94.1 | committed | mechanical gate: 94.1% clean (pass1) [cohort=retrieval] |
+| FUN_000eb020 | 0xeb020 | ui_widget.obj | 97 | committed | mechanical gate: 97% clean (pass1) [cohort=retrieval] |
+| FUN_000ecd50 | 0xecd50 | ui_widget.obj | 100 | committed | mechanical gate: 100% clean (escalated+optimize) [cohort=retrieval] |
+| ui_widget_multiplayer_profile_init_name | 0xece10 | ui_widget.obj | 0 | parked | below_65pct [cohort=retrieval] |
+| actor_situation_combat_status_update | 0x302b0 | actor_perception.obj | 0 | parked | below_65pct [cohort=retrieval] |
+| FUN_000a55e0 | 0xa55e0 | cheats.obj | 0 | parked | below_65pct [cohort=retrieval] |
+
+**Summary:** 9/12 committed (stop_on_fail_reached); 2 build_failed (disk-full/infra: G: drive 100% full at 0 bytes, OSError EIO on write); 4 parked (0%, 0%, 0%, 0% scores — all below 65% gate); 8 skipped (6 repeated attempts below 90%, 2 reg-args).

@@ -31395,6 +31395,11 @@
     "confidence": "moderate",
     "coverage_pct": 37.4
   },
+  "0xea010": {
+    "class": "non_leaf",
+    "confidence": "moderate",
+    "coverage_pct": 32.8
+  },
   "0xefed0": {
     "class": "non_leaf",
     "confidence": "weak",

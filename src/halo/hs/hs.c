@@ -635,7 +635,7 @@ void FUN_000c1210(int16_t function_index, int thread_datum, char init)
 /* 0xc1260 — HS built-in evaluator: dispatch a macro function call and commit a
  * 16-bit query result to the thread. Evaluates the macro function via
  * hs_macro_function_evaluate; if it produces a non-null result record, reads
- * the record's first dword and passes it to FUN_00057380 (a query returning a
+ * the record's first dword and passes it to ai_scripting_command_list_status (a query returning a
  * 16-bit value in AX), then commits that value — zero-extended to int — to the
  * thread via hs_return.
  *
@@ -647,7 +647,8 @@ void FUN_000c1210(int16_t function_index, int thread_datum, char init)
  *
  * Callees:
  *   0xcc560 = hs_macro_function_evaluate(int16_t, int, char) -> result ptr
- *   0x57380 = FUN_00057380(int value) -> 16-bit result in AX
+ *   0x57380 = ai_scripting_command_list_status(int parent_handle) -> 16-bit
+ *             result in AX
  *   0xcbf80 = hs_return(int thread_handle, int value)
  */
 void FUN_000c1260(int16_t function_index, int thread_datum, char init)
@@ -662,7 +663,7 @@ void FUN_000c1260(int16_t function_index, int thread_datum, char init)
     (int *)hs_macro_function_evaluate(function_index, thread_datum, init);
   if (result != NULL) {
     value.i = 0;
-    value.s = FUN_00057380(*result);
+    value.s = ai_scripting_command_list_status(*result);
     hs_return(thread_datum, value.i);
   }
 }
@@ -671,7 +672,7 @@ void FUN_000c1260(int16_t function_index, int thread_datum, char init)
  * success the result block holds a handle at +0x0 (int). Passes result[0] to
  * FUN_00056880 (returns short), then returns that short to the HS thread via
  * hs_return(thread_datum, value). Structurally identical to FUN_000c1260
- * (0xc1260); the only difference is the callee (FUN_00056880 vs FUN_00057380).
+ * (0xc1260); the only difference is the callee (FUN_00056880 vs ai_scripting_command_list_status).
  * The union preserves the original's int-slot-zeroed-then-16-bit-store shape:
  * value.i = 0 clears the full 4-byte slot, value.s writes only the low word,
  * so the value passed to hs_return is the short in the low 16 bits with a

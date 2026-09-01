@@ -1,40 +1,4 @@
 
-/* ai_debug_initialize (0x48e90): clear AI debug state, reset selections, and
- * allocate the actor and path debug arrays when they are not already present.
- *
- * Confirmed from disassembly:
- *   csmemset(0x5ac9c0, 0, 0x85b2c)
- *   actor_debug_array allocation: 0x657c00 bytes, source line 0x93
- *   actor_path_debug_array allocation: 0x394f80 bytes, source line 0x94
- *   display_assert(..., line 0x96, true) followed by system_exit(-1).
- * The global addresses remain raw because no corresponding declarations exist
- * in types.h. */
-void ai_debug_initialize(void)
-{
-  csmemset((void *)0x5ac9c0, 0, 0x85b2c);
-  *(int32_t *)0x5ac9f8 = -1;
-  *(int32_t *)0x5ac9f4 = -1;
-  *(int32_t *)0x5acab4 = 1;
-  *(uint8_t *)0x5aca65 = 1;
-
-  if (*(void **)0x331f58 == NULL) {
-    *(void **)0x331f58 =
-      debug_malloc(0x657c00, false, "c:\\halo\\SOURCE\\ai\\ai_debug.c",
-                   0x93);
-  }
-  if (*(void **)0x331f5c == NULL) {
-    *(void **)0x331f5c =
-      debug_malloc(0x394f80, false, "c:\\halo\\SOURCE\\ai\\ai_debug.c",
-                   0x94);
-  }
-  if (*(void **)0x331f58 != NULL && *(void **)0x331f5c != NULL) {
-    return;
-  }
-  display_assert("actor_debug_array && actor_path_debug_array",
-                 "c:\\halo\\SOURCE\\ai\\ai_debug.c", 0x96, true);
-  system_exit(-1);
-}
-
 /* ai_debug_dispose: free actor_debug_array and actor_path_debug_array.
  *
  * Confirmed: __FILE__ = "c:\halo\SOURCE\ai\ai_debug.c"
@@ -327,6 +291,73 @@ void FUN_00049280(float *point, void *color, int16_t count, float *entries)
       pfVar1 = pfVar1 + 4;
     } while (i < count);
   }
+}
+
+/* ai_debug_render_surface (0x49300): draw the edge outline of one
+ * structure-BSP surface as a sequence of debug lines.
+ *
+ * No __FILE__ string. 1 register arg (structure_bsp@<eax>, the same
+ * "structure_bsp+0xb0 -> bsp_surfaces tag_block_get_element" base pointer
+ * documented at path_smoothing.c:154/268 and path_smoothing.c's
+ * `structure_test_ray2d`/FUN_000638f0) + 3 cdecl stack args ([EBP+0x8]
+ * surface_index, [EBP+0xc] scale, [EBP+0x10] color); caller cleans (deferred
+ * ADD ESP,0x18 then ADD ESP,0x38 per loop iteration, not RET N).
+ *
+ * bsp_surfaces = tag_block_get_element(structure_bsp+0xb0, 0, 0x60) is the
+ * same call as path_smoothing.c:154/268. coll_surface =
+ * tag_block_get_element(bsp_surfaces+0x3c, surface_index, 0xc) is the same
+ * call/element-size as path_smoothing.c:169/199 (collision_surface, 0xc
+ * bytes); +0x4 of that record is read here as a 4-byte int (first_edge),
+ * unverified beyond this access (field_04 confidence).
+ *
+ * The edge tag_block sits at bsp_surfaces+0x48, element size 0x18 (6 ints):
+ * edge[0]/edge[1] = start/end vertex index, edge[2]/edge[3] = forward/
+ * backward edge index, edge[5] = right_surface index (read at [ESI+0x14]
+ * then compared against surface_index via SETZ — preserved here as the
+ * boolean array-index `edge[2 + (edge[5] == surface_index)]` to match the
+ * disassembly's shape, not rewritten as an if/else). The vertex tag_block
+ * sits at bsp_surfaces+0x54, element size 0x10; only the leading floats are
+ * used (forwarded as FUN_00189450's float* point_a/point_b).
+ *
+ * scale is combined ONCE before the loop with the unnamed float constant at
+ * 0x25abcc (FADD [0x25abcc] at 0x4932c) and the sum is reused for every
+ * FUN_00189450 call in the loop (matches the original's reuse of the
+ * [EBP+0xc] argument slot as a local after the FSTP at 0x4933e).
+ *
+ * Loop walks the surface's edge ring starting at first_edge, drawing a line
+ * per edge between its two vertices with FUN_00189450(1, point_a, point_b,
+ * color, scale), and follows forward_edge or backward_edge depending on
+ * which side of the edge this surface is on, until the ring returns to
+ * first_edge. */
+void ai_debug_render_surface(void *structure_bsp /* @<eax> */,
+                             int surface_index, float scale, void *color)
+{
+  void *bsp_surfaces;
+  char *coll_surface;
+  int *edge;
+  float *point_a;
+  float *point_b;
+  int first_edge;
+  int cur_edge;
+  unsigned char side;
+
+  bsp_surfaces = tag_block_get_element((char *)structure_bsp + 0xb0, 0, 0x60);
+  coll_surface = (char *)tag_block_get_element((char *)bsp_surfaces + 0x3c,
+                                               surface_index, 0xc);
+  scale = scale + *(float *)0x25abcc;
+  first_edge = *(int *)(coll_surface + 4);
+  cur_edge = first_edge;
+  do {
+    edge =
+      (int *)tag_block_get_element((char *)bsp_surfaces + 0x48, cur_edge, 0x18);
+    side = (unsigned char)(edge[5] == surface_index);
+    point_a = (float *)tag_block_get_element((char *)bsp_surfaces + 0x54,
+                                             edge[0], 0x10);
+    point_b = (float *)tag_block_get_element((char *)bsp_surfaces + 0x54,
+                                             edge[1], 0x10);
+    FUN_00189450(1, point_a, point_b, color, scale);
+    cur_edge = edge[2 + side];
+  } while (cur_edge != *(int *)(coll_surface + 4));
 }
 
 /* ai_debug_point3d_set: store three reals into a 3-float point.
@@ -2688,12 +2719,12 @@ float *ai_debug_drawstack(void)
   return (float *)0x5ac9a0;
 }
 
-/* ai_debug_highlight_unit (0x4b670): draws the AI debug "unit position" marker for a
- * unit passed in EDI, with a caller-supplied colour in EBX and a draw-extras
- * flag on the stack (`draw_flag`, [EBP+8]).  Register args confirmed from
- * disasm: EDI/EBX are read without being defined inside the function (no
- * prologue PUSH for either, only ESI is saved/restored), and both are
- * forwarded unchanged into callees whose kb.json decls fix their meaning
+/* ai_debug_highlight_unit (0x4b670): draws the AI debug "unit position" marker
+ * for a unit passed in EDI, with a caller-supplied colour in EBX and a
+ * draw-extras flag on the stack (`draw_flag`, [EBP+8]).  Register args
+ * confirmed from disasm: EDI/EBX are read without being defined inside the
+ * function (no prologue PUSH for either, only ESI is saved/restored), and both
+ * are forwarded unchanged into callees whose kb.json decls fix their meaning
  * (EDI -> object_try_and_get_and_verify_type's datum_handle and
  * biped_get_camera_height_and_offset's unit_handle; EBX -> the `color`
  * argument of every FUN_001898xx draw call).
@@ -2734,8 +2765,9 @@ float *ai_debug_drawstack(void)
  *           *(float*)0x255154, color) — same FSTP-over-dummy shape.
  *
  * Uncertain: no __FILE__ string/assert anchor for this function; kept as
- * ai_debug_highlight_unit. Confirmed callers: FUN_0004c920 (0x4caaa, 0x4cad6), not yet
- * ported, so the caller-side register setup is not cross-checked here. */
+ * ai_debug_highlight_unit. Confirmed callers: FUN_0004c920 (0x4caaa, 0x4cad6),
+ * not yet ported, so the caller-side register setup is not cross-checked here.
+ */
 void ai_debug_highlight_unit(int object_handle, void *color, char draw_flag)
 {
   void *unit;
@@ -3041,9 +3073,9 @@ void FUN_0004c890(void)
  * table at [0x331f5c] (stride 0x1ca7c).  For each entry whose two enable bytes
  * at +0x0c and +0x0d are both non-zero, it offsets the entry's world position
  * by the global up vector, pushes that as the debug-text anchor
- * (ai_debug_drawstack_setup), formats the entry's actor description into a 256-byte stack
- * buffer, draws it at the current text cursor, and runs the paired
- * FUN_0004c560 pass for the entry.
+ * (ai_debug_drawstack_setup), formats the entry's actor description into a
+ * 256-byte stack buffer, draws it at the current text cursor, and runs the
+ * paired FUN_0004c560 pass for the entry.
  *
  * Confirmed (0x52ab0-0x52b50):
  *   - Loop is `do { } while (--count)`: XOR EDI,EDI / MOV EBX,0x20 /
@@ -3489,17 +3521,16 @@ int16_t FUN_000538d0(void)
  *   encounters), matching ai_erase's all-actors branch.
  * Confirmed: ADD ESP,0xc at 0x5390c is *coalesced* cleanup for both preceding
  *   calls (2 args + 1 arg).  The loop-back call at 0x5392b has its own
- *   ADD ESP,0x4, so actor_iterator_next really does take exactly one argument; the
- *   ARG_COUNT hazard on this site is a false positive.
- * Confirmed: actor_iterator_next returns the actor record pointer (kb decl types it
- *   int); it is dereferenced at +0x6 and +0x1e here, so the result is cast.
- * Confirmed: MOVSX EAX,word ptr [EAX+0x1e] at 0x5391a -- the count field is a
- *   *signed* 16-bit member, not an int.
- * Confirmed: both arms materialise the addend in EAX (MOVSX ... / MOV EAX,1)
- *   and join at 0x53925 before a single ADD ESI,EAX, i.e. a ternary rather
- *   than two separate accumulating branches.
- * Confirmed: MOV AX,SI at 0x53937 -- the result is returned 16-bit in AX, so
- *   this is int16_t-returning despite the accumulator being a full int.
+ *   ADD ESP,0x4, so actor_iterator_next really does take exactly one argument;
+ * the ARG_COUNT hazard on this site is a false positive. Confirmed:
+ * actor_iterator_next returns the actor record pointer (kb decl types it int);
+ * it is dereferenced at +0x6 and +0x1e here, so the result is cast. Confirmed:
+ * MOVSX EAX,word ptr [EAX+0x1e] at 0x5391a -- the count field is a *signed*
+ * 16-bit member, not an int. Confirmed: both arms materialise the addend in EAX
+ * (MOVSX ... / MOV EAX,1) and join at 0x53925 before a single ADD ESI,EAX, i.e.
+ * a ternary rather than two separate accumulating branches. Confirmed: MOV
+ * AX,SI at 0x53937 -- the result is returned 16-bit in AX, so this is
+ * int16_t-returning despite the accumulator being a full int.
  *
  * Uncertain: the semantics of record+0x1e (a cached swarm component count in
  * actors_move_randomly terms, but that path reads the count from the swarm
@@ -3532,10 +3563,10 @@ int16_t FUN_000538f0(void)
  *   encounters), matching the sibling counter at 0x538f0.
  * Confirmed: the ADD ESP,0xc after the second CALL is *coalesced* cleanup for
  *   both preceding calls (2 dwords + 1 dword).  The loop-back call site has
- *   its own ADD ESP,0x4, so actor_iterator_next really takes exactly one argument;
- *   the ARG_COUNT hazard on the first site is a false positive.
- * Confirmed: actor_iterator_next returns the actor record pointer (kb decl types it
- *   int); it is dereferenced at +0x6 here, so the result is cast.
+ *   its own ADD ESP,0x4, so actor_iterator_next really takes exactly one
+ * argument; the ARG_COUNT hazard on the first site is a false positive.
+ * Confirmed: actor_iterator_next returns the actor record pointer (kb decl
+ * types it int); it is dereferenced at +0x6 here, so the result is cast.
  * Confirmed: MOVZX DX,byte ptr [EAX+0x6] -- the summed member is an *unsigned
  *   8-bit* field widened to 16 bits, then ADD ESI,EDX.  It is not a word.
  * Confirmed: the loop is a guarded while -- TEST EAX,EAX / JZ past the body
