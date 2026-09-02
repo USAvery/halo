@@ -134,6 +134,10 @@ opencode.json
 # Semantic-retrieval index (rebuildable from kb.json + sources)
 tools/retrieval/index.duckdb
 tools/retrieval/index.duckdb.wal
+# ... plus any WAL quarantined by the corrupt-WAL recovery in db.py, and any
+# pre-repair backup of the DB itself.
+tools/retrieval/index.duckdb.wal.corrupt-*
+tools/retrieval/index.duckdb.bak-*
 
 # Ephemeral worktrees
 /.claude/worktrees/

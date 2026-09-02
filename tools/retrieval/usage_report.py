@@ -96,7 +96,19 @@ def _summarize_retrieval_index() -> dict:
             "exists": False,
         }
 
-    con = _db.connect(read_only=True)
+    try:
+        con = _db.connect(read_only=True)
+    except Exception as exc:
+        # Degrade loudly rather than aborting the whole report: the outcome and
+        # context-cache sections below read flat JSON and stay valid even when
+        # the DuckDB index is unopenable (e.g. a corrupt WAL).
+        print(f"[usage_report] cannot open retrieval index: "
+              f"{type(exc).__name__}: {exc}", file=sys.stderr, flush=True)
+        return {
+            "index_path": str(_db.DB_PATH),
+            "exists": True,
+            "error": f"{type(exc).__name__}: {str(exc).splitlines()[0]}",
+        }
     stats = _db.stats(con)
     con.close()
     stats["index_path"] = str(_db.DB_PATH)
@@ -300,7 +312,10 @@ def print_human(report: dict) -> None:
     print("retrieval index")
     print(f"  path: {idx.get('index_path', 'n/a')}")
     print(f"  exists: {idx.get('exists', False)}")
-    if idx.get("exists"):
+    if idx.get("error"):
+        print(f"  ERROR: {idx['error']}")
+        print("  (index unreadable — the sections below are still valid)")
+    elif idx.get("exists"):
         print(f"  rows total: {idx.get('total', 0)}")
         print(f"  rows with embeddings: {idx.get('with_emb', 0)}")
         print(f"  rows with pseudocode: {idx.get('with_pseudocode', 0)}")

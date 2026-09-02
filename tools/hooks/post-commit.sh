@@ -31,11 +31,28 @@ if [ "$BRANCH" = "main" ]; then
             if flock -n 9; then
                 cd "$ROOT"
                 echo "=== $(date -Is) post-commit refresh @ $(git rev-parse --short HEAD) ===" >>"$RLOG"
-                "$PY" tools/retrieval/build_index.py extract  >>"$RLOG" 2>&1 && \
-                "$PY" tools/retrieval/build_index.py outcomes >>"$RLOG" 2>&1 && \
-                "$PY" tools/retrieval/build_index.py embed    >>"$RLOG" 2>&1 && \
-                "$PY" tools/retrieval/build_index.py stats    >>"$RLOG" 2>&1
-                echo "=== $(date -Is) refresh done (exit chain above) ===" >>"$RLOG"
+                # Each stage names itself so a failure in the log is
+                # attributable; a failed chain must be LOUD.  Until 2026-09-02
+                # this chain swallowed every error into $RLOG and 17
+                # consecutive refreshes failed unnoticed (corrupt DuckDB WAL).
+                FAILED=""
+                for STAGE in extract outcomes embed stats; do
+                    if ! "$PY" tools/retrieval/build_index.py "$STAGE" >>"$RLOG" 2>&1; then
+                        FAILED="$STAGE"
+                        break
+                    fi
+                done
+                if [ -n "$FAILED" ]; then
+                    echo "=== $(date -Is) refresh FAILED at stage '$FAILED' ===" >>"$RLOG"
+                    printf '[retrieval] refresh FAILED at stage %s -- see %s\n' \
+                        "$FAILED" "$RLOG" >&2
+                    # Also leave a sticky marker so a later session can notice
+                    # the index went stale even if this stderr line scrolled by.
+                    printf '%s post-commit retrieval refresh FAILED at stage %s (log: %s)\n' \
+                        "$(date -Is)" "$FAILED" "$RLOG" >>/tmp/retrieval_refresh_FAILED
+                else
+                    echo "=== $(date -Is) refresh done (all stages ok) ===" >>"$RLOG"
+                fi
             else
                 echo "=== $(date -Is) refresh skipped (another refresh holds the lock) ===" >>"$RLOG"
             fi

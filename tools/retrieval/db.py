@@ -13,7 +13,9 @@ once a model is loaded. Commit 1 only fills the text columns.
 
 from __future__ import annotations
 
+import os
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Iterator
 
@@ -59,10 +61,69 @@ MIGRATIONS = [
 ]
 
 
+WAL_PATH = Path(str(DB_PATH) + ".wal")
+AUTORECOVER_ENV = "RETRIEVAL_WAL_AUTORECOVER"
+
+
+class IndexOpenError(RuntimeError):
+    """The index DB could not be opened; carries the operator-facing fix."""
+
+
+def _wal_replay_hint(exc: Exception) -> str | None:
+    """Return a readable remedy when *exc* is a corrupt-WAL replay failure.
+
+    DuckDB reports a corrupt write-ahead log as a bare ``InternalException``
+    ("Failure while replaying WAL file ...").  Every caller of connect() then
+    dies with an assertion-failure traceback that names no fix, which is how
+    the 2026-08-17 corruption went unnoticed for 17 post-commit refreshes.
+    """
+    msg = str(exc)
+    if "replaying WAL" not in msg and "WAL file" not in msg:
+        return None
+    return (
+        f"retrieval index WAL is corrupt: {WAL_PATH}\n"
+        f"  DuckDB failed to replay it, so {DB_PATH.name} cannot be opened.\n"
+        f"  Fix: move the WAL aside, then re-open --\n"
+        f"    mv {WAL_PATH} {WAL_PATH}.corrupt-$(date +%Y%m%d)\n"
+        f"  The committed data in {DB_PATH.name} normally survives intact; if it\n"
+        f"  does not, rebuild with:\n"
+        f"    python3 tools/retrieval/build_index.py extract && \\\n"
+        f"    python3 tools/retrieval/build_index.py outcomes && \\\n"
+        f"    python3 tools/retrieval/build_index.py embed && \\\n"
+        f"    python3 tools/retrieval/build_index.py stats\n"
+        f"  Original DuckDB error: {msg.splitlines()[0]}"
+    )
+
+
 def connect(read_only: bool = False) -> duckdb.DuckDBPyConnection:
-    """Open the index DB and ensure the schema exists."""
+    """Open the index DB and ensure the schema exists.
+
+    Raises :class:`IndexOpenError` (with the remedy spelled out) when the
+    write-ahead log is corrupt, instead of leaking DuckDB's internal-error
+    traceback.
+    """
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    con = duckdb.connect(str(DB_PATH), read_only=read_only)
+    try:
+        con = duckdb.connect(str(DB_PATH), read_only=read_only)
+    except Exception as exc:  # duckdb.InternalException and friends
+        hint = _wal_replay_hint(exc)
+        if hint is None:
+            raise
+        # Opt-in self-heal.  A corrupt WAL is what a killed writer leaves
+        # behind (the post-commit refresh is detached, and `extract` runs for
+        # minutes), and every stage is idempotent and rebuildable from kb.json
+        # + sources -- so quarantining the WAL loses only work that was never
+        # committed.  Off by default: silently discarding a WAL is exactly the
+        # kind of quiet repair that hid the 2026-08-17 outage for weeks.
+        if os.environ.get(AUTORECOVER_ENV) == "1" and WAL_PATH.exists():
+            stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+            quarantined = WAL_PATH.with_name(f"{WAL_PATH.name}.corrupt-{stamp}")
+            WAL_PATH.rename(quarantined)
+            print(f"[retrieval] corrupt WAL quarantined to {quarantined} "
+                  f"({AUTORECOVER_ENV}=1); re-opening index",
+                  file=sys.stderr, flush=True)
+            return connect(read_only=read_only)
+        raise IndexOpenError(hint) from exc
     if not read_only:
         con.execute(SCHEMA)
         for stmt in MIGRATIONS:

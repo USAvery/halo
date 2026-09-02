@@ -4,6 +4,34 @@
 The shared store contains immutable binary/tool-backed artifacts.  It never
 stores an agent brief, inferred argument meanings, source-presence claims, or
 retrieval neighbor bodies.  Source presence and retrieval are evaluated live.
+
+Retrieval A/B experiment
+------------------------
+Every prepared bundle carries a ``retrieval`` block::
+
+    "retrieval": {"cohort": "<retrieval|control|off>", "neighbor_ids": [...]}
+
+``cohort`` is the arm of the retrieval A/B experiment this target was assigned
+to, and it decides whether the lift prompt is given semantic neighbors:
+
+``retrieval``
+    Treatment arm.  ``neighbor_ids`` (and a ``neighbor`` body) are populated
+    from the semantic index, so the lift prompt sees worked examples.
+``control``
+    Control arm.  ``neighbor_ids`` is ALWAYS empty and no ``neighbor`` body is
+    attached, so the lift prompt sees none.  This is what makes the comparison
+    in ``tools/retrieval/cohort_report.py`` meaningful.
+``off``
+    Excluded from the experiment entirely (no neighbors, and callers should not
+    record an outcome).  Only reachable via the env override.
+
+Assignment is deterministic in the target address, so the same target always
+lands in the same arm across runs, sessions, and worktrees.  It hashes the
+address rather than testing ``addr % 2``: function entry points are aligned, so
+every address in kb.json is even and the old parity test put 100% of targets in
+``retrieval`` -- 727 recorded outcomes measured nothing.
+
+Override for a whole run with ``RETRIEVAL_COHORT=retrieval|control|off``.
 """
 
 from __future__ import annotations
@@ -89,9 +117,40 @@ def score_fingerprint(payload: dict) -> str:
     return _fingerprint({"kind": "score", "schema": SCHEMA, **payload})
 
 
+COHORT_RETRIEVAL = "retrieval"
+COHORT_CONTROL = "control"
+COHORT_OFF = "off"
+COHORT_CHOICES = (COHORT_RETRIEVAL, COHORT_CONTROL, COHORT_OFF)
+COHORT_ENV = "RETRIEVAL_COHORT"
+
+
+def cohort_override() -> Optional[str]:
+    """Return the forced cohort from ``$RETRIEVAL_COHORT``, or None.
+
+    An unset/blank/unrecognised value means "no override" -- a typo must not
+    silently pin the whole experiment to one arm.
+    """
+    raw = (os.environ.get(COHORT_ENV) or "").strip().lower()
+    return raw if raw in COHORT_CHOICES else None
+
+
 def retrieval_cohort(addr: str) -> str:
-    """Deterministic address assignment for the retrieval A/B experiment."""
-    return "retrieval" if int(addr, 16) % 2 == 0 else "control"
+    """Deterministic ~50/50 assignment for the retrieval A/B experiment.
+
+    Hashes the address instead of testing its parity.  Function entry points
+    are aligned, so every kb.json address is even; the original
+    ``int(addr, 16) % 2 == 0`` test therefore returned "retrieval" for 100% of
+    targets and the experiment never had a control arm (727 outcomes, zero
+    controls, as of 2026-09-02).
+
+    ``$RETRIEVAL_COHORT`` forces one arm for the whole run.
+    """
+    forced = cohort_override()
+    if forced is not None:
+        return forced
+    key = _norm_addr(addr) if addr else ""
+    digest = hashlib.sha256(f"retrieval-ab-v1:{key}".encode("ascii")).digest()
+    return COHORT_RETRIEVAL if digest[0] & 1 else COHORT_CONTROL
 
 
 @dataclass(frozen=True)
@@ -400,8 +459,10 @@ class ResearchCache:
         })
         self._record_cache_event(hit, ghidra_builds)
 
+        # Control (and off) bundles carry NO neighbors: that emptiness is the
+        # experiment's independent variable, so it must hold unconditionally.
         retrieval = {"cohort": cohort, "neighbor_ids": []}
-        if cohort == "retrieval" and ghidra.get("decompile_c"):
+        if cohort == COHORT_RETRIEVAL and ghidra.get("decompile_c"):
             loader = retrieval_loader or _load_retrieval_neighbors
             neighbors = loader(ghidra["decompile_c"], target.object_name)
             retrieval["neighbor_ids"] = [n.get("addr", "") for n in neighbors]
@@ -604,7 +665,7 @@ def build_parser() -> argparse.ArgumentParser:
     stats.add_argument("--json", action="store_true")
     outcome = sub.add_parser("record-outcome")
     outcome.add_argument("--target", required=True)
-    outcome.add_argument("--cohort", choices=("retrieval", "control"), required=True)
+    outcome.add_argument("--cohort", choices=COHORT_CHOICES, required=True)
     outcome.add_argument("--outcome", required=True)
     outcome.add_argument("--tokens", type=int, default=0)
     outcome.add_argument("--fingerprint", default="")

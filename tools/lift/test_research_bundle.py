@@ -10,6 +10,7 @@ import unittest
 from pathlib import Path
 
 from research_bundle import (
+    COHORT_ENV,
     ResearchCache,
     ResolvedTarget,
     context_fingerprint,
@@ -35,9 +36,44 @@ def _kb(target: ResolvedTarget) -> dict:
 
 class FingerprintTests(unittest.TestCase):
     def test_retrieval_cohort_is_deterministic_by_address(self):
-        self.assertEqual(retrieval_cohort("0x10"), "retrieval")
-        self.assertEqual(retrieval_cohort("0x11"), "control")
-        self.assertEqual(retrieval_cohort("0x00000010"), "retrieval")
+        for addr in ("0x10", "0x11", "0x124e90"):
+            self.assertEqual(retrieval_cohort(addr), retrieval_cohort(addr))
+        # Assignment keys off the normalised address, so zero-padding and case
+        # must not move a target between arms.
+        self.assertEqual(retrieval_cohort("0x10"), retrieval_cohort("0x00000010"))
+        self.assertEqual(retrieval_cohort("0x124e90"), retrieval_cohort("0x124E90"))
+
+    def test_retrieval_cohort_splits_aligned_addresses(self):
+        """Both arms must be populated by REAL (aligned, even) addresses.
+
+        The original ``int(addr, 16) % 2`` test assigned on address parity.
+        Function entry points are aligned, so every kb.json address is even and
+        100% of targets landed in "retrieval" -- 727 outcomes with no control.
+        """
+        addrs = [f"0x{a:x}" for a in range(0x100000, 0x100000 + 0x1000, 0x10)]
+        cohorts = [retrieval_cohort(a) for a in addrs]
+        self.assertEqual(set(cohorts), {"retrieval", "control"})
+        share = cohorts.count("retrieval") / len(cohorts)
+        self.assertTrue(0.35 < share < 0.65, f"lopsided split: {share:.2f}")
+
+    def test_retrieval_cohort_env_override(self):
+        import os
+        original = os.environ.get(COHORT_ENV)
+        try:
+            for forced in ("retrieval", "control", "off"):
+                os.environ[COHORT_ENV] = forced
+                self.assertEqual(retrieval_cohort("0x10"), forced)
+                self.assertEqual(retrieval_cohort("0x11"), forced)
+            # An unrecognised value must NOT pin the experiment to one arm.
+            os.environ[COHORT_ENV] = "typo"
+            self.assertEqual(retrieval_cohort("0x10"),
+                             retrieval_cohort("0x00000010"))
+            self.assertIn(retrieval_cohort("0x10"), ("retrieval", "control"))
+        finally:
+            if original is None:
+                os.environ.pop(COHORT_ENV, None)
+            else:
+                os.environ[COHORT_ENV] = original
 
     def test_context_stability_and_all_required_invalidations(self):
         base = {
@@ -97,6 +133,42 @@ class StoreTests(unittest.TestCase):
                 "accepted_per_100k_tokens": 1000.0,
             })
             self.assertEqual(stats["models"]["provider-b/model-x"]["attempts"], 1)
+
+    def test_control_bundle_carries_no_neighbors(self):
+        """The control arm must never receive neighbors, even if the loader
+        would return some — that emptiness IS the experiment's independent
+        variable, so it cannot depend on the index having no match."""
+        import os
+        neighbor = {"addr": "0x999", "name": "helper", "decl": "void helper(void);",
+                    "c_source": "void helper(void) {}"}
+        results = {}
+        original = os.environ.get(COHORT_ENV)
+        try:
+            for forced in ("retrieval", "control", "off"):
+                os.environ[COHORT_ENV] = forced
+                with tempfile.TemporaryDirectory() as td:
+                    cache = ResearchCache(Path(td) / "shared", Path(td) / "repo")
+                    target = _target()
+                    results[forced] = cache.prepare_target(
+                        target, _kb(target),
+                        build_ghidra=lambda _t: {
+                            "decompile_c": "void f(void) {}", "disassembly": "ret",
+                            "callers": [], "callees": []},
+                        source_checker=lambda _addr, _name: None,
+                        retrieval_loader=lambda _body, _obj: [neighbor],
+                    )["retrieval"]
+        finally:
+            if original is None:
+                os.environ.pop(COHORT_ENV, None)
+            else:
+                os.environ[COHORT_ENV] = original
+
+        self.assertEqual(results["retrieval"]["neighbor_ids"], ["0x999"])
+        self.assertIn("neighbor", results["retrieval"])
+        for arm in ("control", "off"):
+            self.assertEqual(results[arm]["cohort"], arm)
+            self.assertEqual(results[arm]["neighbor_ids"], [], arm)
+            self.assertNotIn("neighbor", results[arm])
 
     def test_retrieval_gate_stays_closed_without_two_fifty_target_cohorts(self):
         with tempfile.TemporaryDirectory() as td:
