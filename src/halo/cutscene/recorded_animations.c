@@ -1304,18 +1304,13 @@ void FUN_00095930(int object_handle)
  */
 void FUN_000959b0(int object_handle, char *event)
 {
+  typedef struct { int x, y, z; } copy3_t;
   int *object;
-  int *src;
-  int *dst;
 
   object = (int *)object_get_and_verify_type(object_handle, 0x200);
   tag_get(0x6c696669, *object);
   FUN_00097080(object_handle, event + 0x28);
-  src = (int *)(event + 0x30);
-  dst = (int *)((char *)object + 0x1c4);
-  dst[0] = src[0];
-  dst[1] = src[1];
-  dst[2] = src[2];
+  *(copy3_t *)((char *)object + 0x1c4) = *(copy3_t *)(event + 0x30);
   *(int *)((char *)object + 0x1d0) = *(int *)(event + 0x3c);
   *(int *)((char *)object + 0x1d4) = *(int *)(event + 0x40);
   *(int *)((char *)object + 0x1d8) = *(int *)(event + 0x44);

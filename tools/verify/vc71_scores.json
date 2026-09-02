@@ -12511,16 +12511,16 @@
     "FUN_000959b0": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 97.4,
+      "abi_modeled_mnemonic_pct": 100.0,
       "addr": "0x959b0",
       "end": "0x95a1c",
       "kind": "auto",
       "n_r": 39,
-      "opnd_percent": 71.1,
-      "raw_mnemonic_pct": 97.4,
+      "opnd_percent": 94.9,
+      "raw_mnemonic_pct": 100.0,
       "ref": "synth",
       "ref_sha": "a89eeb9c3ebbd79c",
-      "score": 97.4,
+      "score": 100.0,
       "source": "src/halo/cutscene/recorded_animations.c"
     },
     "FUN_00095a20": {
