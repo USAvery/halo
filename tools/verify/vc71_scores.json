@@ -62086,16 +62086,16 @@
     "game_sound_dispose_from_old_map": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 92.3,
+      "abi_modeled_mnemonic_pct": 100.0,
       "addr": "0x1c7e40",
       "end": "0x1c7e62",
       "kind": "auto",
       "n_r": 12,
-      "opnd_percent": 61.5,
-      "raw_mnemonic_pct": 92.3,
+      "opnd_percent": 100.0,
+      "raw_mnemonic_pct": 100.0,
       "ref": "synth",
       "ref_sha": "2e648ea8513954f0",
-      "score": 92.3,
+      "score": 100.0,
       "source": "src/halo/sound/game_sound.c"
     },
     "game_sound_initialize": {

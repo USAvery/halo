@@ -772,8 +772,8 @@ void game_sound_music_stop_for_vehicle(void)
 void game_sound_dispose_from_old_map(void)
 {
   if (*(void **)0x5054e4 != 0 && *(uint8_t *)(*(char **)0x5054e4 + 0x24) != 0) {
-    ((void (*)(void))0x1c70b0)();
-    ((void (*)(void *))0x119550)(*(void **)0x5054e4);
+    game_sound_clear();
+    data_make_invalid(*(data_t **)0x5054e4);
   }
 }
 
