@@ -41131,16 +41131,16 @@
     "FUN_00194360": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 90.9,
+      "abi_modeled_mnemonic_pct": 100.0,
       "addr": "0x194360",
       "end": "0x19437c",
       "kind": "auto",
       "n_r": 11,
       "opnd_percent": 54.5,
-      "raw_mnemonic_pct": 90.9,
+      "raw_mnemonic_pct": 100.0,
       "ref": "synth",
       "ref_sha": "8ac9eb793bad96b6",
-      "score": 90.9,
+      "score": 100.0,
       "source": "src/halo/structures/structures.c"
     },
     "FUN_00194380": {
