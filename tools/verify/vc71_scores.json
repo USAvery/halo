@@ -47746,16 +47746,16 @@
     "actor_action_handle_panic_from_attached_melee_attackers": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 98.0,
+      "abi_modeled_mnemonic_pct": 100.0,
       "addr": "0x1c880",
       "end": "0x1c8d0",
       "kind": "auto",
       "n_r": 25,
-      "opnd_percent": 93.9,
-      "raw_mnemonic_pct": 98.0,
+      "opnd_percent": 96.0,
+      "raw_mnemonic_pct": 100.0,
       "ref": "synth",
       "ref_sha": "88b2e95e70d96321",
-      "score": 98.0,
+      "score": 100.0,
       "source": "src/halo/ai/actions.c"
     },
     "actor_action_handle_panic_from_attached_projectiles": {

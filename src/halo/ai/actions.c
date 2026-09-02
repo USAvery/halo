@@ -848,10 +848,7 @@ char actor_action_handle_panic_from_attached_melee_attackers(int actor_handle)
   result = 0;
   if (((actor_t *)actor)->field_1b4 != '\0') {
     panic_type = ((actor_t *)actor)->stimuli_panic_type;
-    if ((int)panic_type <= (0xc - 1)) {
-      panic_type = 0xb;
-    }
-    ((actor_t *)actor)->stimuli_panic_type = panic_type;
+    ((actor_t *)actor)->stimuli_panic_type = panic_type > 0xb ? panic_type : 0xb;
     ((actor_t *)actor)->stimuli_panic_prop_index = -1;
     result = 1;
   }
