@@ -1859,7 +1859,6 @@ void FUN_00015cf0(int actor_handle)
 {
   char *actor;
   short decval;
-  int uVar3;
 
   actor = (char *)datum_get(actor_data, actor_handle);
   if ((((actor_t *)actor)->field_013 == '\0') &&
@@ -1900,7 +1899,7 @@ void FUN_00015cf0(int actor_handle)
     }
     goto wake;
   }
-  if (((actor_t *)actor)->field_0a8 < 1) {
+  if (((actor_t *)actor)->field_0a8 <= 0) {
     return;
   }
   decval = ((actor_t *)actor)->field_0a8 - 1;
@@ -1916,8 +1915,8 @@ wake:
   ((actor_t *)actor)->field_0a8 = 0;
   if (((actor_t *)actor)->field_06e >= 2 &&
       ((actor_t *)actor)->field_018 != -1) {
-    uVar3 = actor_target_unit_index(actor_handle);
-    FUN_00046f10(0x23, ((actor_t *)actor)->field_018, uVar3, -1, -1, -1, 0);
+    FUN_00046f10(0x23, ((actor_t *)actor)->field_018,
+                 actor_target_unit_index(actor_handle), -1, -1, -1, 0);
   }
   FUN_00024be0(actor_handle, *(short *)(actor + 0xc4), 0);
   ((actor_t *)actor)->firing_positions_current_position_index = -1;
