@@ -65446,16 +65446,16 @@
     "input_recording_write_packet": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 87.5,
+      "abi_modeled_mnemonic_pct": 100.0,
       "addr": "0xce590",
       "end": "0xce5b7",
       "kind": "auto",
       "n_r": 16,
-      "opnd_percent": 87.5,
-      "raw_mnemonic_pct": 87.5,
+      "opnd_percent": 68.8,
+      "raw_mnemonic_pct": 100.0,
       "ref": "synth",
       "ref_sha": "5b619df6775538f5",
-      "score": 87.5,
+      "score": 100.0,
       "source": "src/halo/input/input_xbox.c"
     },
     "input_set_rumble": {
