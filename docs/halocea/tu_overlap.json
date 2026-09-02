@@ -1,0 +1,714 @@
+[
+ {
+  "tu": "hs.obj",
+  "total": 257,
+  "ported": 257,
+  "fun": 229,
+  "ported_fun": 229,
+  "halocea": 225
+ },
+ {
+  "tu": "game_engine.obj",
+  "total": 238,
+  "ported": 237,
+  "fun": 76,
+  "ported_fun": 75,
+  "halocea": 134
+ },
+ {
+  "tu": "rasterizer.obj",
+  "total": 89,
+  "ported": 83,
+  "fun": 57,
+  "ported_fun": 51,
+  "halocea": 379
+ },
+ {
+  "tu": "scenario.obj",
+  "total": 62,
+  "ported": 62,
+  "fun": 49,
+  "ported_fun": 49,
+  "halocea": 52
+ },
+ {
+  "tu": "players.obj",
+  "total": 248,
+  "ported": 245,
+  "fun": 184,
+  "ported_fun": 181,
+  "halocea": 26
+ },
+ {
+  "tu": "main.obj",
+  "total": 106,
+  "ported": 104,
+  "fun": 26,
+  "ported_fun": 25,
+  "halocea": 131
+ },
+ {
+  "tu": "objects.obj",
+  "total": 228,
+  "ported": 219,
+  "fun": 110,
+  "ported_fun": 102,
+  "halocea": 24
+ },
+ {
+  "tu": "hud.obj",
+  "total": 38,
+  "ported": 38,
+  "fun": 23,
+  "ported_fun": 23,
+  "halocea": 95
+ },
+ {
+  "tu": "game.obj",
+  "total": 59,
+  "ported": 45,
+  "fun": 25,
+  "ported_fun": 16,
+  "halocea": 62
+ },
+ {
+  "tu": "actors.obj",
+  "total": 124,
+  "ported": 124,
+  "fun": 72,
+  "ported_fun": 72,
+  "halocea": 11
+ },
+ {
+  "tu": "effects.obj",
+  "total": 37,
+  "ported": 37,
+  "fun": 20,
+  "ported_fun": 20,
+  "halocea": 11
+ },
+ {
+  "tu": "rasterizer_decals.obj",
+  "total": 65,
+  "ported": 62,
+  "fun": 59,
+  "ported_fun": 56,
+  "halocea": 11
+ },
+ {
+  "tu": "ui_widget.obj",
+  "total": 121,
+  "ported": 67,
+  "fun": 36,
+  "ported_fun": 11,
+  "halocea": 14
+ },
+ {
+  "tu": "units.obj",
+  "total": 208,
+  "ported": 208,
+  "fun": 62,
+  "ported_fun": 62,
+  "halocea": 11
+ },
+ {
+  "tu": "ai_communication.obj",
+  "total": 48,
+  "ported": 24,
+  "fun": 19,
+  "ported_fun": 11,
+  "halocea": 19
+ },
+ {
+  "tu": "hs_compile.obj",
+  "total": 46,
+  "ported": 46,
+  "fun": 37,
+  "ported_fun": 37,
+  "halocea": 10
+ },
+ {
+  "tu": "rasterizer_xbox.obj",
+  "total": 44,
+  "ported": 43,
+  "fun": 20,
+  "ported_fun": 19,
+  "halocea": 10
+ },
+ {
+  "tu": "render_debug.obj",
+  "total": 36,
+  "ported": 35,
+  "fun": 36,
+  "ported_fun": 35,
+  "halocea": 10
+ },
+ {
+  "tu": "decals.obj",
+  "total": 75,
+  "ported": 60,
+  "fun": 53,
+  "ported_fun": 38,
+  "halocea": 9
+ },
+ {
+  "tu": "event_manager.obj",
+  "total": 34,
+  "ported": 21,
+  "fun": 16,
+  "ported_fun": 9,
+  "halocea": 17
+ },
+ {
+  "tu": "encounters.obj",
+  "total": 138,
+  "ported": 132,
+  "fun": 98,
+  "ported_fun": 95,
+  "halocea": 9
+ },
+ {
+  "tu": "data.obj",
+  "total": 27,
+  "ported": 27,
+  "fun": 8,
+  "ported_fun": 8,
+  "halocea": 52
+ },
+ {
+  "tu": "errors.obj",
+  "total": 26,
+  "ported": 26,
+  "fun": 15,
+  "ported_fun": 15,
+  "halocea": 8
+ },
+ {
+  "tu": "particle_systems.obj",
+  "total": 22,
+  "ported": 22,
+  "fun": 14,
+  "ported_fun": 14,
+  "halocea": 8
+ },
+ {
+  "tu": "particles.obj",
+  "total": 20,
+  "ported": 19,
+  "fun": 10,
+  "ported_fun": 10,
+  "halocea": 8
+ },
+ {
+  "tu": "rasterizer_text.obj",
+  "total": 68,
+  "ported": 55,
+  "fun": 34,
+  "ported_fun": 23,
+  "halocea": 8
+ },
+ {
+  "tu": "draw_string.obj",
+  "total": 20,
+  "ported": 19,
+  "fun": 8,
+  "ported_fun": 8,
+  "halocea": 18
+ },
+ {
+  "tu": "damage.obj",
+  "total": 34,
+  "ported": 27,
+  "fun": 18,
+  "ported_fun": 11,
+  "halocea": 8
+ },
+ {
+  "tu": "ai.obj",
+  "total": 48,
+  "ported": 35,
+  "fun": 8,
+  "ported_fun": 7,
+  "halocea": 264
+ },
+ {
+  "tu": "breakable_surfaces.obj",
+  "total": 18,
+  "ported": 15,
+  "fun": 9,
+  "ported_fun": 7,
+  "halocea": 8
+ },
+ {
+  "tu": "stack_memory_pool.obj",
+  "total": 37,
+  "ported": 17,
+  "fun": 19,
+  "ported_fun": 7,
+  "halocea": 14
+ },
+ {
+  "tu": "hs_runtime.obj",
+  "total": 130,
+  "ported": 100,
+  "fun": 88,
+  "ported_fun": 60,
+  "halocea": 7
+ },
+ {
+  "tu": "hud_messaging.obj",
+  "total": 91,
+  "ported": 91,
+  "fun": 56,
+  "ported_fun": 56,
+  "halocea": 7
+ },
+ {
+  "tu": "ai_debug.obj",
+  "total": 73,
+  "ported": 54,
+  "fun": 36,
+  "ported_fun": 23,
+  "halocea": 7
+ },
+ {
+  "tu": "collision_bsp.obj",
+  "total": 37,
+  "ported": 28,
+  "fun": 20,
+  "ported_fun": 12,
+  "halocea": 7
+ },
+ {
+  "tu": "bink_playback.obj",
+  "total": 25,
+  "ported": 25,
+  "fun": 6,
+  "ported_fun": 6,
+  "halocea": 9
+ },
+ {
+  "tu": "contrails.obj",
+  "total": 18,
+  "ported": 18,
+  "fun": 6,
+  "ported_fun": 6,
+  "halocea": 7
+ },
+ {
+  "tu": "game_sound.obj",
+  "total": 36,
+  "ported": 30,
+  "fun": 9,
+  "ported_fun": 6,
+  "halocea": 8
+ },
+ {
+  "tu": "recorded_animations.obj",
+  "total": 47,
+  "ported": 41,
+  "fun": 26,
+  "ported_fun": 23,
+  "halocea": 6
+ },
+ {
+  "tu": "first_person_weapons.obj",
+  "total": 30,
+  "ported": 17,
+  "fun": 17,
+  "ported_fun": 12,
+  "halocea": 5
+ },
+ {
+  "tu": "point_physics.obj",
+  "total": 29,
+  "ported": 8,
+  "fun": 20,
+  "ported_fun": 5,
+  "halocea": 5
+ },
+ {
+  "tu": "profile.obj",
+  "total": 50,
+  "ported": 34,
+  "fun": 19,
+  "ported_fun": 11,
+  "halocea": 5
+ },
+ {
+  "tu": "projectiles.obj",
+  "total": 28,
+  "ported": 28,
+  "fun": 12,
+  "ported_fun": 12,
+  "halocea": 5
+ },
+ {
+  "tu": "shell.obj",
+  "total": 9,
+  "ported": 9,
+  "fun": 5,
+  "ported_fun": 5,
+  "halocea": 6
+ },
+ {
+  "tu": "structure_detail_objects.obj",
+  "total": 8,
+  "ported": 8,
+  "fun": 6,
+  "ported_fun": 6,
+  "halocea": 5
+ },
+ {
+  "tu": "weather_particle_systems.obj",
+  "total": 17,
+  "ported": 17,
+  "fun": 12,
+  "ported_fun": 12,
+  "halocea": 5
+ },
+ {
+  "tu": "actor_perception.obj",
+  "total": 45,
+  "ported": 13,
+  "fun": 10,
+  "ported_fun": 5,
+  "halocea": 24
+ },
+ {
+  "tu": "hud_draw.obj",
+  "total": 4,
+  "ported": 4,
+  "fun": 4,
+  "ported_fun": 4,
+  "halocea": 13
+ },
+ {
+  "tu": "items.obj",
+  "total": 40,
+  "ported": 31,
+  "fun": 21,
+  "ported_fun": 15,
+  "halocea": 4
+ },
+ {
+  "tu": "observer.obj",
+  "total": 42,
+  "ported": 18,
+  "fun": 17,
+  "ported_fun": 4,
+  "halocea": 25
+ },
+ {
+  "tu": "player_ui.obj",
+  "total": 40,
+  "ported": 34,
+  "fun": 5,
+  "ported_fun": 4,
+  "halocea": 44
+ },
+ {
+  "tu": "scenario.obj",
+  "total": 20,
+  "ported": 20,
+  "fun": 4,
+  "ported_fun": 4,
+  "halocea": 52
+ },
+ {
+  "tu": "structures.obj",
+  "total": 128,
+  "ported": 127,
+  "fun": 84,
+  "ported_fun": 83,
+  "halocea": 4
+ },
+ {
+  "tu": "bipeds.obj",
+  "total": 45,
+  "ported": 35,
+  "fun": 27,
+  "ported_fun": 18,
+  "halocea": 4
+ },
+ {
+  "tu": "vehicles.obj",
+  "total": 34,
+  "ported": 10,
+  "fun": 21,
+  "ported_fun": 4,
+  "halocea": 4
+ },
+ {
+  "tu": "edit_text.obj",
+  "total": 12,
+  "ported": 9,
+  "fun": 7,
+  "ported_fun": 4,
+  "halocea": 6
+ },
+ {
+  "tu": "actor_combat.obj",
+  "total": 19,
+  "ported": 14,
+  "fun": 7,
+  "ported_fun": 4,
+  "halocea": 15
+ },
+ {
+  "tu": "props.obj",
+  "total": 30,
+  "ported": 27,
+  "fun": 23,
+  "ported_fun": 21,
+  "halocea": 4
+ },
+ {
+  "tu": "cheats.obj",
+  "total": 28,
+  "ported": 12,
+  "fun": 18,
+  "ported_fun": 3,
+  "halocea": 7
+ },
+ {
+  "tu": "memory_pool.obj",
+  "total": 14,
+  "ported": 14,
+  "fun": 3,
+  "ported_fun": 3,
+  "halocea": 13
+ },
+ {
+  "tu": "game_state.obj",
+  "total": 20,
+  "ported": 19,
+  "fun": 3,
+  "ported_fun": 3,
+  "halocea": 43
+ },
+ {
+  "tu": "progress_bar.obj",
+  "total": 31,
+  "ported": 20,
+  "fun": 12,
+  "ported_fun": 3,
+  "halocea": 8
+ },
+ {
+  "tu": "real_math.obj",
+  "total": 168,
+  "ported": 164,
+  "fun": 92,
+  "ported_fun": 89,
+  "halocea": 3
+ },
+ {
+  "tu": "render.obj",
+  "total": 22,
+  "ported": 13,
+  "fun": 7,
+  "ported_fun": 3,
+  "halocea": 63
+ },
+ {
+  "tu": "tags.obj",
+  "total": 27,
+  "ported": 7,
+  "fun": 20,
+  "ported_fun": 3,
+  "halocea": 3
+ },
+ {
+  "tu": "structure_visibility.obj",
+  "total": 10,
+  "ported": 5,
+  "fun": 8,
+  "ported_fun": 3,
+  "halocea": 12
+ },
+ {
+  "tu": "lruv_cache.obj",
+  "total": 46,
+  "ported": 45,
+  "fun": 24,
+  "ported_fun": 23,
+  "halocea": 3
+ },
+ {
+  "tu": "weapons.obj",
+  "total": 63,
+  "ported": 22,
+  "fun": 28,
+  "ported_fun": 3,
+  "halocea": 4
+ },
+ {
+  "tu": "bsp3d.obj",
+  "total": 5,
+  "ported": 5,
+  "fun": 3,
+  "ported_fun": 3,
+  "halocea": 7
+ },
+ {
+  "tu": "director.obj",
+  "total": 47,
+  "ported": 14,
+  "fun": 16,
+  "ported_fun": 2,
+  "halocea": 33
+ },
+ {
+  "tu": "game_allegiance.obj",
+  "total": 17,
+  "ported": 17,
+  "fun": 2,
+  "ported_fun": 2,
+  "halocea": 12
+ },
+ {
+  "tu": "player_control.obj",
+  "total": 46,
+  "ported": 45,
+  "fun": 2,
+  "ported_fun": 2,
+  "halocea": 54
+ },
+ {
+  "tu": "predicted_resources.obj",
+  "total": 8,
+  "ported": 8,
+  "fun": 7,
+  "ported_fun": 7,
+  "halocea": 2
+ },
+ {
+  "tu": "random_math.obj",
+  "total": 38,
+  "ported": 36,
+  "fun": 21,
+  "ported_fun": 19,
+  "halocea": 2
+ },
+ {
+  "tu": "tag_groups.obj",
+  "total": 16,
+  "ported": 16,
+  "fun": 7,
+  "ported_fun": 7,
+  "halocea": 2
+ },
+ {
+  "tu": "collision_features.obj",
+  "total": 18,
+  "ported": 12,
+  "fun": 3,
+  "ported_fun": 2,
+  "halocea": 9
+ },
+ {
+  "tu": "cache_files.obj",
+  "total": 8,
+  "ported": 5,
+  "fun": 2,
+  "ported_fun": 2,
+  "halocea": 18
+ },
+ {
+  "tu": "path.obj",
+  "total": 41,
+  "ported": 14,
+  "fun": 21,
+  "ported_fun": 2,
+  "halocea": 32
+ },
+ {
+  "tu": "actor_looking.obj",
+  "total": 120,
+  "ported": 118,
+  "fun": 107,
+  "ported_fun": 105,
+  "halocea": 1
+ },
+ {
+  "tu": "debug_keys.obj",
+  "total": 5,
+  "ported": 5,
+  "fun": 1,
+  "ported_fun": 1,
+  "halocea": 3
+ },
+ {
+  "tu": "game_statistics.obj",
+  "total": 4,
+  "ported": 4,
+  "fun": 1,
+  "ported_fun": 1,
+  "halocea": 4
+ },
+ {
+  "tu": "structure_render.obj",
+  "total": 1,
+  "ported": 1,
+  "fun": 1,
+  "ported_fun": 1,
+  "halocea": 20
+ },
+ {
+  "tu": "unicode.obj",
+  "total": 69,
+  "ported": 66,
+  "fun": 3,
+  "ported_fun": 2,
+  "halocea": 1
+ },
+ {
+  "tu": "ai_profile.obj",
+  "total": 46,
+  "ported": 46,
+  "fun": 34,
+  "ported_fun": 34,
+  "halocea": 1
+ },
+ {
+  "tu": "actor_firing_position.obj",
+  "total": 15,
+  "ported": 8,
+  "fun": 12,
+  "ported_fun": 6,
+  "halocea": 1
+ },
+ {
+  "tu": "devices.obj",
+  "total": 18,
+  "ported": 18,
+  "fun": 1,
+  "ported_fun": 1,
+  "halocea": 4
+ },
+ {
+  "tu": "wind.obj",
+  "total": 3,
+  "ported": 3,
+  "fun": 1,
+  "ported_fun": 1,
+  "halocea": 5
+ },
+ {
+  "tu": "glow.obj",
+  "total": 1,
+  "ported": 1,
+  "fun": 1,
+  "ported_fun": 1,
+  "halocea": 21
+ },
+ {
+  "tu": "rasterizer_lights.obj",
+  "total": 1,
+  "ported": 1,
+  "fun": 1,
+  "ported_fun": 1,
+  "halocea": 7
+ }
+]
