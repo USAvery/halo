@@ -988,12 +988,12 @@ void *FUN_0011d320(int cache, int value)
  */
 void FUN_0011d3f0(int cache, int block)
 {
-  unsigned int *status;
+  char *header;
 
-  status = (unsigned int *)(block - 0xc);
+  header = (char *)block - 0x10;
   FUN_0011d090(cache);
-  FUN_0011d010(cache, (void *)(block - 0x10));
-  *status |= 1;
+  FUN_0011d010(cache, header);
+  *(unsigned int *)(header + 4) |= 1;
 }
 
 /* 0x11d420: lru_cache entry release helper (mirror of FUN_0011d3f0).
@@ -1012,9 +1012,12 @@ void FUN_0011d3f0(int cache, int block)
  */
 void FUN_0011d420(int cache, int block)
 {
+  char *header;
+
+  header = (char *)block - 0x10;
   FUN_0011d090(cache);
-  FUN_0011d010(cache, (void *)(block - 0x10));
-  *(unsigned int *)(block - 0xc) &= 0xfffffffe;
+  FUN_0011d010(cache, header);
+  *(unsigned int *)(header + 4) &= 0xfffffffe;
 }
 
 /* 0x11d450: lru_cache entry acquire/stamp helper. Sibling of FUN_0011d420.
@@ -1035,9 +1038,12 @@ void FUN_0011d420(int cache, int block)
  */
 void FUN_0011d450(int cache, int block)
 {
+  char *header;
+
+  header = (char *)block - 0x10;
   FUN_0011d090(cache);
-  FUN_0011d010(cache, (void *)(block - 0x10));
-  *(int *)(block - 8) = *(int *)(cache + 0x3c);
+  FUN_0011d010(cache, header);
+  *(int *)(header + 8) = *(int *)(cache + 0x3c);
   *(int *)(cache + 0x3c) = *(int *)(cache + 0x3c) + 1;
 }
 
