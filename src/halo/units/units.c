@@ -3775,9 +3775,7 @@ void unit_get_head_position(int object_handle, float *out_position)
   char marker_buf[0x6c];
   object_get_markers_by_string_id(object_handle, (void *)0x2909e4, marker_buf,
                                   1);
-  out_position[0] = *(float *)(marker_buf + 0x60);
-  out_position[1] = *(float *)(marker_buf + 0x64);
-  out_position[2] = *(float *)(marker_buf + 0x68);
+  *(vector3_t *)out_position = *(vector3_t *)(marker_buf + 0x60);
 }
 
 /* unit_set_seat_state (0x1a9240)

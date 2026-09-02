@@ -1366,17 +1366,14 @@ void ui_widget_begin_filesystem_checks(void)
  * engine shutdown. */
 void ui_widgets_dispose(void)
 {
-  int *ptr;
-
   ui_widgets_close_all();
 
-  ptr = *(int **)0x31e04c;
-  if (ptr[1] != 0) {
-    debug_free((void *)ptr[1], "c:\\halo\\SOURCE\\interface\\ui_widget.c",
-               0x76);
+  if ((*(int **)0x31e04c)[1] != 0) {
+    debug_free((void *)(*(int **)0x31e04c)[1],
+               "c:\\halo\\SOURCE\\interface\\ui_widget.c", 0x76);
   }
-  ptr[1] = 0;
-  ptr[2] = 0;
+  (*(int **)0x31e04c)[1] = 0;
+  (*(int **)0x31e04c)[2] = 0;
   csmemset((void *)0x46cc20, 0, 0x68);
 }
 

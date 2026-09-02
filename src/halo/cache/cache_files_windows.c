@@ -526,7 +526,7 @@ void cache_files_precache_map_queue_end(void)
                    "c:\\halo\\SOURCE\\cache\\cache_files_windows.c", 0x3cb, 1);
     system_exit(-1);
   }
-  ((void (*)(void))0x1ba5d0)();
+  FUN_001ba5d0();
 }
 
 /* Cache file slot accessor helpers. All take map_file_index in @<si>.

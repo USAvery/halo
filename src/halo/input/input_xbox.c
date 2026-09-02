@@ -468,9 +468,11 @@ void FUN_000ce530(void *state)
 void input_recording_write_packet(void *state)
 {
   uint32_t bytes_written;
+  int handle;
+
+  handle = *input_state_file_handle();
   bytes_written = 0;
-  WriteFile(*input_state_file_handle(), state, sizeof(input_gamepad_state),
-            &bytes_written, NULL);
+  WriteFile(handle, state, sizeof(input_gamepad_state), &bytes_written, NULL);
 }
 
 /* input_open_state_file (0xce5c0)

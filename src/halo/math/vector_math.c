@@ -31,22 +31,22 @@ void FUN_00012090(int actor_handle)
  * Sets actor->state_data1 (0xa2) and state_data2 (0xa4) to 0xffff. */
 void FUN_000120e0(int actor_handle)
 {
-  int actor;
+  char *actor;
 
-  actor = (int)datum_get(*(data_t **)0x6325a4, actor_handle);
-  *(unsigned short *)(actor + 0xa2) = 0xffff;
-  *(unsigned short *)(actor + 0xa4) = 0xffff;
+  actor = (char *)datum_get(*(data_t **)0x6325a4, actor_handle) + 0x9c;
+  *(short *)(actor + 0x6) = -1;
+  *(short *)(actor + 0x8) = -1;
 }
 
 /* 0x12110 — action_alert: clear another alert/avoid state.
  * Sets actor->field_d0 (short) to 0xffff and field_f4 (int) to -1. */
 void FUN_00012110(int actor_handle)
 {
-  int actor;
+  char *actor;
 
-  actor = (int)datum_get(*(data_t **)0x6325a4, actor_handle);
-  *(unsigned short *)(actor + 0xd0) = 0xffff;
-  *(unsigned int *)(actor + 0xf4) = 0xffffffff;
+  actor = (char *)datum_get(*(data_t **)0x6325a4, actor_handle) + 0x9c;
+  *(short *)(actor + 0x34) = -1;
+  *(int *)(actor + 0x58) = -1;
 }
 
 
