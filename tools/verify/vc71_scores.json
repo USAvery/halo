@@ -81811,16 +81811,16 @@
     "structure_bsp_get_cluster_encoded_sound_data": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 98.0,
+      "abi_modeled_mnemonic_pct": 100.0,
       "addr": "0x1937d0",
       "end": "0x193866",
       "kind": "auto",
       "n_r": 50,
-      "opnd_percent": 92.0,
-      "raw_mnemonic_pct": 98.0,
+      "opnd_percent": 96.0,
+      "raw_mnemonic_pct": 100.0,
       "ref": "synth",
       "ref_sha": "ad6302e64cb12d42",
-      "score": 98.0,
+      "score": 100.0,
       "source": "src/halo/structures/structure_bsp_definitions.c"
     },
     "structure_bsp_get_cluster_sound_data": {

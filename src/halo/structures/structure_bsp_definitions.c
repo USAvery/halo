@@ -41,7 +41,7 @@ uint8_t *structure_bsp_get_cluster_encoded_sound_data(void *bsp,
   offset = (int16_t)((*(int16_t *)(b + 0x134) - 1) * from_cluster -
                      (from_cluster + 1) * from_cluster / 2 + to_cluster - 1);
 
-  if (to_cluster <= from_cluster) {
+  if (from_cluster >= to_cluster) {
     display_assert("row_index<column_index",
                    "c:\\halo\\SOURCE\\structures\\structure_bsp_definitions.c",
                    0x4b2, 1);
