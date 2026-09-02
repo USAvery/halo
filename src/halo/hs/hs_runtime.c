@@ -1068,9 +1068,14 @@ void hs_compile_cleanup(void)
  *
  * The single caller is FUN_000bdef0 (CALL at 0xbdf19). Semantic role is
  * unknown beyond the byte-inversion, so the name is left as FUN_000c95c0. */
+static __inline unsigned char hs_byte_cast(int val)
+{
+  return (unsigned char)val;
+}
+
 unsigned char FUN_000c95c0(unsigned char value)
 {
-  return (unsigned char)(value == 0);
+  return hs_byte_cast(value == 0);
 }
 
 /* 0xc95d0 — forward one dword to the terminal overlay as a formatted line,

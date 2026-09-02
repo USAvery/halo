@@ -22441,16 +22441,16 @@
     "FUN_000c95c0": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 93.3,
+      "abi_modeled_mnemonic_pct": 100.0,
       "addr": "0xc95c0",
       "end": "0xc95cf",
       "kind": "auto",
       "n_r": 8,
-      "opnd_percent": 80.0,
-      "raw_mnemonic_pct": 93.3,
+      "opnd_percent": 100.0,
+      "raw_mnemonic_pct": 100.0,
       "ref": "synth",
       "ref_sha": "d278ee5928eebb9d",
-      "score": 93.3,
+      "score": 100.0,
       "source": "src/halo/hs/hs_runtime.c"
     },
     "FUN_000c95d0": {
