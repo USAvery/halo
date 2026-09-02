@@ -97,3 +97,55 @@ Never declare these in `kb.json` or call them as normal C functions:
 | `0x1dd660` | `_aullshr` | `(uint64_t)val >> shift` |
 | `0x1dd680` | `_aullrem` | `(uint64_t)a % b` |
 | `0x1dd770` | `_aulldiv` | `(uint64_t)a / b` |
+
+## 5. Detail Moved From CLAUDE.md (2026-09-02)
+
+### SEH wrappers (`__SEH_prolog` / `__SEH_epilog`)
+All 74 `__SEH_prolog` callers are LIBCMT/XAPILIB CRT helpers. Use
+`__try { <body> } __except(1) { return 0; }` (or the appropriate error return).
+The SEH is a safety net — in normal execution the `__try` body runs to
+completion. `vc71_verify` will report ~55% match because the frame shape differs
+(clang emits an inline SEH frame; the original uses compact thunks). This is
+expected and accepted for these CRT wrappers. New source files go in
+`src/halo/cseries/xbox_crt.c`; register the object as `XAPILIB:xbox_crt.obj` in
+`kb.json`. See `docs/seh-handling.md`.
+
+### Verify callee buffer sizes
+Ghidra may under-size local buffers. When a lifted function passes a stack
+buffer to a callee, check the callee's `memset`/init size in disassembly — it
+reveals the true required size. Example: `FUN_0013fc20` (object placement init)
+writes 0x88 bytes; Ghidra showed the caller's buffer as 0x30, causing a stack
+overflow.
+
+### MSVC stack-layout overlap hazard
+When a lifted function calls an **unlifted** function by pointer (vtable,
+callback, function table), the callee may read from offsets within a local array
+that MSVC placed overlapping with other local variables. Our clang build uses a
+different stack layout, so those offsets contain garbage instead of the expected
+data.
+- **Detection:** decompile the unlifted callee and check every offset it reads
+  from the array parameter. Cross-reference with the original function's
+  `[EBP±N]` disassembly to see if those offsets land on other locals.
+- **Fix:** explicitly copy the required data into the array at the expected
+  offsets before the call.
+- **Example:** `FUN_0009fd30` passes `marker_buf` to creation physics (vtable
+  `0x26ab10`). The callee reads position from `marker_buf+0x60`, which in the
+  original MSVC layout overlaps with `local_position`. Fix was to copy
+  `local_position` into `marker_buf+0x60` explicitly.
+
+### Worked examples for the five call-site traps
+- **Cross-product operand swap:** `cross(A,B)[0] = A[1]*B[2] - A[2]*B[1]`.
+  Getting it backwards negates the vector, which can cause invisible geometry,
+  flipped UV mapping, or reflected projections.
+- **Buffer-alias confusion:** `FUN_000f90d0` had `damage_params` at EBP-0x8C
+  (0xac bytes). After `FUN_00137d20(damage_params, ...)`, Ghidra showed
+  `local_44` (EBP-0x44 = damage_params+0x48) and `local_40` (EBP-0x40 =
+  damage_params+0x4C) as independent locals. The lift incorrectly read these
+  from `col_result` instead of `damage_params`, causing wrong impact effects on
+  all objects.
+
+### XCALL type-mismatch example
+`real_a_rgb_color_to_pixel32` (0x99530) returns `uint32_t` in EAX; an XCALL cast
+`float(*)` read ST(0) garbage instead — the plasma-pistol overcharge orb was
+invisible for weeks. Run `rtk python3 tools/audit/check_xcall_types.py` after
+adding or modifying any XCALL macro.

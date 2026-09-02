@@ -346,3 +346,67 @@ loaded-XBE code pages, invalidating original-vs-candidate comparisons.
 | GDB cleanup | `gdb -ex "target remote :1234" -ex "delete" -ex "detach" -ex "quit"` |
 | Live capture (virtual, proven) | `rtk python3 tools/equivalence/memsave_snapshot.py plan --target <func> -o plan.json` then `... capture --plan plan.json -o snap.json` |
 | Real-HW dump (XBDM getmem) | `rtk python3 tools/equivalence/dump_xemu_memory.py dump --method xbdm -o artifacts/memory_dumps/dump_<target>.bin` |
+
+## G — Live Memory Capture + State Replay (moved from CLAUDE.md, 2026-09-02)
+
+For Unicorn equivalence that under-covers live engine paths, capture live game
+state and replay it into `unicorn_diff.py --state-snapshot <path>` (or
+`--from-halorec`). **Use the proven virtual-memory paths — never physical
+`pmemsave`:**
+
+- `tools/equivalence/memsave_snapshot.py` — reloc-driven virtual QMP `memsave`;
+  validated byte-exact against `known_globals.json`. Flow:
+  `plan --target <func> -o artifacts/plan_<func>.json` →
+  `capture --plan artifacts/plan_<func>.json -o artifacts/snapshot_<func>.json`
+  (`--follow` dereferences `*_ptr` regions; `--anchors` adds player/game-engine
+  anchors). **Coverage caveat:** reloc-driven capture grabs only the *data*
+  windows the target's relocations reference — NOT callee **code** pages. For a
+  **non-leaf** target whose callees you do not stub, either run
+  `unicorn_diff.py --allow-stubs` (stubs the callees — the usual path) or replay
+  a `.halorec` frame that carries the code segments. (The old
+  `dump_xemu_memory.py --full` mapped all non-zero pages incl. callee code, but
+  only via the broken `pmemsave` default — on real hardware use
+  `dump --method xbdm` + `snapshot --full`.)
+- `tools/equivalence/qmp_capture.py` — atomic `stop`→`memsave`→`cont` live
+  capture that verifies the datum magic for you; the basis of the `.halorec`
+  lineage (`capture_trajectory.py` → `hmrc.py` → `halorec_to_snapshot.py`),
+  whose regions map 1:1 to `--from-halorec`.
+- **Do NOT use `tools/equivalence/dump_xemu_memory.py`'s default QMP `pmemsave`
+  (physical) path.** Cerbios does not identity-map game VA on this dev box, so
+  virt-to-phys reads the wrong bytes — the tool's own header documents every
+  capture method as broken here (2026-06-07). Only its `--xbdm` getmem path is
+  kept, and only for real hardware.
+
+Workflow:
+1. Get into the desired game state in xemu (e.g. MP match with players).
+2. **VERIFY EVERY CAPTURE before building a snapshot:** read a known global and
+   confirm it is sane/non-zero — fwd-vector ptr @VA `0x31fc38` ≈ `0x0028xxxx`,
+   and the object table (`*0x5a8d50` → `~0x80xxxxxx`) should contain datum magic
+   `0x64407440`. If those read `0`, the capture is unusable — wrong
+   method/context (e.g. a menu/idle pause instead of an **active-gameplay paused
+   state** like a Flood encounter, where the paused CPU context has the game's
+   user address space live). Fix the capture, do not proceed. `qmp_capture.py`
+   performs this magic check itself.
+3. Build the snapshot with `memsave_snapshot.py plan`+`capture` (above), or
+   reuse a `.halorec` frame.
+4. Run equivalence:
+   `rtk python3 tools/equivalence/unicorn_diff.py <target> --seeds 50 --allow-stubs --mem-trace --state-snapshot artifacts/snapshot_<func>.json`.
+
+- Do not use QEMU `savevm`/`loadvm` for oracle tests — those restore old loaded-XBE code pages.
+- **xemu MCP daemon may be unreliable:** the `mcp__xemu__*` tools
+  (xemu_connect/query_state/screenshot) can fail with `connection reset by peer`
+  even when QMP is healthy (stale daemon attachment; QMP is single-client).
+  Verify with a raw QMP probe (`socket → recv greeting →
+  {"execute":"qmp_capabilities"}` → expect `return`); if raw works, **bypass the
+  MCP**: use `tools/xbox/xbdm_screenshot.py --png` for screenshots and
+  `dump_xemu_memory.py --xbdm` for memory. The MCP's launch path is also
+  env-driven (`XEMU_PATH`); the real binary is `/mnt/g/dev/xemu/dist/xemu.exe`
+  (WSL2 → xemu runs as a Windows `.exe`), and the HDD is opened `locked=on` so
+  only one instance can run at a time.
+
+### Standalone ISO testing
+System Memory MUST be set to **128 MiB** in xemu (required for debug build
+2276). For standalone ISO testing: copy the 2276 build directory, replace its
+`default.xbe` with `halo-patched/default.xbe`, pack with
+`extract-xiso -c "<dir>" out.iso`, load ISO in xemu, and use **Machine → Reset**
+to boot.
