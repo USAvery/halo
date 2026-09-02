@@ -378,23 +378,24 @@ char *draw_string_get_string(short index)
  * Confirmed: SHL EAX,1 before csmemcpy — copies count*2 bytes (shorts).
  * Confirmed: tab count stored as word at 0x4d9b28; array at 0x4d9b2a.
  */
-void draw_string_set_tab_stops(void *stops, short count)
+void draw_string_set_tab_stops(void *stops, int16_t count)
 {
   if (count < 0 || count >= MAXIMUM_NUMBER_OF_TAB_STOPS) {
     display_assert("count>=0 && count<MAXIMUM_NUMBER_OF_TAB_STOPS",
                    "c:\\halo\\SOURCE\\text\\draw_string.c", 0x15e, 1);
     system_exit(-1);
     /* After assert: cap at 16 and continue. */
-    if (count > 0x10) {
-      *(short *)0x4d9b28 = 0x10;
+    if (count > MAXIMUM_NUMBER_OF_TAB_STOPS) {
+      count = MAXIMUM_NUMBER_OF_TAB_STOPS;
+      *(short *)0x4d9b28 = count;
       goto copy;
     }
   }
   *(short *)0x4d9b28 = count;
-  if (count < 1)
+  if (count <= 0)
     return;
 copy:
-  csmemcpy((void *)0x4d9b2a, stops, (int)*(short *)0x4d9b28 << 1);
+  csmemcpy((void *)0x4d9b2a, stops, (int)count * sizeof(short));
 }
 
 /*
