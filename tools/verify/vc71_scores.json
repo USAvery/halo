@@ -2988,16 +2988,16 @@
     "FUN_0001a600": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 96.0,
+      "abi_modeled_mnemonic_pct": 97.3,
       "addr": "0x1a600",
       "end": "0x1a666",
       "kind": "auto",
       "n_r": 36,
-      "opnd_percent": 64.0,
-      "raw_mnemonic_pct": 96.0,
+      "opnd_percent": 64.9,
+      "raw_mnemonic_pct": 97.3,
       "ref": "synth",
       "ref_sha": "b44308b86a7afc92",
-      "score": 96.0,
+      "score": 97.3,
       "source": "src/halo/ai/actor_looking.c"
     },
     "FUN_0001a670": {

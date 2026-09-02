@@ -5482,10 +5482,11 @@ void FUN_0001a600(int actor_handle, int *param_2)
     param_2[3] = *(int *)(src + 0xc);
     return;
   }
-  *param_2 = *(int *)*(char **)0x2ee6ec;
-  param_2[1] = *(int *)(*(char **)0x2ee6ec + 4);
-  param_2[2] = *(int *)(*(char **)0x2ee6ec + 8);
-  param_2[3] = *(int *)(*(char **)0x2ee6ec + 0xc);
+  looking = (*(char **)0x2ee6ec) + 8;
+  *param_2 = *(int *)(*(char **)0x2ee6ec);
+  param_2[1] = *(int *)((*(char **)0x2ee6ec) + 4);
+  param_2[2] = *(int *)looking;
+  param_2[3] = *(int *)((*(char **)0x2ee6ec) + 0xc);
 }
 
 /* FUN_0001a670 (0x1a670)
