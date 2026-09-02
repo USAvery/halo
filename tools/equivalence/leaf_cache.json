@@ -28411,6 +28411,11 @@
   "0x1bba0": {
     "class": "non_leaf"
   },
+  "0x1bc5c0": {
+    "class": "non_leaf",
+    "confidence": "moderate",
+    "coverage_pct": 47.8
+  },
   "0x1bc6a0": {
     "class": "non_leaf",
     "confidence": "high",
