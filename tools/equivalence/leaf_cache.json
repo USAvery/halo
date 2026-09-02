@@ -29474,7 +29474,9 @@
   },
   "0x5e000": {
     "class": "leaf",
-    "z3_proven": true
+    "z3_proven": true,
+    "confidence": "high",
+    "coverage_pct": 100.0
   },
   "0x5e030": {
     "class": "leaf",
@@ -29486,7 +29488,9 @@
   },
   "0x5e0d0": {
     "class": "leaf",
-    "z3_proven": true
+    "z3_proven": true,
+    "confidence": "moderate",
+    "coverage_pct": 41.7
   },
   "0x5e560": {
     "class": "non_leaf",
