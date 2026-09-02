@@ -1800,7 +1800,7 @@ char FUN_000159d0(int actor_handle, short *state_data)
       *(float *)((char *)state_data + 0x38) = 1.5f;
       break;
     default:
-      return 1;
+      goto done_success;
     }
     actor_perception_find_prop_pathfinding_location(
       actor_handle, ((actor_t *)actor)->field_1e8);
@@ -1810,6 +1810,7 @@ char FUN_000159d0(int actor_handle, short *state_data)
     *(int *)((char *)state_data + 0x30) = *(int *)(prop + 0xf8);
     *(int *)((char *)state_data + 0x34) = *(int *)(prop + 0xec);
   }
+done_success:
   return 1;
 }
 
