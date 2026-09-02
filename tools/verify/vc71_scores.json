@@ -85351,16 +85351,16 @@
     "ui_widgets_dispose": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 85.0,
+      "abi_modeled_mnemonic_pct": 100.0,
       "addr": "0xe6a60",
       "end": "0xe6aad",
       "kind": "auto",
       "n_r": 20,
-      "opnd_percent": 65.0,
-      "raw_mnemonic_pct": 85.0,
+      "opnd_percent": 95.0,
+      "raw_mnemonic_pct": 100.0,
       "ref": "synth",
       "ref_sha": "826cbb1aa498bdfb",
-      "score": 85.0,
+      "score": 100.0,
       "source": "src/halo/interface/ui_widget.c"
     },
     "ui_widgets_initialize": {
