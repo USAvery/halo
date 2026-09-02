@@ -2161,13 +2161,13 @@ game_variant_t *build_game_variant_reverse_tag(game_variant_t *out)
   *(int32_t *)((char *)&v + 0x20) =
     (*(int32_t *)((char *)&v + 0x20) & 0xffffffc2) | 2;
   *(int32_t *)((char *)&v + 0x24) = 1;
+  *(int32_t *)((char *)&v + 0x30) = 0x96;
+  *(int32_t *)((char *)&v + 0x34) = 0x96;
   *(int32_t *)((char *)&v + 0x48) = 1;
   *(int32_t *)((char *)&v + 0x60) = 1;
   *(uint8_t *)((char *)&v + 0x4d) = 1;
   *(int32_t *)((char *)&v + 0x5c) = 1;
   *(int16_t *)((char *)&v + 0x64) = 1;
-  *(int32_t *)((char *)&v + 0x30) = 0x96;
-  *(int32_t *)((char *)&v + 0x34) = 0x96;
   *(int32_t *)((char *)&v + 0x18) = 3;
   *(int32_t *)((char *)&v + 0x3c) = 0x3f800000;
   *(int32_t *)((char *)&v + 0x38) = 0;
@@ -2228,10 +2228,10 @@ game_variant_t *build_game_variant_juggernaut(game_variant_t *out)
     (*(int32_t *)((char *)&v + 0x20) & 0xffffffc3) | 3;
   *(int32_t *)((char *)&v + 0x30) = 0x96;
   *(int32_t *)((char *)&v + 0x34) = 0x96;
+  *(int32_t *)((char *)&v + 0x24) = 1;
   *(int32_t *)((char *)&v + 0x48) = 2;
   *(int32_t *)((char *)&v + 0x54) = 2;
   *(int32_t *)((char *)&v + 0x5c) = 2;
-  *(int32_t *)((char *)&v + 0x24) = 1;
   *(int32_t *)((char *)&v + 0x60) = 1;
   *(int16_t *)((char *)&v + 0x64) = 1;
   *(int32_t *)((char *)&v + 0x18) = 3;
