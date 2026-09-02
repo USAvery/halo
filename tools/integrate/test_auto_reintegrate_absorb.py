@@ -55,6 +55,9 @@ def make_repo(tmp):
     (tmp / "tools/objects.csv").write_text("Object,Delink?,addr_range,func_count\n")
     (tmp / "tools/equivalence/leaf_cache.json").write_text("{}\n")
     (tmp / "artifacts/batch_verify/summary.json").write_text("{}\n")
+    # Tracked, not ignored -- .gitignore explicitly un-ignores these two, and
+    # the verify lane rewrites both, so they are the pair that dirtied main.
+    (tmp / "artifacts/batch_verify/results.csv").write_text("target,match\n")
     (tmp / "src").mkdir(exist_ok=True)
     (tmp / "src/units.c").write_text("int f(void){return 0;}\n")
     sh("git", "add", "-A", cwd=tmp)
@@ -104,7 +107,41 @@ def main():
               ["artifacts/batch_verify/summary.json",
                "tools/verify/vc71_scores.json"])
 
+        sh("git", "checkout", "--", ".", cwd=tmp)
+
+        # --- the measured real-world combination -------------------------
+        # 2026-09-02 audit: 0 of 13 batches landed across 7 auto-session runs,
+        # every one on `main_worktree_dirty`. Main's dirt was exactly this
+        # trio -- a README stats regen plus the batch_verify pair, which is
+        # tracked (explicitly un-ignored in .gitignore) and rewritten wholesale
+        # by the verify lane. None of it is authored work, so all three must
+        # absorb TOGETHER; pinning the pieces separately (above) did not.
+        dirty(tmp, "README.md",
+              "# Halo\n\nProse that must never drift.\n\n"
+              "Ported Functions: 4102 / 8143 (50.4%)\n"
+              "[█████████░░░░░░░]\n")
+        dirty(tmp, "artifacts/batch_verify/results.csv",
+              "target,match\nfoo,100.0\n")
+        dirty(tmp, "artifacts/batch_verify/summary.json", '{"n": 7}\n')
+        got = ar._absorbable_paths(wt)
+        check("README stats + batch_verify pair -> all absorbable",
+              got and sorted(got),
+              ["README.md",
+               "artifacts/batch_verify/results.csv",
+               "artifacts/batch_verify/summary.json"])
+
+        # ...and the same trio with a README PROSE edit must still park, so
+        # the widening did not buy the batch_verify pair a free README absorb.
+        dirty(tmp, "README.md",
+              "# Halo\n\nProse a person rewrote.\n\n"
+              "Ported Functions: 4102 / 8143 (50.4%)\n"
+              "[█████████░░░░░░░]\n")
+        check("README prose + batch_verify pair -> park",
+              ar._absorbable_paths(wt), None)
+        sh("git", "checkout", "--", ".", cwd=tmp)
+
         # --- a source file alongside generated output MUST park ----------
+        dirty(tmp, "tools/verify/vc71_scores.json", '{"scores": {"f": 1}}\n')
         dirty(tmp, "src/units.c", "int f(void){return 1;}\n")
         check("source file present -> park (fails closed)",
               ar._absorbable_paths(wt), None)
