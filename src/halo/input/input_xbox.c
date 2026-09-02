@@ -530,7 +530,7 @@ void input_state_process_packet(void *state)
 /* FUN_000cf3e0 (0xcf3e0)
  * Remaps a short value from range [-param_2..param_2] to
  * [-0x8000..0x7fff], returning the sign bit if in the dead zone. */
-int FUN_000cf3e0(short param_1, short param_2)
+short FUN_000cf3e0(short param_1, short param_2)
 {
   if (param_1 > param_2) {
     return (((int)param_1 - (int)param_2) * 0x7fff) / (0x7fff - (int)param_2);
@@ -538,7 +538,7 @@ int FUN_000cf3e0(short param_1, short param_2)
   if ((int)param_1 < -(int)param_2) {
     return (((int)param_1 + (int)param_2) * -0x8000) / ((int)param_2 + -0x8000);
   }
-  return (int)param_1 & ~0xFFFF;
+  return 0;
 }
 
 /* FUN_000cf430 (0xcf430)
@@ -687,10 +687,13 @@ void *input_get_gamepad_state(int16_t gamepad_index)
 
 void input_set_rumble(int16_t gamepad_index, uint16_t left, uint16_t right)
 {
+  int offset;
+
   assert_halt(gamepad_index >= 0 && gamepad_index < MAXIMUM_GAMEPADS);
-  if (!((bool (*)(int16_t))0xe0b00)(gamepad_index)) {
-    input_rumble_states()[gamepad_index].left = left;
-    input_rumble_states()[gamepad_index].right = right;
+  if (!player_ui_rumble_disabled(gamepad_index)) {
+    offset = (int)gamepad_index << 2;
+    *(uint16_t *)(0x46bb14 + offset) = left;
+    *(uint16_t *)(0x46bb16 + offset) = right;
   }
 }
 

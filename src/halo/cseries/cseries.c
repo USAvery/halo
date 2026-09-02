@@ -36,17 +36,13 @@ uint32_t *tag_to_string(uint32_t param_1, uint32_t *param_2)
  * Returns the number of characters before the first null, at most n. */
 int strnlen(const char *s, int n)
 {
-  int count;
-  char c;
+  int count = 0;
 
-  count = 0;
-  if (0 < n) {
+  if (n > 0) {
     do {
-      c = *s;
-      s = s + 1;
-      if (c == '\0')
-        return count;
-      count = count + 1;
+      if (*s++ == '\0')
+        break;
+      count++;
     } while (count < n);
   }
   return count;

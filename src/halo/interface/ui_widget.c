@@ -5,13 +5,15 @@
  * widget+8) or if the widget's local_player_index matches the event's
  * controller_index (at event+2). Same check is inlined below as
  * "allowed_player" in ui_widget_process_event. */
-bool event_controller_index_compatible_with_widget(void *event, void *widget)
+int event_controller_index_compatible_with_widget(void *event, void *widget)
 {
-  if (*(int16_t *)((char *)widget + 8) != -1 &&
-      *(int16_t *)((char *)widget + 8) != *(int16_t *)((char *)event + 2)) {
-    return false;
+  short player_index;
+
+  player_index = *(short *)((char *)widget + 8);
+  if (player_index == -1 || player_index == *(short *)((char *)event + 2)) {
+    return 1;
   }
-  return true;
+  return 0;
 }
 
 /* set_ui_plasma_effect_color (0xe3bb0) — stores four caller-supplied dword

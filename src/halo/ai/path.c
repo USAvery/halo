@@ -68,11 +68,8 @@ void paths_dispose(void *param_1, int param_2)
 void path_input_set_start(void *param_1, float *param_2, int param_3)
 {
   *(uint8_t *)((char *)param_1 + 0x10) = 1;
-  *(float *)((char *)param_1 + 0x14) = param_2[0];
-  *(float *)((char *)param_1 + 0x18) = param_2[1];
-  *(float *)((char *)param_1 + 0x1c) = param_2[2];
+  *(vector3_t *)((char *)param_1 + 0x14) = *(vector3_t *)param_2;
   *(int *)((char *)param_1 + 0x20) = param_3;
-  return;
 }
 
 /* 0x005e030 — path_state_set_sphere
@@ -159,12 +156,9 @@ void path_state_new(void *param_1, void *param_2, void *param_3)
 void FUN_0005e0d0(void *param_1, float *param_2, int param_3, int param_4)
 {
   *(uint8_t *)((char *)param_1 + 0x4c) = 1;
-  *(float *)((char *)param_1 + 0x50) = param_2[0];
-  *(float *)((char *)param_1 + 0x54) = param_2[1];
-  *(float *)((char *)param_1 + 0x58) = param_2[2];
+  *(vector3_t *)((char *)param_1 + 0x50) = *(vector3_t *)param_2;
   *(int *)((char *)param_1 + 0x5c) = param_3;
   *(int *)((char *)param_1 + 0x60) = param_4;
-  return;
 }
 
 /* 0x005e560 — path_heap_pop_cheapest_node

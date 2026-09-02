@@ -9610,15 +9610,9 @@ void object_get_root_location(int object_handle, float *position_out,
  */
 void object_get_location(int object_handle, void *location_out)
 {
-  /* Single nested cdecl expression so MSVC pre-pushes the -1 type_mask before
-   * evaluating object_get_root_parent (matches the original's interleaved push
-   * scheduling). */
-  object_data_t *obj = (object_data_t *)object_get_and_verify_type(
-    object_get_root_parent(object_handle), -1);
-  uint32_t *out = (uint32_t *)location_out;
-
-  out[0] = obj->unk_72;
-  out[1] = (uint32_t)obj->unk_76.value;
+  typedef struct { uint32_t a; uint32_t b; } loc_t;
+  *(loc_t *)location_out = *(loc_t *)&((object_data_t *)object_get_and_verify_type(
+    object_get_root_parent(object_handle), -1))->unk_72;
 }
 
 /*

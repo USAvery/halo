@@ -932,17 +932,17 @@ __attribute__((naked)) int FUN_000d1540(void)
 /* Scan int array backwards from index 127, return first index where element
  * is not the sentinel 0x62626262 ("bbbb"). Returns -1 if all are sentinel.
  * Loop counter is short (16-bit); OR AX,0xffff sign-extends -1 to int. */
-int FUN_000d1550(int param_1)
+short FUN_000d1550(int param_1)
 {
   short i;
 
   i = 0x7f;
   do {
     if (*(int *)(param_1 + (int)i * 4) != 0x62626262)
-      return (int)i;
+      return i;
     i--;
   } while (i >= 0);
-  return i;
+  return -1;
 }
 
 /* Looks up a HUD bitmap-widget element: indexes the 'bitm' tag's widget block

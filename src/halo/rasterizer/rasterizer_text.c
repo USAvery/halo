@@ -54,7 +54,7 @@ float *FUN_0017ffc0(float *param_1, unsigned int param_2)
  * assert valid range (0x180050) */
 int FUN_00180050(short param_1)
 {
-  if ((param_1 < 0) || (0xb < param_1)) {
+  if (param_1 < 0 || param_1 >= 12) {
     display_assert("type>=0 && type<NUMBER_OF_RASTERIZER_VERTEX_TYPES",
                    "c:\\halo\\SOURCE\\rasterizer\\rasterizer_geometry.c", 0xaa,
                    1);

@@ -169,7 +169,7 @@ int FUN_0002f5b0(int param_1, int param_2)
   f2 = *(float *)(param_2 + 8);
   if (f1 < f2)
     return -1;
-  if (f2 < f1)
+  if (f1 > f2)
     return 1;
   return 0;
 }

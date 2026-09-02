@@ -12488,7 +12488,7 @@
     },
     {
      "addr": "0xd1550",
-     "decl": "int FUN_000d1550(int param_1);",
+     "decl": "short FUN_000d1550(int param_1);",
      "ported": true,
      "src": "src/halo/interface/hud.c"
     },
@@ -13342,7 +13342,7 @@
     },
     {
      "addr": "0xcf3e0",
-     "decl": "int FUN_000cf3e0(short param_1, short param_2);",
+     "decl": "short FUN_000cf3e0(short param_1, short param_2);",
      "ported": true,
      "source_path": "src/halo/input/input_xbox.c"
     },
@@ -24312,7 +24312,7 @@
     {
      "addr": "0x1c8f20",
      "comment": "Sample the pitch value from a permutation block by index.",
-     "decl": "float sound_get_permutation_pitch(int permutation_block_ptr, short permutation_index);",
+     "decl": "float sound_get_permutation_pitch(int permutation_block_ptr, int permutation_index);",
      "ported": true
     },
     {
@@ -26452,7 +26452,7 @@
    "functions": [
     {
      "addr": "0xe3b80",
-     "decl": "bool event_controller_index_compatible_with_widget(void *event, void *widget);",
+     "decl": "int event_controller_index_compatible_with_widget(void *event, void *widget);",
      "ported": true
     },
     {

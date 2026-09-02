@@ -431,10 +431,10 @@ unsigned int FUN_00119bb0(unsigned int *buf, unsigned int size)
   unsigned int uVar1;
 
   uVar1 = 0;
-  if (3 < size) {
+  if (size >= 4) {
     uVar1 = *buf;
-    uVar1 = ((uVar1 & 0xff0000) | uVar1 >> 0x10) >> 8 |
-            ((uVar1 << 0x10) | (uVar1 & 0xff00)) << 8;
+    uVar1 = ((uVar1 & 0xff0000) | (uVar1 >> 16)) >> 8 |
+            ((uVar1 & 0xff00) | (uVar1 << 16)) << 8;
   }
   return uVar1;
 }

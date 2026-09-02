@@ -851,16 +851,19 @@ int FUN_0011ba00(unsigned char *key, unsigned int key_size)
 {
   int hash;
   short prime_index;
+  int prime;
 
   hash = 0;
   prime_index = 0;
-  if (key_size != 0) {
+  if (key_size > 0) {
     do {
       if (prime_index == 0xf) {
         prime_index = 0;
         key_size = key_size - 0xf;
       }
-      hash = hash + (int)hashtable_primes[prime_index] * (unsigned short)*key;
+      prime = hashtable_primes[prime_index];
+      prime = (short)(prime * (unsigned short)*key);
+      hash += prime;
       prime_index = prime_index + 1;
       key = key + 1;
     } while ((unsigned int)(int)prime_index < key_size);

@@ -257,7 +257,7 @@ void matrix_inverse(float *src, float *dst)
 /* 0x109240 — Initialize a scaled 4x3 identity matrix. */
 void FUN_00109240(float *out, float scale)
 {
-  *(uint32_t *)&out[0] = *(uint32_t *)&scale;
+  out[0] = scale;
   ((uint32_t *)out)[1] = 0x3f800000;
   ((uint32_t *)out)[2] = 0;
   ((uint32_t *)out)[3] = 0;

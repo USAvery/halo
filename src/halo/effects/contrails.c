@@ -329,17 +329,16 @@ float contrail_scale_random_value(float datum_scale, float range_min,
                                   int bit_index)
 {
   float base;
-  float range;
-  unsigned int *seed;
 
   base = range_min;
-  if (flags & (1 << (bit_index & 0x1f)))
+  if ((flags & (1 << (char)bit_index)) != 0) {
     base = datum_scale * range_min;
-  range = range_max - range_min;
-  if (flags & (1 << ((bit_index + 1) & 0x1f)))
-    range *= datum_scale;
-  seed = random_math_get_local_seed_address();
-  return random_real_range((int *)seed, 0.0f, range) + base;
+  }
+  range_min = range_max - range_min;
+  if ((flags & (1 << (char)(bit_index + 1))) != 0) {
+    range_min *= datum_scale;
+  }
+  return random_real_range((int *)random_math_get_local_seed_address(), 0.0f, range_min) + base;
 }
 
 void contrails_initialize(void)

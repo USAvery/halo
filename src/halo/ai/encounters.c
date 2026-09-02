@@ -787,12 +787,12 @@ bool FUN_000567e0(int16_t param_1, int16_t param_2)
 int FUN_00056830(int param_1, int param_2)
 {
   if (*(char *)(param_1 + 8) != *(char *)(param_2 + 8)) {
-    return (*(char *)(param_1 + 8) != '\0') * 2 - 1;
+    return *(char *)(param_1 + 8) != '\0' ? 1 : -1;
   }
   if (*(float *)(param_1 + 4) < *(float *)(param_2 + 4)) {
     return -1;
   }
-  if (*(float *)(param_2 + 4) < *(float *)(param_1 + 4)) {
+  if (*(float *)(param_1 + 4) > *(float *)(param_2 + 4)) {
     return 1;
   }
   return 0;

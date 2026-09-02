@@ -35,7 +35,7 @@ typedef char (*get_save_path_fn)(short index, void *out_path);
 typedef int (*get_last_error_fn)(void);
 typedef void (*crc_begin_fn)(uint32_t *checksum);
 
-#define XCloseHandle ((close_handle_fn)0x1cf900)
+#define XCloseHandle CloseHandle
 #define XSetFilePointer ((set_file_pointer_fn)0x1d1610)
 #define XReadFile ((read_file_fn)0x1d13c9)
 #define XWriteFile ((write_file_fn)0x1d14b6)

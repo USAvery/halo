@@ -434,7 +434,7 @@ short FUN_001bc5c0(void)
   do {
     request_index = 0;
     do {
-      if (request_index < 0 || request_index > 0x1ff) {
+      if (request_index < 0 || request_index >= 0x200) {
         display_assert("request_index>=0 && "
                        "request_index<MAXIMUM_SIMULTANEOUS_CACHE_REQUESTS",
                        "c:\\halo\\SOURCE\\cache\\cache_files_windows.c", 0x260,

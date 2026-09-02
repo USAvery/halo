@@ -196,18 +196,18 @@ short sound_select_pitch_range(void *sound_tag, float random_scale,
  * If the permutation has no mouth data (size == 0), logs an error
  * and returns 0.0f. */
 float sound_get_permutation_pitch(int permutation_block_ptr,
-                                  short permutation_index)
+                                  int permutation_index)
 {
   int mouth_data_size = *(int *)((char *)permutation_block_ptr + 0x54);
   int clamped_index;
 
   if (mouth_data_size != 0) {
-    if (permutation_index < 0) {
+    if ((short)permutation_index < 0) {
       clamped_index = 0;
     } else {
       clamped_index = mouth_data_size - 1;
-      if ((int)permutation_index <= clamped_index) {
-        clamped_index = (int)permutation_index;
+      if ((short)permutation_index <= clamped_index) {
+        clamped_index = (short)permutation_index;
       }
     }
 

@@ -580,7 +580,7 @@ int16_t random_range(unsigned int *seed, int16_t min, int16_t max)
 
   s = *seed * 0x19660d + 0x3c6ef35f;
   *seed = s;
-  return (int16_t)(((int)(max - min) * (int)(s >> 16) >> 16) + (int)min);
+  return (int16_t)(((unsigned int)((int)(max - min) * (s >> 16)) >> 16) + (int)min);
 }
 
 /* Look up a precomputed unit direction from the random direction table

@@ -13,7 +13,7 @@ void rect2d_offset(int16_t *rect, int16_t dx, int16_t dy)
 int16_t FUN_00108db0(unsigned int value)
 {
   int result = 0;
-  if (value != 0) {
+  if (value > 0) {
     while (value != 1) {
       value >>= 1;
       result++;
