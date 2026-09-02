@@ -133,7 +133,7 @@ uint32_t bsp3d_find_leaf(void *bsp3d, int root, void *point)
       (float *)tag_block_get_element((char *)bsp3d + 0xc, (int)node[0], 0x10);
     dist = (plane[0] * p[0] + plane[2] * p[2] + plane[1] * p[1]) - plane[3];
     node_index = (int)node[1 + (0.0f <= dist ? 1 : 0)];
-  } while (0 <= node_index);
+  } while ((node_index & 0x80000000) == 0);
 
   if (node_index != -1) {
     return (uint32_t)node_index & 0x7fffffff;

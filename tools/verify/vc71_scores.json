@@ -53041,16 +53041,16 @@
     "bsp3d_find_leaf": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 98.0,
+      "abi_modeled_mnemonic_pct": 100.0,
       "addr": "0x146db0",
       "end": "0x146e25",
       "kind": "auto",
       "n_r": 51,
-      "opnd_percent": 96.1,
-      "raw_mnemonic_pct": 98.0,
+      "opnd_percent": 98.0,
+      "raw_mnemonic_pct": 100.0,
       "ref": "synth",
       "ref_sha": "f9437c4c5cc9a432",
-      "score": 98.0,
+      "score": 100.0,
       "source": "src/halo/physics/bsp3d.c"
     },
     "bsp3d_get_plane_from_designator": {
