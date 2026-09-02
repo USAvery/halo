@@ -7953,16 +7953,16 @@
     "FUN_0005de80": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 85.4,
+      "abi_modeled_mnemonic_pct": 91.9,
       "addr": "0x5de80",
       "end": "0x5df71",
       "kind": "auto",
       "n_r": 84,
-      "opnd_percent": 69.0,
-      "raw_mnemonic_pct": 85.4,
+      "opnd_percent": 81.4,
+      "raw_mnemonic_pct": 91.9,
       "ref": "synth",
       "ref_sha": "661757ef2033c6c4",
-      "score": 85.4,
+      "score": 91.9,
       "source": "src/halo/ai/encounters.c"
     },
     "FUN_0005df80": {
@@ -48718,6 +48718,21 @@
       "score": 92.3,
       "source": "src/halo/ai/actors.c"
     },
+    "actor_iterator_next": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 84.6,
+      "addr": "0x59b50",
+      "end": "0x59bee",
+      "kind": "auto",
+      "n_r": 63,
+      "opnd_percent": 75.4,
+      "raw_mnemonic_pct": 84.6,
+      "ref": "synth",
+      "ref_sha": "c63382cbc58b9b61",
+      "score": 84.6,
+      "source": "src/halo/ai/encounters.c"
+    },
     "actor_kill": {
       "abi_model": "raw",
       "abi_model_items": 0,
@@ -58651,16 +58666,16 @@
     "encounters_create_for_new_map": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 85.3,
+      "abi_modeled_mnemonic_pct": 88.7,
       "addr": "0x5ddc0",
       "end": "0x5de75",
       "kind": "auto",
       "n_r": 65,
-      "opnd_percent": 67.6,
-      "raw_mnemonic_pct": 85.3,
+      "opnd_percent": 63.2,
+      "raw_mnemonic_pct": 88.7,
       "ref": "synth",
       "ref_sha": "b03ceaefe164abbe",
-      "score": 85.3,
+      "score": 88.7,
       "source": "src/halo/ai/encounters.c"
     },
     "encounters_dispose": {

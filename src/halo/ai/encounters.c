@@ -7421,14 +7421,16 @@ void encounters_create_for_new_map(void)
   char *encounter;
   char *encounter_def;
   char flag;
+  char active;
 
   scenario = (char *)global_scenario_get();
+  active = *(char *)(*(int *)0x632574 + 1);
   if (*(char *)(*(int *)0x632574 + 1) != '\0') {
     data_iterator_new(&iter, *(data_t **)0x5ab270);
     flag = '\0';
   }
   for (;;) {
-    if (*(char *)(*(int *)0x632574 + 1) == '\0')
+    if (active == '\0')
       return;
     do {
       encounter = (char *)data_iterator_next(&iter);
@@ -7457,9 +7459,9 @@ void FUN_0005de80(void)
   int tick;
   int tick_mod15;
   data_iter_t iter;
-  int encounter_handle;
   char *encounter;
   char flag;
+  char active;
 
   tick = game_time_get();
   if (tick % 30 == 0) {
@@ -7471,26 +7473,26 @@ void FUN_0005de80(void)
     data_iterator_new(&iter, *(data_t **)0x5ab270);
     flag = 1;
   }
+  active = *(char *)(*(int *)0x632574 + 1);
   for (;;) {
-    if (*(char *)(*(int *)0x632574 + 1) == '\0')
+    if (active == '\0')
       return;
     do {
       encounter = (char *)data_iterator_next(&iter);
       if (encounter == NULL || flag == '\0')
         break;
     } while (*(char *)(encounter + 0xd) == '\0');
-    encounter_handle = (int)iter.datum_handle;
     if (encounter == NULL)
       return;
     (*(short *)0x5abb34)++;
-    if ((short)((encounter_handle & 0xffff) % 15) == (short)tick_mod15) {
-      encounter_update_status(encounter_handle);
-      FUN_0005acf0(encounter_handle);
-      FUN_0005c680(encounter_handle);
-      FUN_0005ae70(encounter_handle);
-      FUN_0005c940(encounter_handle);
-      FUN_0005ca80(encounter_handle);
-      FUN_0005dc00(encounter_handle);
+    if ((short)((((int)iter.datum_handle) & 0xffff) % 15) == (short)tick_mod15) {
+      encounter_update_status((int)iter.datum_handle);
+      FUN_0005acf0((int)iter.datum_handle);
+      FUN_0005c680((int)iter.datum_handle);
+      FUN_0005ae70((int)iter.datum_handle);
+      FUN_0005c940((int)iter.datum_handle);
+      FUN_0005ca80((int)iter.datum_handle);
+      FUN_0005dc00((int)iter.datum_handle);
     }
   }
 }
