@@ -65,3 +65,21 @@ description: "Command decision tree + full tools/ script reference: which comman
 - **`tools/equivalence/state_snapshot.py`** — State snapshot capture and replay. `load_snapshot(path)` loads JSON into memory overrides for Unicorn. Low-level building block; prefer `memsave_snapshot.py` (virtual memsave) for capture workflows.
 - **`tools/equivalence/dump_xemu_memory.py`** — LEGACY full-memory dump/snapshot builder. Its default `dump` path uses QMP `pmemsave` (physical), which is **broken on this dev box** (Cerbios does not identity-map game VA → reads wrong bytes; see the tool's own header). Prefer `memsave_snapshot.py`/`qmp_capture.py` (virtual memsave) for capture. The one kept use is `dump --method xbdm` (`getmem`, virtual) on **real Xbox hardware**. Given a verified dump, `snapshot --dump <path> --target <func> [--full] [--arg <name> <value>]` still assembles a `unicorn_diff.py --state-snapshot`-compatible JSON.
 - **`tools/analysis/punpckhdq_import.py`** — Imports PDB-derived TU/symbol corpus from punpckhdq/halo (debug-build PDB) and proposes real names for our `FUN_<addr>` placeholders. `tools/analysis/apply_punpckhdq_renames.py` performs textual renames across kb.json/baseline/src after dry-run review.
+
+## Toolchain Bootstrap (moved from CLAUDE.md, 2026-09-02)
+
+Requirements are `clang + lld (lld-link) + cmake + python3` pinned with
+`pefile~=2023.2.7`, `pyxbe~=1.0.2`, `libclang~=16.0.0`, `setuptools<81` (newer
+setuptools removed `pkg_resources`), and `capstone`. Direct CMake interface:
+
+```bash
+cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE=toolchains/llvm.cmake
+cmake --build build
+```
+
+- *Windows:* Add LLVM, CMake, Python 3.12, Ninja to PATH. If MSVC CRT is absent,
+  add `-DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY` to cmake configure.
+- *Linux without root:* Bootstrap user-space toolchain via
+  `mkdir -p /tmp/debs && cd /tmp/debs && apt-get download clang-14 lld-14 libllvm14 libclang-cpp14 libclang-common-14-dev libclang1-14 llvm-14-linker-tools llvm-14`
+  then `mkdir -p ~/llvm && for d in *.deb; do dpkg-deb -x "$d" ~/llvm; done` and
+  export PATH/LD_LIBRARY_PATH.

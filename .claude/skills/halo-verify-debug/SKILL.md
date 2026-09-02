@@ -249,3 +249,139 @@ Report:
 - exact fix made
 - validation performed
 - remaining risk or follow-up
+
+## Lane Detail Moved From CLAUDE.md (2026-09-02)
+
+### VC71 verify — warnings and reference derivation
+After lifting FPU-heavy functions (geometry, math, projections), run
+`rtk python3 tools/verify/vc71_verify.py src/path/to/file.c`. Review any
+`[FPU-WARN]` (operand-order bugs), `[LOADW-WARN]` (int vs int16/int8
+field-width bugs; `--loadw-only`), `[IMM-WARN]` (wrong float/magic numeric
+literal; `--imm-only`), and `[SHAPE-WARN]` (call-count delta = a dropped or
+wrongly aimed call, and reference-only stores to an incoming param slot = the
+original reassigns a parameter; `--shape-only`, see lift-learnings 49-50)
+output. **A call-count delta on a function with fewer than ~12 reference
+instructions is a dropped call, not a codegen artifact** — decode the
+reference's E8/E9 targets before accepting any tail-call or inlining
+explanation (`hs_dispose` sat at 66.7% with one of its two calls missing).
+References are derived automatically from the pristine XBE + the committed
+bounds table (`tools/verify/function_bounds.json`) — no delinked export is
+needed for scoring. `vc71_verify.py` regenerates `build/generated/decl.h` from
+kb.json on every run (`--skip-decl-regen` opts out), so a kb.json prototype edit
+can no longer be compiled against a stale header.
+
+### A gate regression with no matching source change is a harness bug until it reproduces
+`vc71_regression.py check` fans out 8 `vc71_verify` workers; until 2026-08-19
+each rewrote `build/generated/decl.h` while its siblings compiled against it, so
+two runs of the same command on the same tree reported 24 vs 26 regressions with
+only 3 in common — and the wrong scores were then memoized under a valid-looking
+key and served back to serial runs. Any new parallel fan-out over `vc71_verify`
+MUST pin the header once in the parent and pass `--skip-decl-regen` to workers
+(see `vc71_regression._pin_decl_header`). When triaging an unexplained
+regression, run the gate twice and diff the `✗` lists, and use
+`VC71_NO_MEASURE_MEMO=1` to tell "the measurement is wrong" from "the memo is
+serving an old wrong measurement". See lift-learnings 52.
+
+### A verify run that scores ZERO functions in a TU is a compile failure until proven otherwise
+Read the first `cl.exe` diagnostic before investigating the reference side: a
+reference problem degrades or drops individual functions, it never blanks a
+whole TU. The classic cause is a stale `decl.h` (see §41 in
+`docs/lift-learnings.md`) — a widened kb.json prototype turns every call site
+into a hard error, and the empty result reads like a missing delinked reference
+when the delinked object is fine.
+
+### Bounds-table precondition (REQUIRED before VC71 verify)
+Before running `vc71_verify.py` for any newly lifted target, confirm the
+function's address has an entry in the committed bounds table:
+
+```
+rtk jq '."0x<addr>"' tools/verify/function_bounds.json
+```
+
+If missing (kb.json gained functions since the table was generated), regenerate
+with `rtk python3 tools/verify/function_bounds.py` and commit the updated table
+— the scoring reference is derived from it. Delinked COFF exports
+(`mcp__ghidra-live__export_delinked_object`) are still required for the
+**equivalence lane** (unicorn/z3 execute the oracle object) and for objdiff —
+not for VC71 scoring.
+
+### Permuter (`/verify permute`)
+Last-mile match optimizer. Use ONLY when VC71 match is in **[85, 98]%**. The
+reference COFF is derived automatically from the XBE (same reference VC71
+scoring uses); a delinked object is opt-in via `--delinked-ref`. Below 85% the
+lift has a structural bug — fix it first; permuter cannot recover from real
+correctness issues. Above 98% it is not worth the cycles. Never accept a
+permutation that lowers the existing match; always re-run the lift pipeline
+against the new source.
+
+### Equivalence (`/verify equivalence`)
+Unicorn-Engine behavioral differential with seeded inputs, coverage tracking,
+and concolic feedback. Use when byte-match is weak evidence: FPU-heavy code,
+hashes/serializers, or structurally capped lifts (e.g. SEH wrappers stuck at
+~55%). Works for both leaf and non-leaf functions:
+- **Pure leaves:** `rtk python3 tools/equivalence/unicorn_diff.py <target> --seeds 100`
+- **Non-leaf or FPU-heavy:** `rtk python3 tools/equivalence/unicorn_diff.py <target> --seeds 100 --allow-stubs --float-tolerance 32`.
+  `--allow-stubs` stubs known callees (csmemcpy, fabs, _chkstk, etc.) and seeds
+  known XBE globals. `--float-tolerance N` compares float* scratch buffers with
+  N ULP tolerance instead of byte-exact (recommended: 16–32 for typical
+  geometry, up to 256 for long chains), accounting for x87 rounding differences
+  across compiler versions. With `--allow-stubs`, a stub-argument differential
+  records each stubbed callee's register and stack args in oracle and candidate
+  and fails seeds on mismatch, catching swapped, dropped, or wrong-constant call
+  arguments that return-value and mem-trace comparison miss; disable with
+  `--no-stub-arg-trace`.
+- **Coverage & confidence:** Each run reports code coverage % and a confidence
+  tier (high/moderate/weak). If coverage < 60%, a **concolic Phase 2**
+  automatically injects non-zero values into zero-filled global memory to reach
+  untested branches. The confidence tier and coverage are persisted to
+  `leaf_cache.json` and shown in pipeline output.
+- **Memory-trace differential:** `--mem-trace` (enabled by default in
+  pipeline/batch) compares all non-stack memory writes between oracle and
+  candidate, catching side-effect bugs (wrong struct offset, missing writes)
+  that return-value comparison misses.
+- **State snapshots:** `--state-snapshot path.json` loads real game-state memory
+  (captured from xemu) instead of zero-fill. Use for functions that depend on
+  complex runtime state (linked lists, hash tables). Capture with
+  `tools/equivalence/state_snapshot.py`.
+- Each run records leaf classification and confidence to
+  `tools/equivalence/leaf_cache.json`, boosting pure leaves by `+5 eq_pure_leaf`
+  and high-confidence results by `+3 eq_high_conf` in future selector runs.
+- **Verification decision:** Match ≥99% → done (byte-match sufficient);
+  [85, 98]% with delinked ref → try `/verify permute` first; [85, 98]% pure leaf
+  FPU-heavy → `/verify equivalence` first; <85% → investigate lift (don't
+  permute); structurally capped (~55%) → equivalence to prove behavior.
+  **Interpret confidence:** `high` = strong evidence; `moderate` = concolic
+  improved coverage but returns monotonic; `weak` = only early-exit path tested,
+  needs investigation or live memory replay.
+
+### Hazard scan — checks and their lift-learnings sections
+XCALL (§1), buffer-alias (§2), intrinsics (table), duplicate-args (§3),
+pointer-as-float (§4), frame-size (§2 stack), callee-output-size (projection
+§5), x87-math, void-EAX (§16), CONCAT (§13, ERROR), float-smuggling (§6),
+addr-value-add (§17), param-loop-corruption (§4), discarded-result (§8/§11),
+vendored-source (§36, advisory: the TU is a public library — transcribe upstream
+instead of reshaping Ghidra output), effect-marker-buf (§48, ERROR). Use
+`--changed-only` to scan the union of staged, unstaged-tracked, and untracked
+files you have touched; use `--staged-only` (what the pre-commit hook uses) for
+staged files only. **WARN-level findings in files you touched are review items,
+not ignorable noise** — an fmod/FPREM1 warning in `hud_messaging.c` was ignored
+as pre-existing noise and shipped a visible HUD rendering bug (2026-06-10).
+
+### Golden Master test harness — usage
+A specialized test harness intercepts the engine boot in
+`src/halo/shell_xbox.c`. It lets you run functions inside the engine context and
+verify their side-effects/return values against the exact Xbox ASM output.
+- *Usage:* Add tests to `src/halo/test_harness.c`. Ensure your function is
+  unmapped in `kb.json` (`"ported": false`), run
+  `rtk python3 tools/verify/run_golden_tests.py` to capture the original FPU hex
+  values. Then map your function (`"ported": true`) and press Enter to verify
+  your C implementation.
+- *Use cases:* FPU math functions, struct/object initializers, and complex
+  isolated state transitions.
+
+### Dual-oracle runtime harness — procedure (moved from CLAUDE.md, 2026-09-02)
+For high-value stateful targets, prefer a same-process harness case over two
+separate emulator runs. Clone inputs, call the original implementation, restore
+inputs, call the candidate implementation, then compare return values, mutated
+buffers, selected globals, and structured debug records in one initialized
+engine state.

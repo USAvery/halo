@@ -167,3 +167,21 @@ Proposed code, Proposed kb deltas, Validation, Open questions.
 | Prototype inference | `docs/references/prototype-inference.md` |
 | kb.json update rules | `docs/references/kb-update-policy.md` |
 | Output schema | `docs/references/output-schema.md` |
+
+## Commit Message File Safety (moved from CLAUDE.md, 2026-09-02)
+
+The standard recipe is:
+
+```bash
+MSG=$(mktemp /tmp/halo-commit-msg.XXXXXX)
+rtk python3 tools/audit/generate_lift_commit.py --batch-name "<short description>" > "$MSG"
+rtk git commit -F "$MSG" && rm -f "$MSG"
+```
+
+**Never use a fixed path such as `/tmp/commit_msg.txt`.** It is shared by every
+concurrent agent, cron job, and worktree on the box, and they all follow this
+same recipe. A second actor overwriting the file between your write and your
+`git commit -F` silently commits YOUR staged changes under THEIR message — no
+hook catches it, and the commit looks legitimate. Observed 2026-07-31: commit
+d6caee6b landed a `game_engine.c` fix titled "Port draw_string_get_string
+(draw_string.obj)". Always `mktemp`.
