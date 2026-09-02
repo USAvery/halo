@@ -10,8 +10,12 @@ Hook protocol (Claude Code):
 - Writes JSON to stdout: {"systemMessage": "..."} when there's something to say.
 
 Wired in `.claude/settings.json` to:
-- PostToolUse on Read|Edit|Write: update counts, emit ratio warning on
+- PostToolUse on Read|Edit|Write|Bash: update counts, emit ratio warning on
   drift, emit duplicate-read warning when (path, offset, limit) repeats.
+  Bash is included because repo doctrine routes most reads through the shell
+  (`rtk read -o N -l M`, `sed -n 'A,Bp'`, `cat`, `head`/`tail`); counting only
+  the Read tool undercounted research and made the 4:1 ratio meaningless
+  (59 sessions measured 260 reads vs 370 edits/writes = 0.7:1).
 - Stop: emit final session summary.
 
 State file: `.claude/agent-memory/token_discipline/<session_id>.json`.
@@ -21,6 +25,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -59,7 +64,12 @@ def _load_state(session_id: str) -> dict:
     p = _state_path(session_id)
     if p.exists():
         try:
-            return json.loads(p.read_text(encoding="utf-8"))
+            state = json.loads(p.read_text(encoding="utf-8"))
+            # Additive schema: sessions written by an older hook lack the
+            # Bash-derived counters. Never rename existing keys.
+            state.setdefault("bash_reads", 0)
+            state.setdefault("searches", 0)
+            return state
         except json.JSONDecodeError:
             pass
     return {
@@ -67,6 +77,8 @@ def _load_state(session_id: str) -> dict:
         "started": datetime.now().isoformat(timespec="seconds"),
         "reads": 0,
         "noisy_reads": 0,
+        "bash_reads": 0,
+        "searches": 0,
         "edits": 0,
         "writes": 0,
         "repeat_reads": 0,
@@ -123,6 +135,203 @@ def _save_state(session_id: str, state: dict) -> None:
 def _is_noisy(path: str) -> bool:
     norm = path.replace("\\", "/")
     return any(frag in norm for frag in NOISY_PATH_FRAGMENTS) or norm.endswith(".log")
+
+
+# --- Bash command parsing -------------------------------------------------
+#
+# CLAUDE.md routes reads through the shell, so the Read tool sees only a
+# fraction of the research a session actually does. These tables classify a
+# Bash command line into reads (credit the ratio, eligible for the
+# duplicate-range warning) and searches (tracked separately: a grep is
+# research, but it is not a file read and must not inflate the ratio).
+
+# Commands whose arguments name files we are reading.
+_READ_HEADS = ("cat", "head", "tail", "sed", "read")  # "read" = `rtk read`
+# Commands that search rather than read.
+_SEARCH_HEADS = ("grep", "egrep", "fgrep", "rg", "ripgrep", "ast-grep", "sg")
+# Build / test / VCS / packaging heads: never counted, and their arguments are
+# not scanned (so `git grep`, `make cat.o`, ... stay silent).
+_IGNORED_HEADS = (
+    "git", "cmake", "ninja", "make", "msbuild", "pytest", "tox", "cargo",
+    "npm", "pnpm", "yarn", "tsc", "gcc", "g++", "clang", "clang++", "cl",
+    "ld", "lld-link", "ctest", "gh", "docker", "pip", "pip3", "apt",
+    "apt-get", "dpkg", "curl", "wget", "scp", "rsync", "cp", "mv", "rm",
+    "mkdir", "chmod", "echo", "printf", "python", "python3", "node", "jq",
+    "fd", "find", "ls", "wc", "diff", "sort", "uniq", "awk", "tr", "xargs",
+)
+# Wrappers that prefix a real command.
+_WRAPPER_HEADS = ("rtk", "sudo", "time", "command", "nohup", "env", "exec")
+_SEPARATORS = ("&&", "||", ";", "|", "&", "\n")
+
+
+def _split_segments(tokens: list) -> list:
+    """Split a flat token list into command segments on shell separators."""
+    segments, cur = [], []
+    for tok in tokens:
+        if tok in _SEPARATORS:
+            if cur:
+                segments.append(cur)
+            cur = []
+        else:
+            cur.append(tok)
+    if cur:
+        segments.append(cur)
+    return segments
+
+
+def _strip_prefix(tokens: list) -> list:
+    """Drop env assignments and wrapper commands (rtk, sudo, ...)."""
+    i = 0
+    while i < len(tokens):
+        tok = tokens[i]
+        if tok in _WRAPPER_HEADS or ("=" in tok and not tok.startswith("-")
+                                     and "/" not in tok.split("=", 1)[0]):
+            i += 1
+            continue
+        break
+    return tokens[i:]
+
+
+def _looks_like_path(tok: str) -> bool:
+    if not tok or tok.startswith("-"):
+        return False
+    if tok[0] in "><$(){}`":
+        return False
+    return True
+
+
+def _int_or_none(tok: str):
+    try:
+        return int(tok)
+    except (TypeError, ValueError):
+        return None
+
+
+def _parse_sed_range(script: str):
+    """`1,20p` / `1,20 p` / `20p` -> (offset, limit); None if not a print range."""
+    body = script.strip()
+    if not body.endswith("p"):
+        return None
+    body = body[:-1].strip()
+    if "," in body:
+        a, _, b = body.partition(",")
+        start, end = _int_or_none(a.strip()), _int_or_none(b.strip())
+        if start is None or end is None:
+            return None
+        return (start, max(end - start + 1, 0))
+    start = _int_or_none(body)
+    if start is None:
+        return None
+    return (start, 1)
+
+
+def parse_bash_command(command: str) -> dict:
+    """Classify a Bash command line.
+
+    Returns {"reads": [(path, offset, limit), ...], "searches": int}.
+    offset/limit of 0 mean "whole file" (matches the Read tool's defaults so
+    the duplicate-range key is shared between the two surfaces).
+    """
+    result = {"reads": [], "searches": 0}
+    if not command or not command.strip():
+        return result
+    try:
+        tokens = shlex.split(command, comments=False, posix=True)
+    except ValueError:
+        tokens = command.split()
+
+    for seg in _split_segments(tokens):
+        seg = _strip_prefix(seg)
+        if not seg:
+            continue
+        head = os.path.basename(seg[0])
+        args = seg[1:]
+        if head in _IGNORED_HEADS:
+            continue
+        if head in _SEARCH_HEADS:
+            result["searches"] += 1
+            continue
+        if head not in _READ_HEADS:
+            continue
+
+        if head == "read":  # `rtk read <path> [-o N] [-l M]`
+            path, offset, limit = "", 0, 0
+            i = 0
+            while i < len(args):
+                a = args[i]
+                if a in ("-o", "--offset") and i + 1 < len(args):
+                    offset = _int_or_none(args[i + 1]) or 0
+                    i += 2
+                elif a in ("-l", "--limit") and i + 1 < len(args):
+                    limit = _int_or_none(args[i + 1]) or 0
+                    i += 2
+                elif _looks_like_path(a) and not path:
+                    path = a
+                    i += 1
+                else:
+                    i += 1
+            if path:
+                result["reads"].append((path, offset, limit))
+            continue
+
+        if head == "cat":
+            for a in args:
+                if _looks_like_path(a):
+                    result["reads"].append((a, 0, 0))
+            continue
+
+        if head in ("head", "tail"):
+            n, path = 0, ""
+            i = 0
+            while i < len(args):
+                a = args[i]
+                if a in ("-n", "-c") and i + 1 < len(args):
+                    n = _int_or_none(args[i + 1]) or 0
+                    i += 2
+                elif a.startswith("-") and _int_or_none(a[1:]) is not None:
+                    n = _int_or_none(a[1:]) or 0
+                    i += 1
+                elif _looks_like_path(a) and not path:
+                    path = a
+                    i += 1
+                else:
+                    i += 1
+            if path:
+                result["reads"].append((path, 0, n))
+            continue
+
+        if head == "sed":
+            # Positional grammar: `sed [flags] <script> <file>...`, unless the
+            # script came from -e/-f, in which case every positional is a file.
+            rng, script_from_flag = None, False
+            positionals = []
+            i = 0
+            while i < len(args):
+                a = args[i]
+                if a.startswith("-"):
+                    if a in ("-e", "--expression") and i + 1 < len(args):
+                        rng = rng or _parse_sed_range(args[i + 1])
+                        script_from_flag = True
+                        i += 2
+                        continue
+                    if a in ("-f", "--file", "-i") and i + 1 < len(args):
+                        script_from_flag = True
+                        i += 2
+                        continue
+                    i += 1
+                    continue
+                if _looks_like_path(a):
+                    positionals.append(a)
+                i += 1
+            if not script_from_flag and positionals:
+                rng = _parse_sed_range(positionals[0])
+                positionals = positionals[1:]
+            offset, limit = rng if rng else (0, 0)
+            for path in positionals:
+                result["reads"].append((path, offset, limit))
+            continue
+
+    return result
 
 
 def _ratio_message(state: dict) -> str | None:
@@ -182,6 +391,20 @@ def _record_read(state: dict, file_path: str, offset, limit) -> str | None:
     return None
 
 
+def _record_bash(state: dict, command: str) -> list:
+    """Credit shell-issued reads/searches to the same counters as the tools."""
+    parsed = parse_bash_command(command)
+    msgs = []
+    for path, offset, limit in parsed["reads"]:
+        state["bash_reads"] = state.get("bash_reads", 0) + 1
+        m = _record_read(state, path, offset, limit)
+        if m:
+            msgs.append(m)
+    if parsed["searches"]:
+        state["searches"] = state.get("searches", 0) + parsed["searches"]
+    return msgs
+
+
 def _record_edit_or_write(state: dict, tool_name: str) -> None:
     if tool_name == "Edit":
         state["edits"] += 1
@@ -196,7 +419,8 @@ def _summary(state: dict) -> str:
     lines = [
         f"Token-discipline summary (session {state['session_id'][:8]}):",
         f"  reads:        {state['reads']} ({research_reads} research, "
-        f"{state['noisy_reads']} noisy)",
+        f"{state['noisy_reads']} noisy, {state.get('bash_reads', 0)} via bash)",
+        f"  searches:     {state.get('searches', 0)}",
         f"  edits/writes: {state['edits']} / {state['writes']}",
         f"  repeat reads: {state['repeat_reads']}",
         f"  ratio:        {ratio:.1f}:1 (target {TARGET_RATIO:.0f}:1)",
@@ -229,6 +453,10 @@ def main() -> int:
                 m = _record_read(state, file_path, offset, limit)
                 if m:
                     msgs.append(m)
+        elif tool_name == "Bash":
+            command = tool_input.get("command", "")
+            if command:
+                msgs.extend(_record_bash(state, command))
         elif tool_name in ("Edit", "Write"):
             _record_edit_or_write(state, tool_name)
             m = _ratio_message(state)

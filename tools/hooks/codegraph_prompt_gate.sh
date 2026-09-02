@@ -19,10 +19,25 @@ payload=$(cat) || exit 0
 prompt=$(printf '%s' "$payload" | jq -r '.prompt // empty' 2>/dev/null) || exit 0
 [ -n "$prompt" ] || exit 0
 
-# Hard-problem / debugging / explicit-request intent. Keep this list narrow:
-# routine lift & command prompts must stay zero-cost.
-if printf '%s' "$prompt" | grep -qiE \
-  'crash|page fault|access.violation|assert|freeze|hang|deadlock|regression|\bbug\b|broken|divergen|corrupt|garbage|\bstuck\b|root.cause|investigate|\bdebug|misbehav|wrong (value|color|position|behavior|output|result)|codegraph'; then
-  printf '%s' "$payload" | CODEGRAPH_NO_PROMPT_HOOK=0 codegraph prompt-hook 2>/dev/null
-fi
+# Two-part gate (narrowed 2026-09-02 after a 15.8KB false fire on an
+# "evaluate ... investigate it" efficiency-audit prompt):
+#
+#   1. INTENT: genuine *runtime-debug* vocabulary only. Deliberately dropped:
+#      investigate, regression, bug, broken, stuck, root cause, misbehav,
+#      divergen, debug -- all of them fire on planning / audit / meta prompts
+#      that have no code locus at all.
+#   2. LOCUS: the prompt must also name at least one plausible code symbol --
+#      a Ghidra name (FUN_0009fd30), an address (0x9fd30), or a snake_case
+#      identifier (object_damage_update). Without a locus there is nothing
+#      for codegraph to anchor on, so the injection is guaranteed noise.
+#
+# Both must match. Keep both lists narrow: routine lift & command prompts
+# must stay zero-cost.
+INTENT_RE='crash|page fault|access.violation|assert|freeze|hang|deadlock|corrupt|garbage|trap frame|EIP|CR2|wrong (value|color|position|behavior|output|result)|codegraph'
+SYMBOL_RE='FUN_[0-9a-fA-F]{8}|0[xX][0-9a-fA-F]{4,6}|[a-z_]+_[a-z_]+'
+
+printf '%s' "$prompt" | grep -qiE "$INTENT_RE" || exit 0
+printf '%s' "$prompt" | grep -qE "$SYMBOL_RE" || exit 0
+
+printf '%s' "$payload" | CODEGRAPH_NO_PROMPT_HOOK=0 codegraph prompt-hook 2>/dev/null
 exit 0
