@@ -192,7 +192,23 @@ def _load() -> tuple:
     embedder = Embedder()
 
     print("[server] loading index...", flush=True)
-    con = _db.connect(read_only=True)
+    try:
+        con = _db.connect(read_only=True)
+    except _db.IndexOpenError as exc:
+        # Fail loudly with the remedy: a silent crash here leaves no socket,
+        # and every retrieval consumer then degrades invisibly to "no index".
+        print(f"[server] FATAL: cannot open retrieval index — {exc}",
+              file=sys.stderr, flush=True)
+        SOCK_PATH.unlink(missing_ok=True)
+        PID_PATH.unlink(missing_ok=True)
+        raise SystemExit(2)
+    except Exception as exc:
+        print(f"[server] FATAL: cannot open retrieval index "
+              f"({_db.DB_PATH}): {type(exc).__name__}: {exc}",
+              file=sys.stderr, flush=True)
+        SOCK_PATH.unlink(missing_ok=True)
+        PID_PATH.unlink(missing_ok=True)
+        raise SystemExit(2)
     rows = list(_db.iter_records(con, require_embeddings=True))
     con.close()
 
