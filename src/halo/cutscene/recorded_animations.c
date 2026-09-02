@@ -686,7 +686,7 @@ void recorded_animations_initialize(void)
     system_exit(-1);
   }
 
-  *(void **)0x44df0c = ((void *(*)(int, int, const char *, int))0x8ee60)(
+  *(void **)0x44df0c = debug_malloc(
     0x400, 0, "c:\\halo\\SOURCE\\cutscene\\recorded_animations.c", 0x6f);
   if (!*(void **)0x44df0c) {
     display_assert("animation_threads_debug",
@@ -700,9 +700,8 @@ void recorded_animations_initialize(void)
 void recorded_animations_dispose(void)
 {
   if (*(void **)0x44df0c != 0) {
-    ((void (*)(void *, const char *, int))0x8ef70)(
-      *(void **)0x44df0c, "c:\\halo\\SOURCE\\cutscene\\recorded_animations.c",
-      0x7b);
+    debug_free(*(void **)0x44df0c,
+               "c:\\halo\\SOURCE\\cutscene\\recorded_animations.c", 0x7b);
     *(void **)0x44df0c = 0;
   }
 }
