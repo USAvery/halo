@@ -28676,7 +28676,9 @@
     "class": "non_leaf"
   },
   "0x1c8f20": {
-    "class": "non_leaf"
+    "class": "non_leaf",
+    "confidence": "high",
+    "coverage_pct": 74.4
   },
   "0x1c90e0": {
     "class": "non_leaf",
