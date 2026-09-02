@@ -686,7 +686,7 @@ void recorded_animations_initialize(void)
     system_exit(-1);
   }
 
-  *(void **)0x44df0c = ((void *(*)(int, int, const char *, int))0x8ee60)(
+  *(void **)0x44df0c = debug_malloc(
     0x400, 0, "c:\\halo\\SOURCE\\cutscene\\recorded_animations.c", 0x6f);
   if (!*(void **)0x44df0c) {
     display_assert("animation_threads_debug",
@@ -700,9 +700,8 @@ void recorded_animations_initialize(void)
 void recorded_animations_dispose(void)
 {
   if (*(void **)0x44df0c != 0) {
-    ((void (*)(void *, const char *, int))0x8ef70)(
-      *(void **)0x44df0c, "c:\\halo\\SOURCE\\cutscene\\recorded_animations.c",
-      0x7b);
+    debug_free(*(void **)0x44df0c,
+               "c:\\halo\\SOURCE\\cutscene\\recorded_animations.c", 0x7b);
     *(void **)0x44df0c = 0;
   }
 }
@@ -1039,7 +1038,7 @@ void render_debug_recording(void)
 /* Clear animation threads and zero the debug buffer for a new map. */
 void recorded_animations_initialize_for_new_map(void)
 {
-  ((void (*)(void *))0x119b20)(*(void **)0x44df04);
+  data_delete_all((data_t *)*(void **)0x44df04);
   if (!*(void **)0x44df0c) {
     display_assert("animation_threads_debug",
                    "c:\\halo\\SOURCE\\cutscene\\recorded_animations.c", 0x99,
@@ -1305,18 +1304,13 @@ void FUN_00095930(int object_handle)
  */
 void FUN_000959b0(int object_handle, char *event)
 {
+  typedef struct { int x, y, z; } copy3_t;
   int *object;
-  int *src;
-  int *dst;
 
   object = (int *)object_get_and_verify_type(object_handle, 0x200);
   tag_get(0x6c696669, *object);
   FUN_00097080(object_handle, event + 0x28);
-  src = (int *)(event + 0x30);
-  dst = (int *)((char *)object + 0x1c4);
-  dst[0] = src[0];
-  dst[1] = src[1];
-  dst[2] = src[2];
+  *(copy3_t *)((char *)object + 0x1c4) = *(copy3_t *)(event + 0x30);
   *(int *)((char *)object + 0x1d0) = *(int *)(event + 0x3c);
   *(int *)((char *)object + 0x1d4) = *(int *)(event + 0x40);
   *(int *)((char *)object + 0x1d8) = *(int *)(event + 0x44);
