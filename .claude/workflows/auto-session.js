@@ -128,9 +128,47 @@ log(`Branch: ${BRANCH}  |  main worktree: ${MAIN_WT}`)
 // returned 'inconclusive'. That is the designed behaviour (the commits stay
 // landable), but the operator only found out at the end. Say it up front so
 // they can quiet main, or re-run with noLand and land once, deliberately.
+//
+// Not every dirty file blocks a land. auto_reintegrate.py ABSORBS a known set
+// of machine-generated paths (commits them and carries on) and parks only on
+// anything else -- so "main is dirty" alone does not predict a park. Mirror
+// that set here (tools/integrate/auto_reintegrate.py: _ABSORB_EXACT /
+// _ABSORB_PREFIXES) and split the advisory into absorbable vs blocking, so the
+// operator can see at a glance whether landing will actually work.
+//
+// Keep the two lists in sync. This copy is ADVISORY ONLY -- the lander re-does
+// the check itself and is the authority. In particular README.md also gets a
+// CONTENT check there (stats-block lines only); a prose edit parks despite
+// appearing absorbable here, which is why it is flagged as conditional.
+const ABSORB_EXACT = new Set([
+  'README.md',
+  'tools/verify/vc71_scores.json',
+  'tools/objects.csv',
+  'tools/equivalence/leaf_cache.json',
+])
+const ABSORB_PREFIXES = ['artifacts/batch_verify/']
+// `git status --short` lines arrive either as bare paths or with the two-column
+// status code still attached; normalise both, and drop rename arrows.
+const dirtyPath = (s) => String(s).trim().replace(/^[A-Z? ]{1,2}\s+/, '').split(' -> ').pop().trim()
+const isAbsorbable = (p) => ABSORB_EXACT.has(p) || ABSORB_PREFIXES.some(q => p.startsWith(q))
+
 if (guard.mainDirty && !DRY_RUN && !NO_LAND) {
-  const files = (guard.mainDirtyFiles || []).slice(0, 5).join(', ')
-  log(`⚠ main worktree is dirty${files ? ` (${files})` : ''} — batches will accumulate unlanded until it is clean.`)
+  const paths = (guard.mainDirtyFiles || []).map(dirtyPath).filter(Boolean)
+  const absorbable = paths.filter(isAbsorbable)
+  const blocking = paths.filter(p => !isAbsorbable(p))
+  log(`⚠ main worktree is dirty (${paths.length} tracked file(s)).`)
+  if (absorbable.length) {
+    log(`  absorbable (generated — the lander commits these): ${absorbable.slice(0, 8).join(', ')}`)
+    if (absorbable.includes('README.md')) {
+      log(`    note: README.md absorbs only if its diff is stats-block lines; a prose edit still parks.`)
+    }
+  }
+  if (blocking.length) {
+    log(`  BLOCKING (authored work — landing will park): ${blocking.slice(0, 8).join(', ')}`)
+    log(`  Batches will accumulate unlanded until those are committed or reverted.`)
+  } else if (paths.length) {
+    log(`  No blocking files — landing should succeed (the lander absorbs the above).`)
+  }
   log(`  This does not stop the run. To land deliberately later instead, re-run with noLand:true.`)
 }
 
@@ -158,6 +196,20 @@ let resumable = false
 const MAX_INFRA_RETRIES = 2
 let infraRetries = 0
 
+// Cross-batch dedupe. Batches shared no state, so a target that goal-lift
+// parked in batch 1 was re-selected and re-lifted in batch 2 (and 3...) --
+// paying full research + lift cost each time for a target already known to
+// fail. Accumulate every address goal-lift reports attempting and exclude it
+// from later batches. Lowercase 0x-prefixed strings; goal-lift may not return
+// `attempted` at all (older versions), which just means no dedupe that batch.
+const attempted = new Set()
+const addAttempted = (addrs) => {
+  for (const a of (Array.isArray(addrs) ? addrs : [])) {
+    const s = String(a).trim().toLowerCase()
+    if (/^0x[0-9a-f]+$/.test(s)) attempted.add(s)
+  }
+}
+
 for (let i = 1; i <= BATCHES; i++) {
   log(`\n── Batch ${i}/${BATCHES} ─────────────────────────────`)
 
@@ -168,7 +220,15 @@ for (let i = 1; i <= BATCHES; i++) {
   if (CRITERIA) glArgs.criteria = CRITERIA
   if (ADDRS) glArgs.addrs = ADDRS
   if (LIFT_REG_ARGS) glArgs.liftRegArgs = true
+  if (attempted.size) {
+    glArgs.excludeAddrs = [...attempted]
+    log(`Batch ${i}: excluding ${attempted.size} addresses attempted earlier this run`)
+  }
   const r = await workflow(GOAL_LIFT, glArgs)
+
+  // Union in what this batch tried, whether it committed or parked -- a parked
+  // target is exactly the one we must not pay for again.
+  addAttempted(r && r.attempted)
 
   for (const [name, value] of Object.entries((r && r.phase_token_deltas) || {})) {
     phaseTokenDeltas[name] = (phaseTokenDeltas[name] || 0) + (Number(value) || 0)
@@ -329,6 +389,7 @@ if (IMPROVE_GOAL > 0 && !resumable) {
   evidenceCache.hits += (ir && ir.cache && ir.cache.hits) || 0
   evidenceCache.misses += (ir && ir.cache && ir.cache.misses) || 0
   evidenceCache.ghidra_builds += (ir && ir.ghidra_builds) || 0
+  addAttempted(ir && ir.attempted)
   improvePromoted = (ir && ir.promoted) || 0
   functionsCommitted += improvePromoted
   log(`Improve pass: promoted ${improvePromoted} (stop reason: ${ir ? ir.stop_reason : 'null'})`)
@@ -341,6 +402,7 @@ log(`Batches landed:      ${batchesLanded}`)
 if (unlandedBatches) log(`Batches unlanded:    ${unlandedBatches} (committed on ${BRANCH}, landing was blocked)`)
 log(`Functions committed: ${functionsCommitted}`)
 if (improvePromoted) log(`Improve promoted:    ${improvePromoted}`)
+log(`Attempted this run:  ${attempted.size} addresses`)
 log(`Stop reason:         ${stoppedReason}`)
 if (parkReason) log(`Park reason:         ${parkReason}`)
 log(`Evidence cache:      ${evidenceCache.hits} hit / ${evidenceCache.misses} miss / ${evidenceCache.ghidra_builds} Ghidra build(s)`)
@@ -353,6 +415,9 @@ return {
   batches_unlanded: unlandedBatches,
   functions_committed: functionsCommitted,
   improve_promoted: improvePromoted,
+  // Every address any batch tried this run (committed or parked). Additive:
+  // lets /campaign carry the dedupe across successive auto-session runs.
+  attempted: [...attempted],
   stopped_reason: stoppedReason,
   park_reason: parkReason,
   conflicts: parkConflicts,

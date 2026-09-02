@@ -20,7 +20,7 @@ class WorkflowCutoverTests(unittest.TestCase):
         self.assertNotIn("cache-context --target ${t.addr} --force", self.goal)
         self.assertNotIn("agent(researchPrompt(", self.goal)
         self.assertNotIn("schema: BRIEF_SCHEMA", self.goal)
-        self.assertIn("agent(bundlePrompt(t)", self.goal)
+        self.assertIn("schemaAgent(bundlePrompt(t)", self.goal)
         self.assertIn("phase: 'Research', ...M.mechanical, schema: BUNDLE_SCHEMA", self.goal)
 
     def test_no_broken_skill_paths(self):
