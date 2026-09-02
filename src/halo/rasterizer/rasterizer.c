@@ -2218,15 +2218,19 @@ void FUN_00174cc0(void)
  * S16). */
 void FUN_00174ce0(void)
 {
-  unsigned int enable_flags;
+  union {
+    unsigned int dword;
+    struct {
+      char lo;
+      char hi;
+    } b;
+  } flags;
 
-  enable_flags = *(unsigned int *)0x325740;
+  flags.dword = *(unsigned int *)0x325740;
   *(int *)0x47e4b8 = 0;
   *(char *)0x47e4c0 = 0;
 
-  /* the high enable byte is tested in place (CMP AH,CL at 0x174cf7); a
-   * `>> 8` here costs an extra SHR that the original does not have. */
-  if ((char)enable_flags == 0 || (enable_flags & 0xff00) == 0) {
+  if (flags.b.lo == 0 || flags.b.hi == 0) {
     return;
   }
   if (*(short *)0x5a5bc2 == -1) {
