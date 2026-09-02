@@ -11626,16 +11626,16 @@
     "FUN_0008e680": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 98.0,
+      "abi_modeled_mnemonic_pct": 100.0,
       "addr": "0x8e680",
       "end": "0x8e6cd",
       "kind": "auto",
       "n_r": 25,
-      "opnd_percent": 94.1,
-      "raw_mnemonic_pct": 98.0,
+      "opnd_percent": 96.0,
+      "raw_mnemonic_pct": 100.0,
       "ref": "synth",
       "ref_sha": "e2c99655881d6d2a",
-      "score": 98.0,
+      "score": 100.0,
       "source": "src/halo/cseries/errors.c"
     },
     "FUN_0008e6d0": {

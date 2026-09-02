@@ -56,9 +56,8 @@ void FUN_0008e680(int param_1, int param_2)
 {
   if (*(int *)0x2ee74c != 0x53414654 || *(int *)0x2ee768 != 0x53414654) {
     display_assert(
-      csprintf((char *)0x5ab100,
-               "Debug memory manager is uninitialized or corrupted. (%s:%d)",
-               param_1, param_2),
+      csprintf("Debug memory manager is uninitialized or corrupted. (%s:%d)",
+               (const char *)param_1, param_2),
       "c:\\halo\\SOURCE\\cseries\\debug_memory.c", 0x91, 1);
     system_exit(-1);
   }
