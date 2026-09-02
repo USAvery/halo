@@ -29413,8 +29413,8 @@
   },
   "0x56830": {
     "class": "leaf",
-    "confidence": "none",
-    "coverage_pct": 0.0
+    "confidence": "moderate",
+    "coverage_pct": 61.8
   },
   "0x56880": {
     "class": "non_leaf",
