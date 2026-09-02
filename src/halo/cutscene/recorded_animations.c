@@ -1039,7 +1039,7 @@ void render_debug_recording(void)
 /* Clear animation threads and zero the debug buffer for a new map. */
 void recorded_animations_initialize_for_new_map(void)
 {
-  ((void (*)(void *))0x119b20)(*(void **)0x44df04);
+  data_delete_all((data_t *)*(void **)0x44df04);
   if (!*(void **)0x44df0c) {
     display_assert("animation_threads_debug",
                    "c:\\halo\\SOURCE\\cutscene\\recorded_animations.c", 0x99,

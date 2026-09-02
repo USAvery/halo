@@ -79006,16 +79006,16 @@
     "recorded_animations_initialize_for_new_map": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 97.8,
+      "abi_modeled_mnemonic_pct": 100.0,
       "addr": "0x95280",
       "end": "0x952ce",
       "kind": "auto",
       "n_r": 22,
-      "opnd_percent": 80.0,
-      "raw_mnemonic_pct": 97.8,
+      "opnd_percent": 95.5,
+      "raw_mnemonic_pct": 100.0,
       "ref": "synth",
       "ref_sha": "c8fd9ae14755e47a",
-      "score": 97.8,
+      "score": 100.0,
       "source": "src/halo/cutscene/recorded_animations.c"
     },
     "recorded_animations_update": {
