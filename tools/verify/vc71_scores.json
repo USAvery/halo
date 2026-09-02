@@ -72571,16 +72571,16 @@
     "oddball_get_score_header_string": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 93.6,
+      "abi_modeled_mnemonic_pct": 100.0,
       "addr": "0xb2ca0",
       "end": "0xb2cda",
       "kind": "auto",
       "n_r": 24,
-      "opnd_percent": 93.6,
-      "raw_mnemonic_pct": 93.6,
+      "opnd_percent": 100.0,
+      "raw_mnemonic_pct": 100.0,
       "ref": "synth",
       "ref_sha": "e68631cdf9d653c6",
-      "score": 93.6,
+      "score": 100.0,
       "source": "src/halo/game/game_engine.c"
     },
     "oddball_get_score_hud_text": {

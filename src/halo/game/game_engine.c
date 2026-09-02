@@ -8565,21 +8565,16 @@ wchar_t *oddball_get_player_score_string(int param_1, wchar_t *param_2)
 /* Return the score column header string ("Score" or "Time"). */
 
 wchar_t *oddball_get_score_header_string(wchar_t *param_1)
-
 {
   int variant;
 
-
   variant = (int)game_engine_get_variant();
-
-  if (*(int *)(variant + 0x5c) == 2) {
+  if (*(int *)(variant + 0x5c) - 2 == 0) {
     usprintf(param_1, L"Score");
-
     return param_1;
   }
 
   usprintf(param_1, L"Time");
-
   return param_1;
 }
 
