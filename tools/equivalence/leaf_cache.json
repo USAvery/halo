@@ -31332,6 +31332,11 @@
     "confidence": "moderate",
     "coverage_pct": 78.9
   },
+  "0xe3b80": {
+    "class": "leaf",
+    "confidence": "high",
+    "coverage_pct": 100.0
+  },
   "0xe3c80": {
     "class": "leaf",
     "confidence": "high",
