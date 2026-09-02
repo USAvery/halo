@@ -4794,6 +4794,7 @@ void FUN_00019940(int actor_handle)
   char *actor;
   char *tag_data;
   char *prop;
+  short tag_type;
   int remain;
 
   actor = (char *)datum_get(actor_data, actor_handle);
@@ -4801,14 +4802,15 @@ void FUN_00019940(int actor_handle)
     return;
   }
   tag_data = (char *)tag_get(0x61637472, ((actor_t *)actor)->field_058);
+  tag_type = *(short *)(tag_data + 0x2f8);
   ((actor_t *)actor)->field_09f = 0;
-  if ((*(short *)(tag_data + 0x2f8) == 4) ||
+  if ((tag_type == 4) ||
       ((*(tag_data) & 2) != 0 && *(short *)(actor + 0xa4) == 0 &&
        ((actor_t *)actor)->target_target_type == 5)) {
     if (*(short *)(tag_data + 0x2f8) != 4) {
       prop = (char *)datum_get(prop_data,
                                ((actor_t *)actor)->target_target_prop_index);
-      if (*(char *)(prop + 0x121) >= 3) {
+      if (*(char *)(prop + 0x121) > 2) {
         goto skip_flag;
       }
     }
@@ -4844,7 +4846,7 @@ skip_flag:
     if ((((actor_t *)actor)->field_504 == '\0') &&
         (*(char *)(actor + 6) == '\0')) {
       *(int *)(actor + 0xc4) = *(int *)(actor + 0xc4) + 1;
-      if (*(int *)(actor + 0xc4) >= 0x78) {
+      if (*(int *)(actor + 0xc4) > 0x77) {
         ((actor_t *)actor)->field_09d = 1;
         *(char *)(actor + 0x9c) = 1;
       }

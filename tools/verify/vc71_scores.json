@@ -2808,16 +2808,16 @@
     "FUN_00019940": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 95.2,
+      "abi_modeled_mnemonic_pct": 97.6,
       "addr": "0x19940",
       "end": "0x19ac0",
       "kind": "auto",
       "n_r": 124,
-      "opnd_percent": 92.9,
-      "raw_mnemonic_pct": 95.2,
+      "opnd_percent": 95.2,
+      "raw_mnemonic_pct": 97.6,
       "ref": "synth",
       "ref_sha": "15e14ce36a6f9ba9",
-      "score": 95.2,
+      "score": 97.6,
       "source": "src/halo/ai/actor_looking.c"
     },
     "FUN_00019ac0": {
