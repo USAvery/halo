@@ -27711,7 +27711,7 @@
   },
   "0x180050": {
     "class": "non_leaf",
-    "confidence": "weak",
+    "confidence": "moderate",
     "coverage_pct": 76.5
   },
   "0x180770": {
