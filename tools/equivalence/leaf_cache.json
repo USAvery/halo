@@ -31070,8 +31070,8 @@
   },
   "0xd1550": {
     "class": "leaf",
-    "confidence": "none",
-    "coverage_pct": 0.0
+    "confidence": "moderate",
+    "coverage_pct": 67.5
   },
   "0xd16a0": {
     "class": "non_leaf",
