@@ -402,9 +402,11 @@ void game_options_new(game_options_t *options)
   options->random_seed = 0xDEADBEEF;
 }
 
-static bool game_options_verify(game_options_t *options)
+bool game_options_verify(game_options_t *options)
 {
-  return options->difficulty >= 0 && options->difficulty < 4;
+  if (options->difficulty >= 0 && options->difficulty < 4)
+    return 1;
+  return 0;
 }
 
 void game_initial_pulse()
