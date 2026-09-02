@@ -27676,16 +27676,16 @@
     "FUN_0010c700": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 98.0,
+      "abi_modeled_mnemonic_pct": 100.0,
       "addr": "0x10c700",
       "end": "0x10c780",
       "kind": "auto",
       "n_r": 51,
-      "opnd_percent": 94.0,
-      "raw_mnemonic_pct": 98.0,
+      "opnd_percent": 100.0,
+      "raw_mnemonic_pct": 100.0,
       "ref": "synth",
       "ref_sha": "0537e181740d073b",
-      "score": 98.0,
+      "score": 100.0,
       "source": "src/halo/math/real_math.c"
     },
     "FUN_0010c780": {

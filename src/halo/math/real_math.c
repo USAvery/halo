@@ -1983,16 +1983,18 @@ void yaw_vectors(float *v1, float *axis, float scale1, float scale2)
  * away from v1 by (scale1, scale2). Uses temporaries to allow aliasing. */
 void FUN_0010c700(float *v1, float *v2, float scale1, float scale2)
 {
-  float a = -v1[0];
-  float b = -v1[1];
-  float c = -v1[2];
+  float temp[3];
+
+  temp[0] = -v1[0];
+  temp[1] = -v1[1];
+  temp[2] = -v1[2];
 
   v1[0] = scale2 * v1[0] + scale1 * v2[0];
   v1[1] = scale2 * v1[1] + scale1 * v2[1];
   v1[2] = scale2 * v1[2] + scale1 * v2[2];
-  v2[0] = scale2 * v2[0] + a * scale1;
-  v2[1] = b * scale1 + scale2 * v2[1];
-  v2[2] = scale2 * v2[2] + c * scale1;
+  v2[0] = scale2 * v2[0] + temp[0] * scale1;
+  v2[1] = temp[1] * scale1 + scale2 * v2[1];
+  v2[2] = scale2 * v2[2] + temp[2] * scale1;
 }
 
 /* Normalize a quaternion [x,y,z,w] in place.
