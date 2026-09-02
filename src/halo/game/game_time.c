@@ -19,9 +19,12 @@ void game_time_initialize_for_new_map(void)
 
 void game_time_dispose_from_old_map(void)
 {
-  if (game_time_globals) {
-    game_time_globals->initialized = false;
-    game_time_globals->active = false;
+  game_time_globals_t *globals;
+
+  globals = game_time_globals;
+  if (globals) {
+    globals->initialized = false;
+    globals->active = false;
   }
 }
 

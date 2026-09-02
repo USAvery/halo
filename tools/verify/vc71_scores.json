@@ -62851,16 +62851,16 @@
     "game_time_dispose_from_old_map": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 92.3,
+      "abi_modeled_mnemonic_pct": 100.0,
       "addr": "0xb5a30",
       "end": "0xb5a41",
       "kind": "auto",
       "n_r": 6,
-      "opnd_percent": 92.3,
-      "raw_mnemonic_pct": 92.3,
+      "opnd_percent": 100.0,
+      "raw_mnemonic_pct": 100.0,
       "ref": "synth",
       "ref_sha": "8f93706ad2f8a877",
-      "score": 92.3,
+      "score": 100.0,
       "source": "src/halo/game/game_time.c"
     },
     "game_time_end": {
