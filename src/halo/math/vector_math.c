@@ -222,6 +222,113 @@ void FUN_00012be0(int actor_handle)
   }
 }
 
+/* 0x12c30 — FUN_00012c30: recompute an actor's action-selection state
+ * (move class, look-lock flags, and target-acquire snapshot) after its
+ * per-tick evaluation.
+ *
+ * Confirmed: cdecl, one stack arg [EBP+0x8] (actor_handle); Ghidra's
+ *   in_stack_00000004 pattern (same shape as FUN_00012090/FUN_00012be0).
+ * Confirmed: PUSH EDI([EBP+8]) / PUSH EAX(=[0x6325a4]) / CALL 0x119320 ->
+ *   datum_get(actors_data, actor_handle); the single ADD ESP,0x10 at
+ *   0x12c71 cleans this call together with the tag_get call below (both
+ *   cdecl, 2 args each — same combined-cleanup shape as FUN_00012090).
+ * Confirmed: PUSH ECX([ESI+0x58]) / PUSH 0x61637472('actr') / CALL 0x1ba140
+ *   -> tag_get(group_tag='actr', tag_index=*(int*)(actor+0x58)); result
+ *   held at [EBP-0x4] and reread twice below for two separate flag tests.
+ * Confirmed: MOV word[ESI+0x3ec],2 / MOV word[ESI+0x3fc],4 — 16-bit stores.
+ * Confirmed: first branch tests actor+0xa0(short)==2||3, actor+0xa5(char)
+ *   !=0, actor+0x504(char)==0, and FUN_0002a3d0(actor_handle)==0 (PUSH
+ *   EDI/CALL 0x2a3d0/ADD ESP,4/TEST AL,AL — actor_handle forwarded
+ *   unchanged); on all true, stores 4 at actor+0x3e8(short).
+ * Confirmed: else-if actor+0x6e(short)<5 or actor+0xa0==1, stores 5 at
+ *   actor+0x3e8 (MOV EAX,5 at 0x12cac feeds both the JL/JZ-taken path via
+ *   AX and the fallthrough compare — same literal 5), else stores 7.
+ * Confirmed: if actor+0xa0==1, actor+0x426/+0x427(char) := (actor+0xc1==0);
+ *   else if actor+0x428(char)==0 && (tag_def[0]&0x10000)!=0, both :=
+ *   actor+0x358(char); else both := 0.
+ * Confirmed: if actor+0xa8(byte — MOV AL,byte[ESI+0xa8]) != 0:
+ *   actor+0x440=1; actor+0x441 := (actor+0xbc < actor+0xb8*[0x2533c4]) via
+ *   FLD[+0xb8]/FMUL[0x2533c4]/FCOMP[+0xbc]/FNSTSW/TEST AH,0x41 — the same
+ *   confirmed 0.7f-constant idiom as actor_looking.c:4656 (0x2533c4=0.7f);
+ *   actor+0x442=1; actor+0x444/0x448/0x44c/0x450(float, dword copies) :=
+ *   actor+0xb0/0xb4/0xb8/0xbc; actor+0xa7=1; actor+0xa8=0; then
+ *   CALL 0x000b5aa0 -> game_time_get() stored to actor+0xac(int);
+ *   actor+0xaa(word)=0.
+ * Confirmed: if (tag_def[0]&0x100000)!=0 && (actor+0x378(char)!=0 ||
+ *   actor+0xa0==2 || actor+0xa0==3): actor+0x428(char) :=
+ *   (actor+0xc4!=0 && actor+0x427==0).
+ * Confirmed: unconditional tail — actor+0x42a=1; actor+0x424=0;
+ *   actor+0x425=0; actor+0x454(bool) := actor+0xa0 != 1.
+ * Permuter (95.8% LCS vs 88.6% baseline, audit=OK — semantics unchanged):
+ *   an extra `char **new_var = &actor` indirection level at some sites
+ *   (still the same actor pointer, one more load) matches the reference's
+ *   register/stack scheduling more closely than reading through `actor`
+ *   everywhere; kept exactly as found, only reformatted to house style. */
+void FUN_00012c30(int actor_handle)
+{
+  char *actor;
+  unsigned int *tag_def;
+  char **new_var;
+
+  actor = (char *)datum_get(*(data_t **)0x6325a4, actor_handle);
+  new_var = &actor;
+  tag_def = (unsigned int *)tag_get(0x61637472, *(int *)(*new_var + 0x58));
+  *(short *)(actor + 0x3ec) = 2;
+  *(short *)(actor + 0x3fc) = 4;
+
+  if ((*(short *)(*new_var + 0xa0) == 2 || *(short *)(actor + 0xa0) == 3) &&
+      *(char *)(*new_var + 0xa5) != '\0' &&
+      (*(char *)(actor + 0x504) == '\0' &&
+       FUN_0002a3d0(actor_handle) == '\0')) {
+    *(short *)(*new_var + 0x3e8) = 4;
+  } else if (*(short *)(*new_var + 0x6e) < 5 ||
+             *(short *)(*new_var + 0xa0) == 1) {
+    *(short *)(*new_var + 0x3e8) = 5;
+  } else {
+    *(short *)(actor + 0x3e8) = 7;
+  }
+
+  if (*(short *)(actor + 0xa0) == 1) {
+    *(unsigned char *)(actor + 0x426) = *(char *)(*new_var + 0xc1) == '\0';
+    *(unsigned char *)(actor + 0x427) = *(char *)(*new_var + 0xc1) == '\0';
+  } else if (*(char *)(actor + 0x428) == '\0' && (*tag_def & 0x10000) != 0) {
+    *(unsigned char *)(*new_var + 0x426) = *(unsigned char *)(*new_var + 0x358);
+    *(unsigned char *)(*new_var + 0x427) = *(unsigned char *)(*new_var + 0x358);
+  } else {
+    *(unsigned char *)(actor + 0x426) = 0;
+    *(unsigned char *)(*new_var + 0x427) = 0;
+  }
+
+  if (*(char *)(actor + 0xa8) != '\0') {
+    *(unsigned char *)(*new_var + 0x440) = 1;
+    *(unsigned char *)(*new_var + 0x441) =
+      (unsigned char)(*(float *)(actor + 0xbc) <
+                      *(float *)(actor + 0xb8) * *(float *)0x2533c4);
+    *(unsigned char *)(actor + 0x442) = 1;
+    *(float *)(actor + 0x444) = *(float *)(*new_var + 0xb0);
+    *(float *)(actor + 0x448) = *(float *)(actor + 0xb4);
+    *(float *)(*new_var + 0x44c) = *(float *)(actor + 0xb8);
+    *(float *)(actor + 0x450) = *(float *)(*new_var + 0xbc);
+    *(unsigned char *)(*new_var + 0xa7) = 1;
+    *(unsigned char *)(*new_var + 0xa8) = 0;
+    *(int *)(actor + 0xac) = game_time_get();
+    *(short *)(*new_var + 0xaa) = 0;
+  }
+
+  if ((*tag_def & 0x100000) != 0 &&
+      (*(char *)(actor + 0x378) != '\0' || *(short *)(actor + 0xa0) == 2 ||
+       *(short *)(*new_var + 0xa0) == 3)) {
+    *(unsigned char *)(*new_var + 0x428) =
+      (unsigned char)(*(char *)(actor + 0xc4) != '\0' &&
+                      *(char *)(actor + 0x427) == '\0');
+  }
+
+  *(unsigned char *)(*new_var + 0x42a) = 1;
+  *(unsigned char *)(actor + 0x424) = 0;
+  *(unsigned char *)(actor + 0x425) = 0;
+  *(bool *)(*new_var + 0x454) = *(short *)(*new_var + 0xa0) != 1;
+}
+
 /* 0x12e50 — FUN_00012e50: check if actor is in a valid 'swarm flying' state
  * and its state timer has not yet expired.
  *

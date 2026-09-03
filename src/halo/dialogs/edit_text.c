@@ -1,3 +1,94 @@
+/* Sets a device group's cached value and, if it actually changed, notifies
+ * every live device attached to that group (0x96f20).
+ *
+ * Binary evidence (0x96f20..0x97032, cdecl, args at [EBP+8] int16, [EBP+0xc]
+ * float; no other lift's kb decl matches -- this is a standalone entry):
+ *
+ * 1. Clamp value to [0,1] against the .rdata constants at 0x2533c0 (0.0f) and
+ *    0x2533c8 (1.0f) -- same idiom and same addresses as
+ *    device_group_set_actual_value below.
+ * 2. If device_group_index (the int16 at [EBP+8]) is NONE (-1), return false
+ *    (BL stays 0 from the XOR BL,BL at entry) without touching anything.
+ * 3. Otherwise datum_get the device-group record (pool at 0x5aa8c8, same
+ *    pool as device_group_set_actual_value/device_effect_new/
+ *    device_group_get_value in devices.c). That record's +0x02 is a flags
+ *    word and +0x04 is the cached float value -- confirmed by
+ *    device_effect_new's seeding of the same two fields.
+ * 4. If the new value equals the cached one, this is a no-op (return false).
+ * 5. If both flag bits 0x1 and 0x2 are already set, this is also a no-op
+ *    (matches the `(flags & 1) != 0 && (flags & 2) != 0` gate devices.c
+ *    already uses for this same flags word).
+ * 6. Otherwise: OR bit 0x2 into the flags, store the new value, set the
+ *    return flag true, then walk every device object (object_iterator_new
+ *    type_mask 0x380, same mask control_toggle/device_new use). The iterator
+ *    buffer is a 16-byte/int[4] struct identical to the one
+ *    device_group_set_actual_value and vehicles.c use; index [2] (byte
+ *    offset 0x08) holds the current object's datum handle, confirmed by the
+ *    vehicles.c comment on object_iterator_next.
+ * 7. For each device object whose own group-index field at +0x1a8 (int16)
+ *    equals device_group_index, resolve its 'devi' tag (tag_get(0x64657669,
+ *    *(int*)object) -- object+0 is the tag index, same field device_new
+ *    reads) and forward one of two definition-relative effect-tag fields to
+ *    FUN_000967a0(object_handle, tag_index): +0x1fc when the (already
+ *    clamped) value is > 0.0f, +0x1ec otherwise. FUN_000967a0 itself gates
+ *    on tag_index != -1 and spawns the 'effe'/'snd!' effect, so no NONE
+ *    check is needed here.
+ *
+ * Callers (xrefs_to): control_toggle (0x95874), FUN_00095c60 (0x95e87,
+ * 0x95edd), FUN_00097220 (0x9724b, below), FUN_00097260 (0x97299, below),
+ * FUN_000bfbc0 (0xbfbf1). */
+char FUN_00096f20(int device_group_index, float value)
+{
+  int16_t index;
+  char *device_group;
+  unsigned short flags;
+  char result;
+  int iterator[4];
+  char *object;
+  char *definition;
+  int object_handle;
+  int tag_value;
+
+  result = 0;
+  index = (int16_t)device_group_index;
+
+  if (value < *(float *)0x2533c0) {
+    value = 0.0f;
+  } else if (value > *(float *)0x2533c8) {
+    value = 1.0f;
+  }
+
+  if (index != -1) {
+    device_group = (char *)datum_get(*(data_t **)0x5aa8c8, index);
+    if (*(float *)(device_group + 4) != value) {
+      flags = *(unsigned short *)(device_group + 2);
+      if ((flags & 1) == 0 || (flags & 2) == 0) {
+        *(unsigned short *)(device_group + 2) = flags | 2;
+        *(float *)(device_group + 4) = value;
+        result = 1;
+
+        object_iterator_new(iterator, 0x380, 0);
+        object = (char *)object_iterator_next(iterator);
+        while (object != NULL) {
+          definition = (char *)tag_get(0x64657669 /* 'devi' */, *(int *)object);
+          if (*(int16_t *)(object + 0x1a8) == index) {
+            object_handle = iterator[2];
+            if (value > *(float *)0x2533c0) {
+              tag_value = *(int *)(definition + 0x1fc);
+            } else {
+              tag_value = *(int *)(definition + 0x1ec);
+            }
+            FUN_000967a0(object_handle, tag_value);
+          }
+          object = (char *)object_iterator_next(iterator);
+        }
+      }
+    }
+  }
+
+  return result;
+}
+
 /* Forwards a value to the device group attached to a device-family object
  * (0x97040). Resolves object_handle as a device|control|machine object
  * (type_mask 0x380); if it has a device_group_index (int16_t at +0x1b4)

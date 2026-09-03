@@ -144,6 +144,109 @@ char game_state_write_to_file(void)
   return 0;
 }
 
+/* 0x1c0450
+ * Read the game-state buffer back from the save file. Asserts that the
+ * buffer is allocated, the file is open, and the file is either valid for
+ * read or the recover-saved-games hack is active, then seeks to the
+ * beginning and reads buffer_size bytes into the buffer. Returns 1 on
+ * success; on failure, halts with an error message including the last
+ * Win32 error code.
+ */
+char game_state_read_from_file(void)
+{
+  int bytes_read;
+
+  assert_halt_msg_at("xbox_game_state_globals.buffer_allocated",
+                     "c:\\halo\\SOURCE\\saved games\\game_state_xbox.c", 0x90,
+                     *(char *)0x4ea9b0);
+  assert_halt_msg_at("xbox_game_state_globals.file_open",
+                     "c:\\halo\\SOURCE\\saved games\\game_state_xbox.c", 0x91,
+                     *(char *)0x4ea9bc);
+  assert_halt_msg_at(
+    "xbox_game_state_globals.file_valid_for_read || recover_saved_games_hack",
+    "c:\\halo\\SOURCE\\saved games\\game_state_xbox.c", 0x92,
+    *(char *)0x4ea9bd || *(char *)0x5054e8);
+
+  if (XSetFilePointer(*(int *)0x4ea9c0, 0, NULL, 0) != (uint32_t)-1) {
+    if (XReadFile(*(int *)0x4ea9c0, *(void **)0x4ea9b4, *(uint32_t *)0x4ea9b8,
+                  &bytes_read, NULL) &&
+        bytes_read == *(int *)0x4ea9b8) {
+      return 1;
+    }
+  }
+
+  display_assert(csprintf((char *)0x5ab100,
+                          "couldn't read saved game file (#%d)",
+                          xapi_GetLastError()),
+                 "c:\\halo\\SOURCE\\saved games\\game_state_xbox.c", 0x9c, 1);
+  system_exit(-1);
+  return 0;
+}
+
+/* 0x1c0600
+ * Read the header of a core save file back from persistent storage. Builds
+ * the path "d:\core\<name>" with sprintf, opens it read-only (OPEN_EXISTING),
+ * reads header_size bytes into the caller's buffer, and always closes the
+ * handle -- even when CreateFileA failed and the handle is -1, matching the
+ * original (CloseHandle is unconditional in the disassembly). Returns 1 only
+ * if the file opened and the full header_size bytes were read.
+ */
+char game_state_read_core_header(const char *name, void *header,
+                                 int header_size)
+{
+  char path[0x400];
+  int bytes_read;
+  int file_handle;
+  char result;
+
+  result = 0;
+
+  crt_sprintf(path, "d:\\core\\%s", name);
+
+  file_handle = XCreateFile(path, 0x80000000, 0, 0, 3, 0x80, 0);
+  if (file_handle != -1) {
+    if (XReadFile(file_handle, header, (uint32_t)header_size, &bytes_read,
+                  NULL) &&
+        bytes_read == header_size) {
+      result = 1;
+    }
+  }
+
+  XCloseHandle(file_handle);
+
+  return result;
+}
+
+/* 0x1c0680
+ * Read the body of a core save file back from persistent storage. Builds
+ * the path "d:\core\<name>" with sprintf, opens it read-only (OPEN_EXISTING),
+ * and reads size bytes into the caller's buffer. Unlike
+ * game_state_read_core_header, the handle is closed only on the success
+ * path -- on any failure (open failed, read failed, or short read) this
+ * halts via display_assert + system_exit(-1), which never returns, so
+ * CloseHandle is never reached in the disassembly's error path. */
+void game_state_read_core(const char *name, void *buffer, int size)
+{
+  char path[0x400];
+  int bytes_read;
+  int file_handle;
+
+  crt_sprintf(path, "d:\\core\\%s", name);
+
+  file_handle = XCreateFile(path, 0x80000000, 0, 0, 3, 0x80, 0);
+  if (file_handle != -1) {
+    if (XReadFile(file_handle, buffer, (uint32_t)size, &bytes_read, NULL) &&
+        bytes_read == size) {
+      XCloseHandle(file_handle);
+      return;
+    }
+  }
+
+  display_assert("game state has been corrupted (thank you, come again)",
+                 "c:\\halo\\SOURCE\\saved games\\game_state_xbox.c", 0xe2, 1);
+  system_exit(-1);
+}
+
 /* 0x1c0720 — return the Xbox save-game filename.
  * Used as the leaf file name when constructing the save path. */
 const char *FUN_001c0720(void)
@@ -345,4 +448,100 @@ void FUN_001c0d70(int param_1)
             param_1);
     }
   }
+}
+
+/* 0x1c0ed0
+ * Returns the fixed constant 0x12 (18). No parameters, no memory access,
+ * no side effects. Callers (playlist_profile_initialize_ctf_rules,
+ * multiplayer_settings_select_list_update_item, and others) use the result
+ * as an immediate value; its semantic meaning (count/id/type) is unproven.
+ */
+unsigned short FUN_001c0ed0(void)
+{
+  return 0x12;
+}
+
+/* 0x1c1290
+ * kb.json previously listed this address as game_state_read_from_persistent_
+ * storage(void) — that decl/name does not match the binary. Disassembly and
+ * the __FILE__ assert string ("c:\halo\SOURCE\saved games\player_profile.c")
+ * show a two-arg register/stack function that zero-initializes a 0x30-byte
+ * profile record and stamps default fields, selected by index i in
+ * [0, NUMBER_OF_DEFAULT_PROFILES). Renamed and re-signatured to match;
+ * "profile" and "i" are taken verbatim from the assert condition string.
+ * Immediate caller (FUN_001c19e0, unlifted) and sibling player_profile_new
+ * (0x1c18f0, unlifted) are consistent with this being a profile bootstrap
+ * helper. Field offsets (0x18, 0x1a, 0x26, 0x28-0x2f within the 0x30-byte
+ * record) are raw/unproven — no player_profile struct exists yet, so they
+ * are kept as offset writes rather than named struct fields.
+ */
+void player_profile_set_to_default(void *profile /* @<esi> */, int i)
+{
+  if ((profile == NULL) || (i < 0) ||
+      (i >= 2 /* NUMBER_OF_DEFAULT_PROFILES */)) {
+    display_assert(
+      "(profile != NULL) && (i>=0) && (i<NUMBER_OF_DEFAULT_PROFILES)",
+      "c:\\halo\\SOURCE\\saved games\\player_profile.c", 0x237, true);
+    system_exit(-1);
+  }
+
+  csmemset(profile, 0, 0x30);
+
+  *(uint16_t *)((char *)profile + 0x18) = 0xffff;
+  *(uint8_t *)((char *)profile + 0x2a) = 3;
+  *(uint8_t *)((char *)profile + 0x2b) = 0;
+  *(uint8_t *)((char *)profile + 0x2d) = 0;
+  *(uint8_t *)((char *)profile + 0x2f) = 0;
+  *(uint16_t *)((char *)profile + 0x1a) |= (uint16_t)(((i & 0xff) << 8) | 1);
+  *(uint8_t *)((char *)profile + 0x2c) = 0;
+  *(uint16_t *)((char *)profile + 0x26) = 0;
+
+  if (i != 0) {
+    if (i != 1) {
+      display_assert("unknown default profile configuration requested",
+                     "c:\\halo\\SOURCE\\saved games\\player_profile.c", 0x252,
+                     true);
+      system_exit(-1);
+    }
+    *(uint8_t *)((char *)profile + 0x2b) = 1;
+  }
+
+  *(uint8_t *)((char *)profile + 0x28) = 0;
+  *(uint8_t *)((char *)profile + 0x29) = 0;
+}
+
+/* 0x1c1950
+ * Fills the 0x10-byte record at param_1: dword 0 is the fixed bit pattern
+ * 0x3f800000 (float 1.0f); dwords 1-3 are copied from the 3-dword
+ * struct-return of FUN_001c0ee0(param_2). FUN_001c0ee0 is called with a
+ * local scratch buffer as its hidden output pointer and echoes that same
+ * pointer back in EAX (MSVC struct-return-by-value convention), which is
+ * where the 3 dwords are read from. This function likewise echoes param_1
+ * in its own return value. Field/record semantics are unproven — kept as
+ * raw dwords rather than typed floats/struct fields.
+ */
+void *FUN_001c1950(void *param_1, int param_2)
+{
+  uint32_t local_buf[3];
+  uint32_t *src;
+  uint32_t *volatile dest;
+  uint32_t tmp2;
+
+  dest = (uint32_t *)param_1;
+  src = (uint32_t *)FUN_001c0ee0(local_buf, param_2);
+  dest[0] = 0x3f800000; /* 1.0f */
+  tmp2 = src[2];
+  dest[1] = src[0];
+  dest[2] = src[1];
+  dest[3] = tmp2;
+  return param_1;
+}
+
+/* 0x1c19c0
+ * Returns a random value in [0, 0x11] (0-17 inclusive) using the local
+ * random seed. Single caller: FUN_0012c750.
+ */
+int FUN_001c19c0(void)
+{
+  return (int)random_range(random_math_get_local_seed_address(), 0, 0x11);
 }

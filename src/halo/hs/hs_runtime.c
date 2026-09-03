@@ -407,7 +407,9 @@ bool FUN_000c88b0(int function_index, int expression_index)
     system_exit(-1);
   }
 
-  if (FUN_000c55d0(*(const char **)((char *)hs_function_table_get((int16_t)function_index) + 4),
+  if (FUN_000c55d0(*(const char **)((char *)hs_function_table_get(
+                                      (int16_t)function_index) +
+                                    4),
                    argument_nodes, expression_index, 2)) {
     if (hs_type_check(argument_nodes[0], 0)) { /* _hs_type_unparsed */
       node = (char *)datum_get(*(data_t **)0x5aa6c8, argument_nodes[0]);
@@ -491,10 +493,10 @@ bool FUN_000c88b0(int function_index, int expression_index)
  * contiguous type ranges this callback accepts as a donor type.  [6,8] is
  * real/short/long (6 sits between boolean 5 and short 7 in the hs type enum).
  * The [0x20,0x24] range is unidentified. */
-#define HS_TYPE_IS_COMPARABLE(node_index)              \
-  ((HS_SYNTAX_NODE_TYPE(node_index) >= 0x20 &&         \
-    HS_SYNTAX_NODE_TYPE(node_index) <= 0x24) ||        \
-   (HS_SYNTAX_NODE_TYPE(node_index) >= 6 &&            \
+#define HS_TYPE_IS_COMPARABLE(node_index)       \
+  ((HS_SYNTAX_NODE_TYPE(node_index) >= 0x20 &&  \
+    HS_SYNTAX_NODE_TYPE(node_index) <= 0x24) || \
+   (HS_SYNTAX_NODE_TYPE(node_index) >= 6 &&     \
     HS_SYNTAX_NODE_TYPE(node_index) <= 8))
 
 bool FUN_000c89c0(int function_index, int expression_index)
@@ -507,8 +509,8 @@ bool FUN_000c89c0(int function_index, int expression_index)
 
   success = false;
 
-  if ((int16_t)function_index < 0xf ||     /* _hs_function_gt */
-      (int16_t)function_index > 0x12) {    /* _hs_function_lte */
+  if ((int16_t)function_index < 0xf || /* _hs_function_gt */
+      (int16_t)function_index > 0x12) { /* _hs_function_lte */
     display_assert("function_index>=_hs_function_gt && "
                    "function_index<=_hs_function_lte",
                    "c:\\halo\\source\\hs\\hs_library_internal_compile.h", 0x1e3,
@@ -516,23 +518,25 @@ bool FUN_000c89c0(int function_index, int expression_index)
     system_exit(-1);
   }
 
-  if (FUN_000c55d0(*(const char **)((char *)hs_function_table_get((int16_t)function_index) + 4),
+  if (FUN_000c55d0(*(const char **)((char *)hs_function_table_get(
+                                      (int16_t)function_index) +
+                                    4),
                    argument_nodes, expression_index, 2)) {
-    if (hs_type_check(argument_nodes[0], 0) &&      /* _hs_type_unparsed */
+    if (hs_type_check(argument_nodes[0], 0) && /* _hs_type_unparsed */
         HS_TYPE_IS_COMPARABLE(argument_nodes[0])) {
       if (hs_type_check(argument_nodes[1],
                         HS_SYNTAX_NODE_TYPE_UNSIGNED(argument_nodes[0]))) {
         success = true;
       }
     } else if (*(int *)0x46b6fc == 0) {
-      if (hs_type_check(argument_nodes[1], 0) &&    /* _hs_type_unparsed */
+      if (hs_type_check(argument_nodes[1], 0) && /* _hs_type_unparsed */
           HS_TYPE_IS_COMPARABLE(argument_nodes[1])) {
         if (hs_type_check(argument_nodes[0],
                           HS_SYNTAX_NODE_TYPE_UNSIGNED(argument_nodes[1]))) {
           success = true;
         }
       } else if (*(int *)0x46b6fc == 0) {
-        if (hs_type_check(argument_nodes[0], 6)) {  /* _hs_type_real */
+        if (hs_type_check(argument_nodes[0], 6)) { /* _hs_type_real */
           if (hs_type_check(argument_nodes[1], 6)) {
             success = true;
           }
@@ -613,7 +617,8 @@ bool hs_sleep_parse(int16_t function_index, int expression_index)
 
       /* The reference branches on the type-check result (TEST AL,AL; JZ; then
        * a shared MOV AL,1 at 0xc8c1e) rather than returning it directly, so
-       * this is an `else if' setting the flag, not `success = hs_type_check'. */
+       * this is an `else if' setting the flag, not `success = hs_type_check'.
+       */
       if (script_index == -1) {
         success = true;
       } else if (hs_type_check(script_index, 10)) { /* _hs_type_script */
@@ -743,8 +748,9 @@ bool FUN_000c8d30(int function_index, int script_node)
 
   /* &function_index is the one-element argument_nodes array: the callee
    * overwrites the incoming first parameter slot with the argument handle. */
-  if (FUN_000c55d0(*(const char **)((char *)hs_function_table_get((int16_t)fn_idx) + 4),
-                   &function_index, script_node, 1)) {
+  if (FUN_000c55d0(
+        *(const char **)((char *)hs_function_table_get((int16_t)fn_idx) + 4),
+        &function_index, script_node, 1)) {
     node = (char *)datum_get(*(data_t **)0x5aa6c8, function_index);
 
     if (hs_type_check(function_index, 10)) { /* _hs_type_script */
@@ -867,8 +873,8 @@ int hs_compile(int source_length, const char *source, int *error_info,
   if (source_length < 0x400) {
     if (*(int *)0x326a08 == -1) {
       base_offset = 0;
-      *(void **)0x46b6e8 = debug_malloc(source_length + 1, false,
-                                        "c:\\halo\\SOURCE\\hs\\hs_compile.c", 0xaf);
+      *(void **)0x46b6e8 = debug_malloc(
+        source_length + 1, false, "c:\\halo\\SOURCE\\hs\\hs_compile.c", 0xaf);
       *(uint8_t *)0x46b804 = 1;
       if (*(void **)0x46b6e8 == NULL) {
         display_assert("hs_compile_globals.compiled_source",
@@ -888,7 +894,8 @@ int hs_compile(int source_length, const char *source, int *error_info,
       scenario = global_scenario_get();
       *(void **)0x46b6e8 = *(void **)((char *)scenario + 0x494);
     }
-    csmemcpy((void *)((int)*(void **)0x46b6e8 + base_offset), (void *)source, source_length);
+    csmemcpy((void *)((int)*(void **)0x46b6e8 + base_offset), (void *)source,
+             source_length);
     *(int *)0x46b6e4 = base_offset + source_length;
     *(uint8_t *)(*(int *)0x46b6e4 + (int)*(void **)0x46b6e8) = 0;
     node1_ptr = *(void **)0x46b6e8;
@@ -1213,7 +1220,7 @@ unsigned char FUN_000c9650(int16_t bit_index, int object_list, int state)
   }
 
   if (flag != 0) {
-set_bit:
+  set_bit:
     shift = (int)bit_index;
     word_offset = shift >> 5;
     word_ptr = (uint32_t *)((char *)0x5aa6a0 + word_offset * 4);
@@ -1245,8 +1252,8 @@ char FUN_000c9700(int param_1, int param_2, float param_3)
     else
       position =
         *(vector3_t *)((char *)object_get_and_verify_type(param_2, -1) + 0x50);
-    result =
-      unit_can_see_point(param_1, (float *)&position, param_3 * *(float *)0x253d4c);
+    result = unit_can_see_point(param_1, (float *)&position,
+                                param_3 * *(float *)0x253d4c);
   }
   return result;
 }
@@ -1267,8 +1274,8 @@ char FUN_000c9700(int param_1, int param_2, float param_3)
  *   call at 0xc97a8 pushes EBX, then ECX, then ESI, so in cdecl order it is
  *   FUN_000c9700(child_handle, arg1, arg2) — the child handle is the FIRST
  *   argument (the seeing unit), matching FUN_000c9700 passing its param_1
- *   straight to unit_can_see_point as the unit handle and resolving its param_2 as
- *   the object whose position is tested.  ADD ESP,0xc confirms three args; the
+ *   straight to unit_can_see_point as the unit handle and resolving its param_2
+ * as the object whose position is tested.  ADD ESP,0xc confirms three args; the
  *   artifact's §7_GETTER_SWALLOWED hazard was against a stale void(void) decl
  *   for 0xc9700 and does not apply.
  *
@@ -1340,8 +1347,8 @@ unsigned char FUN_000c9770(int arg0, int arg1, float arg2)
  *   FSTP float ptr [ESP] at 0xc9883 fills it with FLD [EBP+0x10] * [0x253d4c].
  *   PUSH EAX (the +0x24 point) / PUSH ESI (the child handle) follow, and
  *   ADD ESP,0xc at 0xc98a6 retires all three — so in cdecl order it is
- *   unit_can_see_point(child_handle, flag_position, angle * *(float *)0x253d4c),
- *   identical to the forward in FUN_000c9700.
+ *   unit_can_see_point(child_handle, flag_position, angle * *(float
+ * *)0x253d4c), identical to the forward in FUN_000c9700.
  *
  *   Two exits: MOV AL,0x1 at 0xc98cc on a hit, XOR AL,AL at 0xc98c3 when the
  *   list is walked out (which is also the empty-list exit), so the byte return
@@ -1368,11 +1375,11 @@ unsigned char FUN_000c9840(int arg0, short flag_index, float arg2)
     if (object_try_and_get_and_verify_type(child, 3) != NULL &&
         flag_index != 0) {
       if (unit_can_see_point(child,
-                       (float *)((char *)tag_block_get_element(
-                                   (char *)global_scenario_get() + 0x4e4,
-                                   flag_index, 0x5c) +
-                                 0x24),
-                       arg2 * *(float *)0x253d4c) != 0)
+                             (float *)((char *)tag_block_get_element(
+                                         (char *)global_scenario_get() + 0x4e4,
+                                         flag_index, 0x5c) +
+                                       0x24),
+                             arg2 * *(float *)0x253d4c) != 0)
         return 1;
     }
     child = FUN_000ce320(arg0, &iter_state);
@@ -2836,16 +2843,16 @@ void hs_thread_push_frame(int thread_handle)
   uint32_t *new_frame;
 
   thread = (char *)datum_get(*(data_t **)0x5aa6c4, thread_handle);
-  new_frame = (uint32_t *)
-    (*(int *)(thread + 0x10) + *(int16_t *)(*(int *)(thread + 0x10) + 0xc) + 0x10);
+  new_frame = (uint32_t *)(*(int *)(thread + 0x10) +
+                           *(int16_t *)(*(int *)(thread + 0x10) + 0xc) + 0x10);
 
   if ((char *)new_frame + 0x10 >= thread + 0x218) {
     display_assert(
-      csprintf((char *)0x5ab100,
-               "a problem occurred while executing the script %s: %s (%s)",
-               hs_get_thread_script_name(thread_handle),
-               "stack overflow.",
-               "(byte *) (new_frame+1)<thread->stack_data+HS_THREAD_STACK_SIZE"),
+      csprintf(
+        (char *)0x5ab100,
+        "a problem occurred while executing the script %s: %s (%s)",
+        hs_get_thread_script_name(thread_handle), "stack overflow.",
+        "(byte *) (new_frame+1)<thread->stack_data+HS_THREAD_STACK_SIZE"),
       "c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x35e, true);
     system_exit(-1);
   }
@@ -2922,8 +2929,8 @@ static void *hs_thread_stack_alloc(int thread_handle, int size)
     display_assert(
       csprintf((char *)0x5ab100,
                "a problem occurred while executing the script %s: %s (%s)",
-               hs_get_thread_script_name(thread_handle),
-               "corrupted stack.", "valid_thread(thread)"),
+               hs_get_thread_script_name(thread_handle), "corrupted stack.",
+               "valid_thread(thread)"),
       "c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x37d, true);
     system_exit(-1);
   }
@@ -2942,12 +2949,11 @@ static void *hs_thread_stack_alloc(int thread_handle, int size)
   if ((unsigned int)(frame + (int)*(int16_t *)(frame + 0xc) + 0xe + size) >
       (unsigned int)(thread + 0x218)) {
     display_assert(
-      csprintf(
-        (char *)0x5ab100,
-        "a problem occurred while executing the script %s: %s (%s)",
-        hs_get_thread_script_name(thread_handle),
-        "stack overflow.",
-        "frame->data+frame->size+size<=thread->stack_data+HS_THREAD_STACK_SIZE"),
+      csprintf((char *)0x5ab100,
+               "a problem occurred while executing the script %s: %s (%s)",
+               hs_get_thread_script_name(thread_handle), "stack overflow.",
+               "frame->data+frame->size+size<=thread->stack_data+HS_THREAD_"
+               "STACK_SIZE"),
       "c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x37f, true);
     system_exit(-1);
   }
@@ -2974,6 +2980,162 @@ int FUN_000cada0(int16_t script_index)
     } while (datum_index != -1);
   }
   return -1;
+}
+
+/* 0xcae80 — Test an argument for zero and splice the 1-byte boolean result
+ * back into the argument's own stack slot before reloading the full dword
+ * for the EAX return, matching the same arg-slot-as-scratch idiom documented
+ * at 0xcaf20 just below (there for a float re-box, here for a byte compare).
+ *
+ * Binary evidence (0xcae80..0xcae92, cdecl, EBP frame, no `sub esp`):
+ *
+ *   MOV  EAX,dword ptr [EBP+0x8]   ; load the one stack argument (full dword)
+ *   TEST EAX,EAX                   ; compare against zero using the ORIGINAL
+ *                                    argument value
+ *   SETZ AL                        ; AL = (arg == 0) ? 1 : 0
+ *   MOV  byte ptr [EBP+0x8],AL     ; store only the low byte back into the
+ *                                    argument's slot — the upper 3 bytes are
+ *                                    left untouched
+ *   MOV  EAX,dword ptr [EBP+0x8]   ; reload the full slot for the return
+ *
+ * The kb.json decl said `void FUN_000cae80(void)` and Ghidra's decompiler
+ * gave up with an empty `{ return; }` body; the disassembly above proves a
+ * single dword argument and an EAX-carried return, so the decl is corrected
+ * to `int FUN_000cae80(int)`. The partial byte store is preserved exactly
+ * (not simplified to a full-width `return arg == 0`) because it only leaves
+ * the upper 3 bytes of the original argument untouched when the low byte is
+ * overwritten — behaviorally faithful for whatever upper-byte content a
+ * caller passes, known or not.
+ *
+ * Only data references reach this address (0x2f42ac, 0x2f42b4 — two adjacent
+ * slots of a function table, unrelated to the 0x2f43d0/0x2f50f8 tables next
+ * to 0xcaf20/0xcaf80), so no ported caller constrains the argument's meaning
+ * further; it keeps the unqualified `param_1` name. */
+int FUN_000cae80(int param_1)
+{
+  unsigned char *low_byte;
+
+  low_byte = (unsigned char *)&param_1;
+  *low_byte = (unsigned char)(param_1 == 0);
+  return param_1;
+}
+
+/* 0xcaea0 — Same arg-slot-as-scratch idiom as 0xcae80 immediately above, but
+ * the zero-test only inspects the low 16 bits of the argument (a 16-bit CMP
+ * instead of a 32-bit TEST) before splicing the boolean back into the low
+ * byte and reloading the full dword for the EAX return.
+ *
+ * Binary evidence (0xcaea0..0xcaeb2, cdecl, EBP frame, no `sub esp`):
+ *
+ *   CMP  word ptr [EBP+0x8],0x0    ; compare only the low 16 bits of the
+ *                                    argument against zero
+ *   SETZ AL                        ; AL = (low16(arg) == 0) ? 1 : 0
+ *   MOV  byte ptr [EBP+0x8],AL     ; store only the low byte back into the
+ *                                    argument's slot — the upper 3 bytes are
+ *                                    left untouched
+ *   MOV  EAX,dword ptr [EBP+0x8]   ; reload the full slot for the return
+ *
+ * The kb.json decl said `void FUN_000caea0(void)` and Ghidra's decompiler
+ * gave up with an empty `{ return; }` body; the disassembly above proves a
+ * single dword argument and an EAX-carried return, so the decl is corrected
+ * to `int FUN_000caea0(int)`.
+ *
+ * Referenced only from 0x2f42b0 [DATA], the middle slot of the same
+ * function-table pair documented at 0xcae80 (0x2f42ac / 0x2f42b4) — no
+ * ported caller constrains the argument's meaning further, so it keeps the
+ * unqualified `param_1` name. */
+int FUN_000caea0(int param_1)
+{
+  unsigned char *low_byte;
+
+  low_byte = (unsigned char *)&param_1;
+  *low_byte = (unsigned char)((int16_t)param_1 == 0);
+  return param_1;
+}
+
+/* 0xcaf20 — Increment a 16-bit value and return it re-boxed as a 32-bit float
+ * bit-pattern in EAX (not ST0).
+ *
+ * Binary evidence (0xcaf20..0xcaf35, cdecl, EBP frame, no `sub esp`):
+ *
+ *   MOVSX EAX, word ptr [EBP+0x8]  ; sign-extend the incoming int16 arg
+ *   INC   EAX
+ *   MOV   dword ptr [EBP+0x8],EAX  ; widen to int32, reusing the arg slot
+ *   FILD  dword ptr [EBP+0x8]      ; int32 -> x87 real
+ *   FSTP  float ptr [EBP+0x8]      ; round to float32, store back to the slot
+ *   MOV   EAX,dword ptr [EBP+0x8]  ; return the float's raw bits via EAX
+ *
+ * The kb.json decl said `void FUN_000caf20(void)` and Ghidra's decompiler gave
+ * up with an empty `{ return; }` body; the disassembly above proves both the
+ * int16 argument and the EAX-carried float-bits return, so the decl is
+ * corrected to `int FUN_000caf20(int16_t)`. Returning the bit pattern through
+ * EAX instead of ST0 matches the §31 implicit-EAX-return pattern (thunk/table
+ * callers read a boxed 32-bit value generically, not through the FPU).
+ *
+ * Only data references reach this address (0x2f43d0..0x2f43dc, four slots of
+ * a function table also holding FUN_000caf10/FUN_000caf40 and neighbors), so
+ * no ported caller constrains the parameter's meaning; it keeps the
+ * unqualified `param_1` name. */
+int FUN_000caf20(int16_t param_1)
+{
+  int local_1;
+  float local_2;
+
+  local_1 = (int)param_1 + 1;
+  local_2 = (float)local_1;
+  return *(int *)&local_2;
+}
+
+/* 0xcaf80 — Resolve an object-name index to a handle and register it with the
+ * FUN_000ce200 resource, returning that resource handle or -1 when the name
+ * has no live object right now.  Same FUN_000ce200/FUN_000ce2b0 registration
+ * shape as the very next function (0xcafc0), but this one takes a name-list
+ * index instead of an already-resolved object handle.
+ *
+ * Binary evidence (0xcaf80..0xcafb1, cdecl, EBP frame, no `sub esp`, ESI/EDI
+ * saved):
+ *
+ *   MOV EAX,dword ptr [EBP+0x8]  ; one stack argument, loaded as a dword
+ *   PUSH EAX / OR EDI,0xffffffff ; EDI = -1 is the default return value
+ *   CALL 0x140720 / MOV ESI,EAX / ADD ESP,0x4
+ *     object_name_list_get_handle(index); the call happens unconditionally,
+ *     before any test of the argument, unlike the index!=-1 guard used by
+ *     the sibling callback at 0xc9a20 — this function tests the RETURNED
+ *     handle instead.
+ *   CMP ESI,-0x1 / JZ 0xcafac    ; handle == -1 -> skip straight to the
+ *                                  epilog with EDI still -1
+ *   CALL 0xce200 / MOV EDI,EAX   ; result = FUN_000ce200(), overwrites the
+ *                                  -1 default
+ *   PUSH ESI / PUSH EDI / CALL 0xce2b0 / ADD ESP,0x8
+ *     push order puts EDI (the FUN_000ce200 result) closest to the call, so
+ *     it is the first argument: FUN_000ce2b0(result, handle), matching the
+ *     FUN_000ce2b0(result, object_handle) shape at 0xcafc0/0xc95f0/0x547c0.
+ *   MOV EAX,EDI                  ; return EDI (the FUN_000ce200 result, or
+ *                                  the untouched -1 default)
+ *
+ * The kb.json decl said `void FUN_000caf80(void)` and Ghidra reported the
+ * argument as `in_stack_00000004` with no return; the disassembly above
+ * proves both the single argument and the EAX return, so the decl is
+ * corrected to `int FUN_000caf80(int16_t)` — int16_t because the only
+ * consumer, object_name_list_get_handle, takes int16_t, matching the same
+ * dword-loaded/word-consumed pattern already documented at 0xc9990/0xc9a20.
+ *
+ * Only data references reach this address (0x2f50f8..0x2f510c, six slots of
+ * the same HS function table that also holds 0xcafc0's five slots at
+ * 0x2f50e4..0x2f50f4), so no ported caller constrains the signature further.
+ * FUN_000ce200/FUN_000ce2b0 stay unproven and keep their FUN_ names. */
+int FUN_000caf80(int16_t index)
+{
+  int result;
+  int object_handle;
+
+  result = -1;
+  object_handle = object_name_list_get_handle(index);
+  if (object_handle != -1) {
+    result = FUN_000ce200();
+    FUN_000ce2b0(result, object_handle);
+  }
+  return result;
 }
 
 /* 0xcafc0 — Register a single object handle with the FUN_000ce200 resource and
@@ -3753,8 +3915,7 @@ void hs_evaluate_wake(int16_t function_index, int thread_datum, char init)
  *
  * Validates thread integrity (stack bounds) and asserts dest_ptr != NULL.
  */
-void FUN_000cc1d0(int thread_handle, int expression_index,
-                    void *dest_ptr)
+void FUN_000cc1d0(int thread_handle, int expression_index, void *dest_ptr)
 {
   char *thread;
   char *expr;
@@ -3781,8 +3942,8 @@ void FUN_000cc1d0(int thread_handle, int expression_index,
       display_assert(
         csprintf((char *)0x5ab100,
                  "a problem occurred while executing the script %s: %s (%s)",
-                 hs_get_thread_script_name(thread_handle),
-                 "corrupted stack.", "valid_thread(thread)"),
+                 hs_get_thread_script_name(thread_handle), "corrupted stack.",
+                 "valid_thread(thread)"),
         "c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0x2ff, true);
       system_exit(-1);
     }
@@ -4156,11 +4317,12 @@ void hs_runtime_initialize_for_new_map(void)
           }
           if (*(int *)(internal_thread + 8) != 0) {
             display_assert(
-              csprintf((char *)0x5ab100,
-                       "a problem occurred while executing the script %s: %s (%s)",
-                       hs_get_thread_script_name(thread_index),
-                       "a global initialization attempted to sleep.",
-                       "internal_thread->sleep_until==0"),
+              csprintf(
+                (char *)0x5ab100,
+                "a problem occurred while executing the script %s: %s (%s)",
+                hs_get_thread_script_name(thread_index),
+                "a global initialization attempted to sleep.",
+                "internal_thread->sleep_until==0"),
               "c:\\halo\\SOURCE\\hs\\hs_runtime.c", 0xe7, true);
             system_exit(-1);
           }
@@ -4364,6 +4526,149 @@ void FUN_000cdf70(void *param_1, void *address, long size)
                    (int)((unsigned long)data_size / 0x14u));
     }
   }
+}
+
+/* 0xce050 — Build "<name> reference" into a 256-byte stack buffer with
+ * crt_sprintf, then allocate a data_t pool of that name via
+ * game_state_data_new.
+ *
+ * Confirmed from disassembly (0xce050-0xce086):
+ *   PUSH [EBP+0x8] / PUSH 0x280e94 / PUSH ECX(&local_104) / CALL 0x1d90f0 --
+ *     crt_sprintf(local_104, "%s reference", param at [EBP+0x8]); the
+ *     decompile drops the vararg but the disassembly pushes 3 args and the
+ *     format string takes one %s, so [EBP+0x8] is consumed only as that
+ *     vararg -> declared char *name.
+ *   MOV EDX,[EBP+0xc] / PUSH 0xc / PUSH EDX / PUSH EAX(&local_104) /
+ *     CALL 0x1bfe10 -- game_state_data_new(local_104, [EBP+0xc], 0xc);
+ *     [EBP+0xc] is forwarded verbatim into game_state_data_new's
+ *     __int16 maximum_count slot, so it keeps that type.
+ *   0x280e94 = "%s reference" (per decompile); 0xc = fixed element size.
+ *   ADD ESP,0x18 cleans both calls' 3+3 pushed dwords; return value of
+ *   game_state_data_new is discarded (no EAX store after the call).
+ *
+ * No static callers found (xrefs_to is empty) and no string names this
+ * function itself, so it keeps the FUN_ name. FUN_000ce090/0xce0c0/0xce150/
+ * 0xce1b0 sit immediately adjacent and unlifted -- plausibly siblings in a
+ * per-type reference-pool constructor cluster, unproven.
+ */
+void FUN_000ce050(char *name, __int16 maximum_count)
+{
+  char buffer[0x100];
+
+  crt_sprintf(buffer, "%s reference", name);
+  game_state_data_new(buffer, maximum_count, 0xc);
+}
+
+/* 0xce090 — resolve a reference handle in place: given a data pool and an
+ * in/out handle slot, if *handle_ptr != -1 look the handle up via
+ * datum_get(data, *handle_ptr), overwrite *handle_ptr with the datum's
+ * field at +0x8, and return the datum's field at +0x4. If *handle_ptr is
+ * already -1, return -1 without touching *handle_ptr.
+ *
+ * Confirmed from disassembly (0xce090-0xce0bb):
+ *   MOV ESI,[EBP+0xc] / MOV EAX,[ESI] / CMP EAX,-1 / JZ 0xce0b6 -- if
+ *     *handle_ptr == -1, skip straight to the OR EAX,0xffffffff / RET tail.
+ *   PUSH EAX(*handle_ptr) / MOV EAX,[EBP+8] / PUSH EAX(data) /
+ *     CALL 0x119320 -- cdecl pushes the callee's last arg first, so this is
+ *     datum_get(data, *handle_ptr).
+ *   MOV ECX,[EAX+8] / ADD ESP,8 / MOV [ESI],ECX -- *handle_ptr =
+ *     *(int*)(datum+8); the store leaves the datum pointer live in EAX.
+ *   MOV EAX,[EAX+4] -- return value is *(int*)(datum+4).
+ * No callers found (xrefs_to empty) and no string names this function, so
+ * it keeps the FUN_ name; the two datum fields it touches (+4, +8) have no
+ * evidence tying them to a named struct here, consistent with the rest of
+ * this file treating hs syntax-tree/data-pool entries as raw byte offsets.
+ */
+int FUN_000ce090(data_t *data, int *handle_ptr)
+{
+  void *datum;
+
+  if (*handle_ptr != -1) {
+    datum = datum_get(data, *handle_ptr);
+    *handle_ptr = *(int *)((char *)datum + 8);
+    return *(int *)((char *)datum + 4);
+  }
+  return -1;
+}
+
+/* 0xce0c0 — push a new node onto a data-pool reference chain: allocate a
+ * datum via data_new_at_index(data), and on success set the new datum's
+ * field+0x4 = value and field+0x8 = *head_ptr (the previous head), then
+ * *head_ptr = new_index (push_front onto the chain head_ptr addresses).
+ * On allocation failure, report error(2, "...", data->name,
+ * data->maximum_count) -- mirrors FUN_000ce2b0's inlined version of the
+ * same allocate-or-report pattern against the same field+0x4/field+0x8
+ * datum layout that FUN_000ce090 walks in the opposite direction.
+ *
+ * Confirmed from disassembly (0xce0c0-0xce10e):
+ *   PUSH EDI([EBP+8]) / CALL 0x119610 -- data_new_at_index(data).
+ *   CMP ESI,-1 / JZ 0xce0f6 -- branch to the error path on failure.
+ *   PUSH ESI / PUSH EDI / CALL 0x119320 -- datum_get(data, new_index).
+ *   MOV ECX,[EBP+0x10] / MOV [EAX+4],ECX -- new_datum->field_0x4 = value.
+ *   MOV ECX,[EBP+0xc] / MOV EDX,[ECX] / MOV [EAX+8],EDX --
+ *     new_datum->field_0x8 = *head_ptr.
+ *   MOV [ECX],ESI -- *head_ptr = new_index.
+ *   Error path: MOVSX EAX,word ptr [EDI+0x20] / PUSH EAX / PUSH EDI /
+ *     PUSH 0x280ea4 / PUSH 0x2 / CALL 0x8f390 -- cdecl pushes right-to-left,
+ *     so this is error(2, "WARNING: maximum %ss per map (%d) exceeded.",
+ *     data, data->maximum_count). data is pushed raw (not data->name)
+ *     because data_t's name field sits at offset 0x00, so the pointer IS
+ *     the %s argument; source form uses data->name for clarity, same value.
+ *
+ * No callers found (xrefs_to empty). Sits in the same data-pool reference-
+ * chain cluster as FUN_000ce090 (the mirror pop/lookup) and FUN_000ce2b0
+ * (an already-lifted inlined instance of this exact pattern); head_ptr's
+ * relationship to a specific header field (e.g. FUN_000ce200's header+0x8)
+ * is plausible but unproven for this generic entry point.
+ */
+void FUN_000ce0c0(data_t *data, int *head_ptr, int value)
+{
+  int new_index;
+  char *datum;
+
+  new_index = data_new_at_index(data);
+  if (new_index != -1) {
+    datum = (char *)datum_get(data, new_index);
+    *(int *)(datum + 0x4) = value;
+    *(int *)(datum + 0x8) = *head_ptr;
+    *head_ptr = new_index;
+    return;
+  }
+  error(2, "WARNING: maximum %ss per map (%d) exceeded.", data->name,
+        data->maximum_count);
+}
+
+/* 0xce150 -- allocate the two hs object-list data pools and store them at
+ * 0x5aa698 (header pool) / 0x5aa694 (reference pool). Called once from
+ * hs_initialize (xrefs_to: 0xc507a, unconditional call).
+ *
+ * Confirmed from disassembly (0xce150-0xce1a0):
+ *   PUSH 0xc / PUSH 0x30 / PUSH 0x280edc("object list header") /
+ *     CALL 0x1bfe10 -- game_state_data_new("object list header", 0x30, 0xc);
+ *     result stored to *(data_t **)0x5aa698 (hs_object_list_header_data,
+ *     per the comments on hs_runtime_initialize/dispose below).
+ *   PUSH 0x280ed0("list object") / PUSH 0x280e94("%s reference") /
+ *     PUSH EAX(&local_104) / CALL 0x1d90f0 -- crt_sprintf(local_104,
+ *     "%s reference", "list object"); same format string and 256-byte
+ *     buffer as FUN_000ce050's "%s reference" builder above.
+ *   PUSH 0xc / PUSH 0x80 / PUSH ECX(&local_104) / CALL 0x1bfe10 --
+ *     game_state_data_new(local_104, 0x80, 0xc); result stored to
+ *     *(data_t **)0x5aa694 (hs_object_list_reference_data).
+ *   ADD ESP,0x24 is MSVC's single deferred cleanup for all three calls'
+ *     3+3+3 pushed dwords (9 dwords = 0x24 bytes), not a fourth call --
+ *     the call_site_audit ARG_COUNT hazard on the last call_site is this
+ *     shared cleanup, not an extra argument to game_state_data_new.
+ * No string names this function itself, so it keeps the FUN_ name -- it
+ * pairs with hs_runtime_initialize/hs_runtime_dispose below as the
+ * allocation half of the two-pool lifecycle they delete_all/make_invalid.
+ */
+void FUN_000ce150(void)
+{
+  char buffer[0x100];
+
+  *(data_t **)0x5aa698 = game_state_data_new("object list header", 0x30, 0xc);
+  crt_sprintf(buffer, "%s reference", "list object");
+  *(data_t **)0x5aa694 = game_state_data_new(buffer, 0x80, 0xc);
 }
 
 /* Initialize HaloScript runtime data structures. Calls data_delete_all

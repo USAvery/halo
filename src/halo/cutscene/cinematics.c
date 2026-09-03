@@ -1306,6 +1306,48 @@ void FUN_00093b60(short *angles, signed char *cursor)
 }
 
 
+/* recorded animation playback: per-vector short-delta accumulate helper
+ *
+ * (0x00093ba0, c:\halo\SOURCE\cutscene\recorded_animation_playback.c).
+ *
+ * Leaf helper called from FUN_00093e20 for vectors 1 and 2 (out-of-line
+ * path); vector 0 is inlined there at 0x93ed5-0x93efb.  Short-cursor twin
+ * of FUN_00093b60 (signed-byte cursor, MOVSX).  Takes its two pairs via
+ * registers: angles in EAX, short cursor in EDX.  The original is 0x3c
+ * bytes (0x93ba0-0x93bdc) with no frame, no calls:
+ *   MOV CX,[EDX] / ADD [EAX],CX                                    ; 0x93ba0
+ *   XOR ECX,ECX / MOV CX,[EAX] / CMP CX,0x3e8 / JLE 0x93bc4         ;
+ * 0x93ba6-b0 ADD ECX,-1000 / MOV [EAX],CX / MOV DX,[EDX+2] / ADD [EAX+2],DX /
+ * RET ; 0x93bb2-c3 CMP CX,-1000 / JGE 0x93bd4 / ADD ECX,1000 / MOV [EAX],CX ;
+ * 0x93bc4-d1 MOV DX,[EDX+2] / ADD [EAX+2],DX / RET                       ;
+ * 0x93bd4-dc
+ *
+ * Angles are persistent yaw/pitch shorts in 1/1000-PI units.  Only
+ * angles[0] wraps at +-1000; angles[1] is always accumulated.  All
+ * arithmetic is 16-bit; the cursor word is loaded with plain MOV (not
+ * MOVSX) since it is already a signed 16-bit short, unlike FUN_00093b60's
+ * signed-byte cursor.  Compare is signed 16-bit (CMP CX,0x3e8 / 0xfc18)
+ * with 16-bit store-back; the >1000 path tail-copies the second accumulate
+ * before return, matching FUN_00093b60's shape exactly.
+ */
+void FUN_00093ba0(short *angles, short *cursor)
+{
+  short temp;
+
+  angles[0] = (short)(angles[0] + cursor[0]);
+  temp = angles[0];
+  if (temp > RECORDED_ANIMATION_ANGLE_WRAP) {
+    angles[0] = (short)(temp - RECORDED_ANIMATION_ANGLE_WRAP);
+    angles[1] = (short)(angles[1] + cursor[1]);
+    return;
+  }
+  if (temp < -RECORDED_ANIMATION_ANGLE_WRAP) {
+    angles[0] = (short)(temp + RECORDED_ANIMATION_ANGLE_WRAP);
+  }
+  angles[1] = (short)(angles[1] + cursor[1]);
+}
+
+
 /* recorded animation playback: control-vector char-difference stream event
  * handler (0x00093c20,
  * c:\halo\SOURCE\cutscene\recorded_animation_playback.c lines

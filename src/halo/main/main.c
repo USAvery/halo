@@ -232,6 +232,44 @@ void FUN_000ffeb0(char param_1)
   }
 }
 
+/* gamepad_button_is_down (0xffef0)
+ * Returns whether button_index is currently held on any connected gamepad.
+ * Scans gamepad_index 0..3 for the first slot with a gamepad attached
+ * (input_has_gamepad); reads that slot's hold-state byte at
+ * input_gamepad_state+0x10+button_index — the analog_hold and digital_hold
+ * byte arrays are laid out contiguously starting at +0x10, spanning
+ * NUMBER_OF_GAMEPAD_BUTTONS bytes total, so button_index indexes across
+ * both. The "gamepad_index>=4" check right after a found hit can never be
+ * taken (the scan loop only ever calls input_has_gamepad with 0..3) but is
+ * preserved verbatim from the original binary. */
+bool gamepad_button_is_down(int16_t button_index)
+{
+  int16_t gamepad_index;
+  bool has_gamepad;
+  bool result;
+  unsigned char *gamepad_state;
+
+  assert_halt_msg_at(
+    "button_index>=0 && button_index<NUMBER_OF_GAMEPAD_BUTTONS",
+    "c:\\halo\\SOURCE\\main\\main.c", 0xf5,
+    button_index >= 0 && button_index < NUMBER_OF_GAMEPAD_BUTTONS);
+
+  result = false;
+  gamepad_index = 0;
+  do {
+    has_gamepad = input_has_gamepad(gamepad_index);
+    if (has_gamepad) {
+      if (gamepad_index < 4) {
+        gamepad_state = (unsigned char *)input_get_gamepad_state(gamepad_index);
+        result = gamepad_state[button_index + 0x10] != 0;
+      }
+      break;
+    }
+    gamepad_index = gamepad_index + 1;
+  } while (gamepad_index < 4);
+  return result;
+}
+
 /* Set the game connection state (network connection type).
  * Stores the low 16 bits of param into the global word_46DA0C.
  * 0 = local/singleplayer, 2 = client, other values used for host/dedicated. */
@@ -5762,6 +5800,129 @@ void FUN_00104430(int polygon_count, short *point_counts, float *points,
       crt_fprintf(*(void **)0x46e394, "\t\t]\n\t}\n}\n");
       crt_fflush(*(void **)0x46e394);
     }
+  }
+}
+
+/* FUN_00104710 (0x104710)  error_geometry.c:0x1ac-0x1af
+ *
+ * Emits a debug width*height point/texcoord grid as a VRML/Open-Inventor
+ * "Separator" block (Coordinate3 + TextureCoordinate + IndexedFaceSet, one
+ * quad face per grid cell) to the open error-geometry stream
+ * *(void**)0x46e394.  Unlike sibling FUN_00104430, no matrix transform or
+ * scale is applied -- points[]/texcoords[] are written straight through.
+ *
+ *   width      grid columns (>0)
+ *   height     grid rows (>0)
+ *   points     packed 3-float vertices, width*height entries, row-major
+ *   texcoords  packed 2-float texture coords, width*height entries, row-major
+ *
+ * Pass 1: Coordinate3 point[] -- points[i*3..i*3+2] for i in
+ *   [0, width*height), verified from disassembly at 0x1047eb-0x10481e (ESI
+ *   walks points+1 float; FLD [ESI-4]/[ESI]/[ESI+4] == points[0..2] on the
+ *   first iteration, then ESI += 3 floats per iteration).
+ * Pass 2: TextureCoordinate point[] -- texcoords[i*2], texcoords[i*2+1] for
+ *   the same i range (0x104850-0x104878).
+ * Pass 3: IndexedFaceSet coordIndex[] -- one quad per grid cell: for row r in
+ *   [0, height-1), col c in [0, width-1), face = (r*width+c, r*width+c+1,
+ *   (r+1)*width+c+1, (r+1)*width+c, -1).  Verified from the row-base
+ *   accumulators EDI/EBX at 0x1048ba-0x104926: EDI starts at 0 and EBX at
+ *   width+1 (== EDI+width+1), both advance by +width per row; the inner-loop
+ *   pushes at 0x1048e0-0x1048f7 give args (EDI+ESI, EDI+ESI+1, EBX+ESI,
+ *   EBX+ESI-1) -- Ghidra's decompile dropped the fourth (EBX+ESI-1) arg, and
+ *   the trailing "\n" is a separate crt_fprintf call per grid cell (inside
+ *   the inner loop here, unlike FUN_00104430 where it is once per row).
+ *
+ * cdecl, verified from disassembly at 0x104710: [EBP+0x8]=width (EDI),
+ * [EBP+0xc]=height (EAX), [EBP+0x10]=points (ESI), [EBP+0x14]=texcoords
+ * (EBX).  The outer row down-counter reuses the height parameter's own stack
+ * slot (`MOV [EBP+0xc],EAX` / `DEC dword ptr [EBP+0xc]`), mirrored here by
+ * reassigning `height` directly rather than introducing a separate local.
+ * Assert tails are system_exit(-1) (CALL 0x8e2f0) -- Ghidra's decompile
+ * mislabels all four as thunk_FUN_001029a0 (halt_and_catch_fire), but the
+ * disassembly and call_site_audit both confirm system_exit, same trap noted
+ * on sibling FUN_00104430.
+ */
+void FUN_00104710(int width, int height, float *points, float *texcoords)
+{
+  float *pt;
+  int count;
+  int i;
+  unsigned short col;
+  int row0;
+  int row1;
+
+  if (width < 1) {
+    display_assert("width>0", "c:\\halo\\SOURCE\\tool\\error_geometry.c", 0x1ac,
+                   true);
+    system_exit(-1);
+  }
+  if (height < 1) {
+    display_assert("height>0", "c:\\halo\\SOURCE\\tool\\error_geometry.c",
+                   0x1ad, true);
+    system_exit(-1);
+  }
+  if (points == 0) {
+    display_assert("points", "c:\\halo\\SOURCE\\tool\\error_geometry.c", 0x1ae,
+                   true);
+    system_exit(-1);
+  }
+  if (texcoords == 0) {
+    display_assert("texcoords", "c:\\halo\\SOURCE\\tool\\error_geometry.c",
+                   0x1af, true);
+    system_exit(-1);
+  }
+  if (FUN_00103d30()) {
+    crt_fprintf(*(void **)0x46e394, "Separator\n{\n");
+    crt_fprintf(*(void **)0x46e394, "\tCoordinate3\n\t{\n\t\tpoint\n\t\t[\n");
+    count = width * height;
+    if (count > 0) {
+      pt = points;
+      i = count;
+      do {
+        crt_fprintf(*(void **)0x46e394, "\t\t\t%f %f %f,\n", pt[0], pt[1],
+                    pt[2]);
+        pt = pt + 3;
+        i = i - 1;
+      } while (i != 0);
+    }
+    crt_fprintf(*(void **)0x46e394, "\t\t]\n\t}\n");
+    crt_fprintf(*(void **)0x46e394,
+                "\tTextureCoordinate\n\t{\n\t\tpoint\n\t\t[\n");
+    i = 0;
+    if (count > 0) {
+      do {
+        crt_fprintf(*(void **)0x46e394, "\t\t\t%f %f,\n", texcoords[i * 2],
+                    texcoords[i * 2 + 1]);
+        i = i + 1;
+      } while (i < count);
+    }
+    crt_fprintf(*(void **)0x46e394, "\t\t]\n\t}\n");
+    crt_fprintf(*(void **)0x46e394,
+                "\tMaterialBinding\n\t{\n\t\tvalue PER_FACE\n\t}\n");
+    crt_fprintf(*(void **)0x46e394,
+                "\tIndexedFaceSet\n\t{\n\t\tcoordIndex\n\t\t[\n");
+    height = height - 1;
+    if (height > 0) {
+      row0 = 0;
+      row1 = width + 1;
+      do {
+        col = 0;
+        if (width > 1) {
+          do {
+            crt_fprintf(*(void **)0x46e394, "\t\t\t");
+            crt_fprintf(*(void **)0x46e394, "%d,%d,%d,%d,-1, ", row0 + col,
+                        row0 + col + 1, row1 + col, row1 + col - 1);
+            crt_fprintf(*(void **)0x46e394, "\n");
+            col = col + 1;
+          } while (col < width - 1);
+        }
+        row0 = row0 + width;
+        row1 = row1 + width;
+        height = height - 1;
+      } while (height != 0);
+    }
+    crt_fprintf(*(void **)0x46e394, "\t\t]\n\t}\n}\n");
+    crt_fflush(*(void **)0x46e394);
   }
 }
 

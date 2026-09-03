@@ -45,6 +45,128 @@ void FUN_000a54b0(void)
   }
 }
 
+/* FUN_000a55e0 (0xa55e0)
+ *
+ * Multiplies the results of two calls to FUN_000a5590 (0xa5590, unported,
+ * cdecl, 2 raw dword args -> float in ST0). Confirmed from disassembly:
+ *   000a55ec CALL FUN_000a5590(arg1, arg2) -> FSTP [EBP-4] (saved)
+ *   000a55fc CALL FUN_000a5590(arg3, arg4) -> FMUL [EBP-4] (result * saved)
+ * Argument push order at each call site is the standard cdecl
+ * right-to-left push (second param pushed first), so callee arg order is
+ * NOT swapped: call 1 is FUN_000a5590(arg1, arg2), call 2 is
+ * FUN_000a5590(arg3, arg4). No evidence of the semantic meaning of arg1-4
+ * or of FUN_000a5590 itself beyond its arity/return -- kept as generic int
+ * params and no callers found in this artifact (xrefs_to: none).
+ */
+float FUN_000a55e0(int arg1, int arg2, int arg3, int arg4)
+{
+  float saved;
+
+  saved = FUN_000a5590(arg1, arg2);
+  return FUN_000a5590(arg3, arg4) * saved;
+}
+
+/* FUN_000a5d70 (0xa5d70)
+ *
+ * Recursive per-cluster worker behind FUN_000a5f00 (0xa5f00, unported): walks
+ * the linked list of objects rooted at `object_handle` (object field +0xc4 =
+ * "next object in this cluster"), filters each object by type mask, deletion
+ * flag, unit health fraction, cone containment (FUN_00110210), team
+ * allegiance and a "bipd"-tag flag, appends any matching candidate's 0x38-byte
+ * record (built by FUN_000a5ac0, unported) into `out_buffer`, then recurses
+ * into the object's linked cluster (field +0xc8 = "next cluster", -1
+ * terminated) before continuing the object-list walk.
+ *
+ * Confirmed from disassembly at 0xa5d70:
+ *   - The decompiler's `in_stack_XXXXXXXX` stack-slot names are offset -4
+ *     from the true [EBP+N] disassembly locations in this function (e.g. its
+ *     `in_stack_0000000c` is really [EBP+0x10], `in_stack_00000020` is really
+ *     [EBP+0x24]). Every parameter below was derived from the raw [EBP+N]
+ *     operands and the recursive self-call's argument marshalling at
+ *     0xa5e93-0xa5ecb (which forwards params 3-9 unchanged and only threads
+ *     the next handle / remaining capacity / advanced buffer pointer), not
+ *     from the decompiler's mislabeled variable names.
+ *   - param_1 ([EBP+8]) is never read in this function; it is only forwarded
+ *     unchanged as the first pushed arg to FUN_000a5ac0 (0xa5e5c) and to the
+ *     recursive self-call (0xa5eca).
+ *   - The function returns its running match count in AX only (0xa5eec
+ *     `MOV AX,BX`); the caller's `ADD EBX,EAX` (0xa5ed3) only ever executes
+ *     right after the recursive CALL itself, so the upper 16 bits of EAX are
+ *     always freshly the callee's own (equally AX-only) return and never
+ *     carry stale garbage into a live comparison -- every consumer of the
+ *     count reads BX/AX, never the high word. int16_t is exact.
+ */
+int16_t FUN_000a5d70(void *param_1, int object_handle, float *arg_p3,
+                     float *arg_p4, float arg_p5, float arg_sine,
+                     float arg_cosine, int exclude_handle, int16_t query_team,
+                     int16_t max_count, void *out_buffer)
+{
+  char *obj;
+  char *unit_obj;
+  char *tag_data;
+  char cone_match;
+  char record_built;
+  int record_buf[14];
+  int datum_handle;
+  int next_cluster;
+  int type_byte;
+  int16_t total_count;
+
+  datum_handle = object_handle;
+  total_count = 0;
+
+  do {
+    obj = (char *)object_get_and_verify_type(datum_handle, -1);
+    type_byte = *(unsigned char *)(obj + 0x64) & 0x1f;
+
+    if (((1 << type_byte) & 3) != 0 && (*(unsigned char *)(obj + 4) & 1) == 0) {
+      unit_obj = (char *)object_get_and_verify_type(datum_handle, 3);
+
+      if (*(float *)(unit_obj + 0x32c) < *(float *)0x2533c8) {
+        cone_match = FUN_00110210((float *)(obj + 0x50), *(float *)(obj + 0x5c),
+                                  arg_p3, arg_p4, arg_p5, arg_sine, arg_cosine);
+
+        if (cone_match != 0) {
+          if (((1 << type_byte) & 1) != 0 &&
+              (*(unsigned char *)(obj + 0xb6) & 4) == 0 &&
+              datum_handle != exclude_handle) {
+            if (game_allegiance_get_team_is_friendly(
+                  query_team, *(int16_t *)(obj + 0x68))) {
+              tag_data = (char *)tag_get(0x62697064, *(int *)obj);
+
+              if ((*(unsigned int *)(tag_data + 0x17c) & 0x200000) == 0) {
+                record_built = FUN_000a5ac0(param_1, datum_handle, arg_p3,
+                                            arg_p4, record_buf);
+
+                if (record_built != 0 && total_count < max_count) {
+                  csmemcpy((char *)out_buffer + (int)total_count * 0x38,
+                           record_buf, 0x38);
+                  total_count = total_count + 1;
+                }
+              }
+            }
+          }
+
+          next_cluster = *(int *)(obj + 0xc8);
+          if (next_cluster != -1 && total_count < max_count) {
+            total_count =
+              (int16_t)(total_count +
+                        FUN_000a5d70(
+                          param_1, next_cluster, arg_p3, arg_p4, arg_p5,
+                          arg_sine, arg_cosine, exclude_handle, query_team,
+                          (int16_t)(max_count - total_count),
+                          (char *)out_buffer + (int)total_count * 0x38));
+          }
+        }
+      }
+    }
+
+    datum_handle = *(int *)(obj + 0xc4);
+  } while (datum_handle != -1 && total_count < max_count);
+
+  return total_count;
+}
+
 /* FUN_000a6030 (0xa6030)
  *
  * Locate the best candidate record inside the cone described by `cone_spec`,
@@ -68,8 +190,8 @@ void FUN_000a54b0(void)
  *     the return count at 0xa60a1, which is why the original's live range ends
  *     at the call.
  */
-char FUN_000a6030(float *cone_spec, float *point, float *direction,
-                  float *arg4, float *arg5, void *out_struct)
+char FUN_000a6030(float *cone_spec, float *point, float *direction, float *arg4,
+                  float *arg5, void *out_struct)
 {
   void *scenario;
   void *leaf_element;
@@ -177,8 +299,8 @@ void cheats_load_from_file(void)
     csstrtok(entry, "\r\n\t;");
     if ((slot == 12 || slot == 13) && *entry != '\0') {
       /* Second textual use of the address expression: with only one use cl.exe
-       * sinks the add into the scaled-index register (`add esi,0`); a second use
-       * makes it CSE the value and emit the reference's `lea esi,(esi)`. */
+       * sinks the add into the scaled-index register (`add esi,0`); a second
+       * use makes it CSE the value and emit the reference's `lea esi,(esi)`. */
       *(cheats_globals + (int)slot * 200) = '\0';
       error(2, "Cannot execute cheats attached to the back or start button");
     }

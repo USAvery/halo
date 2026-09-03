@@ -3388,8 +3388,76 @@ bool ui_widget_game_data_select_game_engine_item(void *widget)
     }
 
     child = widget_instance_get_nth_child(widget,
-      *(int16_t *)((char *)widget + 0x3c));
+                                          *(int16_t *)((char *)widget + 0x3c));
     *(void **)((char *)widget + 0x38) = child;
+
+    return true;
+  }
+
+  error(2, "failed to retrieve editable game variant");
+  return false;
+}
+
+/* multiplayer profile init name (event handler, data xref 0x31e224,
+ * same ui_widget_event_handler_fn pointer array as the game-engine-item
+ * handlers above) — 0xece10. Fetches the in-progress playlist-profile
+ * edit copy (player_ui_get_edit_playlist_profile, called unconditionally
+ * first, before the widget-type check — order preserved per
+ * disassembly), then asserts widget itself (not a parent) is a text box
+ * widget (+0xe == 1), same "expected text box widget for profile name"
+ * display_assert/system_exit(-1) shape as the sibling handlers, and the
+ * same +0xe==1 text-box check render_text_box_widget's siblings use.
+ *
+ * If a profile is being edited, (re)allocates a 0x100-byte name buffer
+ * through ui_widget_realloc (same stack_memory_pool_realloc wrapper and
+ * +0x3c buffer-pointer slot render_text_box_widget above uses), passing
+ * the widget's existing +0x3c buffer pointer as the realloc input. The
+ * result is stored back to +0x3c unconditionally right after the call
+ * (MOV before the NULL-test JZ in the disassembly, order preserved).
+ * On successful allocation, copies up to 0x7f wide characters from the
+ * profile pointer itself (not an offset field — the profile struct's
+ * name is its first member, per the disassembly passing EDI, the raw
+ * profile pointer, as ustrncpy's source with no added offset) into the
+ * new buffer via ustrncpy, then null-terminates at wchar_t index 0x7f
+ * (byte offset 0xfe) by reloading the buffer pointer from +0x3c rather
+ * than reusing the local (matches the disassembly's MOV ECX,[ESI+0x3c]
+ * reload). Always returns true on the profile-found path.
+ *
+ * If no playlist profile is being edited, logs error(2, "failed to
+ * retrieve editable game variant") (same message/severity as the
+ * sibling handlers) and returns false; event_data and widget_deleted are
+ * unused, same 3-arg handler typedef shape as the sibling handlers
+ * above. */
+bool ui_widget_multiplayer_profile_init_name(void *widget, void *event_data,
+                                             bool *widget_deleted)
+{
+  void *profile;
+  void *name_buffer;
+
+  (void)event_data;
+  (void)widget_deleted;
+
+  profile = player_ui_get_edit_playlist_profile();
+
+  if (*(int16_t *)((char *)widget + 0xe) != 1) {
+    display_assert(
+      "expected text box widget for profile name",
+      "c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 0xad2,
+      true);
+    system_exit(-1);
+  }
+
+  if (profile != NULL) {
+    name_buffer = ui_widget_realloc(
+      *(int *)((char *)widget + 0x3c), 0x100,
+      "c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c",
+      0xad6);
+    *(void **)((char *)widget + 0x3c) = name_buffer;
+
+    if (name_buffer != NULL) {
+      ustrncpy((wchar_t *)name_buffer, (wchar_t *)profile, 0x7f);
+      *(int16_t *)((char *)*(void **)((char *)widget + 0x3c) + 0xfe) = 0;
+    }
 
     return true;
   }

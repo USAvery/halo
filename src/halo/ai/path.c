@@ -10,7 +10,8 @@
  *         path_get_node (path node accessor with bounds assert),
  *         path_node_from_hash_table (path hash table lookup by key),
  *         path_3d_available (path ray-cast clearance check),
- *         FUN_0005ff70 (path traverse + debug snapshot).
+ *         FUN_0005ff70 (path traverse + debug snapshot),
+ *         FUN_00060070 (obstacle-disc bounds-checked accessor, path.h inline).
  * Deferred: path_state_build_path (0x5eae0) — complex path evaluation,
  * deferred.
  */
@@ -266,6 +267,107 @@ short path_heap_pop_cheapest_node(void *state)
   }
 
   return node_index;
+}
+
+/* 0x005e680 — path_heap_insert
+ * Inserts a new {node_index, quantized_cost_estimate} entry into the path
+ * state's binary min-heap at heap[heap_count] (the next free 1-indexed
+ * slot), then restores heap order via path_heap_bubble_up.
+ *
+ * Register-arg: state passed in EAX (moved to EDI at entry — same
+ * convention as the sibling heap functions above).
+ *
+ * Disassembly-confirmed assert (display_assert + system_exit(-1), at
+ * __FILE__ "c:\halo\SOURCE\ai\path.c"):
+ *   0x594 (1428): state->heap_count >= 1
+ *
+ * If state->heap_count has reached PATH_NODE_LIST_SIZE (0x400), the insert
+ * is dropped after logging via error(2, "path_heap_insert: overflowed
+ * static size heap") — a separate fall-through return path with no state
+ * mutation (no assert/halt), confirmed by the disassembly's second exit
+ * (`ADD ESP,8; POP EDI; POP EBP; RET`).
+ *
+ * Otherwise: stores heap_count+1 into state->heap_count, writes node_index
+ * and quantized_cost_estimate into heap[old heap_count], then calls
+ * path_heap_bubble_up(state, old_heap_count). path_heap_bubble_up takes
+ * `state` implicitly via EDI (relies on this function's EDI, never reloaded
+ * before the call — the same implicit-register-argument pattern documented
+ * for path_heap_bubble_down above) and `heap_index` via EAX (this
+ * function's EAX still holds the pre-increment heap_count at the call
+ * site: the only instruction that wrote EAX's low 16 bits since entry is
+ * `MOV AX,[EDI+0x11084]`, and nothing between that load and the call
+ * touches EAX again — confirmed by disassembly at 0x5e6b0..0x5e6e4).
+ */
+void path_heap_insert(void *state, short node_index,
+                      short quantized_cost_estimate)
+{
+  short heap_count;
+
+  if (!(*(short *)((char *)state + 0x11084) >= 1)) {
+    display_assert("state->heap_count >= 1", "c:\\halo\\SOURCE\\ai\\path.c",
+                   0x594, 1);
+    system_exit(-1);
+  }
+
+  heap_count = *(short *)((char *)state + 0x11084);
+
+  if (heap_count < PATH_NODE_LIST_SIZE) {
+    *(short *)((char *)state + 0x11084) = heap_count + 1;
+    *(short *)((char *)state + (int)heap_count * 4 + 0x11086) = node_index;
+    *(short *)((char *)state + (int)heap_count * 4 + 0x11088) =
+      quantized_cost_estimate;
+
+    path_heap_bubble_up(state, heap_count);
+  } else {
+    error(2, "path_heap_insert: overflowed static size heap");
+  }
+  return;
+}
+
+/* 0x005e700 — FUN_0005e700
+ * Tests whether a structure-bsp collision surface is breakable and still
+ * intact (not yet broken).
+ *
+ * Register-arg: structure_bsp passed in EAX (used directly at entry with
+ * no stack load — same register-arg convention as the sibling path-heap
+ * functions above; surface_index is the only stack argument, at [EBP+8]).
+ *
+ * Same tag_block chain as structure_test_ray2d (path_smoothing.c, 0x63710)
+ * and path_3d_available (0x5e830 below):
+ *   tag_block_get_element(structure_bsp + 0xb0, 0, 0x60) -> bsp element
+ *   tag_block_get_element(bsp + 0x3c, surface_index, 0xc) -> collision_surface
+ * The collision_surface flags byte at +8, bit 3, is
+ * _collision_surface_breakable_bit (named via the display_assert string in
+ * structure_test_ray2d). If clear, returns 0 immediately (disassembly: TEST
+ * CL,8; JE to the plain epilogue — no assert on this path, unlike
+ * structure_test_ray2d's fatal invariant check on the same bit). If set, the
+ * byte at +9 indexes breakable_surfaces_get_bsp_surface_data()'s dword bitmap
+ * the same way structure_test_ray2d does; returns 1 if that bit is clear
+ * (surface intact) and 0 if it is set (already broken).
+ *
+ * Disassembly-confirmed 0x5e700-0x5e75a (bounds-table exact): the trailing
+ * NEG EAX / SBB AL,AL / INC AL sequence is the compiler's 0/1 bool
+ * materialization for `(bitmap_word & mask) == 0`.
+ */
+char FUN_0005e700(void *structure_bsp, int surface_index)
+{
+  void *bsp_surfaces;
+  char *collision_surface;
+  unsigned int *breakable_bitmap;
+  unsigned int word;
+
+  bsp_surfaces = tag_block_get_element((char *)structure_bsp + 0xb0, 0, 0x60);
+  collision_surface = (char *)tag_block_get_element((char *)bsp_surfaces + 0x3c,
+                                                    surface_index, 0xc);
+
+  if ((collision_surface[8] & 8) == 0) {
+    return 0;
+  }
+
+  breakable_bitmap = (unsigned int *)breakable_surfaces_get_bsp_surface_data();
+  word = (unsigned char)collision_surface[9];
+
+  return (breakable_bitmap[word >> 5] & (1u << (word & 0x1f))) == 0;
 }
 
 /* 0x005e760 — path_get_node
@@ -738,8 +840,8 @@ char FUN_0005ff70(unsigned int *param_1)
     }
   }
   if (*(unsigned int *)((char *)param_1 + 0x48) != 0) {
-    qmemcpy((char *)(*(unsigned int *)((char *)param_1 + 0x48) + 0x14),
-            param_1, 0x1408c);
+    qmemcpy((char *)(*(unsigned int *)((char *)param_1 + 0x48) + 0x14), param_1,
+            0x1408c);
     uVar2 = global_structure_bsp_index_get();
     *(short *)(*(unsigned int *)((char *)param_1 + 0x48) + 0xe) = uVar2;
     if (*(short *)(*(unsigned int *)((char *)param_1 + 0x48) + 0x10) == 0) {
@@ -754,4 +856,410 @@ char FUN_0005ff70(unsigned int *param_1)
     }
   }
   return local_5;
+}
+
+/* 0x00060070 — obstacle-disc bounds-checked accessor (path.h inline function,
+ * instantiated standalone in path.obj; TU = c:\halo\source\ai\path.h).
+ *
+ * This is the SAME inline bounds check that FUN_00062410/FUN_00062020
+ * (src/halo/structures/structures.c) each duplicate at their own call sites
+ * — identical display_assert text, file string, and line number confirm it:
+ *   "disc_index>=0 && disc_index<obstacles->disc_count &&
+ *    obstacles->disc_count<=MAXIMUM_DISC_COUNT"
+ *   "c:\halo\source\ai\path.h", 0x18c
+ * Header record layout (same as those two): obstacles+0x2 = int16_t
+ * disc_count (valid range 0..MAXIMUM_DISC_COUNT==0x80); discs begin at
+ * obstacles+0x8 with a 24-byte (0x18) stride, so disc N is at
+ * obstacles+8+N*0x18.
+ *
+ * Disassembly-confirmed: cdecl, 2 stack args only (MOV EDI,[EBP+8];
+ * MOV SI,[EBP+0xc]; plain RET — no register args, no ADD ESP,N cleanup).
+ * Bounds violated -> display_assert + system_exit(-1), matching every other
+ * lifted call site of this same inline check.
+ *
+ * Returns &obstacles->disc[disc_index] (record pointer; record field types
+ * are not established at this call site — see FUN_00062410/FUN_00062020 for
+ * confirmed individual field offsets within the 24-byte record).
+ */
+void *FUN_00060070(void *obstacles, int16_t disc_index)
+{
+  char *base;
+  short disc_count;
+
+  base = (char *)obstacles;
+  disc_count = *(short *)(base + 2);
+  if (disc_index < 0 || disc_count <= disc_index || disc_count > 0x80) {
+    display_assert("disc_index>=0 && disc_index<obstacles->disc_count && "
+                   "obstacles->disc_count<=MAXIMUM_DISC_COUNT",
+                   "c:\\halo\\source\\ai\\path.h", 0x18c, 1);
+    system_exit(-1);
+  }
+  return base + 8 + disc_index * 0x18;
+}
+
+/* 0x000600f0 — obstacle-avoidance step bounds-checked accessor (inline
+ * function; instantiated standalone in path.obj, same pattern as
+ * FUN_00060070 above). __FILE__ in the assert string is
+ * "c:\halo\SOURCE\ai\path_obstacle_avoidance.c", line 0x28 (40) —
+ * confirmed by reading the two .rdata strings out of the pristine XBE at
+ * the reference disassembly's push operands (0x25e9b0 / 0x25ea14):
+ *   "step_index>=0 && step_index<path->step_count && "
+ *   "path->step_count<=MAXIMUM_OBSTACLE_AVOIDANCE_STEPS"
+ * This names the fields directly: path+0x2c = int16_t step_count (valid
+ * range 0..MAXIMUM_OBSTACLE_AVOIDANCE_STEPS==0x80), step records begin at
+ * path+0x30 with a 40-byte (0x28) stride, so step N is at
+ * path+0x30+N*0x28.
+ *
+ * Disassembly-confirmed (synthesized per-function reference,
+ * 000600f0-0006013b.obj): cdecl, 2 stack args only (MOV EDI,[EBP+8];
+ * MOV SI,[EBP+0xc]; plain RET — no register args, no ADD ESP,N cleanup).
+ * Bounds violated -> display_assert + system_exit(-1), matching every
+ * other lifted call site of this same inline check.
+ *
+ * Sole caller in this TU is FUN_00060910 (below), which calls this purely
+ * for its bounds-check side effect and discards the returned pointer.
+ *
+ * Returns &path->step[step_index] (record pointer; individual field
+ * offsets within the 40-byte record are not established at this call
+ * site).
+ */
+void *FUN_000600f0(void *path, int16_t step_index)
+{
+  char *base;
+  short step_count;
+
+  base = (char *)path;
+  step_count = *(short *)(base + 0x2c);
+  if (step_index < 0 || step_count <= step_index || step_count > 0x80) {
+    display_assert("step_index>=0 && step_index<path->step_count && "
+                   "path->step_count<=MAXIMUM_OBSTACLE_AVOIDANCE_STEPS",
+                   "c:\\halo\\SOURCE\\ai\\path_obstacle_avoidance.c", 0x28, 1);
+    system_exit(-1);
+  }
+  return base + 0x30 + step_index * 0x28;
+}
+
+/* 0x00060140 — path-obstacle-avoidance step-index heap accessor.
+ *
+ * Ghidra was unreachable for this attempt (cached artifact held only
+ * "Ghidra is not reachable at http://localhost:8089" for every field, and
+ * the live MCP connection failed this session too). Evidence below is read
+ * directly from the pristine XBE (halo-patched/cachebeta.xbe) with capstone,
+ * bounded 0x60140-0x6019d per the committed function_bounds.json entry.
+ *
+ * Disassembly-confirmed:
+ *   PUSH EBP; MOV EBP,ESP; PUSH ESI
+ *   MOV SI,[EBP+0xc]              ; heap_index (int16_t stack arg)
+ *   TEST SI,SI
+ *   PUSH EDI; MOV EDI,[EBP+8]     ; path pointer
+ *   JL 0x60163                    ; heap_index<0 -> assert
+ *   MOV AX,[EDI+0x1430]           ; path->heap_count
+ *   CMP SI,AX; JGE 0x60163        ; heap_index>=heap_count -> assert
+ *   CMP AX,0x80; JLE 0x6018f      ; heap_count<=0x80 -> ok
+ *   ; fail (fallthrough when heap_count>0x80, or from either JL/JGE above):
+ *   PUSH 1; PUSH 0x31; PUSH 0x25ea14; PUSH 0x25ea40; CALL display_assert
+ *   PUSH -1; CALL system_exit; ADD ESP,0x14
+ *   ; ok (0x6018f) and fail-fallthrough both compute the same read:
+ *   MOVSX EAX,SI; MOV AX,[EDI+EAX*2+0x1432]   ; path->heap[heap_index]
+ *   POP EDI; POP ESI; POP EBP; RET
+ *
+ * The two .rdata strings read directly out of the XBE at the pushed operands
+ * are "heap_index>=0 && heap_index<path->heap_count && path->heap_count<=
+ * MAXIMUM_OBSTACLE_AVOIDANCE_STEPS" (0x25ea40) and
+ * "c:\halo\SOURCE\ai\path_obstacle_avoidance.c" (0x25ea14), line 0x31 (49).
+ *
+ * path->heap_count at +0x1430 sits immediately after FUN_000600f0's
+ * MAXIMUM_OBSTACLE_AVOIDANCE_STEPS(0x80)-entry, 0x28-byte step array based at
+ * +0x30 (0x30+0x80*0x28==0x1430), and +0x1432 is confirmed by FUN_00060910
+ * (push) / FUN_00060970 (pop-front) elsewhere in this file as a int16_t
+ * count(+0x1430)/array(+0x1432, 0x80 entries) pair on the same struct — this
+ * function is the bounds-checked read accessor for that same heap array,
+ * each entry a step index into the step array above.
+ *
+ * Return width: int16_t (only AX is read/written on both the ok and fail
+ * paths; the sole caller below, FUN_00060200, only inspects SI of the
+ * result).
+ */
+int16_t FUN_00060140(void *path, int16_t heap_index)
+{
+  char *base;
+  short heap_count;
+
+  base = (char *)path;
+  heap_count = *(short *)(base + 0x1430);
+  if (heap_index < 0 || heap_count <= heap_index || heap_count > 0x80) {
+    display_assert("heap_index>=0 && heap_index<path->heap_count && "
+                   "path->heap_count<=MAXIMUM_OBSTACLE_AVOIDANCE_STEPS",
+                   "c:\\halo\\SOURCE\\ai\\path_obstacle_avoidance.c", 0x31, 1);
+    system_exit(-1);
+  }
+  return *(short *)(base + 0x1432 + (int)heap_index * 2);
+}
+
+/* 0x000601a0 — 0-based binary-heap parent-index helper.
+ *
+ * Ghidra was unreachable for this attempt (cached artifact held only
+ * "Ghidra is not reachable at http://localhost:8089" for every field, and
+ * the live MCP connection failed this session too). Evidence below is
+ * read directly from the pristine XBE (halo-patched/cachebeta.xbe) with
+ * the same capstone-disassembly method vc71_verify.py uses to build its
+ * reference (tools/verify/vc71_verify.py:_xbe_read / _true_end_offset),
+ * bounded 0x601a0-0x601d3 per the committed function_bounds.json entry.
+ *
+ * Disassembly (51 bytes, single basic block plus one assert-tail branch):
+ *   PUSH EBP; MOV EBP,ESP; PUSH ESI
+ *   MOV SI,[EBP+8]            ; heap_index (int16_t stack arg)
+ *   TEST SI,SI; JG 0x601ca    ; heap_index > 0 -> skip assert
+ *   PUSH 1; PUSH 0x39; PUSH 0x25ea14; PUSH 0x25eaa4
+ *   CALL 0x8d9f0              ; display_assert(reason, file, line, halt)
+ *   PUSH -1; CALL 0x8e2f0     ; system_exit(-1)
+ *   ADD ESP,0x14
+ * 0x601ca: MOVSX EAX,SI; DEC EAX; SAR EAX,1   ; (heap_index-1) >> 1
+ *   POP ESI; POP EBP; RET
+ *
+ * The two .rdata strings at 0x25eaa4/0x25ea14 (read from the XBE) are
+ * "heap_index>0" and "c:\halo\SOURCE\ai\path_obstacle_avoidance.c", line
+ * 0x39 (57) — a DIFFERENT original source file than this TU's own heap
+ * routines (path_heap_pop_cheapest_node / path_heap_insert above assert
+ * against "c:\halo\SOURCE\ai\path.c"), so this is a distinct, standalone
+ * 0-based heap used by path_obstacle_avoidance.c that happened to link
+ * into path.obj. display_assert/system_exit are both already in kb.json
+ * with plain stack-arg decls (no @<reg> callees here).
+ *
+ * A full .text scan for E8 CALLs targeting 0x601a0 across every code
+ * section of the pristine XBE found zero direct callers — this helper is
+ * either called only through a function-pointer/vtable slot not visible
+ * to a static relative-call scan, or is otherwise not reached in this
+ * build; no caller evidence constrains param/return width beyond the
+ * function's own body.
+ *
+ * The tail computes (heap_index-1)>>1, the standard 0-based binary-heap
+ * parent-index formula (valid only for heap_index>0, hence the assert —
+ * index 0 is the root and has no parent). Written as `>> 1`, NOT `/ 2`:
+ * the disassembly is DEC EAX; SAR EAX,1 with no CDQ/sign-adjustment
+ * sequence, which is what a plain signed `/2` would require to round
+ * toward zero for a possibly-negative dividend. A raw SAR with no
+ * adjustment is what MSVC emits for a literal `>> 1` in source, so the
+ * original expression must have used shift, not division (they only
+ * coincide here because the assert already guarantees a non-negative
+ * operand — irrelevant to which one the compiler actually emitted).
+ *
+ * Return width: kept int16_t to match this file's established convention
+ * for heap/step indices (FUN_00060970 above, FUN_000600f0's step_index).
+ * Not disassembly-provable either way — EAX is left with a full 32-bit
+ * result and never truncated before RET, and no caller was found to
+ * pin the declared width. The value itself is unaffected: heap_index>0
+ * is asserted, so (heap_index-1)>>1 always fits int16_t.
+ */
+int16_t FUN_000601a0(int16_t heap_index)
+{
+  if (heap_index <= 0) {
+    display_assert("heap_index>0",
+                   "c:\\halo\\SOURCE\\ai\\path_obstacle_avoidance.c", 0x39, 1);
+    system_exit(-1);
+  }
+  return (int16_t)((heap_index - 1) >> 1);
+}
+
+/* 0x000601f0 — 0-based binary-heap right-child-index helper.
+ *
+ * Ghidra was unreachable for this attempt (cached artifact held only
+ * "Ghidra is not reachable at http://localhost:8089" for every field, and
+ * the live MCP connection failed this session too). Evidence below is
+ * read directly from the pristine XBE (halo-patched/cachebeta.xbe) via
+ * tools/verify/xbe_reference.py (the same bytes vc71_verify.py's own
+ * reference derives from), bounded 0x601f0-0x601fb per the committed
+ * function_bounds.json entry (end 0x601fc).
+ *
+ * Full disassembly (12 bytes, single basic block, no calls):
+ *   PUSH EBP; MOV EBP,ESP
+ *   MOV EAX,[EBP+8]           ; heap_index
+ *   LEA EAX,[EAX+EAX*1+0x2]   ; eax = 2*heap_index + 2
+ *   POP EBP; RET
+ *
+ * The sibling function FUN_000601a0 immediately above computes the
+ * 0-based binary-heap PARENT index (heap_index-1)>>1. The immediately
+ * preceding address FUN_000601e0 (still unported) is byte-identical
+ * except for its LEA displacement (0x1 instead of 0x2):
+ * [EAX+EAX*1+0x1] = 2*heap_index+1. Together this is the standard 0-based
+ * binary-heap index triple (parent, left child, right child):
+ * FUN_000601e0 is left-child, FUN_000601f0 (this function) is right-child.
+ * Unlike the parent helper, no display_assert here — a child-index formula
+ * needs no index>0 guard.
+ *
+ * A full .text scan for E8 CALLs targeting 0x601f0 across every code
+ * section of the pristine XBE found zero direct callers, so no caller
+ * pins param/return width. Declared int16_t param/return to match this
+ * file's established convention for heap indices (FUN_000601a0 above) —
+ * EAX is left with the full 32-bit result and never truncated before RET,
+ * so this is a style choice consistent with the sibling, not
+ * disassembly-provable either way.
+ */
+int16_t FUN_000601f0(int16_t heap_index)
+{
+  return (int16_t)(heap_index * 2 + 2);
+}
+
+/* 0x00060200 — path-obstacle-avoidance step float-field accessor via heap
+ * indirection.
+ *
+ * Ghidra was unreachable for this attempt (cached artifact held only
+ * "Ghidra is not reachable at http://localhost:8089" for every field, and
+ * the live MCP connection failed this session too). Evidence below is read
+ * directly from the pristine XBE (halo-patched/cachebeta.xbe) with capstone,
+ * bounded 0x60200-0x60257 per the committed function_bounds.json entry
+ * (end 0x60258; the trailing bytes 0x60258-0x6025f are 8 NOP pad bytes
+ * before the next function at 0x60260, confirming the true end).
+ *
+ * Disassembly-confirmed:
+ *   PUSH EBP; MOV EBP,ESP
+ *   MOV EAX,[EBP+0xc]              ; param_2, full dword read
+ *   PUSH ESI; PUSH EDI
+ *   MOV EDI,[EBP+8]                ; path pointer
+ *   PUSH EAX; PUSH EDI; CALL FUN_00060140   ; step_index = path->heap[param_2]
+ *   ADD ESP,8
+ *   MOV ESI,EAX
+ *   TEST SI,SI; JL 0x6022b                  ; step_index<0 -> assert
+ *   MOV AX,[EDI+0x2c]                       ; path->step_count
+ *   CMP SI,AX; JGE 0x6022b                  ; step_index>=step_count -> assert
+ *   CMP AX,0x80; JLE 0x60248                ; step_count<=0x80 -> ok
+ *   ; fail (fallthrough when step_count>0x80, or from either JL/JGE above):
+ *   PUSH 1; PUSH 0x28; PUSH 0x25ea14; PUSH 0x25e9b0; CALL display_assert
+ *   PUSH -1; CALL system_exit; ADD ESP,0x14
+ *   ; ok (0x60248) and fail-fallthrough both compute the same FLD:
+ *   MOVSX EAX,SI; ADD EAX,2; LEA ECX,[EAX+EAX*4]; FLD dword ptr [EDI+ECX*8]
+ *   POP EDI; POP ESI; POP EBP; RET
+ *
+ * The assert reason string (0x25e9b0) read directly out of the XBE is
+ * byte-identical to FUN_000600f0's own assert text —
+ * "step_index>=0 && step_index<path->step_count && path->step_count<=
+ * MAXIMUM_OBSTACLE_AVOIDANCE_STEPS" — same file (0x25ea14) and same line
+ * 0x28 (40), confirming path->step_count lives at the same +0x2c offset on
+ * the same "path" struct FUN_000600f0 already established.
+ *
+ * EDI+(step_index+2)*40 == EDI+0x30+step_index*0x28+0x20 (0x30/0x28 are
+ * FUN_000600f0's confirmed step-array base/stride; 0x50==2*40 accounts for
+ * the "+2"): this reads a float at offset 0x20 within path->step[step_index]
+ * — the same step array/stride FUN_000600f0 indexes. The field itself is
+ * not independently named; no other lifted call site in this TU establishes
+ * what lives at step+0x20 beyond "a float".
+ *
+ * param_2 declared int16_t to match this file's established convention for
+ * heap/step indices (it is forwarded unmodified to FUN_00060140, whose own
+ * param is int16_t; the MOV EAX,[EBP+0xc] full-dword read is just the
+ * ordinary int16_t->int default-argument-promotion push, identical in
+ * shape whether the source type is short or int).
+ */
+float FUN_00060200(void *path, int16_t param_2)
+{
+  char *base;
+  short step_index;
+  short step_count;
+
+  base = (char *)path;
+  step_index = FUN_00060140(path, param_2);
+  step_count = *(short *)(base + 0x2c);
+  if (step_index < 0 || step_count <= step_index || step_count > 0x80) {
+    display_assert("step_index>=0 && step_index<path->step_count && "
+                   "path->step_count<=MAXIMUM_OBSTACLE_AVOIDANCE_STEPS",
+                   "c:\\halo\\SOURCE\\ai\\path_obstacle_avoidance.c", 0x28, 1);
+    system_exit(-1);
+  }
+  return *(float *)(base + ((int)step_index + 2) * 40);
+}
+
+/* 0x00060910 — bounded push onto a fixed-size 16-bit value list
+ * The owning structure's type is not established by this call site (it is
+ * NOT the giant path-state struct used elsewhere in this file — offset
+ * 0x1430 would fall in the middle of node_list[74] of that struct, which
+ * makes no sense for a standalone counter/array pair). Only the two touched
+ * offsets are confirmed by disassembly:
+ *   +0x1430: short count, valid range 0..0x80
+ *   +0x1432: array of up to 0x80 shorts, indexed by count
+ *
+ * Register-arg ABI (no stack params, confirmed by disassembly — MOV ESI,EAX
+ * at entry and the unpaired unaff_BX use both indicate this function's own
+ * incoming args arrive in registers, not on the stack):
+ *   param_1 (EAX) = pointer to the owning structure
+ *   value   (BX)  = 16-bit value to append
+ *
+ * Bracketed by FUN_00060330(tag) calls with two different literal .rdata
+ * addresses (0x25eb18 on entry, 0x25eb04 only on the success exit — NOT
+ * called on the full-list failure path; the JGE at 0x60930 branches straight
+ * to the return-0 tail without a second bracket call). FUN_000600f0(param_1,
+ * value) runs after the count increment is stored but before the value is
+ * written into the array; FUN_000604e0(old_count) runs right after the
+ * array write, passed the PRE-increment index (old_count), matching the
+ * cumulative-cleanup call chain at 0x6093d-0x6095a (ADD ESP,0x10 at 0x6095f
+ * cleans all 4 pushes from this chain in one shot; the call-site audit's
+ * per-call cleanup attribution is misleading here — cross-checked against
+ * disassembly).
+ *
+ * Returns 1 if the value was appended, 0 if the list was already full
+ * (count >= 0x80). Ghidra's decompile mis-typed this `void` — AL carries the
+ * real return value on both paths (MOV AL,0x1 / XOR AL,AL before RET).
+ */
+char FUN_00060910(void *param_1, int16_t value)
+{
+  short count;
+
+  FUN_00060330((void *)0x25eb18);
+  count = *(short *)((char *)param_1 + 0x1430);
+  if (count < 0x80) {
+    *(short *)((char *)param_1 + 0x1430) = count + 1;
+    FUN_000600f0(param_1, value);
+    *(short *)((char *)param_1 + 0x1432 + count * 2) = value;
+    FUN_000604e0(count);
+    FUN_00060330((void *)0x25eb04);
+    return 1;
+  }
+  return 0;
+}
+
+/* 0x00060970 — pop-front (swap-with-last) from the same fixed-size 16-bit
+ * value list FUN_00060910 pushes onto (see that function's comment for the
+ * +0x1430 count / +0x1432 array[0x80] layout; owning struct type still not
+ * established).
+ *
+ * Register-arg ABI (no stack params, confirmed by disassembly — MOV ESI,EAX
+ * at entry, no other incoming register use):
+ *   param_1 (EAX) = pointer to the owning structure
+ *
+ * Bracketed by FUN_00060330(tag) calls with two different literal .rdata
+ * addresses, same pattern as FUN_00060910: 0x25eb40 fires unconditionally on
+ * entry; 0x25eb2c only fires on the non-empty exit (the JLE at 0x6098c goes
+ * straight to the empty-return tail without it). FUN_00060670(0) runs right
+ * after array[0] is overwritten with the swapped-in last element, before the
+ * second bracket call — ADD ESP,0x8 at 0x609c3 cleans both this call's PUSH 0
+ * (0x609a9) and the FUN_00060330 call's PUSH 0x25eb2c (0x609b7) in one shot;
+ * FUN_00060670's own kb.json decl was `void FUN_00060670(void)` (0 args) —
+ * wrong, corrected to `void FUN_00060670(int param_1)` to match this pushed
+ * constant (has_reg_args confirmed false for this callee by the call-site
+ * audit, so EAX's live value at the call is not consumed).
+ *
+ * Removes the front element (array[0]) by copying the current last element
+ * into its slot and decrementing count (order not preserved), returning the
+ * ORIGINAL front element. Returns -1 (0xffff) if the list was already empty
+ * — Ghidra mis-typed this `void`; MOV AX,DI / OR AX,0xffff before RET carry
+ * the real int16_t return value on both paths.
+ */
+int16_t FUN_00060970(void *param_1)
+{
+  short count;
+  short front;
+  short last;
+
+  FUN_00060330((void *)0x25eb40);
+  count = *(short *)((char *)param_1 + 0x1430);
+  if (0 < count) {
+    count = count - 1;
+    *(short *)((char *)param_1 + 0x1430) = count;
+    last = *(short *)((char *)param_1 + 0x1432 + count * 2);
+    front = *(short *)((char *)param_1 + 0x1432);
+    *(short *)((char *)param_1 + 0x1432) = last;
+    FUN_00060670(0);
+    FUN_00060330((void *)0x25eb2c);
+    return front;
+  }
+  return (int16_t)-1;
 }

@@ -29,6 +29,10 @@
       "kind": "function",
       "status": "ported"
     },
+    "0x12660": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0x128c0": {
       "kind": "function",
       "status": "ported"
@@ -2329,7 +2333,15 @@
       "kind": "function",
       "status": "ported"
     },
+    "0x5e150": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0x5e560": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x5e680": {
       "kind": "function",
       "status": "ported"
     },
@@ -8609,6 +8621,10 @@
       "kind": "function",
       "status": "ported"
     },
+    "0xcab80": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0xcaba0": {
       "kind": "function",
       "status": "ported"
@@ -8861,6 +8877,10 @@
       "status": "ported"
     },
     "0xce840": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0xce8c0": {
       "kind": "function",
       "status": "ported"
     },
@@ -10090,6 +10110,10 @@
       "status": "ported"
     },
     "0xece10": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0xeea10": {
       "kind": "function",
       "status": "ported"
     },
@@ -17173,6 +17197,10 @@
       "kind": "function",
       "status": "ported"
     },
+    "0x1b5680": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0x1b5770": {
       "kind": "function",
       "status": "ported"
@@ -17688,6 +17716,22 @@
       "kind": "function",
       "status": "ported"
     },
+    "0x1c0450": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x1c0570": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x1c0600": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x1c0680": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0x1c0910": {
       "kind": "function",
       "status": "ported"
@@ -17697,6 +17741,18 @@
       "status": "ported"
     },
     "0x1c0da0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x1c1290": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x1c1340": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x1c18f0": {
       "kind": "function",
       "status": "ported"
     },
@@ -17979,6 +18035,10 @@
       "status": "ported"
     },
     "0x1c7e70": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x1c7f80": {
       "kind": "function",
       "status": "ported"
     },

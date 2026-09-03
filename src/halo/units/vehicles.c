@@ -101,6 +101,39 @@ void FUN_001b5610(int vehicle_handle, uint8_t param_2)
   }
 }
 
+/* vehicle_is_flipped (0x1b5680) — reports whether a vehicle has rolled onto
+ * its side or back, based on the float at object+0x38.
+ *
+ * Confirmed: MOV EAX,[EBP+0x8]; PUSH 0x2; PUSH EAX ->
+ * object_get_and_verify_type(vehicle_handle, 2) (type mask 2 = vehicle, the
+ * same mask vehicle_hover/vehicle_reset/FUN_001b56b0 use). kb.json's prior
+ * "void vehicle_is_flipped(void)" decl was wrong: the function takes one
+ * cdecl dword argument (the vehicle handle) and returns a bool in EAX.
+ * Confirmed: FLD [EAX+0x38]; FCOMP [0x2549d4] (pooled constant, confirmed
+ * 0.2f elsewhere -- see units.c:1768) -> compares the float at vehicle+0x38
+ * against 0.2f.
+ * Confirmed: FNSTSW AX; TEST AH,0x5; JP -> the parity trick for an x87
+ * "less than" test. Per FCOM condition codes, ST0<src sets C0=1/C2=0 (AH&5 =
+ * 1, odd parity, PF=0, JP NOT taken); ST0==src, ST0>src, and unordered all
+ * set AH&5 to an even-parity value (PF=1, JP taken). So EAX=1 (JP not taken,
+ * falls to MOV EAX,1) only when the field is strictly less than 0.2f; EAX=0
+ * (JP taken, XOR EAX,EAX) for >=, ==, or NaN.
+ * Inferred: +0x38 is the Z component of the vector3 at object+0x30 (types.h
+ * unk_48, offset/meaning unproven); a small Z reading "flipped" when
+ * < 0.2f is consistent with an up-vector upright test, but the vector's
+ * identity is not proven here, so it is left as a raw offset rather than a
+ * struct field.
+ */
+bool vehicle_is_flipped(int vehicle_handle)
+{
+  int result;
+  void *vehicle;
+
+  vehicle = object_get_and_verify_type(vehicle_handle, 2);
+  result = *(float *)((char *)vehicle + 0x38) < *(float *)0x2549d4;
+  return (bool)result;
+}
+
 /* FUN_001b56b0 (0x1b56b0) — per-tick contact bookkeeping for a vehicle,
  * driven by the caller's mass-point state array (passed in EDI).
  *

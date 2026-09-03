@@ -1,3 +1,32 @@
+/* FUN_001ac030 (0x1ac030)
+ *
+ * Sets or clears bit 0x10000 of the flags dword at (unit-type object)+0x1b4.
+ * Bit meaning is UNKNOWN -- no assert/string evidence names it; kept as
+ * FUN_ per naming-confidence rules. No-op when param_1 == -1 (skips both
+ * the object lookup and the flag update).
+ *
+ * Sole caller FUN_000bf1e0 (players.c, HaloScript builtin dispatcher)
+ * passes (record[0], zero-extended byte at record+4) and discards the
+ * (void) return. */
+void FUN_001ac030(int param_1, int param_2)
+{
+  char *obj;
+  uint32_t flags;
+
+  if (param_1 != -1) {
+    obj = (char *)object_get_and_verify_type(param_1, 3);
+    flags = *(uint32_t *)(obj + 0x1b4);
+
+    if (param_2 == 0) {
+      flags |= 0x10000;
+    } else {
+      flags &= ~0x10000u;
+    }
+
+    *(uint32_t *)(obj + 0x1b4) = flags;
+  }
+}
+
 /* sound_object_apply_pitch_delta (0x1ac2f0)
  *
  * Computes a clamped pitch delta and accumulates it onto the object's
@@ -68,7 +97,8 @@ void sound_cache_sound_finished(int permutation_ptr)
  * noinline: the original is a real out-of-line call from sound_update_music
  * (direct CALL 0x1c7b00 at 0x1cf0d3).  Without this the optimizer inlines the
  * body into that caller and the call shape diverges. */
-__declspec(noinline) void sound_pitch_push_sample(int object_handle, float pitch)
+__declspec(noinline) void sound_pitch_push_sample(int object_handle,
+                                                  float pitch)
 {
   if (*(uint8_t *)(*(int *)0x5054e4 + 0x24) != 0) {
     if (object_try_and_get_and_verify_type(object_handle, 3) != 0) {
@@ -104,7 +134,8 @@ float sound_get_default_priority(int sound_tag_index)
   float priority = *(float *)((char *)sound_tag + 0xc);
 
   if (priority == *(float *)0x2533c0) {
-    void *class_def = sound_class_get_definition(*(short *)((char *)sound_tag + 0x4));
+    void *class_def =
+      sound_class_get_definition(*(short *)((char *)sound_tag + 0x4));
     return *(float *)((char *)class_def + 0x1c);
   }
 
@@ -122,7 +153,8 @@ float sound_class_get_min_distance(int sound_tag_index)
   float min_distance = *(float *)((char *)sound_tag + 0x8);
 
   if (min_distance == *(float *)0x2533c0) {
-    void *class_def = sound_class_get_definition(*(short *)((char *)sound_tag + 0x4));
+    void *class_def =
+      sound_class_get_definition(*(short *)((char *)sound_tag + 0x4));
     return *(float *)((char *)class_def + 0x18);
   }
 
@@ -1083,12 +1115,12 @@ void sound_stop_channel(int sound_handle /* @<ebx> */)
     *(short *)(sound_entry + 0x8c) = -1;
   } else if ((*(uint8_t *)(sound_entry + 0x4) & 2) != 0) {
     /* No active channel -- release cache sound if flags bit 1 set. */
-    sound_cache_sound_finished(
-      (int)tag_block_get_element(
-        (char *)tag_block_get_element(
-          (char *)tag_get(0x736e6421, *(int *)(sound_entry + 0x8)) + 0x98,
-          (int)*(short *)(sound_entry + 0x8e), 0x48) + 0x3c,
-        (int)*(short *)(sound_entry + 0x90), 0x7c));
+    sound_cache_sound_finished((int)tag_block_get_element(
+      (char *)tag_block_get_element(
+        (char *)tag_get(0x736e6421, *(int *)(sound_entry + 0x8)) + 0x98,
+        (int)*(short *)(sound_entry + 0x8e), 0x48) +
+        0x3c,
+      (int)*(short *)(sound_entry + 0x90), 0x7c));
   }
 
   /* If this is a looping sound (type != 0), update the looping-sound entry. */
@@ -1393,7 +1425,7 @@ void sound_start_next_looping_permutation(int sound_handle /* @<eax> */)
 
   pitch_range_index =
     sound_select_pitch_range(sound_tag, *(float *)(sound_entry + 0x88),
-                             (uint16_t)*(short *)(sound_entry + 0x8e));
+                             (uint16_t) * (short *)(sound_entry + 0x8e));
   *(short *)(sound_entry + 0x8e) = pitch_range_index;
 
   *(short *)(sound_entry + 0x90) =
@@ -1623,7 +1655,8 @@ int sound_create_looping_entry(int sound_tag_handle /* @<eax> */,
     tag_block_get_element(
       (char *)tag_block_get_element(
         (char *)tag_get(0x736e6421, *(int *)(sound_entry + 0x8)) + 0x98,
-        (int)*(short *)(sound_entry + 0x8e), 0x48) + 0x3c,
+        (int)*(short *)(sound_entry + 0x8e), 0x48) +
+        0x3c,
       (int)permutation_index, 0x7c),
     0, 1, 0);
 
@@ -2015,12 +2048,15 @@ int sound_start(int sound_tag_index, void *source, int object_handle,
         float skip_min = *(float *)((char *)sound_tag + 0x3c);
         float skip_max = *(float *)((char *)sound_tag + 0x54);
         float max_dist = *(float *)((char *)sound_tag + 0x10);
-        if (((skip_max - skip_min) * source_scale + skip_min) * max_dist < random_val) {
+        if (((skip_max - skip_min) * source_scale + skip_min) * max_dist <
+            random_val) {
           float priority = sound_get_default_priority(sound_tag_index);
           if (*(int *)((char *)sound_tag + 0x98) > 0) {
-            void *pr0 = tag_block_get_element((char *)sound_tag + 0x98, 0, 0x48);
+            void *pr0 =
+              tag_block_get_element((char *)sound_tag + 0x98, 0, 0x48);
             if (*(int *)((char *)pr0 + 0x3c) > 0) {
-              void *cls = sound_class_get_definition(*(short *)((char *)sound_tag + 4));
+              void *cls =
+                sound_class_get_definition(*(short *)((char *)sound_tag + 4));
               if (*(char *)((char *)cls + 0x28) == '\0') {
                 channel_index = sound_allocate_channel(source, priority);
                 if (channel_index != -1) {
@@ -2039,7 +2075,8 @@ int sound_start(int sound_tag_index, void *source, int object_handle,
                   /* Allocate a new sound datum. */
                   result = data_new_at_index(*(data_t **)0x4fdba4);
                   if (result != -1) {
-                    sound_entry = (char *)datum_get(*(data_t **)0x4fdba4, result);
+                    sound_entry =
+                      (char *)datum_get(*(data_t **)0x4fdba4, result);
 
                     /* 0x1ccca0: compute distance (EAX = channel_index,
                      * EDI = source). Returns float distance in ST(0). Then
@@ -2057,12 +2094,12 @@ int sound_start(int sound_tag_index, void *source, int object_handle,
 
                     /* Compute random scale for this sound instance. */
                     {
-                      float rscale =
-                        sound_compute_random_scale(*(float *)((char *)sound_tag + 0x14),
-                                                   *(float *)((char *)sound_tag + 0x18),
-                                                   *(float *)((char *)sound_tag + 0x44),
-                                                   *(float *)((char *)sound_tag + 0x5c),
-                                                   *(float *)((char *)source + 4));
+                      float rscale = sound_compute_random_scale(
+                        *(float *)((char *)sound_tag + 0x14),
+                        *(float *)((char *)sound_tag + 0x18),
+                        *(float *)((char *)sound_tag + 0x44),
+                        *(float *)((char *)sound_tag + 0x5c),
+                        *(float *)((char *)source + 4));
                       *(float *)(sound_entry + 0x88) = rscale;
                     }
 
@@ -2076,9 +2113,9 @@ int sound_start(int sound_tag_index, void *source, int object_handle,
                     *(int *)(sound_entry + 0x10) = track_data;
                     if (track_data != 0) {
                       if (sound_entry + 0x54 == 0) {
-                        display_assert("sound->track_data",
-                                       "c:\\halo\\SOURCE\\sound\\sound_manager.c", 0x28e,
-                                       1);
+                        display_assert(
+                          "sound->track_data",
+                          "c:\\halo\\SOURCE\\sound\\sound_manager.c", 0x28e, 1);
                         system_exit(-1);
                       }
                       csmemcpy(sound_entry + 0x54, track_data_ptr,
@@ -2090,8 +2127,8 @@ int sound_start(int sound_tag_index, void *source, int object_handle,
                       sound_tag, *(float *)(sound_entry + 0x88), -1);
                     *(short *)(sound_entry + 0x8e) = pitch_range_index;
 
-                    permutation_index =
-                      sound_select_permutation(sound_tag, pitch_range_index, -1);
+                    permutation_index = sound_select_permutation(
+                      sound_tag, pitch_range_index, -1);
                     *(short *)(sound_entry + 0x90) = permutation_index;
 
                     *(int *)(sound_entry + 0xa8) = 0;
@@ -2103,8 +2140,11 @@ int sound_start(int sound_tag_index, void *source, int object_handle,
                     sound_cache_request_sound(
                       tag_block_get_element(
                         (char *)tag_block_get_element(
-                          (char *)tag_get(0x736e6421, *(int *)(sound_entry + 0x8)) + 0x98,
-                          (int)pitch_range_index, 0x48) + 0x3c,
+                          (char *)tag_get(0x736e6421,
+                                          *(int *)(sound_entry + 0x8)) +
+                            0x98,
+                          (int)pitch_range_index, 0x48) +
+                          0x3c,
                         (int)permutation_index, 0x7c),
                       0, 1, 0);
 
@@ -2112,8 +2152,10 @@ int sound_start(int sound_tag_index, void *source, int object_handle,
                      * amount relative to current timestamp, and set bit 0 of
                      * flags. */
                     if (ftol_result > 250) {
-                      *(uint8_t *)(sound_entry + 4) = *(uint8_t *)(sound_entry + 4) | 1;
-                      *(int *)(sound_entry + 0x84) = *(int *)0x4eaf4c + ftol_result;
+                      *(uint8_t *)(sound_entry + 4) =
+                        *(uint8_t *)(sound_entry + 4) | 1;
+                      *(int *)(sound_entry + 0x84) =
+                        *(int *)0x4eaf4c + ftol_result;
                       return result;
                     }
                     *(int *)(sound_entry + 0x84) = *(int *)0x4eaf4c;
@@ -2237,27 +2279,26 @@ void sound_update_music(void)
         }
 
         matrix = listener + 4;
-        real_matrix3x3_transform_point(
-          matrix, (float *)(sound_entry + 0x20), location.position);
-        real_matrix4x3_transform_point(
-          matrix, sound_entry + 0x2c, location.forward);
+        real_matrix3x3_transform_point(matrix, (float *)(sound_entry + 0x20),
+                                       location.position);
+        real_matrix4x3_transform_point(matrix, sound_entry + 0x2c,
+                                       location.forward);
         real_matrix3x3_transform_vector(
           matrix, (vector3_t *)(sound_entry + 0x38), (vector3_t *)location.up);
 
-        location.up[0] =
-          location.up[0] * 30.0f - *(float *)(listener + 0x38);
-        location.up[1] =
-          location.up[1] * 30.0f - *(float *)(listener + 0x3c);
-        location.up[2] =
-          location.up[2] * 30.0f - *(float *)(listener + 0x40);
+        location.up[0] = location.up[0] * 30.0f - *(float *)(listener + 0x38);
+        location.up[1] = location.up[1] * 30.0f - *(float *)(listener + 0x3c);
+        location.up[2] = location.up[2] * 30.0f - *(float *)(listener + 0x40);
 
-        (*(void (**)(int, int, void *, int, int, int))(*(int *)0x4eaf48 + 0x30))(
+        (*(void (**)(int, int, void *, int, int, int))(*(int *)0x4eaf48 +
+                                                       0x30))(
           (int)i, 1, location.position, *(int *)(sound_entry + 0x4c),
           *(int *)(sound_entry + 0x50), (int)*(uint8_t *)(listener + 1));
         break;
       case 2:
-        (*(void (**)(int, int, void *, int, int, int))(*(int *)0x4eaf48 + 0x30))(
-          (int)i, 1, (void *)(sound_entry + 0x20), 0, 0, 0);
+        (*(void (**)(int, int, void *, int, int, int))(
+          *(int *)0x4eaf48 + 0x30))((int)i, 1, (void *)(sound_entry + 0x20), 0,
+                                    0, 0);
         break;
       default:
         display_assert(0, "c:\\halo\\SOURCE\\sound\\sound_manager.c", 0x7ec, 1);
@@ -2280,8 +2321,8 @@ void sound_update_music(void)
                          "c:\\halo\\SOURCE\\sound\\sound_manager.c", 0x7fa, 1);
           system_exit(-1);
         }
-        real_matrix3x3_transform_point(
-          listener + 4, (float *)(sound_entry + 0x20), pos);
+        real_matrix3x3_transform_point(listener + 4,
+                                       (float *)(sound_entry + 0x20), pos);
         break;
       case 2:
         break;
@@ -2292,9 +2333,12 @@ void sound_update_music(void)
       }
 
       if (mode != 0) {
-        float min_dist = sound_class_get_min_distance(*(int *)(sound_entry + 0x8));
-        float max_dist = sound_get_default_priority(*(int *)(sound_entry + 0x8));
-        float dist = xbox_sqrtf(pos[0] * pos[0] + pos[1] * pos[1] + pos[2] * pos[2]);
+        float min_dist =
+          sound_class_get_min_distance(*(int *)(sound_entry + 0x8));
+        float max_dist =
+          sound_get_default_priority(*(int *)(sound_entry + 0x8));
+        float dist =
+          xbox_sqrtf(pos[0] * pos[0] + pos[1] * pos[1] + pos[2] * pos[2]);
         float falloff = 1.0f - (dist - min_dist) / (max_dist - min_dist);
         if (falloff < 0.0f)
           falloff = 0.0f;
@@ -2311,7 +2355,8 @@ void sound_update_music(void)
     }
 
     {
-      void *class_def = sound_class_get_definition(*(short *)((char *)tag_ptr + 4));
+      void *class_def =
+        sound_class_get_definition(*(short *)((char *)tag_ptr + 4));
       /* Compare against the SYMBOL, not the literal 0x1c7a10.  The only
        * store site (object_impulse_sound_new, 0x1c7f48) is ported, so the
        * stored callback is our impl's address, never the original VA; a
@@ -2319,7 +2364,8 @@ void sound_update_music(void)
       if (*(char *)((char *)class_def + 8) != '\0' &&
           *(void **)(sound_entry + 0x10) == (void *)&FUN_001c7a10) {
         float sample = sound_get_permutation_pitch(
-          *(int *)((char *)channel + 0x10), (short)(int)*(float *)((char *)channel + 8));
+          *(int *)((char *)channel + 0x10),
+          (short)(int)*(float *)((char *)channel + 8));
         sound_pitch_push_sample(*(int *)(sound_entry + 0xc), sample);
       }
     }
@@ -2375,7 +2421,8 @@ void sound_dispose_from_old_map(void)
       /* Compute deadline: start_ms + 300.0f ms (constant at 0x2c1a60). */
       fade_end_ms = (float)start_ms + 300.0f;
 
-      /* Spin until current time >= fade_end_ms, pumping sound each iteration. */
+      /* Spin until current time >= fade_end_ms, pumping sound each iteration.
+       */
       while ((float)system_milliseconds() < fade_end_ms) {
         sound_idle();
       }

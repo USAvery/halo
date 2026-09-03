@@ -80,6 +80,7 @@ double __cdecl fabs(double);
   ((x) < (low) ? (low) : ((x) > (high) ? (high) : (x)))
 
 #define MAXIMUM_GAMEPADS 4
+#define NUMBER_OF_GAMEPAD_BUTTONS 0x10
 #define MAXIMUM_NUMBER_OF_LOCAL_PLAYERS 4
 #define MAXIMUM_STRING_SIZE            0x2000
 #define MAXIMUM_MEMSET_SIZE            0x10000000
