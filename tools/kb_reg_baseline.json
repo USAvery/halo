@@ -9996,5 +9996,7 @@
     "0x169650": "int __stdcall FUN_00169650(void *device, uint32_t reg@<edx>, float a, float b);",
     "0x1696d0": "void FUN_001696d0(int param_1, float *bounds@<esi>);",
     "0x169200": "bool FUN_00169200(float *point, float radius, float *out_extent, float *out_screen @<ebx>);"
-  }
+  },
+  "0x57330": "short FUN_00057330(int16_t scenario_index@<eax>, void *record@<esi>, int field_1a8_val, int child_handle, int reserved);",
+  "0x1631d0": "void FUN_001631d0(void);"
 }
