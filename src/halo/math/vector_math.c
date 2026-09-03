@@ -99,6 +99,134 @@ float FUN_000121e0(float min, float max)
   return random_real_range(seed, min, max);
 }
 
+/* action_alert_perform (0x12660)
+ * One tick of the alert action: (1) if the actor has an alert command list
+ * and no command in flight, optionally retire the arrival check and pick the
+ * next position; (2) if the actor is timesliced, awake and holding a command
+ * index, look the command up in the scenario squad's command block, copy it
+ * into the actor state and hand it to the move-position selector.
+ *
+ * Confirmed: cdecl, one stack arg at [EBP+0x8] kept in ESI (0x1266b) and
+ *   re-read at 0x1286b; the kb decl was `(void)`.
+ * Confirmed: XOR AL,AL at 0x128ad on the single epilogue — byte return,
+ *   always false (the 0x12881 JNZ early exit lands on the same XOR).
+ * Confirmed: PUSH ESI / PUSH EAX(=[0x6325a4]) / CALL 0x119320 -> datum_get;
+ *   result kept in EBX. EDI holds the -1 sentinel (OR EDI,0xffffffff).
+ * Confirmed guards: CMP word [EBX+0x9c],0 / JZ; CMP word [EBX+0xa4],DI / JNZ.
+ * Confirmed: MOV AL,[EBX+6] -> display_assert("!actor->meta.swarm",
+ *   "c:\halo\SOURCE\ai\action_alert.c", 0x47, 1) then PUSH EDI(-1) /
+ *   CALL system_exit (noreturn); the second copy at 0x127a8 uses line 0x78.
+ * Confirmed: PUSH ECX(EBX+0xa8) / PUSH EDX(EBX+0x12c) / CALL 0x121a0 ->
+ *   distance_squared3d(actor+0x12c, actor+0xa8); FSTP [EBP-4] holds it while
+ *   PUSH ESI / CALL 0x3bd50 -> actor_destination_tolerance(actor_handle).
+ *   ADD ESP,0xc cleans both (2 + 1 dword args).
+ * Confirmed: FCOM [0x253398] / FNSTSW / TEST AH,0x41 / JZ skips the reload,
+ *   so tolerance <= *(float *)0x253398 clamps up to that constant; then
+ *   FLD ST0 / FMUL ST1 (tolerance squared) / FLD [EBP-4] / FCOMPP /
+ *   TEST AH,0x41 / JZ 0x12770 — leave when dist2 > tolerance*tolerance.
+ * Confirmed: CMP word [EBX+0x9e],0 / JG and MOV AL,[EBX+0xa6] / TEST / JNZ
+ *   gate the next-position pick; object_get_and_verify_type([EBX+0x18], 3)
+ *   then CMP byte [EAX+0x253],0x1c / JZ skips it too.
+ * Confirmed action_alert_next_position pushes (last-to-first, 0x1275d..
+ *   0x12760): EBX+0xa0, MOVZX word [EBX+0xa2], MOVZX word [EBX+0x9c],
+ *   actor_handle; ADD ESP,0x10 (4 dword args, cdecl) and MOV word
+ *   [EBX+0xa4],AX — 16-bit return.  Its kb decl was `void (void)`.
+ * Confirmed: PUSH 0xb0 / PUSH (EAX & 0xffff) / global_scenario_get() + 0x42c
+ *   / tag_block_get_element, then +0x80 with MOVSX [EBX+0x3a] and 0xe8;
+ *   ADD ESP,0x18 cleans both 3-arg calls.
+ * Confirmed: TEST CX,CX / JL and CMP ECX,[EAX+0xc4] / JGE bound the command
+ *   index against the block count at squad+0xc4; the element block base is
+ *   squad+0xc4 with element size 0x50.
+ * Confirmed: MOV EDX,[ESI+0x18] / MOV EAX,[ESI+0x14] / PUSH EDX / PUSH EAX /
+ *   CALL 0x121e0 -> FUN_000121e0(command[5], command[6]) — raw dword pushes
+ *   of two float fields; FMUL [0x253394] (TICKS_PER_SECOND) follows, and the
+ *   product stays on the x87 stack across the copy until CALL _ftol2
+ *   (0x1d9068) whose AX is stored 16-bit to [EBX+0x9e].
+ * Confirmed: MOVSD.REP with ECX=0x14, EDI=EBX+0xa8, ESI=command — an inline
+ *   0x50-byte copy of the command element into the actor state.
+ * Confirmed: MOV byte [EBX+0xa6],1 then PUSH EDX(MOVZX word [EBX+0xa2]) /
+ *   PUSH EAX([EBP+8]) / CALL 0x2d850 -> actor_move_to_move_position;
+ *   TEST AL,AL / JNZ 0x128ab returns without the reset block.
+ * Unknown: field meanings at 0x9c/0x9e/0xa0/0xa2/0xa4/0xa6/0xa8 and the
+ *   0x1c object-state constant — no string evidence in this function. */
+bool action_alert_perform(int actor_handle)
+{
+  char *actor;
+  void *unit;
+  void *encounter;
+  void *squad;
+  int *command;
+  float dist2;
+  float tolerance;
+  float ticks;
+  short current;
+
+  actor = (char *)datum_get(*(data_t **)0x6325a4, actor_handle);
+  if (*(short *)(actor + 0x9c) != 0 && *(short *)(actor + 0xa4) == -1) {
+    if (*(char *)(actor + 6) != '\0') {
+      display_assert("!actor->meta.swarm",
+                     "c:\\halo\\SOURCE\\ai\\action_alert.c", 0x47, 1);
+      system_exit(-1);
+    }
+    if (*(short *)(actor + 0xa2) != -1 && FUN_0002a3d0(actor_handle) != '\0') {
+      dist2 = distance_squared3d((const float *)(actor + 0x12c),
+                                 (const float *)(actor + 0xa8));
+      tolerance = actor_destination_tolerance(actor_handle);
+      if (tolerance <= *(float *)0x253398) {
+        tolerance = *(float *)0x253398;
+      }
+      if (tolerance * tolerance < dist2) {
+        goto update_command;
+      }
+    }
+    if (*(short *)(actor + 0x9e) <= 0 && *(char *)(actor + 0xa6) == '\0') {
+      unit = object_get_and_verify_type(*(int *)(actor + 0x18), 3);
+      if (*(char *)((char *)unit + 0x253) != 0x1c) {
+        *(short *)(actor + 0xa4) = action_alert_next_position(
+          actor_handle, *(unsigned short *)(actor + 0x9c),
+          *(unsigned short *)(actor + 0xa2), actor + 0xa0);
+      }
+    }
+  }
+
+update_command:
+  if (*(char *)(actor + 0x4c) != '\0' && *(char *)(actor + 0x13) == '\0' &&
+      *(short *)(actor + 0xa4) != -1) {
+    if (*(char *)(actor + 6) != '\0') {
+      display_assert("!actor->meta.swarm",
+                     "c:\\halo\\SOURCE\\ai\\action_alert.c", 0x78, 1);
+      system_exit(-1);
+    }
+    if (*(int *)(actor + 0x34) != -1) {
+      encounter = tag_block_get_element((char *)global_scenario_get() + 0x42c,
+                                        *(int *)(actor + 0x34) & 0xffff, 0xb0);
+      squad = tag_block_get_element((char *)encounter + 0x80,
+                                    *(short *)(actor + 0x3a), 0xe8);
+      current = *(short *)(actor + 0xa4);
+      if (current >= 0 && (int)current < *(int *)((char *)squad + 0xc4)) {
+        command = (int *)tag_block_get_element((char *)squad + 0xc4,
+                                               (int)current, 0x50);
+        ticks = FUN_000121e0(*(float *)(command + 5), *(float *)(command + 6)) *
+                TICKS_PER_SECOND;
+        *(short *)(actor + 0xa2) = *(short *)(actor + 0xa4);
+        *(short *)(actor + 0xa4) = -1;
+        qmemcpy(actor + 0xa8, command, 0x50);
+        *(short *)(actor + 0x9e) = (short)(int)ticks;
+        *(char *)(actor + 0xa6) = 1;
+        if (actor_move_to_move_position(
+              actor_handle, *(unsigned short *)(actor + 0xa2)) != '\0') {
+          return 0;
+        }
+      }
+    }
+    *(short *)(actor + 0xa2) = *(short *)(actor + 0xa4);
+    *(short *)(actor + 0xa4) = -1;
+    *(short *)(actor + 0x9e) = 0;
+    *(char *)(actor + 0xa6) = 0;
+  }
+  return 0;
+}
+
 /* action_avoid_setup (0x128c0)
  * Initialize action avoid state: asserts non-null state pointer, zeroes 4
  * bytes, returns true.

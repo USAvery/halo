@@ -21564,11 +21564,12 @@
     },
     {
      "addr": "0x12350",
-     "decl": "void action_alert_next_position(void);"
+     "decl": "short action_alert_next_position(int actor_handle, int param_2, int param_3, void *param_4);"
     },
     {
      "addr": "0x12660",
-     "decl": "void action_alert_perform(void);"
+     "decl": "bool action_alert_perform(int actor_handle);",
+     "ported": true
     },
     {
      "addr": "0x128c0",
