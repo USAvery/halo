@@ -62941,16 +62941,16 @@
     "game_time_update": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 72.3,
+      "abi_modeled_mnemonic_pct": 90.8,
       "addr": "0xb6020",
       "end": "0xb636e",
       "kind": "auto",
       "n_r": 272,
-      "opnd_percent": 57.6,
-      "raw_mnemonic_pct": 72.3,
+      "opnd_percent": 79.9,
+      "raw_mnemonic_pct": 90.8,
       "ref": "synth",
       "ref_sha": "c2c3d8fa9bfeedd7",
-      "score": 72.3,
+      "score": 90.8,
       "source": "src/halo/game/game_time.c"
     },
     "game_unload": {

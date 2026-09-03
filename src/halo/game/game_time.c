@@ -229,26 +229,36 @@ void game_time_start(void)
   }
 }
 
-// 0xb6020
+extern double floor(double);
+
+/* 0xb6020
+ *
+ * Compare operands are read from .rdata so they match the original's
+ * `fcom DWORD PTR ds:...` forms:
+ *   0x2533c0 = 0.0f, 0x253f00 = 100.0f, 0x254cb8 = 1000.0f,
+ *   TICKS_PER_SECOND = *(float *)0x253394 = 30.0f.
+ * game_time_globals + 0x14 is the "target/end tick" counter driven by
+ * update_get_game_time(); it has no name in game_time_globals_t yet. */
 void game_time_update(float param_1)
 {
   float fVar1;
   float fVar2;
-  unsigned int local_8;
-  unsigned int local_8_unclamped;
-  unsigned int max_ticks;
-  bool bVar3;
+  double ticks_f;
+  double leftover_base;
+  int ticks_elapsed;
+  int maximum_ticks;
+  bool clamp_leftover;
   int conn;
-  int server;
-  int16_t server_state;
-  uint32_t server_min_time;
-  int cur_time;
+  void *server;
+  unsigned int server_min_time;
+  unsigned int cur_time;
   int update_time;
   int extra_ticks;
-  unsigned int time_val;
-  unsigned int *end_tick_ptr;
-  unsigned int target_tick;
-  unsigned int remaining;
+  int delta;
+  int target_tick;
+  int n;
+  int cur_tick;
+  game_time_globals_t *globals;
 
   assert_halt(game_time_globals);
   if (!game_time_globals->active) {
@@ -256,118 +266,125 @@ void game_time_update(float param_1)
     return;
   }
   fVar2 = game_time_globals->speed * TICKS_PER_SECOND;
-  if (fVar2 <= *(float *)0x2533c0)
+  if (!(fVar2 > *(float *)0x2533c0))
     goto LAB_end;
   conn = (int)(int16_t)game_connection();
   switch (conn) {
+  case 0: /* jump-table entry 0 shares the default arm's body (0xb612e) */
+    maximum_ticks = 7;
+    clamp_leftover = true;
+    break;
   default:
-    max_ticks = 7;
-    bVar3 = true;
+    maximum_ticks = 7;
+    clamp_leftover = true;
     break;
   case 1:
-    max_ticks = 0x1e;
-    bVar3 = true;
+    maximum_ticks = 0x1e;
+    clamp_leftover = true;
     break;
   case 2:
-    server = ((int (*)(void))0x12a1d0)();
-    server_state = *(int16_t *)(server + 4);
-    server_min_time = ((unsigned int (*)(int))0x12d5b0)(server);
-    cur_time = game_time_get();
-    // During system-link host bootstrap the server is still in pregame state
-    // 0 and its client sync times start at 0/0xffffffff until the loopback
-    // client finishes validation. Stock does not hit the in-game drift assert
-    // in that window, so keep pregame hosts on the normal tick budget until a
-    // real synchronized client time exists.
-    if (server_min_time == 0xffffffff ||
-        (server_state == 0 && server_min_time == 0)) {
-      max_ticks = 0x1e;
-      ((void (*)(int, bool))0x12e1d0)(server, false);
-      bVar3 = true;
-      break;
+    server = network_game_server_get();
+    server_min_time =
+      network_game_server_get_oldest_client_update_received((int)server);
+    cur_time = (unsigned int)game_time_get();
+    if (cur_time - server_min_time > 0x80) {
+      assert_halt_msg(0, "update server is too far ahead of a client for the "
+                         "client to ever catch up!");
     }
-    if ((unsigned int)(cur_time - server_min_time) > 0x80) {
-      assert_halt(0 && "update server is too far ahead of a client for the "
-                       "client to ever catch up!");
-    }
-    if (cur_time == 0) {
-      max_ticks = 1;
-    } else {
-      max_ticks = (unsigned int)(server_min_time - cur_time) + 0x80;
-      if ((int)max_ticks < 0x1e) {
-        if ((int)max_ticks < 1) {
-          ((void (*)(int, bool))0x12e1d0)(server, true);
-          bVar3 = true;
-          goto LAB_after_switch;
+    if (cur_time > 0) {
+      delta = (int)(server_min_time - cur_time) + 0x80;
+      if (delta < 0x1e) {
+        maximum_ticks = delta;
+        if (delta <= 0) {
+          network_game_server_stalled_on_client(server, true);
+          clamp_leftover = true;
+          break;
         }
       } else {
-        max_ticks = 0x1e;
+        maximum_ticks = 0x1e;
       }
-      ((void (*)(int, bool))0x12e1d0)(server, false);
+      network_game_server_stalled_on_client(server, false);
+    } else {
+      maximum_ticks = 1;
     }
-    bVar3 = true;
+    clamp_leftover = true;
     break;
   case 3:
-    max_ticks = 0x1e;
-    bVar3 = false;
+    maximum_ticks = 0x1e;
+    clamp_leftover = false;
     break;
   }
-LAB_after_switch:
   fVar1 = param_1 + game_time_globals->leftover_dt;
-  local_8_unclamped = (unsigned int)(double)(fVar1 * fVar2);
-  local_8 = local_8_unclamped;
-  if ((int)max_ticks < (int)local_8 && bVar3) {
-    local_8 = max_ticks;
-    game_time_globals->leftover_dt = 0.0f;
+  /* The clamped value feeds the tick count; the UNCLAMPED floor result is what
+   * stays on the x87 stack and drives leftover_dt (0xb616c pops only the
+   * duplicate/constant pushed at 0xb6162/0xb6166). */
+  ticks_f = floor((double)(fVar1 * fVar2));
+  ticks_elapsed =
+    (int)(ticks_f <= *(float *)0x254cb8 ? ticks_f : (double)*(float *)0x254cb8);
+  if (ticks_elapsed > maximum_ticks) {
+    /* 0xb617c/0xb617f clamp before testing clamp_leftover: the clamp is
+     * unconditional, only the leftover_dt reset is gated. */
+    ticks_elapsed = maximum_ticks;
+    if (clamp_leftover)
+      leftover_base = ticks_f / fVar2;
+    else
+      leftover_base = fVar1;
   } else {
-    game_time_globals->leftover_dt =
-      (float)((double)fVar1 - (double)local_8_unclamped / (double)fVar2);
+    leftover_base = fVar1;
   }
+  game_time_globals->leftover_dt = (float)(leftover_base - ticks_f / fVar2);
   if (game_time_globals->leftover_dt < *(float *)0x2533c0)
     game_time_globals->leftover_dt = 0.0f;
-  assert_halt(game_time_globals->leftover_dt >= *(float *)0x2533c0 &&
-              game_time_globals->leftover_dt < *(float *)0x253f00);
-  conn = (int)(int16_t)game_connection();
-  if (conn == 1) {
-    max_ticks = (unsigned int)update_get_maximum_actions();
-    if ((int)local_8 > (int)max_ticks) {
-      local_8 = max_ticks > 0 ? max_ticks - 1 : 0;
-    } else if ((int)(local_8 + 7) < (int)max_ticks) {
-      local_8 = max_ticks > 0 ? max_ticks - 1 : 0;
-    } else if ((int)(local_8 + 1) < (int)max_ticks) {
-      local_8 = local_8 + 1;
+  assert_halt_msg(game_time_globals->leftover_dt >= *(float *)0x2533c0 &&
+                    game_time_globals->leftover_dt < *(float *)0x253f00,
+                  "game_time_globals->leftover_dt>=0.f && "
+                  "game_time_globals->leftover_dt<100.f");
+  if ((int)(int16_t)game_connection() == 1) {
+    maximum_ticks = update_get_maximum_actions();
+    if (ticks_elapsed > maximum_ticks) {
+      ticks_elapsed = maximum_ticks - 1 < 0 ? 0 : maximum_ticks - 1;
+    } else if (ticks_elapsed + 7 < maximum_ticks) {
+      ticks_elapsed = maximum_ticks - 1 < 0 ? 0 : maximum_ticks - 1;
+    } else if (ticks_elapsed + 1 < maximum_ticks) {
+      ticks_elapsed = ticks_elapsed + 1;
     }
-    assert_halt((int)local_8 <= (int)max_ticks);
-    if ((int)local_8 > (int)max_ticks)
-      local_8 = max_ticks;
+    assert_halt_msg(ticks_elapsed <= maximum_ticks,
+                    "ticks_elapsed <= maximum_actions");
+    if (ticks_elapsed > maximum_ticks)
+      ticks_elapsed = maximum_ticks;
   }
-  if (0 < (int)local_8) {
-    end_tick_ptr = (unsigned int *)((char *)game_time_globals + 0x14);
-    time_val = game_time_globals->time;
-    remaining = local_8;
-    while (time_val < *end_tick_ptr && remaining > 0) {
-      time_val++;
-      remaining--;
+  if (ticks_elapsed > 0) {
+    globals = game_time_globals;
+    while (1) {
+      cur_tick = (int)globals->time;
+      if (cur_tick >= *(int *)((char *)globals + 0x14))
+        break;
+      globals->time = (unsigned int)(cur_tick + 1);
+      if (--ticks_elapsed <= 0)
+        break;
     }
-    game_time_globals->time = time_val;
-    local_8 = remaining;
-    target_tick = time_val + remaining;
-    conn = (int)(int16_t)game_connection();
-    if (conn == 0) {
-      update_client_apply_actions((int16_t)local_8);
-    } else if (conn == 2) {
-      server = ((int (*)(void))0x12a1d0)();
-      ((void (*)(int, int16_t))0x12cdb0)(server, (int16_t)local_8);
+    target_tick = (int)globals->time + ticks_elapsed;
+    switch ((int)(int16_t)game_connection()) {
+    case 0:
+      update_client_apply_actions((int16_t)ticks_elapsed);
+      break;
+    case 2:
+      network_game_server_update_ticks((int)network_game_server_get(),
+                                       (unsigned short)ticks_elapsed);
+      break;
+    default:
+      break;
     }
-    update_time = ((int (*)(void))0xb9610)();
-    if ((int)*end_tick_ptr < update_time) {
-      if (update_time <= (int)target_tick)
-        target_tick = (unsigned int)update_time;
-      extra_ticks = (int)target_tick - (int)*end_tick_ptr;
-      if (0 < extra_ticks) {
-        int n = extra_ticks;
+    update_time = update_get_game_time();
+    if (update_time > *(int *)((char *)game_time_globals + 0x14)) {
+      if (update_time <= target_tick)
+        target_tick = update_time;
+      extra_ticks = target_tick - *(int *)((char *)game_time_globals + 0x14);
+      if (extra_ticks > 0) {
+        n = extra_ticks;
         do {
           game_tick();
-          *end_tick_ptr += 1;
+          *(int *)((char *)game_time_globals + 0x14) += 1;
           game_time_globals->time++;
           n--;
         } while (n != 0);
@@ -375,13 +392,10 @@ LAB_after_switch:
     } else {
       extra_ticks = 0;
     }
-    {
-      int16_t stats_a =
-        (int16_t)((uint16_t)update_time - (uint16_t)game_time_globals->time);
-      int16_t stats_b = (int16_t)extra_ticks;
-      game_time_statistics_frame(stats_a, stats_b, 0);
-    }
-    game_time_globals->elapsed = (int16_t)local_8;
+    game_time_statistics_frame(
+      (int16_t)((uint16_t)update_time - (uint16_t)game_time_globals->time),
+      (int16_t)extra_ticks, 0);
+    game_time_globals->elapsed = (uint16_t)ticks_elapsed;
   }
 LAB_end:
   assert_halt(game_time_globals);
