@@ -1215,7 +1215,7 @@ void FUN_001330a0(int widget_datum)
  * Resolves the glow widget (datum_get(*(data_t**)0x5a90c8, widget_datum), the
  * same widget pool FUN_00134ae0 uses) and its 'glw!' tag definition
  * (tag_get(0x676c7721, glow_widget+0x224)), opens a sprite-build record
- * (FUN_0018d2c0) sized from the widget's active particle count (+0x24c,
+ * (build_sprites_begin) sized from the widget's active particle count (+0x24c,
  * zero-extended per the XOR ECX,ECX;MOV CX idiom at 0x133554) and the tag's
  * shader field (glowdef+0x150), then walks the particle list rooted at
  * glow_widget+0x250 (next-link at particle+0x5c) appending one sprite per
@@ -1242,9 +1242,9 @@ void FUN_001330a0(int widget_datum)
  * disassembly never reads [EBP+8] in this body -- confirmed unused.
  *
  * Confirmed: the ADD ESP,0x24 at 0x133578 batch-cleans 9 dwords -- the two
- * cdecl pushes each for datum_get and tag_get plus FUN_0018d2c0's 5 pushes --
+ * cdecl pushes each for datum_get and tag_get plus build_sprites_begin's 5 pushes --
  * deferred cdecl cleanup, not an extra argument (see call_site_audit
- * ARG_COUNT note on FUN_0018d2c0).
+ * ARG_COUNT note on build_sprites_begin).
  */
 void FUN_00133520(int object_handle, int widget_datum)
 {
@@ -1255,7 +1255,7 @@ void FUN_00133520(int object_handle, int widget_datum)
 
   glow_widget = (int)datum_get(*(data_t **)0x5a90c8, widget_datum);
   glow_tag = (int)tag_get(0x676c7721, *(int *)(glow_widget + 0x224));
-  FUN_0018d2c0((uint32_t *)record, *(uint16_t *)(glow_widget + 0x24c),
+  build_sprites_begin((uint32_t *)record, *(uint16_t *)(glow_widget + 0x24c),
                *(uint32_t *)(glow_tag + 0x150), 0x326a78, 0);
 
   for (particle = *(int *)(glow_widget + 0x250); particle != 0;

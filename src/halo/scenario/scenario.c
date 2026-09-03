@@ -1130,7 +1130,7 @@ typedef struct particle_sort_record {
  * hold {datum, definition tag index (+0x4), sort key (+0x2c), fp flag}.
  * Pass 2 qsorts (CRT qsort, comparator FUN_0018c580) and run-length encodes
  * runs of identical (tag, sort, fp) into up to 0x200 counts. Pass 3 builds
- * one sprite batch per run: FUN_0018d2c0 begin (shader from 'part' tag+0x10,
+ * one sprite batch per run: build_sprites_begin begin (shader from 'part' tag+0x10,
  * geometry tag+0xb0, flags 2 for first-person), per particle resolve the
  * world position/direction — already-detached particles (+0x8 == -1) copy
  * +0x30/+0x3c directly (with the original's redundant -1 self-store);
@@ -1241,7 +1241,7 @@ void FUN_0018c5b0(void)
             tag = (char *)tag_get(0x70617274, (int)rec->tag_index);
             radius_accum = 0.0f;
             emitted = 0;
-            FUN_0018d2c0((uint32_t *)record, *runp, *(uint32_t *)(tag + 0x10),
+            build_sprites_begin((uint32_t *)record, *runp, *(uint32_t *)(tag + 0x10),
                          (int)(tag + 0xb0), rec->first_person != 0 ? 2u : 0u);
             if (*runp > 0) {
               inner = (int)(uint16_t)*runp;
@@ -1353,7 +1353,7 @@ void FUN_0018c5b0(void)
  * flushed through FUN_0016b240 (the 0x17cbf0 thunk's target, matching the
  * scenario_test_pvs reloc lesson). cdecl, void(void), 0x1658-byte frame via
  * _chkstk. */
-void FUN_0018ca40(void)
+void render_sky(void)
 {
   float node_matrices[832]; /* EBP-0x1658: 64 x 0x34-byte node matrices */
   float node_buf[512]; /* EBP-0x958: 64 x 0x20-byte node transforms */
@@ -1720,7 +1720,7 @@ int16_t FUN_0018d140(void *data, int bitmap)
  * +0x14..+0x1c, and finally re-sets +0x10 to flags | _build_sprites_valid_bit.
  * The +0x10 store happens twice (param_5 then param_5|4), matching the
  * original. cdecl. */
-void FUN_0018d2c0(uint32_t *param_1, int16_t param_2, uint32_t param_3,
+void build_sprites_begin(uint32_t *param_1, int16_t param_2, uint32_t param_3,
                   int param_4, uint32_t param_5)
 {
   uint32_t *view;

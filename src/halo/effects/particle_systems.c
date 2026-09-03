@@ -1079,7 +1079,7 @@ done:
  *     caches it back into particle+0x44, otherwise the cached frame is reduced
  *     modulo the sprite count and biased positive.
  *   - each non-negligible blend weight (> 0.01, 0xa0adf/0xa0bf6) emits one
- *     sprite batch: FUN_0018d2c0 opens the record, FUN_0018dcf0 (sprite path,
+ *     sprite batch: build_sprites_begin opens the record, FUN_0018dcf0 (sprite path,
  *     type_def+0x28 == 1) or FUN_0018d6e0 adds the sprite, the batch's shader
  *     pointer (record+8) receives the state's dword at +0x80, and FUN_0018d360
  *     closes it.  The second pass nudges the view-space z of the origin by
@@ -1087,7 +1087,7 @@ done:
  *
  * Confirmed: record[0xa4] is the render_sprite build record -- the frame is
  * 0x118 bytes and `record+8` (EBP-0x110, read at 0xa0bd8/0xa0cfd) is the
- * pointer FUN_0018d2c0 stores at its param_1[2] (0x18d323 MOV [EAX+8],ESI);
+ * pointer build_sprites_begin stores at its param_1[2] (0x18d323 MOV [EAX+8],ESI);
  * scenario.c's sprite batcher declares the same `char record[0xa4]`.
  * Uncertain: the second pass copies state_a's dword at +0x80 into state_b's
  * shader record (0xa0cf7 MOV ECX,[EBX+0x80] with EBX still the *first* state);
@@ -1245,7 +1245,7 @@ void FUN_000a0800(int particle_system_handle)
                 color_a[2] = color_a[2] * *(float *)(ps_datum + 0x4c);
                 color_a[3] = color_a[3] * *(float *)(ps_datum + 0x50);
               }
-              FUN_0018d2c0((uint32_t *)record, 2,
+              build_sprites_begin((uint32_t *)record, 2,
                            *(unsigned int *)(particle_state_a + 0x3c),
                            (int)(particle_state_a + 0xb8), 0);
               sprite_flags = 1;
@@ -1280,7 +1280,7 @@ void FUN_000a0800(int particle_system_handle)
                 color_b[2] = color_b[2] * *(float *)(ps_datum + 0x4c);
                 color_b[3] = color_b[3] * *(float *)(ps_datum + 0x50);
               }
-              FUN_0018d2c0((uint32_t *)record, 2,
+              build_sprites_begin((uint32_t *)record, 2,
                            *(unsigned int *)(particle_state_b + 0x3c),
                            (int)shader_b, 0);
               origin[2] = origin[2] + 0.001f;

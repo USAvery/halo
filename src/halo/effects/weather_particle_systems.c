@@ -896,7 +896,7 @@ void weather_particle_system_render(int16_t local_player_index /* @<eax> */)
       }
     }
 
-    FUN_0018d2c0((uint32_t *)sprite_data, *(int16_t *)(particle_type + 8),
+    build_sprites_begin((uint32_t *)sprite_data, *(int16_t *)(particle_type + 8),
                  (uint32_t) * (int *)(type_element + 0x1a0),
                  (int)(size_t)(type_element + 0x1a8), 0);
 

@@ -7955,7 +7955,7 @@ void FUN_0003ec80(int actor_handle /* @<esi> */)
   /* Subsystem pre-init */
   FUN_0003bb50(actor_handle);
   FUN_0003dc20(actor_handle);
-  FUN_000355f0(actor_handle);
+  actor_perception_update(actor_handle);
   actor_situation_update(actor_handle);
   actor_emotion_update(actor_handle);
 

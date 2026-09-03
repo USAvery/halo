@@ -398,7 +398,8 @@
   "decl": "void FUN_00046f10(int mode, int unit_handle, int target_handle, int a4, int a5, int a6, int a7);",
   "name": "FUN_00046f10",
   "obj": "ai.obj",
-  "ported": false
+  "ported": false,
+  "comment": "[NAME: FUN_00046f10 — name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
  },
  "0x803d0": {
   "addr": "0x803d0",
@@ -23887,8 +23888,9 @@
     },
     {
      "addr": "0x18ca40",
-     "decl": "void FUN_0018ca40(void);",
-     "ported": true
+     "decl": "void render_sky(void);",
+     "ported": true,
+     "comment": "[NAME: render_sky — name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
     },
     {
      "addr": "0x18cf10",
@@ -23912,8 +23914,9 @@
     },
     {
      "addr": "0x18d2c0",
-     "decl": "void FUN_0018d2c0(uint32_t *param_1, int16_t param_2, uint32_t param_3, int param_4, uint32_t param_5);",
-     "ported": true
+     "decl": "void build_sprites_begin(uint32_t *param_1, int16_t param_2, uint32_t param_3, int param_4, uint32_t param_5);",
+     "ported": true,
+     "comment": "[NAME: build_sprites_begin — name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
     },
     {
      "addr": "0x18d360",
@@ -29883,9 +29886,10 @@
     },
     {
      "addr": "0x180050",
-     "decl": "int FUN_00180050(short param_1);",
-     "name": "FUN_00180050",
-     "ported": true
+     "decl": "int rasterizer_geometry_get_vertex_size(short param_1);",
+     "name": "rasterizer_geometry_get_vertex_size",
+     "ported": true,
+     "comment": "[NAME: rasterizer_geometry_get_vertex_size — name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
     },
     {
      "addr": "0x1800b0",
@@ -30113,8 +30117,9 @@
     },
     {
      "addr": "0x183390",
-     "decl": "int FUN_00183390(int bitmap);",
-     "ported": false
+     "decl": "int rasterizer_xbox_bitmap_rebuild_hardware_format(int bitmap);",
+     "ported": false,
+     "comment": "[NAME: rasterizer_xbox_bitmap_rebuild_hardware_format — name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
     },
     {
      "addr": "0x183650",
@@ -33555,9 +33560,10 @@
     },
     {
      "addr": "0x355f0",
-     "decl": "void FUN_000355f0(int actor_handle);",
+     "decl": "void actor_perception_update(int actor_handle);",
      "ported": true,
-     "source_path": "src/halo/ai/actor_perception.c"
+     "source_path": "src/halo/ai/actor_perception.c",
+     "comment": "[NAME: actor_perception_update — name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
     }
    ],
    "name": "actor_perception.obj",
@@ -33798,7 +33804,8 @@
     },
     {
      "addr": "0x46f10",
-     "decl": "void FUN_00046f10(int type, int unit_handle, int param3, int param4, int param5, int param6, int param7);"
+     "decl": "void FUN_00046f10(int type, int unit_handle, int param3, int param4, int param5, int param6, int param7);",
+     "comment": "[NAME: FUN_00046f10 — name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
     },
     {
      "addr": "0x48e90",
@@ -35261,8 +35268,9 @@
    "functions": [
     {
      "addr": "0x64100",
-     "decl": "void FUN_00064100(void);",
-     "ported": true
+     "decl": "void props_initialize(void);",
+     "ported": true,
+     "comment": "[NAME: props_initialize — name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
     },
     {
      "addr": "0x64140",

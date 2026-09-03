@@ -569,7 +569,7 @@ done_vision:
   return (float)sum * 10.0f + 5.0f / (*(float *)(prop + 0x11c) * 0.1f + 1.0f) +
          local_c;
 }
-/* FUN_000355f0 (0x355f0): actor_perception_update — the per-tick perception
+/* actor_perception_update (0x355f0): actor_perception_update — the per-tick perception
  * pass for one actor.
  *
  * Phase 1 (skipped when actor+0x13 is set): refresh perception and the danger
@@ -590,7 +590,7 @@ done_vision:
  *
  * TU: c:\halo\SOURCE\ai\actor_perception.c.  Asserts at lines 0x13c, 0x192,
  * 0x1a0, 0x1e9, 0x1ea, 0x204, 0x2b6, 0x2d1, 0x2da, 0x2ea, 0x2ef. */
-void FUN_000355f0(int actor_handle)
+void actor_perception_update(int actor_handle)
 {
   char debug_desc_a[256]; /* EBP-0x4f4 */
   char debug_desc_b[256]; /* EBP-0x3f4 */

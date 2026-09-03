@@ -85,7 +85,7 @@ int FUN_00063e30(int scenario, unsigned char bsp_idx, float *origin,
 /* 0x64100 — props_initialize.
  * Allocates the prop data table. Called from ai_initialize.
  * Asserts (halt=true) if allocation fails, then calls system_exit(-1). */
-void FUN_00064100(void)
+void props_initialize(void)
 {
   prop_data = game_state_data_new("prop", 0x300, 0x138);
   if (prop_data == 0) {

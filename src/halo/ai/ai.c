@@ -73,7 +73,7 @@ void ai_initialize(void)
   set_real_point3d();
   FUN_0005df80();
   actors_initialize();
-  FUN_00064100();
+  props_initialize();
   encounters_initialize();
   ai_script_initialize();
   ai_communication_initialize();

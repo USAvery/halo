@@ -4128,7 +4128,7 @@ int FUN_0015d310(short type, int count)
     if ((*(int *)(0x476ae8 + iType * 0x14) <
          *(int *)(0x476aec + iType * 0x14) - count) &&
         (*(int *)0x47abd8 < 0x3ff)) {
-      FUN_00180050(type);
+      rasterizer_geometry_get_vertex_size(type);
       handle = *(int *)0x47abd8;
       rec = handle * 0x10;
       *(short *)(0x476bd8 + rec) = type;
@@ -4220,7 +4220,7 @@ short FUN_0015d480(int dynamic_vertex_buffer_index)
  * advanced/decremented across chunks (the pristine XBE mutates its own [EBP+8]
  * / [EBP+0xc] param slots -- modelled here as the mutable params themselves).
  *
- * The stream vertex size comes from FUN_00180050(group_index).  Group 6's
+ * The stream vertex size comes from rasterizer_geometry_get_vertex_size(group_index).  Group 6's
  * vertex buffer is overridden to the scratch buffer at 0x47dbf0 when
  * (*(int *)0x325668 & 1) != 0 (verified against disasm 0x15d755-0x15d771 --
  * this is the OPPOSITE polarity to a naive reading; the scratch buffer is used
@@ -4312,7 +4312,7 @@ void rasterizer_draw_dynamic_vertices(int first_primitive_index,
       }
 
       record = 0x476bd8 + dynamic_vertex_buffer_index * 0x10;
-      vertex_size = FUN_00180050(*(uint16_t *)record);
+      vertex_size = rasterizer_geometry_get_vertex_size(*(uint16_t *)record);
       group = 0x476ae8 + (int16_t)*(short *)record * 0x14;
       if (group == 0) {
         display_assert("group", kDrawPrimitivesFile, 0x1f8, 1);
