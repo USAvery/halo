@@ -556,7 +556,7 @@ def cmd_holdout(args):
     cea_by_name = load_cea_index(args.cea_index)
     rename_rows = load_rename_mapping(args.rename_mapping)
     ntsc_func, ntsc_callers = load_callgraph(args.callgraph)
-    all_seeds, seed_stats = build_seeds(kb, cea_by_name, rename_rows)
+    all_seeds, seed_stats, _seed_conflicts = build_seeds(kb, cea_by_name, rename_rows)
 
     print('=== seeds ===')
     for k, v in seed_stats.items():
@@ -630,7 +630,7 @@ def cmd_propose(args):
     cea_by_name = load_cea_index(args.cea_index)
     rename_rows = load_rename_mapping(args.rename_mapping)
     ntsc_func, ntsc_callers = load_callgraph(args.callgraph)
-    seeds, seed_stats = build_seeds(kb, cea_by_name, rename_rows)
+    seeds, seed_stats, _seed_conflicts = build_seeds(kb, cea_by_name, rename_rows)
 
     print('=== seeds ===')
     for k, v in seed_stats.items():
