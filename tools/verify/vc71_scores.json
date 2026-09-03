@@ -4155,6 +4155,21 @@
       "score": 100.0,
       "source": "src/halo/ai/actor_perception.c"
     },
+    "FUN_0002f5f0": {
+      "abi_model": "regparam_stripped_saves",
+      "abi_model_items": 2,
+      "abi_modeled_mnemonic_pct": 90.4,
+      "addr": "0x2f5f0",
+      "end": "0x2f6d9",
+      "kind": "auto",
+      "n_r": 73,
+      "opnd_percent": 61.6,
+      "raw_mnemonic_pct": 89.2,
+      "ref": "synth",
+      "ref_sha": "bd1a9df63807f5cf",
+      "score": 90.4,
+      "source": "src/halo/ai/actor_perception.c"
+    },
     "FUN_00030d10": {
       "abi_model": "raw",
       "abi_model_items": 0,
@@ -49036,17 +49051,17 @@
     "actor_perception_abandoned_search": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 14.0,
+      "abi_modeled_mnemonic_pct": 100.0,
       "addr": "0x32c10",
       "end": "0x32ca8",
       "kind": "auto",
       "n_r": 52,
-      "opnd_percent": 10.5,
-      "raw_mnemonic_pct": 14.0,
+      "opnd_percent": 100.0,
+      "raw_mnemonic_pct": 100.0,
       "ref": "synth",
       "ref_sha": "984b4fd7133d7e59",
-      "score": 14.0,
-      "source": "src/halo/unported_thunks.c"
+      "score": 100.0,
+      "source": "src/halo/ai/actor_perception.c"
     },
     "actor_perception_acknowledge": {
       "abi_model": "raw",
@@ -49081,17 +49096,17 @@
     "actor_perception_become_acknowledged": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 8.7,
+      "abi_modeled_mnemonic_pct": 98.9,
       "addr": "0x33330",
       "end": "0x33440",
       "kind": "auto",
       "n_r": 87,
-      "opnd_percent": 6.5,
-      "raw_mnemonic_pct": 8.7,
+      "opnd_percent": 97.7,
+      "raw_mnemonic_pct": 98.9,
       "ref": "synth",
       "ref_sha": "1dc705b8e42ae2b5",
-      "score": 8.7,
-      "source": "src/halo/unported_thunks.c"
+      "score": 98.9,
+      "source": "src/halo/ai/actor_perception.c"
     },
     "actor_perception_create_orphan_from_friend": {
       "abi_model": "raw",
@@ -49426,17 +49441,17 @@
     "actor_situation_try_new_target": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 9.2,
+      "abi_modeled_mnemonic_pct": 89.0,
       "addr": "0x308e0",
       "end": "0x309c8",
       "kind": "auto",
       "n_r": 82,
-      "opnd_percent": 6.9,
-      "raw_mnemonic_pct": 9.2,
+      "opnd_percent": 86.6,
+      "raw_mnemonic_pct": 89.0,
       "ref": "synth",
       "ref_sha": "6b1d5ce8ffbcd5dd",
-      "score": 9.2,
-      "source": "src/halo/unported_thunks.c"
+      "score": 89.0,
+      "source": "src/halo/ai/actor_perception.c"
     },
     "actor_situation_update": {
       "abi_model": "raw",

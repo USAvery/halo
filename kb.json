@@ -921,7 +921,7 @@
     },
     {
      "addr": "0x1dbdec",
-     "comment": "LIBCMT _except_handler3 \u2014 VC7 frame-based SEH dispatcher (installed by __SEH_prolog @0x1dd5c8). Referenced by clang's __try/__except lowering in FUN_001d6ca8/FUN_001d703b; resolves to the original runtime via forwarding thunk.",
+     "comment": "LIBCMT _except_handler3 — VC7 frame-based SEH dispatcher (installed by __SEH_prolog @0x1dd5c8). Referenced by clang's __try/__except lowering in FUN_001d6ca8/FUN_001d703b; resolves to the original runtime via forwarding thunk.",
      "decl": "int __cdecl _except_handler3(void *ExceptionRecord, void *EstablisherFrame, void *ContextRecord, void *DispatcherContext);"
     },
     {
@@ -7028,7 +7028,7 @@
     {
      "addr": "0x9ca70",
      "decl": "void effects_information_get(int effect_ptr@<ebx>, uint32_t flags_hi@<edi>, unsigned int *seed, float *velocity_out, float min_val, float max_val, uint32_t flags_lo);",
-     "note": "hidden reg deps (EDI=flags_hi, EBX=effect_ptr) \u2014 callers pass these in registers; all known callers inlined",
+     "note": "hidden reg deps (EDI=flags_hi, EBX=effect_ptr) — callers pass these in registers; all known callers inlined",
      "ported": true
     },
     {
@@ -7089,7 +7089,7 @@
     {
      "addr": "0x9dcf0",
      "decl": "void FUN_0009dcf0(float *position, void *effect, void *location, void *part, float *forward, float *up, float scale);",
-     "note": "4 reg args (EAX,EDX,ECX,ESI) \u2014 inlined into FUN_0009e310, cannot be thunked separately",
+     "note": "4 reg args (EAX,EDX,ECX,ESI) — inlined into FUN_0009e310, cannot be thunked separately",
      "ported": true
     },
     {
@@ -33399,7 +33399,10 @@
     },
     {
      "addr": "0x2f5f0",
-     "decl": "void FUN_0002f5f0(void);"
+     "decl": "bool FUN_0002f5f0(int actor_handle /* @<eax> */, int object_handle /* @<edi> */, float param_3, float param_4, char param_5, char param_6);",
+     "name": "FUN_0002f5f0",
+     "ported": true,
+     "source_path": "src/halo/ai/actor_perception.c"
     },
     {
      "addr": "0x2f6e0",
@@ -33466,7 +33469,8 @@
     },
     {
      "addr": "0x308e0",
-     "decl": "void actor_situation_try_new_target(int actor_handle, int target);"
+     "decl": "bool actor_situation_try_new_target(int actor_handle, int target);",
+     "ported": true
     },
     {
      "addr": "0x309d0",
@@ -33482,7 +33486,10 @@
     },
     {
      "addr": "0x30e60",
-     "decl": "void FUN_00030e60(void);"
+     "decl": "short FUN_00030e60(void *records /* @<eax> */, int key /* @<edi> */, int param_1, short *p_count, short max_count);",
+     "name": "FUN_00030e60",
+     "ported": true,
+     "source_path": "src/halo/ai/actor_perception.c"
     },
     {
      "addr": "0x30f50",
@@ -33538,7 +33545,8 @@
     },
     {
      "addr": "0x32c10",
-     "decl": "void actor_perception_abandoned_search(int actor_handle, int prop_handle);"
+     "decl": "void actor_perception_abandoned_search(int actor_handle, int prop_handle);",
+     "ported": true
     },
     {
      "addr": "0x32cb0",
@@ -33546,7 +33554,8 @@
     },
     {
      "addr": "0x33330",
-     "decl": "char actor_perception_become_acknowledged(int actor_handle, int prop_handle, int out_acknowledged);"
+     "decl": "char actor_perception_become_acknowledged(int actor_handle, int prop_handle, int out_acknowledged);",
+     "ported": true
     },
     {
      "addr": "0x33440",

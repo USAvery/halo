@@ -174,6 +174,60 @@ int FUN_0002f5b0(int param_1, int param_2)
   return 0;
 }
 
+/* FUN_0002f5f0 (0x2f5f0)
+ * Register args: actor datum handle in EAX, object handle in EDI.
+ *
+ * Records a new perception entry in the actor's 0x6c-byte block at +0x280
+ * when the incoming event beats what is already stored there.  Rejected
+ * (returns false) when param_4 >= param_3 + *(float *)0x253f34, or when the
+ * stored state at +0x280 is > 1, or the state is exactly 1 and either the
+ * stored object at +0x28c is the same object or param_4 >= *(float *)(+0x2d4).
+ *
+ * On acceptance the block is zeroed, state set to 1, and the object handle,
+ * param_3, the object's world position (+0x298) and the object's +0x18..+0x20
+ * triple (+0x2a4) are stored, then +0x284 = 6, +0x286 = param_6 and
+ * +0x282 = (param_5 == 0).
+ *
+ * Raw offsets are used for the +0x280 block to match the rest of this file
+ * (lines using actor + 0x282 etc.); +0x282 is proven written here.
+ *
+ * No __FILE__ string. */
+bool FUN_0002f5f0(int actor_handle /* @<eax> */, int object_handle /* @<edi> */,
+                  float param_3, float param_4, char param_5, char param_6)
+{
+  char *actor;
+  char *object;
+  int16_t state;
+  uint32_t *src;
+  uint32_t *dst;
+  char result;
+
+  actor = (char *)datum_get(actor_data, actor_handle);
+  result = 0;
+  if (param_4 < param_3 + *(float *)0x253f34) {
+    state = *(int16_t *)(actor + 0x280);
+    if (state < 1 || (state == 1 && *(int *)(actor + 0x28c) != object_handle &&
+                      param_4 < *(float *)(actor + 0x2d4))) {
+      object = (char *)object_get_and_verify_type(object_handle, 3);
+      csmemset(actor + 0x280, 0, 0x6c);
+      *(int16_t *)(actor + 0x280) = 1;
+      *(int *)(actor + 0x28c) = object_handle;
+      *(float *)(actor + 0x294) = param_3;
+      object_get_world_position(object_handle, (vector3_t *)(actor + 0x298));
+      src = (uint32_t *)(object + 0x18);
+      dst = (uint32_t *)(actor + 0x2a4);
+      dst[0] = src[0];
+      dst[1] = src[1];
+      dst[2] = src[2];
+      *(int16_t *)(actor + 0x284) = 6;
+      *(char *)(actor + 0x286) = param_6;
+      *(uint16_t *)(actor + 0x282) = (uint16_t)(param_5 == 0);
+      return 1;
+    }
+  }
+  return result;
+}
+
 /* actor_perception_find_prop_pathfinding_location (0x2f910)
  * Fills prop->pathfinding_surface_index (+0xec) if not already set.
  * If prop has a vehicle handle (+0x110), uses vehicle_get_estimated_position;
@@ -600,6 +654,227 @@ void actor_perception_tried_to_uncover(int actor_handle, int prop_handle)
     actor_situation_update_target_status(actor_handle);
     actor_situation_combat_status_update(actor_handle);
   }
+}
+
+/* actor_situation_try_new_target (0x308e0)
+ * Score prop `target` for `actor_handle` and adopt it as the actor's combat
+ * target when it beats the currently-held target.
+ *
+ * The freshly computed weight is always stored to new_prop+0x50 (FST, not
+ * FSTP, at 0x3093d).  Adoption requires weight > *(float *)0x2533c0 and, when
+ * a previous target exists, new_prop+0x50 >= old_prop+0x50 (FCOMP + TEST AH,1
+ * at 0x30981 exits only on strictly-less).
+ * Assertion: "new_prop->enemy" at line 0x124d.
+ * Return is a live bool (MOV AL,1 at 0x309b8 / XOR AL,AL at 0x309c1).
+ * Store order at 0x3098f..0x3099e is 0x268, 0x270, 0x26c — MSVC rotation,
+ * preserved deliberately. */
+bool actor_situation_try_new_target(int actor_handle, int target)
+{
+  actor_t *actor;
+  char *new_prop;
+  char *old_prop;
+  float weight;
+
+  actor = (actor_t *)datum_get(actor_data, actor_handle);
+  new_prop = (char *)datum_get(prop_data, target);
+  if (actor->target_target_prop_index == -1) {
+    old_prop = (char *)0;
+  } else {
+    old_prop = (char *)datum_get(prop_data, actor->target_target_prop_index);
+  }
+
+  weight = actor_compute_prop_target_weight(actor_handle, target);
+  *(float *)(new_prop + 0x50) = weight;
+  if (weight <= *(float *)0x2533c0) {
+    return false;
+  }
+
+  if (*(char *)(new_prop + 0x60) == 0) {
+    display_assert("new_prop->enemy",
+                   "c:\\halo\\SOURCE\\ai\\actor_perception.c", 0x124d, true);
+    system_exit(-1);
+  }
+
+  if (old_prop != (char *)0 &&
+      *(float *)(new_prop + 0x50) < *(float *)(old_prop + 0x50)) {
+    return false;
+  }
+
+  actor->target_target_type = 0;
+  actor->target_target_prop_index = target;
+  actor->field_26c = -1;
+  actor_situation_update_target_status(actor_handle);
+  actor_situation_combat_status_update(actor_handle);
+  return true;
+}
+
+/* FUN_00030e60 (0x30e60): find-or-append a 0x1c-byte record in a caller-owned
+ * array, keyed by the dword at record+0x8.
+ *
+ * @<eax> = array base, @<edi> = search key.  Stack: param_1 at [EBP+0x8] is
+ * pushed by the caller (0x3102e) but NEVER read by this function — it is
+ * declared so that p_count ([EBP+0xc]) and max_count ([EBP+0x10]) land on the
+ * right slots.  Meaning unknown.
+ *
+ * Returns the record index as a short (caller at 0x3103d does CMP AX,0xffff),
+ * or -1 when the key is absent and the array is already full.  The key itself
+ * is NOT stored here; the caller writes record+0x8 = key at 0x31068.
+ *
+ * Store order at 0x30eb9..0x30ecc is +0x4, +0x8, +0x18, +0x0, +0xc, +0x10,
+ * +0x14 — MSVC rotation, preserved deliberately.  0x7f7fffff is the FLT_MAX
+ * bit pattern but the field is written as a dword immediate; its type is
+ * unproven.
+ *
+ * Single exit: the reference presets EAX = -1 (0x30e6d) and every path falls
+ * through the shared epilogue at 0x30ed6, so the append is nested under
+ * `if (index == -1)` rather than written as an early return.
+ *
+ * No __FILE__ string. */
+short FUN_00030e60(void *records /* @<eax> */, int key /* @<edi> */,
+                   int param_1, short *p_count, short max_count)
+{
+  char *base;
+  short count;
+  short index;
+  short i;
+  char *rec;
+
+  base = (char *)records;
+  count = *p_count;
+  index = -1;
+
+  if (count > 0) {
+    i = 0;
+    do {
+      if (*(int *)(base + i * 0x1c + 8) == key) {
+        index = i;
+        break;
+      }
+      i = i + 1;
+    } while (i < count);
+  }
+
+  if (index == -1) {
+    if (count < max_count) {
+      *p_count = count + 1;
+      rec = base + count * 0x1c;
+      *(int *)(rec + 0x4) = -1;
+      *(int *)(rec + 0x8) = -1;
+      *(int *)(rec + 0x18) = -1;
+      *(short *)(rec + 0x0) = 0;
+      *(int *)(rec + 0xc) = 0;
+      *(short *)(rec + 0x10) = 0;
+      *(int *)(rec + 0x14) = 0x7f7fffff; /* FLT_MAX bit pattern */
+      index = count;
+    }
+  }
+
+  return index;
+}
+
+/* actor_perception_abandoned_search (0x32c10): the actor gives up on a search.
+ *
+ * prop_handle == -1 is the "no prop" path: clear the actor's search
+ * bookkeeping (+0x3c4 word, +0x3bc/+0x3bd bytes, +0x72/+0x74 words, all
+ * zeroed from a single XOR ECX,ECX at 0x32c2b) and refresh combat status.
+ * Store order 0x3c4, 0x3bc, 0x3bd, 0x72, 0x74 is the reference order at
+ * 0x32c2e..0x32c45 and is preserved deliberately.
+ *
+ * Otherwise: demote the prop's state at prop+0x24 from 4 to 5 (CMP word
+ * [EAX+0x24],0x4 at 0x32c78) and set prop+0xbb = 1.  Only when the prop is
+ * the actor's current target (actor+0x270, CMP ESI,[EDI+0x270] at 0x32c8c)
+ * are the target/combat status refreshes run.
+ *
+ * Both datum_get calls in the second path share one ADD ESP,0x10 at 0x32c75;
+ * the actor lookup lands in EDI and the prop lookup in EAX.
+ *
+ * No __FILE__ string. */
+void actor_perception_abandoned_search(int actor_handle, int prop_handle)
+{
+  actor_t *actor;
+  char *prop;
+
+  if (prop_handle == -1) {
+    actor = (actor_t *)datum_get(actor_data, actor_handle);
+    actor->field_3c4 = 0;
+    actor->field_3bc = 0;
+    actor->field_3bd = 0;
+    actor->field_072 = 0;
+    actor->field_074 = 0;
+    actor_situation_combat_status_update(actor_handle);
+    return;
+  }
+
+  actor = (actor_t *)datum_get(actor_data, actor_handle);
+  prop = (char *)datum_get(prop_data, prop_handle);
+  if (*(short *)(prop + 0x24) == 4) {
+    *(short *)(prop + 0x24) = 5;
+  }
+  *(prop + 0xbb) = 1;
+  if (prop_handle == actor->target_target_prop_index) {
+    actor_situation_update_target_status(actor_handle);
+    actor_situation_combat_status_update(actor_handle);
+  }
+}
+/* actor_perception_become_acknowledged (0x33330): promote a prop to the
+ * "acknowledged" state (prop+0x24 == 3).
+ *
+ * Does nothing when the prop is already in state 2 or 3.  Otherwise it asks
+ * actor_expected_acknowledgement whether the acknowledgement was expected,
+ * and — when the prop still has a parent prop (prop+0xc != NONE) — folds the
+ * parent's target weight block (+0x50..+0x5c) and its acknowledgement
+ * bookkeeping (+0x9c, +0xa0, +0xa4, +0xa6, +0xa8) into this prop, retires the
+ * parent link through FUN_0003b410/prop_iterator_next, and clears prop+0xc.
+ *
+ * Returns 1 when the promotion ran, 0 when the prop was already in state 2/3.
+ * out_acknowledged (optional) receives the actor_expected_acknowledgement
+ * result, or 0 on the skipped path.
+ *
+ * ADD ESP,0x1c at 0x33409 coalesces three cdecl cleanups: datum_get (8) +
+ * FUN_0003b410 (12) + prop_iterator_next (8) = 28.  A cleanup=7 ARG_COUNT
+ * hazard on prop_iterator_next is that coalescing, not a real arg mismatch.
+ *
+ * No __FILE__ string. */
+char actor_perception_become_acknowledged(int actor_handle, int prop_handle,
+                                          int out_acknowledged)
+{
+  char *prop;
+  char *parent_prop;
+  char has_parent;
+  char acknowledged;
+  char promoted;
+
+  prop = (char *)datum_get(prop_data, prop_handle);
+  promoted = 0;
+  acknowledged = 0;
+  if (*(short *)(prop + 0x24) < 2 || *(short *)(prop + 0x24) > 3) {
+    has_parent = (char)(*(int *)(prop + 0xc) != -1);
+    acknowledged =
+      (char)actor_expected_acknowledgement(actor_handle, prop_handle);
+    if (has_parent != 0) {
+      parent_prop = (char *)datum_get(prop_data, *(int *)(prop + 0xc));
+      *(int *)(prop + 0x50) = *(int *)(parent_prop + 0x50);
+      *(int *)(prop + 0x54) = *(int *)(parent_prop + 0x54);
+      *(int *)(prop + 0x58) = *(int *)(parent_prop + 0x58);
+      *(int *)(prop + 0x5c) = *(int *)(parent_prop + 0x5c);
+      *(short *)(prop + 0x9c) = *(short *)(parent_prop + 0x9c);
+      *(int *)(prop + 0xa0) = *(int *)(parent_prop + 0xa0);
+      *(prop + 0xa4) = *(parent_prop + 0xa4);
+      *(short *)(prop + 0xa6) = *(short *)(parent_prop + 0xa6);
+      *(short *)(prop + 0xa8) = *(short *)(parent_prop + 0xa8);
+      FUN_0003b410(actor_handle, *(int *)(prop + 0xc), prop_handle);
+      prop_iterator_next(actor_handle, *(int *)(prop + 0xc));
+      *(int *)(prop + 0xc) = -1;
+    }
+    *(short *)(prop + 0x24) = 3;
+    actor_perception_acknowledge(actor_handle, prop_handle, has_parent,
+                                 acknowledged);
+    promoted = 1;
+  }
+  if (out_acknowledged != 0) {
+    *(char *)out_acknowledged = acknowledged;
+  }
+  return promoted;
 }
 
 /* actor_perception_update (0x355f0): actor_perception_update — the per-tick

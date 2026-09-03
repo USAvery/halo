@@ -802,11 +802,7 @@
       "kind": "function",
       "status": "ported"
     },
-    "0x32b50": {
-      "kind": "function",
-      "status": "ported"
-    },
-    "0x355f0": {
+    "0x308e0": {
       "kind": "function",
       "status": "ported"
     },
@@ -1392,10 +1388,6 @@
       "kind": "function",
       "status": "ported"
     },
-    "0x425c0": {
-      "kind": "function",
-      "status": "ported"
-    },
     "0x42a30": {
       "kind": "function",
       "status": "ported"
@@ -1510,10 +1502,6 @@
         "The semantic meaning of actor record field +0x04 is unproven; types.h names it field_004.",
         "No direct code or data xref to 0x43090 was found, so any indirect dispatch caller remains unresolved."
       ]
-    },
-    "0x430d0": {
-      "kind": "function",
-      "status": "ported"
     },
     "0x43270": {
       "kind": "function",
@@ -14865,10 +14853,6 @@
         "The semantic meanings of FUN_0017da40's five parameters and the 0x47e4d4 target structure remain unidentified."
       ]
     },
-    "0x180050": {
-      "kind": "function",
-      "status": "ported"
-    },
     "0x180820": {
       "kind": "function",
       "status": "ported"
@@ -14975,10 +14959,6 @@
       "uncertain": [
         "Ghidra dropped every swizzler argument and the width/height/depth results; the argument lists here are reconstructed from the original push order (2D: dst=temp, src=mip_addr, width in ESI, height in EBX; 3D adds depth from [EBP-0xc]; cubemap walks one source pointer by mip_size/6 and derives dst as src plus a once-computed temp-minus-mip_addr delta). Verified against the disassembly but not against runtime behavior."
       ]
-    },
-    "0x183390": {
-      "kind": "function",
-      "status": "ported"
     },
     "0x183650": {
       "kind": "function",
@@ -15171,15 +15151,7 @@
       "kind": "function",
       "status": "ported"
     },
-    "0x18ca40": {
-      "kind": "function",
-      "status": "ported"
-    },
     "0x18d0b0": {
-      "kind": "function",
-      "status": "ported"
-    },
-    "0x18d2c0": {
       "kind": "function",
       "status": "ported"
     },
@@ -15973,10 +15945,6 @@
         "VC71 47.2% is provably the arithmetic ceiling, not a lift defect: compare_obj._trim_trailing_table_data discards everything after the last RET for any function containing a scaled indirect jump, so the 163-instruction reference is extracted as 91, and 91/193 = 47.2% means the LCS already covers every extracted reference instruction in order.",
         "The meaning of parse result values 2, 5 and 6 and of the three character sets fetched by FUN_0019d3c0(tag_index, 4|5|6) is unproven, so they are left numeric; result 5 is never produced by this function and is only tested in the loop condition."
       ]
-    },
-    "0x19c5d0": {
-      "kind": "function",
-      "status": "ported"
     },
     "0x19d060": {
       "kind": "function",
@@ -17237,7 +17205,15 @@
       "kind": "function",
       "status": "ported"
     },
+    "0x1b5750": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0x1b5770": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x1b5820": {
       "kind": "function",
       "status": "ported"
     },
@@ -18003,6 +17979,10 @@
       "status": "ported"
     },
     "0x1c7160": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x1c7230": {
       "kind": "function",
       "status": "ported"
     },
@@ -18782,6 +18762,62 @@
     },
     "0x5065a4": {
       "kind": "data",
+      "status": "ported"
+    },
+    "0x31440": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x32ac0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x32bb0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x32c10": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x33330": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x32b50": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x355f0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x425c0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x430d0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x180050": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x183390": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x18ca40": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x18d2c0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x19c5d0": {
+      "kind": "function",
       "status": "ported"
     }
   }
