@@ -4638,6 +4638,42 @@ void FUN_000ce0c0(data_t *data, int *head_ptr, int value)
         data->maximum_count);
 }
 
+/* 0xce110 -- release a whole data-pool reference chain: walk the singly
+ * linked list of datums starting at first_reference, deleting each one and
+ * following its field+0x8 successor link until the NONE (-1) terminator.
+ * Called from object_list_delete (0xce28f) as
+ * FUN_000ce110(*(data_t **)0x5aa694, list_header->field_08); the field+0x8
+ * link is the same chain field FUN_000ce090 pops and FUN_000ce0c0 pushes.
+ *
+ * Confirmed from disassembly (0xce110-0xce140):
+ *   MOV ESI,[EBP+0xc] / CMP ESI,-1 / JZ tail -- entry guard on the head
+ *     index; an empty chain skips the loop entirely.
+ *   MOV EBX,[EBP+8] -- data pool pointer, held live across the loop.
+ *   PUSH ESI / PUSH EBX / CALL 0x119320 -- datum_get(data, index).
+ *   MOV EDI,EAX -- keep the datum pointer live across the delete.
+ *   PUSH ESI / PUSH EBX / CALL 0x1196d0 -- datum_delete(data, index).
+ *   MOV ESI,[EDI+8] -- the successor link is read AFTER the delete, from
+ *     the just-freed datum's memory; that read order is preserved here.
+ *   ADD ESP,0x10 -- MSVC's single deferred cleanup for both two-argument
+ *     calls (this is the ARG_COUNT hazard the call_site_audit flags on the
+ *     datum_delete site, not a four-argument call).
+ *   CMP ESI,-1 / JNZ 0xce121 -- loop back to the datum_get push pair.
+ * No string names this function, so it keeps the FUN_ name; field+0x8 has
+ * no evidence tying it to a named struct, consistent with the rest of this
+ * reference-chain cluster treating the datums as raw byte offsets. */
+void FUN_000ce110(data_t *data, int first_reference)
+{
+  char *reference;
+  int index;
+
+  index = first_reference;
+  while (index != -1) {
+    reference = (char *)datum_get(data, index);
+    datum_delete(data, index);
+    index = *(int *)(reference + 0x8);
+  }
+}
+
 /* 0xce150 -- allocate the two hs object-list data pools and store them at
  * 0x5aa698 (header pool) / 0x5aa694 (reference pool). Called once from
  * hs_initialize (xrefs_to: 0xc507a, unconditional call).

@@ -12318,7 +12318,8 @@
     },
     {
      "addr": "0xce110",
-     "decl": "void FUN_000ce110(data_t *data, int first_reference);"
+     "decl": "void FUN_000ce110(data_t *data, int first_reference);",
+     "ported": true
     },
     {
      "addr": "0xce150",
