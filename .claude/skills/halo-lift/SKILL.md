@@ -82,7 +82,10 @@ All edits target **that path**, not a hardcoded `/mnt/g/dev/halo`.
    the Ghidra decompile — advisory context only. It does not change step 4:
    disassembly verification against `cachebeta.xbe` is still mandatory and still
    the only authority. Per `naming-confidence`, CEA names and struct layouts are
-   T2 evidence at most, never T1, and files flagged `owner_divergence` in the CEA
+   capped by `name_source`: `halocea` is T2, `halocea-guess` is T3, and only
+   `halocea+assert` (corroborated by our own 2276 assert/format string) reaches
+   T1 — the T2 cap is the default, not a ceiling that overrides a `+assert`
+   corroboration. Files flagged `owner_divergence` in the CEA
    index are the port author's own back-ports to 2276, not independent Xbox 360
    evidence — the tool calls this out loudly when it applies.
 4. **Cross-check decompilation against raw disassembly.** Mandatory call-site
