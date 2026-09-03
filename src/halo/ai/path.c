@@ -167,7 +167,7 @@ void FUN_0005e0d0(void *param_1, float *param_2, int param_3, int param_4)
  * state and returns its node index, or NONE (-1) if the heap is empty.
  *
  * Register-arg: state passed in EAX (no stack push at either call site in
- * FUN_0005f740: `mov eax, edi; call 0x5e560`).
+ * path_state_traverse: `mov eax, edi; call 0x5e560`).
  *
  * `state->heap_count` (word at +0x11084) is a "next free slot" index into the
  * 1-indexed heap array at +0x11086 (dword entries: low word = node_index,
@@ -802,13 +802,13 @@ LAB_0005ef13:
  * Increments one of two global 16-bit counters depending on a flag at +0x4c
  * (obstacle_valid). Clears the node list, resets distance fields, calls
  * FUN_0005ef80 (@edi) to set up the initial path node. If that succeeds,
- * calls FUN_0005f740 to perform the full traverse. If a debug record exists
+ * calls path_state_traverse to perform the full traverse. If a debug record exists
  * at +0x48, copies the entire path buffer into it, stores the BSP index, and
  * asserts the traverse result is non-zero (not _path_traverse_result_none).
  * If the result is not 5, marks the debug record as needing attention.
  *
  * Returns: char (0 = failed/skipped, nonzero = traverse result from
- * FUN_0005f740)
+ * path_state_traverse)
  */
 char FUN_0005ff70(unsigned int *param_1)
 {
@@ -833,7 +833,7 @@ char FUN_0005ff70(unsigned int *param_1)
   }
   cVar1 = FUN_0005ef80(param_1);
   if (cVar1 != '\0') {
-    local_5 = FUN_0005f740(param_1);
+    local_5 = path_state_traverse(param_1);
   } else {
     if (*(unsigned int *)((char *)param_1 + 0x48) != 0) {
       *(short *)(*(unsigned int *)((char *)param_1 + 0x48) + 0x10) = 1;

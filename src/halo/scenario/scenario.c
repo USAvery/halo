@@ -178,7 +178,7 @@ typedef struct render_model_effect {
  * shadow pass (non-zero); render_data->lighting (+4) is the cluster lighting.
  *
  * NOTE: each of the two model-submit sites is a single 13-argument cdecl call
- * to FUN_00123ed0 (add $0x34 = 13 dwords of stack cleanup). MSVC evaluates the
+ * to render_model (add $0x34 = 13 dwords of stack cleanup). MSVC evaluates the
  * cdecl arguments right-to-left, so object_get_node_matrices (0x13fe70), which
  * supplies arg 3, is called in the middle of the push sequence — after args
  * 4..13 and before args 1..2. Passing only three of these arguments would feed
@@ -325,7 +325,7 @@ void FUN_0018b190(void *render_data, void *parent_model_effect,
            * right-to-left, so the object_get_node_matrices call (arg 3) is
            * emitted after the trailing ten pushes and before the first two —
            * matching the interleaved getter call in the original. */
-          FUN_00123ed0(*(int *)(obje + 0x34), dist,
+          render_model(*(int *)(obje + 0x34), dist,
                        object_get_node_matrices(object_handle), obj + 0x130,
                        obj + 0x168, obj + 0xe4, *(int *)(rd + 4), obj + 0x50,
                        *(int *)(obj + 0x5c), &record, object_handle,
@@ -336,7 +336,7 @@ void FUN_0018b190(void *render_data, void *parent_model_effect,
           }
         } else {
           /* Shadow pass: no record built (arg10 NULL, arg13 constant 2). */
-          FUN_00123ed0(*(int *)(obje + 0x34), dist * *(float *)0x2533e4,
+          render_model(*(int *)(obje + 0x34), dist * *(float *)0x2533e4,
                        object_get_node_matrices(object_handle), obj + 0x130,
                        obj + 0x168, obj + 0xe4, *(int *)(rd + 4), obj + 0x50,
                        *(int *)(obj + 0x5c), 0, object_handle,
@@ -1349,7 +1349,7 @@ void FUN_0018c5b0(void)
  * (0x2b1b50) facing back (perpendicular basis), FUN_00139b40. Finally the
  * node matrices are pulled into a scaled view space (scale 2^-10, position
  * * 0x2b1b4c), FUN_0017d1a0(1) selects the sky rasterizer mode, and the
- * model is drawn with unit region scales via the 13-arg FUN_00123ed0,
+ * model is drawn with unit region scales via the 13-arg render_model,
  * flushed through FUN_0016b240 (the 0x17cbf0 thunk's target, matching the
  * scenario_test_pvs reloc lesson). cdecl, void(void), 0x1658-byte frame via
  * _chkstk. */
@@ -1504,7 +1504,7 @@ void FUN_0018ca40(void)
       *(int32_t *)record = *(int32_t *)defcol;
       *(int32_t *)(record + 4) = *(int32_t *)(defcol + 1);
       *(int32_t *)(record + 8) = *(int32_t *)(defcol + 2);
-      FUN_00123ed0(*(int *)(rec + 0xc), 0.0f, node_matrices, 0, 0, scales,
+      render_model(*(int *)(rec + 0xc), 0.0f, node_matrices, 0, 0, scales,
                    (int)record, (void *)0x506550, 0, 0, 0, 0, 1);
       FUN_0016b240();
     }
