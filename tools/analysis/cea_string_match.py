@@ -601,8 +601,8 @@ def _print_variant_results(result):
     labels = {
         'a_single_alone': '(a) one unique string alone (no corroboration required)',
         'b_single_corroborated': '(b) one unique string + corroboration required',
-        'c_double_regardless': '(c) two+ unique strings, regardless of corroboration',
-        'combined_b_or_c': '(shipped rule) b OR c',
+        'c_double_regardless': '(c) two+ unique strings, regardless of corroboration -- shipped default (--min-unique-strings 2)',
+        'combined_b_or_c': '(b OR c) -- NOT the shipped rule; reachable via --min-unique-strings 1, see propose --help',
     }
     for key, label in labels.items():
         r = result[key]
