@@ -33036,7 +33036,8 @@
     },
     {
      "addr": "0xfe910",
-     "decl": "void FUN_000fe910(void);"
+     "decl": "void weapon_update(void);",
+     "comment": "[NAME: weapon_update — name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
     }
    ],
    "name": "weapons.obj",
@@ -38529,7 +38530,8 @@
     },
     {
      "addr": "0x149680",
-     "decl": "void FUN_00149680(void);"
+     "decl": "void collision_bsp_test_pill(void);",
+     "comment": "[NAME: collision_bsp_test_pill — name_source=cea-pdb method=line_containment tier=high_confidence (T2), cea-apply-unified 2026-09-03]"
     },
     {
      "addr": "0x149c60",
