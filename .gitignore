@@ -194,3 +194,7 @@ scratch/*
 # Claude Code plugin skill lockfile (local tooling, not project source)
 skills-lock.json
 .grok/*
+
+# Host-local CEA corpus root (machine-specific path); see
+# tools/analysis/cea_corpus.path.example for the format.
+tools/analysis/cea_corpus.path

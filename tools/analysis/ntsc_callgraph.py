@@ -127,8 +127,17 @@ DEFAULT_OUT = REPO_ROOT / "artifacts" / "ntsc_callgraph" / "callgraph.json"
 SECTION_HEADER_SIZE = 0x38  # bytes, per-entry, in the XBE section header table
 MAX_STRING_LEN = 200
 MIN_STRING_LEN = 4
+DEFAULT_MAX_FALLBACK_SPAN = 4096  # bytes; see resolve_function_bounds()
 
 _NAME_FROM_DECL_RE = re.compile(r"\b([A-Za-z_][A-Za-z0-9_]*)\s*\(")
+
+# Same pattern as knowledge.py's reg_filter_re -- stripped from decl before
+# name extraction below so the two tools agree byte-for-byte on what "the
+# decl-derived name" means, even though in practice @<reg> annotations only
+# ever appear inside the parameter list (after the function name's own
+# opening paren) and so do not change what _NAME_FROM_DECL_RE's leftmost
+# search finds. Stripping first removes any doubt.
+_REG_ANNOTATION_RE = re.compile(r"@<(\w+)>")
 
 
 # ---------------------------------------------------------------------------
@@ -245,20 +254,37 @@ def try_decode_string(data: bytes, sections: List[Section], va: int) -> Optional
 # ---------------------------------------------------------------------------
 
 class KbFunc:
-    __slots__ = ("addr", "name", "object", "decl")
+    __slots__ = ("addr", "name", "object", "decl", "kb_name")
 
-    def __init__(self, addr: int, name: str, object_: str, decl: str):
+    def __init__(self, addr: int, name: str, object_: str, decl: str, kb_name: Optional[str] = None):
         self.addr = addr
         self.name = name
         self.object = object_
         self.decl = decl
+        # The kb.json row's explicit "name" field, kept alongside the
+        # decl-derived `name` above only when it differs and is informative
+        # (see load_kb() for why `name` no longer prefers this field).
+        self.kb_name = kb_name
 
 
 def load_kb(path: Path) -> Dict[int, KbFunc]:
     """Load every function from kb.json's `.objects[].functions[]` groups.
     (kb.json also carries ~87 top-level "0x..." address keys, but every one
     of those duplicates an entry already inside .objects[]; .objects[] is
-    the complete, non-redundant 9,133-function source of truth.)"""
+    the complete, non-redundant 9,133-function source of truth.)
+
+    `name` is always the decl-derived identifier -- the same rule
+    cea_body.py's function_name() and knowledge.py's _extract_name_regex()
+    use -- not kb.json's optional explicit "name" field. Previously this
+    preferred the explicit "name" field when present, which put this tool
+    out of step with cea_body.py and knowledge.py: at least five addresses
+    (e.g. 0x10a930, kb name "transition_table_fill" but decl
+    "FUN_0010a930(...)") got a different primary name here than in the two
+    other tools, so a lookup keyed on this tool's callgraph output could
+    silently miss the same function elsewhere. The explicit name, when
+    present and different, is kept on kb_name for display/debugging, and
+    cea_body.py separately indexes kb.json by both spellings so it resolves
+    either one."""
     with open(path, "r", encoding="utf-8") as f:
         kb = json.load(f)
 
@@ -274,11 +300,12 @@ def load_kb(path: Path) -> Dict[int, KbFunc]:
             except ValueError:
                 continue
             decl = fn.get("decl", "")
-            name = fn.get("name")
-            if not name:
-                m = _NAME_FROM_DECL_RE.search(decl)
-                name = m.group(1) if m else f"FUN_{addr:08x}"
-            funcs[addr] = KbFunc(addr, name, obj_name, decl)
+            cleaned_decl = _REG_ANNOTATION_RE.sub("", decl)
+            m = _NAME_FROM_DECL_RE.search(cleaned_decl)
+            name = m.group(1) if m else f"FUN_{addr:08x}"
+            explicit_name = fn.get("name")
+            kb_name = explicit_name if explicit_name and explicit_name != name else None
+            funcs[addr] = KbFunc(addr, name, obj_name, decl, kb_name)
     return funcs
 
 
@@ -307,9 +334,27 @@ def resolve_function_bounds(
     kb_funcs: Dict[int, KbFunc],
     bounds: Dict[int, int],
     sections: List[Section],
-) -> Tuple[Dict[int, Tuple[int, Optional[Section]]], int, int]:
-    """Return (addr -> (end, owning_section), functions_with_bounds_entry,
-    functions_using_fallback)."""
+    max_fallback_span: Optional[int] = None,
+) -> Tuple[Dict[int, Tuple[int, Optional[Section], str, bool]], int, int, int]:
+    """Return (addr -> (end, owning_section, bounds_source, span_capped),
+    functions_with_bounds_entry, functions_using_fallback, functions_capped).
+
+    bounds_source is "table" when tools/verify/function_bounds.json had an
+    entry for this address, "fallback" when the end was instead guessed as
+    "starts at the next known function in the same section, or the section
+    end if this is the last one" (mirrors
+    ghidra_scripts/ExportFunctionSizes.java's clamp rule). The fallback rule
+    has no way to know that the next known *kb.json* function isn't actually
+    the next real function -- large gaps of unlisted static helpers, padding,
+    or literal data between two kb.json entries all inflate a fallback span
+    silently (e.g. FUN_001f9d1d measured at a 19,367-byte fallback span).
+    When max_fallback_span is given, a fallback span longer than it is
+    clamped to addr + max_fallback_span and span_capped is set True, so
+    downstream consumers (and this script's own disassembly loop, which
+    slices instructions using this same end value) don't attribute a large
+    stretch of probably-unrelated code to one function on a guess. Bounds
+    that came from the table are never capped -- they are measured, not
+    guessed."""
     addr_section: Dict[int, Optional[Section]] = {}
     by_section: Dict[int, List[int]] = defaultdict(list)
     for addr in kb_funcs:
@@ -320,19 +365,23 @@ def resolve_function_bounds(
     for lst in by_section.values():
         lst.sort()
 
-    result: Dict[int, Tuple[int, Optional[Section]]] = {}
+    result: Dict[int, Tuple[int, Optional[Section], str, bool]] = {}
     with_bounds = 0
     fallback = 0
+    capped = 0
     for addr in kb_funcs:
         sec = addr_section[addr]
+        span_capped = False
         if addr in bounds:
             with_bounds += 1
+            bounds_source = "table"
             end = bounds[addr]
             if sec is not None:
                 end = min(end, sec.va + sec.vsize)
             end = max(end, addr + 1)
         else:
             fallback += 1
+            bounds_source = "fallback"
             end = None
             if sec is not None:
                 group = by_section[id(sec)]
@@ -340,8 +389,12 @@ def resolve_function_bounds(
                 end = group[idx] if idx < len(group) else sec.va + sec.vsize
             if end is None or end <= addr:
                 end = addr + 1
-        result[addr] = (end, sec)
-    return result, with_bounds, fallback
+            if max_fallback_span is not None and end - addr > max_fallback_span:
+                end = addr + max_fallback_span
+                span_capped = True
+                capped += 1
+        result[addr] = (end, sec, bounds_source, span_capped)
+    return result, with_bounds, fallback, capped
 
 
 # ---------------------------------------------------------------------------
@@ -459,7 +512,7 @@ def run_sweep(
     # kb functions living there.
     sections_needed: Dict[int, Section] = {}
     members_by_section: Dict[int, List[Tuple[int, int]]] = defaultdict(list)
-    for addr, (end, sec) in resolved.items():
+    for addr, (end, sec, _bounds_source, _span_capped) in resolved.items():
         if sec is not None:
             sections_needed[id(sec)] = sec
             members_by_section[id(sec)].append((addr, end))
@@ -518,7 +571,12 @@ def main() -> int:
     ap.add_argument("--bounds", type=Path, default=DEFAULT_BOUNDS)
     ap.add_argument("--kb", type=Path, default=DEFAULT_KB)
     ap.add_argument("--out", type=Path, default=DEFAULT_OUT)
+    ap.add_argument("--max-fallback-span", type=int, default=DEFAULT_MAX_FALLBACK_SPAN,
+                     help="cap a fallback (bounds_source=\"fallback\") function span to this many "
+                          "bytes from its start address; a table-sourced span is never capped. "
+                          "Pass 0 to disable capping entirely. Default: %(default)s bytes.")
     args = ap.parse_args()
+    max_fallback_span = args.max_fallback_span if args.max_fallback_span > 0 else None
 
     t0 = time.perf_counter()
 
@@ -529,9 +587,11 @@ def main() -> int:
     bounds_meta_md5 = bounds_meta.get("xbe_md5")
     md5_matches = (bounds_meta_md5 == xbe_md5)
 
-    resolved, with_bounds, fallback = resolve_function_bounds(kb_funcs, bounds, sections)
+    resolved, with_bounds, fallback, capped = resolve_function_bounds(
+        kb_funcs, bounds, sections, max_fallback_span
+    )
 
-    outside_any_section = sum(1 for _, sec in resolved.values() if sec is None)
+    outside_any_section = sum(1 for _, sec, _bs, _sc in resolved.values() if sec is None)
 
     per_func, callers_map, total_instructions, decode_errors = run_sweep(
         data, sections, kb_funcs, resolved
@@ -546,7 +606,7 @@ def main() -> int:
     functions_with_callees = 0
 
     for addr, fn in sorted(kb_funcs.items()):
-        end, _sec = resolved[addr]
+        end, _sec, bounds_source, span_capped = resolved[addr]
         acc = per_func[addr]
         callees_sorted = sorted(hex(c) for c in acc["callees"])
         import_calls_sorted = sorted(hex(c) for c in acc["import_calls"])
@@ -557,7 +617,10 @@ def main() -> int:
             "addr": hex(addr),
             "end": hex(end),
             "name": fn.name,
+            "kb_name": fn.kb_name,
             "object": fn.object,
+            "bounds_source": bounds_source,
+            "span_capped": span_capped,
             "callees": callees_sorted,
             "unresolved_calls": acc["unresolved_calls"],
             "import_calls": import_calls_sorted,
@@ -588,10 +651,12 @@ def main() -> int:
         "kb_functions_total": len(kb_funcs),
         "functions_with_bounds_entry": with_bounds,
         "functions_using_fallback_end": fallback,
+        "functions_with_fallback_span_capped": capped,
+        "max_fallback_span_bytes": max_fallback_span,
         "functions_outside_any_known_section": outside_any_section,
         "bounds_table_coverage_pct": round(100.0 * with_bounds / len(kb_funcs), 2) if kb_funcs else 0.0,
         "sections_disassembled": sorted(
-            {sec.name for _, sec in resolved.values() if sec is not None}
+            {sec.name for _, sec, _bs, _sc in resolved.values() if sec is not None}
         ),
         "total_instructions_decoded": total_instructions,
         "functions_with_decode_errors": decode_errors,

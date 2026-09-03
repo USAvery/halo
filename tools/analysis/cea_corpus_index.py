@@ -33,17 +33,128 @@ throughout):
 """
 
 import argparse
+import hashlib
 import json
 import os
 import re
 import sys
 import time
 
-DEFAULT_CORPUS = (
-    "/mnt/g/H1 Performance Build 2.0 Beta 1 LOCAL 2v2/release-package-local/"
-    "H1 Performance Build 2.0 Beta 1 LOCAL 2v2/src/engine"
-)
+_ANALYSIS_DIR = os.path.dirname(os.path.abspath(__file__))
+CORPUS_PATH_FILE = os.path.join(_ANALYSIS_DIR, "cea_corpus.path")
+
 DEFAULT_OUT = "artifacts/cea_corpus/index.json"
+
+
+def resolve_corpus_root(cli_value=None):
+    """Resolve the CEA corpus root (src/engine of the decompiled Xbox 360
+    tree) without hardcoding a machine-specific path in the source.
+
+    Resolution order:
+      1. --corpus on the command line (the cli_value argument here).
+      2. The HALO_CEA_CORPUS environment variable.
+      3. The first non-empty, non-comment line of
+         tools/analysis/cea_corpus.path, a gitignored local file (see
+         tools/analysis/cea_corpus.path.example for the format).
+    Raises SystemExit with a message naming all three options if none of
+    them resolve.
+    """
+    candidates = []
+    if cli_value:
+        candidates.append(("--corpus", cli_value))
+    env_value = os.environ.get("HALO_CEA_CORPUS")
+    if env_value:
+        candidates.append(("HALO_CEA_CORPUS", env_value))
+    if os.path.exists(CORPUS_PATH_FILE):
+        with open(CORPUS_PATH_FILE, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#"):
+                    candidates.append(("tools/analysis/cea_corpus.path", line))
+                    break
+    for _source, candidate in candidates:
+        if os.path.isdir(candidate):
+            return candidate
+    detail = "\n".join(f"  {source}: {path}" for source, path in candidates)
+    raise SystemExit(
+        "Could not resolve an existing CEA corpus root (expected a directory "
+        "containing blam/, data/, and headers/). Provide it one of three ways:\n"
+        "  1. --corpus <path to src/engine of the CEA decompile tree>\n"
+        "  2. export HALO_CEA_CORPUS=<path>\n"
+        "  3. Create tools/analysis/cea_corpus.path (gitignored) containing "
+        "the path on its first line -- see tools/analysis/cea_corpus.path.example.\n"
+        + ("Configured candidates:\n" + detail if detail else "No configured candidates found.")
+    )
+
+
+def validate_corpus_layout(corpus_root):
+    missing = [sub for sub in ("blam", "data", "headers")
+               if not os.path.isdir(os.path.join(corpus_root, sub))]
+    if missing:
+        raise SystemExit(
+            f"CEA corpus root is missing required directories: {', '.join(missing)}: "
+            f"{corpus_root}"
+        )
+    return corpus_root
+
+
+# Keep path resolution and layout validation separate so callers can report a
+# useful distinction between an unconfigured path and a malformed corpus.
+# Index generation validates both before walking any files.
+
+
+def compute_corpus_signature(corpus_root):
+    """The authoritative staleness fingerprint for the corpus, recorded into
+    index.json at generation time: file count plus a sha256 over the sorted
+    "relpath:size" list of every file under blam/, data/, and headers/.
+
+    Also carries "fast_hash", a sha256 over the sorted relpath list alone
+    (no per-file os.path.getsize() calls). On this repo's corpus (11,901
+    files over a /mnt/g 9p mount) the getsize() calls dominate the cost of
+    this function (~31s measured), because each is a separate round trip to
+    the host filesystem, while just walking the tree and hashing paths costs
+    well under a second. Downstream per-invocation tools (cea_body.py,
+    cea_propagate_names.py) cannot afford the full walk+getsize cost on
+    every run, so they compare against fast_hash via
+    compute_corpus_fast_signature() below instead of recomputing this
+    function. fast_hash catches files added, removed, or renamed (the
+    common case: someone points --corpus at a different or updated checkout)
+    but will not catch an in-place edit that changes a file's size without
+    renaming it — that's the deliberate tradeoff for keeping the check fast
+    enough to run unconditionally."""
+    entries = []
+    relpaths = []
+    for sub in ("blam", "data", "headers"):
+        sub_dir = os.path.join(corpus_root, sub)
+        for path in walk_files(sub_dir, (".c", ".h")):
+            relpath = rel(path, corpus_root)
+            relpaths.append(relpath)
+            try:
+                size = os.path.getsize(path)
+            except OSError:
+                size = -1
+            entries.append(f"{relpath}:{size}")
+    entries.sort()
+    relpaths.sort()
+    digest = hashlib.sha256("\n".join(entries).encode("utf-8")).hexdigest()
+    fast_digest = hashlib.sha256("\n".join(relpaths).encode("utf-8")).hexdigest()
+    return {"file_count": len(entries), "hash": digest, "fast_hash": fast_digest}
+
+
+def compute_corpus_fast_signature(corpus_root):
+    """The cheap half of compute_corpus_signature(): file count plus
+    fast_hash only, from a walk that never calls os.path.getsize(). Measured
+    at well under a second on this repo's corpus, versus ~31s for the full
+    signature. This is what per-invocation tools should call to compare
+    against the "fast_hash" recorded by compute_corpus_signature()."""
+    relpaths = []
+    for sub in ("blam", "data", "headers"):
+        sub_dir = os.path.join(corpus_root, sub)
+        for path in walk_files(sub_dir, (".c", ".h")):
+            relpaths.append(rel(path, corpus_root))
+    relpaths.sort()
+    fast_digest = hashlib.sha256("\n".join(relpaths).encode("utf-8")).hexdigest()
+    return {"file_count": len(relpaths), "fast_hash": fast_digest}
 
 # C89 keywords plus the MSVC/decompiler pseudo-keywords that show up in this
 # corpus, so they never get reported as "callees".
@@ -63,11 +174,16 @@ OWNER_MARKERS = ("OWNER-DIRECTED", "OWNER DECISION")
 
 ADDR_RE = re.compile(r"\b0x(8[0-9A-Fa-f]{5,7})\b")
 STRING_RE = re.compile(r'"((?:\\.|[^"\\])*)"')
-IDENT_CALL_RE = re.compile(r"\b([A-Za-z_]\w*)\s*\(")
-# (?<!\.) and (?<!->) keep this from matching a struct/union member access
-# (foo.index, bar->index) as if it were a reference to the global "index" or
-# "bar" — data-array names are short and common enough (index, count, state)
-# to collide with ordinary field names across the corpus.
+# (?<!\.) and (?<!->) keep both of these from matching a struct/union member
+# access (foo.index, bar->index) as if it were a reference to the global
+# "index" or "bar" -- data-array names are short and common enough (index,
+# count, state) to collide with ordinary field names across the corpus. This
+# guard was previously only on IDENT_RE; without it on IDENT_CALL_RE too,
+# a member-access method call like shader->effect->lpVtbl->SetVector(...)
+# was reported as a callee "SetVector", "effect", or "lpVtbl" depending on
+# where the chain broke -- a phantom callee that no CEA function named
+# SetVector/effect/lpVtbl anywhere in the corpus.
+IDENT_CALL_RE = re.compile(r"(?<!\.)(?<!->)\b([A-Za-z_]\w*)\s*\(")
 IDENT_RE = re.compile(r"(?<!\.)(?<!->)\b([A-Za-z_]\w*)\b")
 BLAMPC_RE = re.compile(r"\bblampc_[A-Za-z0-9_]*\b")
 HEADER_INCLUDE_RE = re.compile(r'#include\s*"(?:\.\./)*headers/')
@@ -473,19 +589,31 @@ def build_index(corpus_root):
         "headers_scanned": len(header_files),
     }
 
+    signature = compute_corpus_signature(corpus_root)
+
     return {
         "functions": function_records,
         "data": data_records,
         "structs": struct_records,
         "summary": summary,
+        "corpus_signature": {
+            "corpus_root": corpus_root,
+            "file_count": signature["file_count"],
+            "hash": signature["hash"],
+            "fast_hash": signature["fast_hash"],
+        },
     }
 
 
 def main():
     ap = argparse.ArgumentParser(description="Index the CEA Xbox 360 decompiled C corpus.")
-    ap.add_argument("--corpus", default=DEFAULT_CORPUS, help="Path to src/engine of the corpus.")
+    ap.add_argument("--corpus", default=None,
+                     help="Path to src/engine of the corpus. If omitted, falls back to the "
+                          "HALO_CEA_CORPUS environment variable, then to "
+                          "tools/analysis/cea_corpus.path.")
     ap.add_argument("--out", default=DEFAULT_OUT, help="Output JSON path.")
     args = ap.parse_args()
+    args.corpus = validate_corpus_layout(resolve_corpus_root(args.corpus))
 
     t0 = time.time()
     index = build_index(args.corpus)
@@ -499,6 +627,7 @@ def main():
 
     out_size = os.path.getsize(args.out)
     print(json.dumps(index["summary"], indent=2))
+    print(json.dumps(index["corpus_signature"], indent=2))
     print("elapsed_seconds=%.2f" % elapsed, file=sys.stderr)
     print("output_bytes=%d" % out_size, file=sys.stderr)
 

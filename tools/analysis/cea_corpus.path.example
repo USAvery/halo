@@ -1,0 +1,18 @@
+# Example tools/analysis/cea_corpus.path.
+#
+# Copy this file to tools/analysis/cea_corpus.path (that filename, without
+# ".example") and edit the path below to point at src/engine of your own
+# checkout of the CEA Xbox 360 decompile tree. That file is gitignored, so
+# each machine keeps its own path without touching tracked source.
+#
+# Lines starting with "#" and blank lines are ignored; the first real line
+# is used as the corpus root.
+#
+# Resolution order used by cea_corpus_index.py, cea_body.py, and
+# cea_propagate_names.py:
+#   1. --corpus <path> on the command line
+#   2. HALO_CEA_CORPUS environment variable
+#   3. this file (tools/analysis/cea_corpus.path)
+#
+# Example value from the machine this tooling was developed on:
+/mnt/g/H1 Performance Build 2.0 Beta 1 LOCAL 2v2/release-package-local/H1 Performance Build 2.0 Beta 1 LOCAL 2v2/src/engine
