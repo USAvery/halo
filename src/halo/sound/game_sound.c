@@ -304,6 +304,84 @@ void game_sound_restore(void)
   }
 }
 
+/* Allocate a new looping-sound datum in the object-looping-sounds table
+ * (0x1c7230).
+ *
+ * `marker_name` is required (asserted).  When `object_index` is NONE the
+ * sound is unattached and no marker lookup happens.  Otherwise the object's
+ * marker is resolved with object_get_markers_by_string_id(..., 1) into a
+ * 108-byte marker buffer; a zero marker count aborts with NONE.
+ *
+ * A NONE `sound_tag_index` returns NONE without touching the table.
+ *
+ * Entry layout written here (table datum size is 0x34, see
+ * game_sound_initialize):
+ *   +0x02 int16  = 2      (state/kind, meaning unproven)
+ *   +0x04 uint32 = 0      (flags; bit 0x10 is _game_looping_sound_scripted)
+ *   +0x0c int32  = sound_tag_index ('lsnd')
+ *   +0x10 int32  = object_index
+ *   +0x14 int32  = NONE
+ *   +0x18 int16  = scale_index
+ *   +0x1a int16  = marker[+0x00]
+ *   +0x1c..+0x24 = marker[+0x2c..+0x34]  (three dwords)
+ *   +0x28..+0x30 = marker[+0x08..+0x10]  (three dwords)
+ * The copied marker fields are raw offsets into the marker buffer; their
+ * meaning is unproven here (units.c uses +0x38 and +0x60 of the same buffer
+ * for a matrix and a position, which are different fields).
+ */
+int game_looping_sound_new(int object_index, int sound_tag_index,
+                           void *marker_name, short scale_index)
+{
+  char marker[0x6c];
+  short marker_count;
+  int looping_sound_index;
+  char *entry;
+  char *dst;
+
+  looping_sound_index = NONE;
+
+  if (marker_name == 0) {
+    display_assert("marker_name", "c:\\halo\\SOURCE\\sound\\game_sound.c", 0xef,
+                   1);
+    system_exit(-1);
+  }
+
+  if (sound_tag_index == NONE)
+    goto done;
+
+  if (object_index != NONE) {
+    marker_count =
+      object_get_markers_by_string_id(object_index, marker_name, marker, 1);
+    if (marker_count == 0)
+      goto done;
+  }
+
+  looping_sound_index = data_new_at_index(*(data_t **)0x5054e4);
+  if (looping_sound_index != NONE) {
+    entry = (char *)datum_get(*(data_t **)0x5054e4, looping_sound_index);
+    *(int *)(entry + 0x10) = object_index;
+    *(int *)(entry + 0xc) = sound_tag_index;
+    *(int16_t *)(entry + 0x2) = 2;
+    *(int *)(entry + 0x4) = 0;
+    *(int16_t *)(entry + 0x18) = scale_index;
+    *(int *)(entry + 0x14) = NONE;
+    if (object_index != NONE) {
+      *(int16_t *)(entry + 0x1a) = *(int16_t *)(marker + 0x00);
+      dst = entry + 0x1c;
+      *(int *)(dst + 0x0) = *(int *)(marker + 0x2c);
+      *(int *)(dst + 0x4) = *(int *)(marker + 0x30);
+      *(int *)(dst + 0x8) = *(int *)(marker + 0x34);
+      entry += 0x28;
+      *(int *)(entry + 0x0) = *(int *)(marker + 0x08);
+      *(int *)(entry + 0x4) = *(int *)(marker + 0x0c);
+      *(int *)(entry + 0x8) = *(int *)(marker + 0x10);
+    }
+  }
+
+done:
+  return looping_sound_index;
+}
+
 /* Delete a looping-sound datum entry from the object-looping-sounds table
  * (0x1c7330).
  *
@@ -935,8 +1013,8 @@ void game_sound_update(float dt)
         /* Environment changed: stop old music and start new. */
         entry = datum_get(*(data_t **)0x5054e4, music_handle);
         *(uint32_t *)((char *)entry + 4) |= 2; /* set stop flag */
-        music_handle = unattached_looping_sound_start(sound_env_tag_index, -1,
-                                                      0x3f800000);
+        music_handle =
+          unattached_looping_sound_start(sound_env_tag_index, -1, 0x3f800000);
         *(int *)(*(int *)0x5054e0 + 4) = music_handle;
       }
     }

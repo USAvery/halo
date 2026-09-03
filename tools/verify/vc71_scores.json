@@ -43381,32 +43381,32 @@
     "FUN_001ac030": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 30.8,
+      "abi_modeled_mnemonic_pct": 85.7,
       "addr": "0x1ac030",
       "end": "0x1ac06f",
       "kind": "auto",
       "n_r": 21,
-      "opnd_percent": 23.1,
-      "raw_mnemonic_pct": 30.8,
+      "opnd_percent": 76.2,
+      "raw_mnemonic_pct": 85.7,
       "ref": "synth",
       "ref_sha": "9fa7bdd1eb98e585",
-      "score": 30.8,
-      "source": "src/halo/unported_thunks.c"
+      "score": 85.7,
+      "source": "src/halo/sound/sound_manager.c"
     },
     "FUN_001ac070": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 34.8,
+      "abi_modeled_mnemonic_pct": 100.0,
       "addr": "0x1ac070",
       "end": "0x1ac09b",
       "kind": "auto",
       "n_r": 18,
-      "opnd_percent": 26.1,
-      "raw_mnemonic_pct": 34.8,
+      "opnd_percent": 100.0,
+      "raw_mnemonic_pct": 100.0,
       "ref": "synth",
       "ref_sha": "ca2899866b3974fc",
-      "score": 34.8,
-      "source": "src/halo/unported_thunks.c"
+      "score": 100.0,
+      "source": "src/halo/sound/sound_manager.c"
     },
     "FUN_001ac0a0": {
       "abi_model": "raw",
@@ -61906,17 +61906,17 @@
     "game_looping_sound_new": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 8.3,
+      "abi_modeled_mnemonic_pct": 91.7,
       "addr": "0x1c7230",
       "end": "0x1c7329",
       "kind": "auto",
       "n_r": 91,
-      "opnd_percent": 6.2,
-      "raw_mnemonic_pct": 8.3,
+      "opnd_percent": 81.8,
+      "raw_mnemonic_pct": 91.7,
       "ref": "synth",
       "ref_sha": "36c476623e5190c9",
-      "score": 8.3,
-      "source": "src/halo/unported_thunks.c"
+      "score": 91.7,
+      "source": "src/halo/sound/game_sound.c"
     },
     "game_map_loading_in_progress": {
       "abi_model": "raw",

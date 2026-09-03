@@ -9708,7 +9708,8 @@
     },
     {
      "addr": "0x1c7230",
-     "decl": "int game_looping_sound_new(int object_index, int sound_tag_index, void *marker_name, short scale_index);"
+     "decl": "int game_looping_sound_new(int object_index, int sound_tag_index, void *marker_name, short scale_index);",
+     "ported": true
     },
     {
      "addr": "0x1c7500",
@@ -24551,7 +24552,8 @@
     },
     {
      "addr": "0x1ac070",
-     "decl": "void FUN_001ac070(int param_1, int param_2);"
+     "decl": "void FUN_001ac070(int param_1, int param_2);",
+     "ported": true
     },
     {
      "addr": "0x1ac0a0",

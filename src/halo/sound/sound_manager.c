@@ -27,6 +27,28 @@ void FUN_001ac030(int param_1, int param_2)
   }
 }
 
+/* FUN_001ac070 (0x1ac070)
+ *
+ * Stores the low byte of param_2 into the byte field at (unit-type
+ * object)+0x258, then forces the object's region count to 6.
+ * Field meaning at +0x258 is UNKNOWN -- no assert/string evidence; the
+ * offset is only observed written here.  No caller evidence available
+ * (xrefs_to empty in the Ghidra bundle), so the source of param_2 is an
+ * explicit unknown.  No-op when param_1 == -1.
+ *
+ * The reference's single ADD ESP,0x10 is merged cdecl cleanup for the two
+ * 2-argument calls, not a 4-argument call. */
+void FUN_001ac070(int param_1, int param_2)
+{
+  char *obj;
+
+  if (param_1 != -1) {
+    obj = (char *)object_get_and_verify_type(param_1, 3);
+    *(unsigned char *)(obj + 0x258) = (unsigned char)param_2;
+    object_set_region_count(param_1, 6);
+  }
+}
+
 /* sound_object_apply_pitch_delta (0x1ac2f0)
  *
  * Computes a clamped pitch delta and accumulates it onto the object's
