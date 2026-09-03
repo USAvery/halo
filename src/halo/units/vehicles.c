@@ -193,6 +193,27 @@ void FUN_001b56b0(int vehicle_handle, void *state_array)
 }
 
 /*
+ * set_real_quaternion (0x1b5750) - store four floats into a real_quaternion.
+ *
+ * Confirmed: cdecl, EBP frame, no calls. [EBP+0x8] is the destination
+ * pointer; the four remaining dword slots are written to +0x0, +0x4, +0x8,
+ * +0xc in argument order. Slot [EBP+0xc] is moved with FLD/FSTP, proving the
+ * arguments are floats; MSVC bit-copies the other three with MOV because no
+ * conversion is needed.
+ * Inferred: the component names i/j/k/w follow the real_quaternion field
+ * order; the artifact only proves the offsets, not the names. There are no
+ * callers in this build, so the argument-to-component mapping is unverified
+ * beyond the store offsets.
+ */
+void set_real_quaternion(float *out, float i, float j, float k, float w)
+{
+  out[0] = i;
+  out[1] = j;
+  out[2] = k;
+  out[3] = w;
+}
+
+/*
  * vehicle_reset (0x1b5770) — clear the vehicle-specific state block that
  * lives at object +0x424 .. +0x47b.
  *
@@ -245,6 +266,56 @@ void vehicle_reset(int vehicle_handle)
   *(uint32_t *)(vehicle + 0x470) = 0;
   *(uint32_t *)(vehicle + 0x474) = 0;
   *(uint32_t *)(vehicle + 0x478) = 0;
+}
+
+/*
+ * vehicle_new (0x1b5820) — initialize a freshly created vehicle object.
+ *
+ * Confirmed: MOV EBX,[EBP+0x8]; PUSH 0x2; PUSH EBX ->
+ * object_get_and_verify_type(vehicle_handle, 2) (mask 2 = vehicle, the same
+ * mask vehicle_reset / vehicle_hover use). kb.json's prior
+ * "void vehicle_new(void)" was wrong; the binary reads one stack parameter.
+ * Confirmed: MOV EAX,[ESI]; PUSH EAX; PUSH 0x76656869 ->
+ * tag_get('vehi', obj->tag_index).
+ * Confirmed: PUSH EBX; CALL 0x001b5770 -> vehicle_reset(vehicle_handle), one
+ * stack dword. ADD ESP,0x14 (5 dwords) is the COALESCED cdecl cleanup for all
+ * three calls (2 + 2 + 1); it is not a 5-argument call to vehicle_reset.
+ * Confirmed: MOV ECX,[EDI+0x8c]; OR EAX,-1; CMP ECX,EAX; JNZ -> the 'vehi'
+ * definition's physics tag index at +0x8c compared against -1 (no physics).
+ * When absent, bit 0x20 of the object dword at +0x4 is set; when present it is
+ * cleared. The compare is then RE-DONE at 0x1b5866 against the same [EDI+0x8c]
+ * — two separate tests in the reference, kept as two ifs here.
+ * Confirmed: FLD [EDI+0x4]; FMUL [0x253398]; FADD [ESI+0x14]; FSTP [ESI+0x14]
+ * -> obj+0x14 += vehi_def+0x4 * 0.5f, in that x87 operand order. 0x253398 is
+ * the shared 0.5f constant used across projectiles.c / scenario.c.
+ * Confirmed: MOV AL,0x1 with EAX live as 0xffffffff from the earlier OR — a
+ * byte-wide write over a live dword is the MSVC bool return ABI, so the
+ * function returns true unconditionally.
+ * Unknown: the meaning of object+0x14 (a float accumulated by half the vehi
+ * definition's +0x4 field) and of flag bit 0x20 at object+0x4.
+ */
+bool vehicle_new(int vehicle_handle)
+{
+  char *vehicle;
+  char *vehicle_tag;
+
+  vehicle = (char *)object_get_and_verify_type(vehicle_handle, 2);
+  vehicle_tag = (char *)tag_get(0x76656869, *(uint32_t *)vehicle);
+  vehicle_reset(vehicle_handle);
+
+  if (*(int32_t *)(vehicle_tag + 0x8c) == -1) {
+    *(uint32_t *)(vehicle + 0x4) |= 0x20;
+  } else {
+    *(uint32_t *)(vehicle + 0x4) &= 0xffffffdf;
+  }
+
+  if (*(int32_t *)(vehicle_tag + 0x8c) != -1) {
+    *(float *)(vehicle + 0x14) =
+      *(float *)(vehicle_tag + 0x4) * *(float *)0x253398 +
+      *(float *)(vehicle + 0x14);
+  }
+
+  return true;
 }
 
 /*

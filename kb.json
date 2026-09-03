@@ -29170,7 +29170,8 @@
     },
     {
      "addr": "0x1b5750",
-     "decl": "void set_real_quaternion(void);"
+     "decl": "void set_real_quaternion(float *out, float i, float j, float k, float w);",
+     "ported": true
     },
     {
      "addr": "0x1b5770",
@@ -29179,7 +29180,8 @@
     },
     {
      "addr": "0x1b5820",
-     "decl": "void vehicle_new(void);"
+     "decl": "bool vehicle_new(int vehicle_handle);",
+     "ported": true
     },
     {
      "addr": "0x1b5890",

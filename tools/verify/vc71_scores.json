@@ -43619,18 +43619,18 @@
       "source": "src/halo/units/vehicles.c"
     },
     "FUN_001b56b0": {
-      "abi_model": "regparam_stripped",
-      "abi_model_items": 2,
-      "abi_modeled_mnemonic_pct": 91.9,
+      "abi_model": "regparam_stripped_saves",
+      "abi_model_items": 5,
+      "abi_modeled_mnemonic_pct": 94.4,
       "addr": "0x1b56b0",
       "end": "0x1b5747",
       "kind": "auto",
       "n_r": 52,
-      "opnd_percent": 82.9,
+      "opnd_percent": 85.2,
       "raw_mnemonic_pct": 90.3,
       "ref": "synth",
       "ref_sha": "6b81479a6427d535",
-      "score": 91.9,
+      "score": 94.4,
       "source": "src/halo/units/vehicles.c"
     },
     "FUN_001b9920": {
@@ -81283,6 +81283,21 @@
       "score": 100.0,
       "source": "src/halo/ai/ai_debug.c"
     },
+    "set_real_quaternion": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 100.0,
+      "addr": "0x1b5750",
+      "end": "0x1b576f",
+      "kind": "auto",
+      "n_r": 13,
+      "opnd_percent": 100.0,
+      "raw_mnemonic_pct": 100.0,
+      "ref": "synth",
+      "ref_sha": "d4ed52dcc31bc03d",
+      "score": 100.0,
+      "source": "src/halo/units/vehicles.c"
+    },
     "set_real_vector2d": {
       "abi_model": "raw",
       "abi_model_items": 0,
@@ -89743,6 +89758,21 @@
       "score": 100.0,
       "source": "src/halo/units/vehicles.c"
     },
+    "vehicle_is_flipped": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 100.0,
+      "addr": "0x1b5680",
+      "end": "0x1b56ac",
+      "kind": "auto",
+      "n_r": 18,
+      "opnd_percent": 100.0,
+      "raw_mnemonic_pct": 100.0,
+      "ref": "synth",
+      "ref_sha": "49c60c4b33d53034",
+      "score": 100.0,
+      "source": "src/halo/units/vehicles.c"
+    },
     "vehicle_moving_near_any_player": {
       "abi_model": "raw",
       "abi_model_items": 0,
@@ -89756,6 +89786,21 @@
       "ref": "synth",
       "ref_sha": "9ac2081c3d4fc1b0",
       "score": 88.2,
+      "source": "src/halo/units/vehicles.c"
+    },
+    "vehicle_new": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 100.0,
+      "addr": "0x1b5820",
+      "end": "0x1b5884",
+      "kind": "auto",
+      "n_r": 39,
+      "opnd_percent": 97.4,
+      "raw_mnemonic_pct": 100.0,
+      "ref": "synth",
+      "ref_sha": "88227c1e62cad097",
+      "score": 100.0,
       "source": "src/halo/units/vehicles.c"
     },
     "vehicle_render_debug": {
