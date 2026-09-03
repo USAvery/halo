@@ -552,7 +552,7 @@ done:
 }
 
 /* Step a single particle: physics, collision, effects, and aging (0xa1c30).
- * Free-floating particles run point physics (FUN_00154a50) for gravity and
+ * Free-floating particles run point physics (point_physics_update) for gravity and
  * collision; attached particles apply velocity damping. Returns false if the
  * particle was deleted during this step. */
 bool FUN_000a1c30(int datum_handle, float delta_time)
@@ -595,7 +595,7 @@ bool FUN_000a1c30(int datum_handle, float delta_time)
     velocity = particle + 0x48;
     radius = particle_get_radius(datum_handle);
 
-    physics_result = FUN_00154a50(
+    physics_result = point_physics_update(
       0, (int)physics_tag, (int *)(particle + 0x28), -1,
       (float *)(particle + 0x30), (float *)(particle + 0x48), NULL,
       collision_normal, (int16_t *)&surface_index, radius, delta_time);

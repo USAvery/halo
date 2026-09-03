@@ -4027,7 +4027,7 @@ seed_fallback:
       }
     }
     actor_move_animation_impulse(actor_handle, 0, (int *)forward);
-    FUN_00046f10(0x2a, ((actor_t *)actor)->field_018, handle, 3, -1, -1, 0);
+    ai_communication_event(0x2a, ((actor_t *)actor)->field_018, handle, 3, -1, -1, 0);
     ((actor_t *)actor)->field_379 = 1;
   }
 
@@ -4061,7 +4061,7 @@ seed_fallback:
     if (unit_leap_begin(((actor_t *)actor)->field_018, forward) == '\0') {
       actor_unit_control_jump(actor_handle);
     } else {
-      FUN_00046f10(0x2f, ((actor_t *)actor)->field_018, -1, -1, -1, -1, 0);
+      ai_communication_event(0x2f, ((actor_t *)actor)->field_018, -1, -1, -1, -1, 0);
     }
   }
   if (((actor_t *)actor)->field_442 != '\0') {

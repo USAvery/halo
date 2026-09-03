@@ -605,7 +605,7 @@ void actor_perception_update(int actor_handle)
     int16_t actor_team; /* +0x0 */
     int16_t prop_team; /* +0x2 */
     char is_friendly; /* +0x4 */
-  } team_info; /* EBP-0x50, passed to FUN_00046f10 arg7 */
+  } team_info; /* EBP-0x50, passed to ai_communication_event arg7 */
   int best_prop; /* EBP-0x48 */
   char acknowledge_flag; /* EBP-0x44, pushed as a dword by MSVC */
   float best_weight; /* EBP-0x40 */
@@ -1221,7 +1221,7 @@ iterate_props:
           *(char *)(prop + 0x122) < 3 &&
           *(float *)(prop + 0x11c) < *(float *)0x2548f4) {
         ((actor_t *)actor)->field_377 = 1;
-        FUN_00046f10(0x19, ((actor_t *)actor)->field_018, *(int *)(prop + 0x18),
+        ai_communication_event(0x19, ((actor_t *)actor)->field_018, *(int *)(prop + 0x18),
                      2, -1, -1, 0);
         FUN_00036a20(actor_handle, iter[0], 0);
       }
@@ -1243,7 +1243,7 @@ iterate_props:
           team_info.prop_team = *(int16_t *)(prop + 0x12);
           team_info.actor_team = ((actor_t *)actor)->field_03e;
           team_info.is_friendly = is_friendly;
-          FUN_00046f10(8, ((actor_t *)actor)->field_018, *(int *)(prop + 0x18),
+          ai_communication_event(8, ((actor_t *)actor)->field_018, *(int *)(prop + 0x18),
                        (is_friendly != 0) * 2 + 2, -1, 1, (int)&team_info);
         }
       }
@@ -1284,14 +1284,14 @@ iterate_props:
             if (((actor_t *)actor)->field_018 != -1) {
               if (((actor_t *)actor)->field_06a < 3) {
                 if (*(char *)(prop + 0x12c) != 0) {
-                  FUN_00046f10(0xf, *(int *)(prop + 0x18),
+                  ai_communication_event(0xf, *(int *)(prop + 0x18),
                                ((actor_t *)actor)->field_018, 2, -1, 2, 0);
                 }
               } else if (FUN_0003b120(actor_handle) != 0 &&
                          actor_is_fighting(actor_handle) == 0 &&
                          *(char *)(prop + 0x12b) != 0 &&
                          *(int16_t *)(prop + 0x32) > 1) {
-                FUN_00046f10(0xf, ((actor_t *)actor)->field_018,
+                ai_communication_event(0xf, ((actor_t *)actor)->field_018,
                              *(int *)(prop + 0x18), 2, -1, 2, 0);
               }
             }

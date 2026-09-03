@@ -152,7 +152,7 @@ void FUN_000369c0(int actor_handle, short priority, int value)
 
 /* 0x36a20 — Notify an actor's unit of a communication stimulus from an
  * encounter. Checks that the encounter is active (+0x60) and not excluded
- * (+0x127), and that the actor has a unit. If so, calls FUN_00046f10 with type
+ * (+0x127), and that the actor has a unit. If so, calls ai_communication_event with type
  * 4 (if param_3) or 5 (otherwise), using the actor's unit handle and the
  * encounter's object. */
 void FUN_00036a20(int actor_handle, int encounter_handle, char param_3)
@@ -164,7 +164,7 @@ void FUN_00036a20(int actor_handle, int encounter_handle, char param_3)
   encounter = (char *)datum_get(*(data_t **)0x5ab23c, encounter_handle);
   if (*(char *)(encounter + 0x127) == 0 &&
       ((actor_t *)actor)->field_018 != -1 && *(char *)(encounter + 0x60) != 0) {
-    FUN_00046f10(param_3 != '\0' ? 4 : 5, ((actor_t *)actor)->field_018,
+    ai_communication_event(param_3 != '\0' ? 4 : 5, ((actor_t *)actor)->field_018,
                  *(int *)(encounter + 0x18), 3, -1, -1, 0);
   }
 }
@@ -352,7 +352,7 @@ void FUN_00036da0(int actor_handle)
  * the actor's "recently perceived threat" counter.
  *
  * If the actor has an associated unit (actor+0x18 != -1) this calls
- * FUN_00046f10 (ai_communication) with type 0x16 when flags_bit1 is
+ * ai_communication_event (ai_communication) with type 0x16 when flags_bit1 is
  * set, or type 0x17 when flags_bit1 is clear. The remaining six args
  * are (unit_handle, -1, -1, -1, -1, 0).
  *
@@ -371,7 +371,7 @@ void FUN_00036dc0(int actor_handle, char flags_bit1, char flags_bit0)
   unit_handle = ((actor_t *)actor)->field_018;
   if (unit_handle != -1) {
     type = flags_bit1 ? 0x16 : 0x17;
-    FUN_00046f10(type, unit_handle, -1, -1, -1, -1, 0);
+    ai_communication_event(type, unit_handle, -1, -1, -1, -1, 0);
   }
   if (flags_bit0 && ((actor_t *)actor)->stimuli_panic_type < 6) {
     ((actor_t *)actor)->stimuli_panic_type = 6;
@@ -558,7 +558,7 @@ after_surprise:
                  (int *)(prop + 0xe0));
   if (((actor_t *)actor)->field_06e < 3 && param_4 == '\0' &&
       *(short *)(prop + 0x32) < 2 && ((actor_t *)actor)->field_018 != -1)
-    FUN_00046f10(6, ((actor_t *)actor)->field_018, *(int *)(prop + 0x18), 3, -1,
+    ai_communication_event(6, ((actor_t *)actor)->field_018, *(int *)(prop + 0x18), 3, -1,
                  -1, 0);
 
 exit_fun:
@@ -656,7 +656,7 @@ void FUN_00037240(int actor_handle, int prop_handle, int unused_param_3,
  *   1) If the actor is already in a charge state with a matching target
  *      object_handle (actor[0x280] > 0 && actor[0x28c] == object_handle &&
  *      actor[0x284] > 0), forward the event as command type 10 via
- *      ai_communication (FUN_00046f10) on the actor's unit (actor+0x18),
+ *      ai_communication (ai_communication_event) on the actor's unit (actor+0x18),
  *      with five trailing -1 placeholders and a trailing 0 byte.
  *
  *   2) Otherwise, build delta = (broadcast_position - actor_position@0x120).
@@ -709,7 +709,7 @@ void FUN_000373b0(int actor_handle, int object_handle, float *position,
       ((actor_t *)actor)->danger_zone_object_index == object_handle &&
       ((actor_t *)actor)->field_284 > 0) {
     unit_handle = ((actor_t *)actor)->field_018;
-    FUN_00046f10(10, unit_handle, -1, -1, -1, -1, 0);
+    ai_communication_event(10, unit_handle, -1, -1, -1, -1, 0);
   } else {
     direction[0] = position[0] - ((actor_t *)actor)->field_120;
     direction[1] = position[1] - ((actor_t *)actor)->field_124;
@@ -973,7 +973,7 @@ void FUN_000377d0(int actor_handle, int prop_handle)
  *
  * If actor has a linked unit (actor+0x18 != -1):
  *   - When param_2 == 2: maps param_3 (0→3, 1→2, 2→1, else -1) to a
- *     communication type and broadcasts via FUN_00046f10(0xb, unit, -1,
+ *     communication type and broadcasts via ai_communication_event(0xb, unit, -1,
  *     type, -1, -1, 0).
  *   - Computes delta from param_5 (position) to actor world position
  *     (actor+0x120), normalizes it via normalize3d.
@@ -1008,7 +1008,7 @@ void FUN_000378e0(int actor_handle, short param_2, short param_3, int param_4,
       type = 2;
     else if (param_3 == 2)
       type = 1;
-    FUN_00046f10(0xb, unit_handle, -1, type, -1, -1, 0);
+    ai_communication_event(0xb, unit_handle, -1, type, -1, -1, 0);
   }
 
   delta[0] = param_5[0] - ((actor_t *)actor)->field_120;

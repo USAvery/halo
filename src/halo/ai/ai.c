@@ -442,11 +442,11 @@ check_debug:
  * param_1 (unit_handle): the unit that just exited.
  * param_2: passed to ai_get_responsible_unit as unit_handle for
  * vehicle-occupant resolution. param_3: vehicle/context handle; used to control
- * prefer_passenger (word !=9) and forwarded as param5 of FUN_00046f10.
+ * prefer_passenger (word !=9) and forwarded as param5 of ai_communication_event.
  *
  * Resolves the occupant from param_2 via ai_get_responsible_unit, determines a
  * relationship code (0=same unit, 2=enemy, 3=friendly, or 0xffffffff if no
- * valid occupant), then notifies the AI communication system (FUN_00046f10),
+ * valid occupant), then notifies the AI communication system (ai_communication_event),
  * clears encounter references (ai_conversation_unit_died), and updates
  * encounter kill counts (encounters_unit_died).
  *
@@ -471,7 +471,7 @@ void ai_handle_death(int unit_handle, int param_2, short param_3)
                   *(short *)((char *)obj_resolved + 0x68)) != 0) +
                2;
   }
-  FUN_00046f10(0, unit_handle, resolved, relation, (int)param_3, -1, 0);
+  ai_communication_event(0, unit_handle, resolved, relation, (int)param_3, -1, 0);
   ai_conversation_unit_died(unit_handle, '\0');
   encounters_unit_died(unit_handle);
 }
@@ -483,7 +483,7 @@ void ai_handle_death(int unit_handle, int param_2, short param_3)
  * meets the threshold to trigger a killing-spree AI communication event.
  * Threshold is 3 if the unit has no rider (unit+0x1c8 == 0xffffffff), or
  * 5 if it does. When the debug flag at 0x5aca60 is set, logs the spree count
- * to the console. If the threshold is met, fires FUN_00046f10 with type=1
+ * to the console. If the threshold is met, fires ai_communication_event with type=1
  * and returns 1; otherwise returns 0.
  *
  * Confirmed: [EBP+8]=unit_handle (int), [EBP+C]=killing_spree_count (short),
@@ -512,7 +512,7 @@ char ai_handle_killing_spree(int unit_handle, short killing_spree_count)
   }
 
   if (killing_spree_count >= threshold) {
-    FUN_00046f10(1, unit_handle, -1, -1, -1, -1, 0);
+    ai_communication_event(1, unit_handle, -1, -1, -1, -1, 0);
     return 1;
   }
   return 0;
@@ -812,15 +812,15 @@ void ai_create_mounted_weapons_for_unit(int param_1)
 /* unit_vehicle_board_notify: notify the AI subsystem that a unit is boarding
  * a vehicle. Verifies the unit object (type_mask=3 for biped|vehicle), and
  * if the unit has an AI actor (offset 0x1a4 != -1), dispatches an AI
- * command via FUN_00046f10 with command type 0x24.
+ * command via ai_communication_event with command type 0x24.
  * The vehicle_handle parameter is accepted but unused in this function body.
  * Confirmed: 1 stack param used ([EBP+8]), second param ([EBP+0xc]) untouched.
- * Confirmed: PUSH order for FUN_00046f10 — 7 args, cdecl (ADD ESP,0x1c). */
+ * Confirmed: PUSH order for ai_communication_event — 7 args, cdecl (ADD ESP,0x1c). */
 void unit_vehicle_board_notify(int unit_handle, int vehicle_handle)
 {
   void *unit_obj = object_get_and_verify_type(unit_handle, 3);
   if (*(int *)((char *)unit_obj + 0x1a4) != -1) {
-    FUN_00046f10(0x24, unit_handle, -1, -1, -1, -1, 0);
+    ai_communication_event(0x24, unit_handle, -1, -1, -1, -1, 0);
   }
 }
 
@@ -828,15 +828,15 @@ void unit_vehicle_board_notify(int unit_handle, int vehicle_handle)
  * vehicle. Looks up the unit object (type_mask=3), checks whether the unit has
  * a valid AI actor handle at offset +0x1a4. If the actor exists, retrieves the
  * actor record from actor_data and checks the byte flag at actor+0x38c. If
- * the flag is clear, dispatches AI command 0x25 via FUN_00046f10 to notify
+ * the flag is clear, dispatches AI command 0x25 via ai_communication_event to notify
  * the subsystem of the vehicle-exit event. The flag at actor+0x38c is then
  * cleared unconditionally (whether or not the command was dispatched).
  *
  * Confirmed: 1 stack param [EBP+8] (unit handle). No return value.
  * Confirmed: object_get_and_verify_type(param_1, 3); EAX+0x1a4 = actor handle.
  * Confirmed: datum_get([0x6325a4], actor_handle); result in ESI.
- * Confirmed: TEST AL,AL on [ESI+0x38c]; JNZ skips FUN_00046f10 call.
- * Confirmed: FUN_00046f10(0x25, param_1, -1, -1, -1, -1, 0), 7 args cdecl
+ * Confirmed: TEST AL,AL on [ESI+0x38c]; JNZ skips ai_communication_event call.
+ * Confirmed: ai_communication_event(0x25, param_1, -1, -1, -1, -1, 0), 7 args cdecl
  *   (ADD ESP,0x1c). MOV byte [ESI+0x38c],0 always executes. */
 void ai_handle_exit_vehicle(int param_1)
 {
@@ -849,7 +849,7 @@ void ai_handle_exit_vehicle(int param_1)
   if (actor_handle != -1) {
     actor = (char *)datum_get(actor_data, actor_handle);
     if (((actor_t *)actor)->field_38c == '\0') {
-      FUN_00046f10(0x25, param_1, -1, -1, -1, -1, 0);
+      ai_communication_event(0x25, param_1, -1, -1, -1, -1, 0);
     }
     ((actor_t *)actor)->field_38c = 0;
   }
@@ -1482,7 +1482,7 @@ void ai_enemies_attacking_player(void)
   ai_clump(1);
 }
 
-/* FUN_000425c0: ai_sound_spatial_effect_submit — submit a spatial sound effect
+/* ai_handle_spatial_effect: ai_sound_spatial_effect_submit — submit a spatial sound effect
  * into the AI's ring buffer of recent spatial events. If AI subsystem is
  * inactive (g+1 == 0), returns immediately.
  *
@@ -1510,7 +1510,7 @@ void ai_enemies_attacking_player(void)
  * Asserts: count > 0, 0 <= volume < 5, 0 <= effect_type < 3.
  * Confirmed: c:\halo\SOURCE\ai\ai.c line 0x80e/0x80f/0x810/0x847/0x871.
  */
-void FUN_000425c0(int object_handle, float *position, short effect_type,
+void ai_handle_spatial_effect(int object_handle, float *position, short effect_type,
                   short volume, short count)
 {
   int *g;

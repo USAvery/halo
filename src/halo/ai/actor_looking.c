@@ -1637,10 +1637,10 @@ skip_mark_unable:
     }
     if (*(char *)(state + 0x10) == '\0') {
       mode = (look_anim == 8) ? 0x20 : 0x1f;
-      FUN_00046f10(mode, ((actor_t *)actor)->field_018, enc_val, -1, -1, 4, 0);
+      ai_communication_event(mode, ((actor_t *)actor)->field_018, enc_val, -1, -1, 4, 0);
       *(char *)(state + 0x10) = 1;
     } else {
-      FUN_00046f10(0x21, ((actor_t *)actor)->field_018, enc_val, -1, -1, -1, 0);
+      ai_communication_event(0x21, ((actor_t *)actor)->field_018, enc_val, -1, -1, -1, 0);
     }
   }
   *(int *)(state + 0x14) = cur_tick;
@@ -1854,7 +1854,7 @@ void actor_clear_guard_state(int actor_handle)
  *
  * Confirmed: datum_get at 0x15cfd. MOV EAX,EDI / CALL FUN_00015bb0 at 0x15d4b.
  * Confirmed: CMP/DEC word [ESI+0x9c/0x9e] at 0x15d1d/0x15d7b.
- * Confirmed: actor_set_dormant at 0x15e0c. actor_target_unit_index+FUN_00046f10
+ * Confirmed: actor_set_dormant at 0x15e0c. actor_target_unit_index+ai_communication_event
  * at 0x15e3a. */
 void FUN_00015cf0(int actor_handle)
 {
@@ -1916,7 +1916,7 @@ wake:
   ((actor_t *)actor)->field_0a8 = 0;
   if (((actor_t *)actor)->field_06e >= 2 &&
       ((actor_t *)actor)->field_018 != -1) {
-    FUN_00046f10(0x23, ((actor_t *)actor)->field_018,
+    ai_communication_event(0x23, ((actor_t *)actor)->field_018,
                  actor_target_unit_index(actor_handle), -1, -1, -1, 0);
   }
   FUN_00024be0(actor_handle, *(short *)(actor + 0xc4), 0);
@@ -2418,7 +2418,7 @@ void FUN_00016590(int actor_handle)
       ((actor_t *)actor)->field_0ab = 0;
       *(int *)(actor + 0xac) = -1;
       FUN_000369c0(actor_handle, 2, 600);
-      FUN_00046f10(7, ((actor_t *)actor)->field_018, *(int *)(prop + 0x18), -1,
+      ai_communication_event(7, ((actor_t *)actor)->field_018, *(int *)(prop + 0x18), -1,
                    -1, 2, 0);
     }
     if (((actor_t *)actor)->field_0a1 != '\0') {
@@ -4494,7 +4494,7 @@ LAB_done:
  * Post-initialization:
  *   - Copies field_c8 to 426/427, field_ca to 42c.
  *   - If field_f8 is set and FUN_0002a360 passes: dispatches
- *     actor_move_animation_impulse and FUN_00046f10 for firing-position
+ *     actor_move_animation_impulse and ai_communication_event for firing-position
  * targets.
  *   - field_a9&1: copies field_b0/ac to 430-43c.
  *   - field_a9&4: evasion/cliff-protection init or maintenance.
@@ -4611,7 +4611,7 @@ LAB_done:
                           param; return val = success bool not needed here) */
     }
     if (((actor_t *)actor)->field_0fc != -1) {
-      (void)FUN_00046f10(((actor_t *)actor)->field_0fc,
+      (void)ai_communication_event(((actor_t *)actor)->field_0fc,
                          ((actor_t *)actor)->field_018, -1, -1, -1, -1, 0);
     }
     ((actor_t *)actor)->field_0f8 = 0;
@@ -4831,13 +4831,13 @@ skip_flag:
             (*(char *)(actor + 0x9c) != '\0' ||
              (remain + 0x5a < *(int *)(actor + 0xbc)))) {
           *(int *)(actor + 0x3bd) = 1;
-          FUN_00046f10(0xd, ((actor_t *)actor)->field_018,
+          ai_communication_event(0xd, ((actor_t *)actor)->field_018,
                        actor_target_unit_index(actor_handle), -1, -1, -1, 0);
           ((actor_t *)actor)->field_3bd = 1;
           return;
         }
       } else if (remain == 0) {
-        FUN_00046f10(0x12, ((actor_t *)actor)->field_018,
+        ai_communication_event(0x12, ((actor_t *)actor)->field_018,
                      actor_target_unit_index(actor_handle), -1, -1, -1, 0);
         return;
       }
@@ -5542,7 +5542,7 @@ void FUN_0001a670(int actor_handle)
       ((actor_t *)actor)->field_06e < 3) {
     prop = (char *)datum_get(*(data_t **)0x5ab23c,
                              ((actor_t *)actor)->target_target_prop_index);
-    FUN_00046f10(0x15, ((actor_t *)actor)->field_018, *(int *)(prop + 0x18), -1,
+    ai_communication_event(0x15, ((actor_t *)actor)->field_018, *(int *)(prop + 0x18), -1,
                  -1, -1, 0);
   }
 }

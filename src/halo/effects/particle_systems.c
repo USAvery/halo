@@ -283,7 +283,7 @@ void FUN_0009fa60(void *particle_arg, float dt)
   if (*(int *)(particle + 0xc) == NONE) {
     physics_tag_index = *(int *)(tag + 0x44);
     if (physics_tag_index != NONE) {
-      FUN_00154a50(0, (int)tag_get(0x70706879, physics_tag_index),
+      point_physics_update(0, (int)tag_get(0x70706879, physics_tag_index),
                    (int *)(particle + 0x18), NONE, (float *)(particle + 0x20),
                    (float *)(particle + 0x2c), (float *)0, (float *)0,
                    (int16_t *)0, 1.0f, dt);
@@ -326,7 +326,7 @@ void FUN_0009fad0(void *param_1, void *param_2, void *out, void *src)
  * The FPU sequence at 0x9fbe6 is `FLD 1.0; FSUB t; FLD t; FMUL [EBX+0x80];
  * FXCH; FMUL [ECX+0x80]; FADDP` with EBX = the state at particle+0x8 and
  * ECX = the state at particle+0xa, i.e. `(1-t)*state_b + t*state_a`.
- * FUN_00154a50's collision result is tested byte-wise: bit 0 against the type's
+ * point_physics_update's collision result is tested byte-wise: bit 0 against the type's
  * flag 0x20, bit 1 against 0x10, bit 2 against 0x40; any hit clears the
  * particle's live byte at +0x3.
  * Frame is `push ebp; mov ebp,esp; sub esp,0x40` with a single 0x40-byte local
@@ -376,7 +376,7 @@ void FUN_0009fb10(void *particle_system, int16_t type_index, float delta_time,
       tag_get(0x70706879, *(int *)(state_a + 0x90)),
       tag_get(0x70706879, *(int *)(state_b + 0x90)), t, physics_buffer);
   }
-  result = FUN_00154a50(0, (int)physics, (int *)(particle_bytes + 0x14), NONE,
+  result = point_physics_update(0, (int)physics, (int *)(particle_bytes + 0x14), NONE,
                         (float *)(particle_bytes + 0x1c),
                         (float *)(particle_bytes + 0x28), (float *)0,
                         (float *)0, (int16_t *)0, scale, delta_time);

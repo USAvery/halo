@@ -851,7 +851,7 @@ void FUN_00022390(int actor_handle)
     } else {
       sound_type = (((actor_t *)actor)->field_161 != 0) ? 0x1b : 0x1a;
     }
-    FUN_00046f10(sound_type, ((actor_t *)actor)->field_018, prop_handle, 3, -1,
+    ai_communication_event(sound_type, ((actor_t *)actor)->field_018, prop_handle, 3, -1,
                  -1, 0);
   }
 }

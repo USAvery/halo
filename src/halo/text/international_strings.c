@@ -8,9 +8,9 @@
  *   0x4d9af4 (short) cursor marker A -> reset to 0, returned
  *   0x4d9af6 (short) best distance   -> reset to 0x7fff (sentinel)
  *   0x4d9af8 (short) cursor marker B -> reset to 0
- * Then walks the text layout via FUN_0019c5d0 (international_strings.obj,
+ * Then walks the text layout via draw_string (international_strings.obj,
  * same TU) with FUN_0019b430 as the per-element hit-test callback — same
- * calling idiom as the FUN_0019c5d0 call in rasterizer_text.c. Returns the
+ * calling idiom as the draw_string call in rasterizer_text.c. Returns the
  * resulting cursor marker.
  */
 int16_t FUN_0019ce70(void *screen_pos, char *text, const void *ref_point)
@@ -20,7 +20,7 @@ int16_t FUN_0019ce70(void *screen_pos, char *text, const void *ref_point)
   *(int16_t *)0x4d9af6 = 0x7fff;
   *(int16_t *)0x4d9af8 = 0;
 
-  FUN_0019c5d0(FUN_0019b430, screen_pos, 0, 0, 0, text);
+  draw_string(FUN_0019b430, screen_pos, 0, 0, 0, text);
 
   return *(int16_t *)0x4d9af4;
 }

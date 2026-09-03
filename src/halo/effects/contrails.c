@@ -770,7 +770,7 @@ void FUN_00098200(int contrail_handle, float delta_time)
           if (phys_ref != -1) {
             radius = *(float *)(kf + 0x40) * 0.5f;
             phys_tag = (char *)tag_get(0x70706879, phys_ref);
-            FUN_00154a50(0, (int)phys_tag, (int *)(pt + 0x14), -1,
+            point_physics_update(0, (int)phys_tag, (int *)(pt + 0x14), -1,
                          (float *)(pt + 0x1c), (float *)(pt + 0x28), NULL, NULL,
                          NULL, radius, delta_time);
           }

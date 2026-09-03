@@ -1,4 +1,4 @@
-void FUN_001963c0(uint32_t *old_cluster_visibility,
+void structure_decals_update(uint32_t *old_cluster_visibility,
                   uint32_t *new_cluster_visibility, int16_t cluster_count)
 {
   char *scenario = scenario_get();

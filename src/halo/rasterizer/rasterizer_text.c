@@ -3387,7 +3387,7 @@ void rasterizer_text_draw(void *screen_pos, short *bounds, const void *color,
     widget_params[17] = texel_height;
 
     FUN_00173b40(widget_params);
-    FUN_0019c5d0(rasterizer_text_draw_cached_chars, draw_bounds, color,
+    draw_string(rasterizer_text_draw_cached_chars, draw_bounds, color,
                  clip_bounds, flags, (char *)text);
     FUN_00173ae0();
   }

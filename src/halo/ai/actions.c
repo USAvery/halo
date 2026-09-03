@@ -375,7 +375,7 @@ void action_wait_update(int actor_handle)
     ((actor_t *)actor)->field_0ac = sVar1;
     if (sVar1 == 0) {
       if (((actor_t *)actor)->field_018 != -1) {
-        FUN_00046f10(0x11, ((actor_t *)actor)->field_018, -1, -1, -1, -1, 0);
+        ai_communication_event(0x11, ((actor_t *)actor)->field_018, -1, -1, -1, -1, 0);
       }
       ((actor_t *)actor)->field_0ac = random_range(
         (unsigned int *)get_global_random_seed_address(), 300, 600);
@@ -387,7 +387,7 @@ void action_wait_update(int actor_handle)
     if (sVar1 == 0) {
       if (((actor_t *)actor)->field_09d != '\0' &&
           ((actor_t *)actor)->field_018 != -1) {
-        FUN_00046f10(0x14, ((actor_t *)actor)->field_018, -1, -1, -1, -1, 0);
+        ai_communication_event(0x14, ((actor_t *)actor)->field_018, -1, -1, -1, -1, 0);
       }
       *(char *)(actor + 0x9c) = 1;
     }
@@ -2020,7 +2020,7 @@ char actor_action_handle_surprise(int actor_handle, short type)
     weapon_state = (*(char *)(prop + 0x60) != '\0') + 2;
   }
 
-  FUN_00046f10(0x29, ((actor_t *)actor)->field_018, weapon_trigger_index,
+  ai_communication_event(0x29, ((actor_t *)actor)->field_018, weapon_trigger_index,
                weapon_state, -1, -1, 0);
 
   if (*(float *)(actv_tag + 0x90) > 0.0f) {
@@ -2053,7 +2053,7 @@ char actor_action_handle_surprise(int actor_handle, short type)
  * Confirmed: datum_get(actor_data, actor_handle) at 0x1dd50.
  * Confirmed: game_time_get() at 0x1ddd6.
  * Confirmed: display_assert + system_exit pattern at 0x1de08-0x1de25.
- * Confirmed: FUN_00046f10 sound event call at 0x1de43.
+ * Confirmed: ai_communication_event sound event call at 0x1de43.
  * Confirmed: FUN_0001d3c0 call at 0x1de74. */
 char actor_action_handle_panic_transition(int actor_handle, short param_2,
                                           char param_3, short param_4)
@@ -2092,7 +2092,7 @@ char actor_action_handle_panic_transition(int actor_handle, short param_2,
       system_exit(-1);
     }
     if (param_3 != '\0' && !bVar3) {
-      FUN_00046f10(0x22, actor->field_018, -1, -1, -1, -1, 0);
+      ai_communication_event(0x22, actor->field_018, -1, -1, -1, -1, 0);
       actor->stimuli_panic_type = 0;
       return result;
     }
@@ -2742,7 +2742,7 @@ verify_action_state:
  *  - The pursuit-eligibility threshold read from the 'actr' tag (+0x354 /
  *    +0x356) is a SEPARATE int16 from the firing-position index; the
  *    decompiler merged both into one variable.
- *  - The 0xd sound event is FUN_00046f10(0xd, actor+0x18,
+ *  - The 0xd sound event is ai_communication_event(0xd, actor+0x18,
  *    actor_target_unit_index(...), -1, -1, -1, 0): the pushes for the trailing
  *    constants precede CALL 0x3b380 (cdecl arg mis-grouping), and the two
  *    cleanups are merged into one ADD ESP,0x1c.
@@ -2898,7 +2898,7 @@ char actor_action_handle_lost_contact(int actor_handle)
       actor_handle, ((actor_t *)actor)->target_target_prop_index);
     if (((actor_t *)actor)->field_3bc != '\0' &&
         ((actor_t *)actor)->field_3bd == '\0') {
-      FUN_00046f10(0xd, ((actor_t *)actor)->field_018,
+      ai_communication_event(0xd, ((actor_t *)actor)->field_018,
                    actor_target_unit_index(actor_handle), -1, -1, -1, 0);
       ((actor_t *)actor)->field_3bd = 1;
     }
@@ -2981,14 +2981,14 @@ char actor_action_handle_lost_contact(int actor_handle)
           *(int *)(actor + 0x34), actor_handle, firing_pos, threat) == '\0')
       return result;
     if (((actor_t *)actor)->field_3c4 == 0)
-      FUN_00046f10(0x10, ((actor_t *)actor)->field_018, -1, -1, -1, -1, 0);
+      ai_communication_event(0x10, ((actor_t *)actor)->field_018, -1, -1, -1, -1, 0);
     ((actor_t *)actor)->field_3c4 += 1;
     return result;
 
   pursuit_failed:
     if (((actor_t *)actor)->field_3c4 > 0 &&
         ((actor_t *)actor)->field_018 != -1)
-      FUN_00046f10(0x13, ((actor_t *)actor)->field_018, -1, -1, -1, -1, 0);
+      ai_communication_event(0x13, ((actor_t *)actor)->field_018, -1, -1, -1, -1, 0);
     if (*(char *)(actor + 6) == '\0' && can_search != '\0' &&
         action_wait_setup(actor_handle, flag_e, (int)action_buf) != '\0') {
       actor_action_change(actor_handle, 8, (int)action_buf);
@@ -3485,7 +3485,7 @@ do_evade:
  * unit_test_animation_impulse accepts its impulse on the actor's object. If a
  * winner is found the output direction is re-derived from the winning
  * animation_direction and committed via actor_move_animation_impulse; on
- * success a 0x2c event is fired (FUN_00046f10) and the impulse result is
+ * success a 0x2c event is fired (ai_communication_event) and the impulse result is
  * returned.
  *
  * Confirmed: datum_get(actor_data, actor_handle); avoidance record
@@ -3599,7 +3599,7 @@ char actor_action_try_to_dive(int actor_handle, short direction_ref,
     *(short *)(record + 0x188) = 3;
     return result;
   }
-  FUN_00046f10(0x2c, ((actor_t *)actor)->field_018, -1, -1, -1, -1, 0);
+  ai_communication_event(0x2c, ((actor_t *)actor)->field_018, -1, -1, -1, -1, 0);
   *(short *)(record + 0x188) = 4;
   return result;
 }
@@ -3909,7 +3909,7 @@ char actor_action_handle_grenade_throwing(int actor_handle)
  *    action as taken.
  * 5. Otherwise (action not yet taken): a retreat gate (b_retreat, from
  *    actor+0x358 / 'actr' flag 0x20 / the target prop's +0x122,+0x121 fields)
- *    may start a seek-cover + fire-retreat-event sequence (FUN_00046f10 event
+ *    may start a seek-cover + fire-retreat-event sequence (ai_communication_event event
  *    0x18); or, when the side-step gate (b_sidestep, cleared when actor+0x6c
  *    == 10 with actor+0xa0 in {2,3}) is open and actor+0x368 == 0, calls
  *    actor_action_try_to_evade and stores a timer at actor+0x368.
@@ -4009,7 +4009,7 @@ char actor_action_handle_evasion(int actor_handle)
         if (random_math_real((unsigned int *)get_global_random_seed_address()) <
             *(float *)(actr_tag + 0x318)) {
           if (actor_action_try_to_seek_cover(actor_handle, 0, 1)) {
-            FUN_00046f10(0x18, ((actor_t *)actor)->field_018,
+            ai_communication_event(0x18, ((actor_t *)actor)->field_018,
                          actor_target_unit_index(actor_handle), -1, -1, -1, 0);
             *(int *)(actor + 0x354) = 0;
             return 1;

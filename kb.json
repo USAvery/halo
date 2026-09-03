@@ -395,11 +395,11 @@
   "ported": false
  },
  "0x46f10": {
-  "decl": "void FUN_00046f10(int mode, int unit_handle, int target_handle, int a4, int a5, int a6, int a7);",
-  "name": "FUN_00046f10",
+  "decl": "void ai_communication_event(int mode, int unit_handle, int target_handle, int a4, int a5, int a6, int a7);",
+  "name": "ai_communication_event",
   "obj": "ai.obj",
   "ported": false,
-  "comment": "[NAME: FUN_00046f10 — name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
+  "comment": "[NAME: FUN_00046f10 — name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03] [NAME: ai_communication_event — name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
  },
  "0x803d0": {
   "addr": "0x803d0",
@@ -4067,8 +4067,9 @@
     },
     {
      "addr": "0x425c0",
-     "decl": "void FUN_000425c0(int object_handle, float *position, short effect_type, short volume, short count);",
-     "ported": true
+     "decl": "void ai_handle_spatial_effect(int object_handle, float *position, short effect_type, short volume, short count);",
+     "ported": true,
+     "comment": "[NAME: ai_handle_spatial_effect — name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
     },
     {
      "addr": "0x41590",
@@ -19502,7 +19503,8 @@
     },
     {
      "addr": "0x154a50",
-     "decl": "int FUN_00154a50(int flags, int physics_tag_data, int *collision_location, int object_handle, float *position, float *velocity, float *force, float *collision_normal_out, int16_t *surface_index_out, float radius, float delta_time);"
+     "decl": "int point_physics_update(int flags, int physics_tag_data, int *collision_location, int object_handle, float *position, float *velocity, float *force, float *collision_normal_out, int16_t *surface_index_out, float radius, float delta_time);",
+     "comment": "[NAME: point_physics_update — name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
     }
    ],
    "name": "point_physics.obj",
@@ -25895,8 +25897,9 @@
    "functions": [
     {
      "addr": "0x1963c0",
-     "decl": "void FUN_001963c0(uint32_t *old_cluster_visibility, uint32_t *new_cluster_visibility, int16_t cluster_count);",
-     "ported": true
+     "decl": "void structure_decals_update(uint32_t *old_cluster_visibility, uint32_t *new_cluster_visibility, int16_t cluster_count);",
+     "ported": true,
+     "comment": "[NAME: structure_decals_update — name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
     }
    ],
    "name": "structure_runtime_decals.obj",
@@ -32642,7 +32645,8 @@
    "functions": [
     {
      "addr": "0x19c5d0",
-     "decl": "void FUN_0019c5d0(void *callback, void *screen_pos, const void *color, void *clip_bounds, int flags, char *text);"
+     "decl": "void draw_string(void *callback, void *screen_pos, const void *color, void *clip_bounds, int flags, char *text);",
+     "comment": "[NAME: draw_string — name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
     },
     {
      "addr": "0x19c960",
@@ -33804,8 +33808,8 @@
     },
     {
      "addr": "0x46f10",
-     "decl": "void FUN_00046f10(int type, int unit_handle, int param3, int param4, int param5, int param6, int param7);",
-     "comment": "[NAME: FUN_00046f10 — name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
+     "decl": "void ai_communication_event(int type, int unit_handle, int param3, int param4, int param5, int param6, int param7);",
+     "comment": "[NAME: FUN_00046f10 — name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03] [NAME: ai_communication_event — name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
     },
     {
      "addr": "0x48e90",

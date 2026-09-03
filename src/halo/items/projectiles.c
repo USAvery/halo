@@ -1082,11 +1082,11 @@ void FUN_000f8920(int projectile_handle, char has_hit_count, float current_time)
   }
 
   /* --- Block 6: Notify AI of detonation position. ---
-   * FUN_000425c0(object_handle, position, effect_type, volume, count).
+   * ai_handle_spatial_effect(object_handle, position, effect_type, volume, count).
    * proj_tag+0x1f0 = AI sound volume category (short).
    * effect_type=2 (explosive), count=1. */
   ai_volume = *(short *)(proj_tag + 0x1f0);
-  FUN_000425c0(projectile_handle, pos, (short)2, ai_volume, (short)1);
+  ai_handle_spatial_effect(projectile_handle, pos, (short)2, ai_volume, (short)1);
 }
 
 /* Initialise a newly-created projectile object.
@@ -2048,7 +2048,7 @@ apply_speed_scale:
  *      g. Collision depth push/pop around FUN_000f8720.
  *      h. Bounce limit (max 10) or detonation-state check -> time=0.
  *      i. On collision hit: adjusts velocity for bounce, calls FUN_000f90d0
- *         for detonation effects and FUN_000425c0 for sound, increments
+ *         for detonation effects and ai_handle_spatial_effect for sound, increments
  *         bounce counter.
  *      j. Accumulates total distance; proximity-checks up to 4 local players
  *         for 3D sound trigger (unattached_impulse_sound_new).
@@ -2533,7 +2533,7 @@ bool FUN_000f9c40(int projectile_handle)
         FUN_000f90d0(projectile_handle, new_pos, time_remaining, vel,
                      (int16_t *)collision_result);
         bounce_count++;
-        FUN_000425c0(projectile_handle,
+        ai_handle_spatial_effect(projectile_handle,
                      (float *)((char *)collision_result + 0x18), 1,
                      *(int16_t *)(proj_tag + 0x182), 1);
         if ((*(uint8_t *)(proj + 0x1dc) & 8) != 0) {

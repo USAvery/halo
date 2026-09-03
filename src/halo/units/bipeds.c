@@ -1928,7 +1928,7 @@ void FUN_001a1e70(int unit_handle)
  * scaled velocity vector from the vehicle physics (phys+0x18/0x1c/0x20 times
  * DAT_2b4ee4, with a gravity bias on z), and if that vector's length is large
  * enough re-probes along it. Depending on which probe/threshold fails it logs
- * one of three eject reasons (0x26/0x27/0x28) via FUN_00046f10(reason,
+ * one of three eject reasons (0x26/0x27/0x28) via ai_communication_event(reason,
  * unit_handle, -1,-1,-1,-1, 0).
  *
  * Confirmed (disasm 0x1a1fb0): register arg unit_handle@<eax> (MOV EDI,EAX at
@@ -1937,7 +1937,7 @@ void FUN_001a1e70(int unit_handle)
  * tag_get('vehi'). keystone: 1st call direction@<eax>=*(float**)0x31fc50,
  * scale=8.0f, out_point=0, out_vec=0; 2nd call direction@<eax>=&scaled_vel,
  * scale=8.0f, out_point=0, out_vec=&probe_vec. unit@<edi> on both.
- * FUN_00046f10 args: 7 pushes (reason, EDI=unit, -1,-1,-1,-1, 0). Void.
+ * ai_communication_event args: 7 pushes (reason, EDI=unit, -1,-1,-1,-1, 0). Void.
  *
  * Inferred: DAT_2b4ee4 velocity scalar, DAT_2b4ee0/DAT_32512c gravity bias;
  * obj fields 0x1a4 seat, 0x253 scream, 0x2d2 throttle byte; vehi+0x428 settle;
@@ -1973,23 +1973,23 @@ void FUN_001a1fb0(int unit_handle /* @eax */)
           *(float *)((char *)vehi_obj + 0x20) * *(float *)0x2b4ee4 -
           *(float *)0x32512c * *(float *)0x2b4ee0;
         if (normalize3d(scaled_vel) <= *(float *)0x2533c0) {
-          FUN_00046f10(0x28, unit_handle, -1, -1, -1, -1, 0);
+          ai_communication_event(0x28, unit_handle, -1, -1, -1, -1, 0);
           return;
         }
         if ((FUN_001a1a10(8.0f, (float *)0, probe_vec, scaled_vel,
                           unit_handle) == -1) ||
             (*(float *)&probe_vec[2] <= *(float *)0x2533e4)) {
-          FUN_00046f10(0x28, unit_handle, -1, -1, -1, -1, 0);
+          ai_communication_event(0x28, unit_handle, -1, -1, -1, -1, 0);
           return;
         }
       }
       if (*(float *)0x253f3c < *(float *)((char *)vehi_obj + 0x38)) {
         if (FUN_00012fe0((float *)(vehi_obj + 0xf)) < *(float *)0x26e2ec) {
-          FUN_00046f10(0x26, unit_handle, -1, -1, -1, -1, 0);
+          ai_communication_event(0x26, unit_handle, -1, -1, -1, -1, 0);
           return;
         }
       }
-      FUN_00046f10(0x27, unit_handle, -1, -1, -1, -1, 0);
+      ai_communication_event(0x27, unit_handle, -1, -1, -1, -1, 0);
     }
   }
 }
