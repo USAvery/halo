@@ -109,9 +109,20 @@ def iter_kb_records(kb):
 
 
 def build_addr_index(kb):
-    idx = {}
+    """addr -> every kb record at that address, both shapes.
+
+    A minority of addresses (~87) exist as BOTH an objects[].functions entry
+    AND a legacy top-level "0x..." entry. Only the objects[] copy feeds the
+    real build (KnowledgeBase.deserialize() in tools/analysis/knowledge.py
+    reads serialized_kb['objects'] only; the top-level shape is inert dead
+    data there). A rename must therefore touch every record sharing an
+    address, not just one of them, or the objects[] copy is left stale at
+    FUN_<addr8> while source files are renamed out from under it, causing
+    "implicit declaration" build failures.
+    """
+    idx = defaultdict(list)
     for addr, rec in iter_kb_records(kb):
-        idx[addr] = rec
+        idx[addr].append(rec)
     return idx
 
 
@@ -182,14 +193,15 @@ def compute_candidates(kb, mapping):
         # appear in the (already correct) current decl.
         old_name = f"FUN_{addr8}"
         kb_addr = norm_addr(addr8)
-        rec = addr_index.get(kb_addr)
-        if rec is None:
+        recs = addr_index.get(kb_addr)
+        if not recs:
             not_found.append(row)
             continue
-        decl = rec.get("decl", "")
-        name = rec.get("name", "")
-        if old_name in decl or old_name in name:
-            candidates.append({"row": row, "kb_addr": kb_addr, "rec": rec, "old_name": old_name})
+        # A candidate if ANY record at this address (either shape) still
+        # carries the FUN_ placeholder; apply_batch_rows renames every
+        # matching record, not just one, so dual-shape addresses stay in sync.
+        if any(old_name in r.get("decl", "") or old_name in r.get("name", "") for r in recs):
+            candidates.append({"row": row, "kb_addr": kb_addr, "recs": recs, "old_name": old_name})
     return candidates, not_found
 
 
@@ -310,31 +322,43 @@ def apply_batch_rows(kb, batch_rows, token_to_files, dry_run):
     row_results = []
 
     for c in batch_rows:
-        rec = c["rec"]
+        recs = c["recs"]
         row = c["row"]
         old_name = c["old_name"]
         new_name = row["new_name"]
         tier = row["tier"]
         token_re = re.compile(r'\b' + re.escape(old_name) + r'\b')
 
-        decl_before = rec.get("decl", "")
-        reg_annotations_before = decl_before.count("@<")
-        decl_changed = old_name in decl_before
-        name_changed = bool(rec.get("name")) and old_name in rec["name"]
+        # Rename every record sharing this address (objects[] copy AND any
+        # legacy top-level duplicate), not just one, so a dual-shape address
+        # never ends up with one copy renamed and the other stale.
+        any_decl_changed = False
+        any_name_changed = False
+        records_touched = 0
+        for rec in recs:
+            decl_before = rec.get("decl", "")
+            reg_annotations_before = decl_before.count("@<")
+            decl_changed = old_name in decl_before
+            name_changed = bool(rec.get("name")) and old_name in rec["name"]
+            if decl_changed or name_changed:
+                records_touched += 1
+            any_decl_changed = any_decl_changed or decl_changed
+            any_name_changed = any_name_changed or name_changed
 
-        if not dry_run:
-            if decl_changed:
-                rec["decl"] = token_re.sub(new_name, decl_before)
-                assert rec["decl"].count("@<") == reg_annotations_before, (
-                    f"@<reg> annotation count changed for {c['kb_addr']}"
-                )
-            if name_changed:
-                rec["name"] = token_re.sub(new_name, rec["name"])
-            plate = f"[NAME: {new_name} — CEA PDB line-containment ({tier}), {BATCH_TAG}]"
-            if rec.get("comment"):
-                rec["comment"] = rec["comment"].rstrip() + " " + plate
-            else:
-                rec["comment"] = plate
+            if not dry_run:
+                if decl_changed:
+                    rec["decl"] = token_re.sub(new_name, decl_before)
+                    assert rec["decl"].count("@<") == reg_annotations_before, (
+                        f"@<reg> annotation count changed for {c['kb_addr']}"
+                    )
+                if name_changed:
+                    rec["name"] = token_re.sub(new_name, rec["name"])
+                if decl_changed or name_changed:
+                    plate = f"[NAME: {new_name} — CEA PDB line-containment ({tier}), {BATCH_TAG}]"
+                    if rec.get("comment"):
+                        rec["comment"] = rec["comment"].rstrip() + " " + plate
+                    else:
+                        rec["comment"] = plate
 
         touched = sorted(token_to_files.get(old_name, ()))
         for path in touched:
@@ -342,8 +366,8 @@ def apply_batch_rows(kb, batch_rows, token_to_files, dry_run):
 
         row_results.append({
             "addr": c["kb_addr"], "old_name": old_name, "new_name": new_name,
-            "tier": tier, "decl_changed": decl_changed, "name_changed": name_changed,
-            "files": touched,
+            "tier": tier, "decl_changed": any_decl_changed, "name_changed": any_name_changed,
+            "files": touched, "records_touched": records_touched,
         })
 
     touched_files = []
@@ -381,7 +405,7 @@ def cmd_apply(args):
     for r in sorted(row_results, key=lambda x: x["addr"]):
         print(f"  {r['addr']}: {r['old_name']} -> {r['new_name']} ({r['tier']}) "
               f"decl={'Y' if r['decl_changed'] else 'n'} name={'Y' if r['name_changed'] else 'n'} "
-              f"files={len(r['files'])}")
+              f"files={len(r['files'])} recs={r['records_touched']}")
 
     print(f"\nRows applied: {len(row_results)}")
     print(f"Distinct src files touched: {len(touched_files)}")
