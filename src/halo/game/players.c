@@ -1043,7 +1043,7 @@ void player_set_unit_camo_flag(int player_handle /* @<eax> */,
 
   player = (char *)datum_get(player_data, player_handle);
   unit_obj = (char *)object_get_and_verify_type(*(int *)(player + 0x34), 3);
-  if (powerup_index == 0) {
+  if (powerup_index == _player_powerup_active_camouflage) {
     *(unsigned int *)(unit_obj + 0x1b4) |= 0x10;
     *(int16_t *)(unit_obj + 0x3d2) = 0;
   }
@@ -1064,7 +1064,7 @@ void FUN_000bb1c0(int player_index /* @<eax> */, int16_t param2)
 
   player = (char *)datum_get(player_data, player_index);
   unit_obj = (char *)object_get_and_verify_type(*(int *)(player + 0x34), 3);
-  if (param2 == 0) {
+  if (param2 == _player_powerup_active_camouflage) {
     *(unsigned int *)(unit_obj + 0x1b4) |= 0x20;
   }
 }
@@ -1082,7 +1082,7 @@ void FUN_000bb1f0(int player_index /* @<eax> */, int16_t param2)
 
   player = (char *)datum_get(player_data, player_index);
   unit_obj = (char *)object_get_and_verify_type(*(int *)(player + 0x34), 3);
-  if (param2 == 0) {
+  if (param2 == _player_powerup_active_camouflage) {
     *(unsigned int *)(unit_obj + 0x1b4) &= 0xffffffef;
   }
 }
@@ -1847,13 +1847,13 @@ bool player_handle_powerup(int player_handle, int16_t powerup_type,
    * assert_halt_msg_at: the macro's `!(a >= 0 && a < 2)` makes VC71
    * materialize the condition as a 0/1 value in EAX instead of emitting the
    * original's two-branch `test si,si / jl` + `cmp si,2 / jl` (measured). */
-  if (powerup_type < 0 || powerup_type >= 2) {
+  if (powerup_type < 0 || powerup_type >= NUMBER_OF_PLAYER_POWERUPS) {
     display_assert("powerup_type>=0 && powerup_type<NUMBER_OF_PLAYER_POWERUPS",
                    "c:\\halo\\SOURCE\\game\\players.c", 0xaea, 1);
     system_exit(-1);
   }
 
-  if (powerup_type == 0) {
+  if (powerup_type == _player_powerup_active_camouflage) {
     /* Active camo: refuse if the camo-active flag is already set.  The
      * original reads only the low byte of the flags dword here. */
     unit_obj = (char *)object_get_and_verify_type(*(int *)(player + 0x34), 3);
@@ -1869,7 +1869,7 @@ bool player_handle_powerup(int player_handle, int16_t powerup_type,
      * the object_get_and_verify_type argument costs 2 insns (measured). */
     char *player2 = (char *)datum_get(player_data, player_handle);
     unit_obj = (char *)object_get_and_verify_type(*(int *)(player2 + 0x34), 3);
-    if (powerup_idx != 0)
+    if (powerup_idx != _player_powerup_active_camouflage)
       goto accumulate;
     flags = *(unsigned int *)(unit_obj + 0x1b4) | 0x10;
     /* `mov word ptr [eax+0x3d2], si` -- provably 0 on this path (guarded by
@@ -1885,7 +1885,7 @@ bool player_handle_powerup(int player_handle, int16_t powerup_type,
       goto accumulate;
     player3 = (char *)datum_get(player_data, player_handle);
     unit_obj = (char *)object_get_and_verify_type(*(int *)(player3 + 0x34), 3);
-    if (powerup_idx != 0)
+    if (powerup_idx != _player_powerup_active_camouflage)
       goto accumulate;
     flags = *(unsigned int *)(unit_obj + 0x1b4) | 0x20;
   }
@@ -1924,7 +1924,7 @@ void player_set_respawn_timer(int player_handle, int16_t respawn_type,
     /* Slot was empty — fetch the unit and mark it. */
     char *player2 = (char *)datum_get(player_data, player_handle);
     unit_obj = (char *)object_get_and_verify_type(*(int *)(player2 + 0x34), 3);
-    if (powerup_idx == 0) {
+    if (powerup_idx == _player_powerup_active_camouflage) {
       /* Active camo: set camo-active flag on the unit object. */
       *(unsigned int *)(unit_obj + 0x1b4) |= 0x10;
       *(int16_t *)(unit_obj + 0x3d2) = respawn_type;
@@ -1953,13 +1953,13 @@ void player_update_weapon_timers(int datum_handle)
 
   player = (char *)datum_get(player_data, datum_handle);
   timer = (int16_t *)(player + 0x68);
-  for (i = 0; i < 2; i++, timer++) {
+  for (i = 0; i < NUMBER_OF_PLAYER_POWERUPS; i++, timer++) {
     if (*timer > 0) {
       (*timer)--;
       if (*timer == 0) {
         player = (char *)datum_get(player_data, datum_handle);
         unit = (char *)object_get_and_verify_type(*(int *)(player + 0x34), 3);
-        if (i == 0)
+        if (i == _player_powerup_active_camouflage)
           *(unsigned int *)(unit + 0x1b4) &= ~0x10u;
       }
     }
@@ -2702,9 +2702,9 @@ void player_set_action_result_for_equipment(int player_handle,
   } else {
     /* Active camo (3) or full-spectrum vision (4). */
     if (powerup_type == 3) {
-      powerup_index = 0;
+      powerup_index = _player_powerup_active_camouflage;
     } else if (powerup_type == 4) {
-      powerup_index = 1;
+      powerup_index = _player_powerup_full_spectrum_vision;
     } else {
       display_assert(0, "c:\\halo\\SOURCE\\game\\players.c", 0xac7, 1);
       system_exit(-1);
@@ -2713,7 +2713,7 @@ void player_set_action_result_for_equipment(int player_handle,
     if (!player_handle_powerup(player_handle, (int16_t)powerup_index, ticks))
       return;
     /* Active camo (index 0) triggers a location notification. */
-    if ((int16_t)powerup_index == 0) {
+    if ((int16_t)powerup_index == _player_powerup_active_camouflage) {
       player_apply_camo_notification(player_handle);
     }
   }
@@ -2841,7 +2841,7 @@ void players_update_before_game(void)
     /* desired_weapon_index: NONE or [0..MAXIMUM_WEAPONS_PER_UNIT=4] */
     if (action->desired_weapon_index != -1 &&
         (action->desired_weapon_index < 0 ||
-         action->desired_weapon_index > 4)) {
+         action->desired_weapon_index > MAXIMUM_WEAPONS_PER_UNIT)) {
       display_assert(
         "(NONE == action->desired_weapon_index) || ((action->desired_weapon_"
         "index >= 0) && (action->desired_weapon_index <= "
@@ -2853,7 +2853,7 @@ void players_update_before_game(void)
     /* desired_grenade_index: NONE or [0..NUMBER_OF_UNIT_GRENADE_TYPES=2] */
     if (action->desired_grenade_index != -1 &&
         (action->desired_grenade_index < 0 ||
-         action->desired_grenade_index > 2)) {
+         action->desired_grenade_index > NUMBER_OF_UNIT_GRENADE_TYPES)) {
       display_assert(
         "(NONE == action->desired_grenade_index) || ((action->desired_grenade"
         "_index >= 0) && (action->desired_grenade_index <= "
@@ -3012,7 +3012,8 @@ void players_update_before_game(void)
       /* Validate assembled control data (mirrors unit_set_control
        * internal checks). */
       if (ctl.weapon_index != -1 &&
-          (ctl.weapon_index < 0 || ctl.weapon_index > 4)) {
+          (ctl.weapon_index < 0 ||
+           ctl.weapon_index > MAXIMUM_WEAPONS_PER_UNIT)) {
         display_assert(
           "(NONE == control_data.weapon_index) || ((control_data.weapon_"
           "index >= 0) && (control_data.weapon_index <= "
@@ -3021,7 +3022,8 @@ void players_update_before_game(void)
         system_exit(-1);
       }
       if (ctl.grenade_index != -1 &&
-          (ctl.grenade_index < 0 || ctl.grenade_index > 2)) {
+          (ctl.grenade_index < 0 ||
+           ctl.grenade_index > NUMBER_OF_UNIT_GRENADE_TYPES)) {
         display_assert(
           "(NONE == control_data.grenade_index) || ((control_data.grenade_"
           "index >= 0) && (control_data.grenade_index <= "

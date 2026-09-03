@@ -227,6 +227,51 @@ Likewise the `_has_filename_bit` conversion covers only the two assert-adjacent 
 five read `ref->unk_4[0]`, an unnamed byte array, where naming the bit while the container stays
 anonymous would read as more recovery than was done. Those want a `structize` field split first.
 
+## Batch 4 — `src/halo/game/players.c` (2026-09-03)
+
+Gate: 245 of 245 scored functions byte-identical to the pre-edit baseline, `IMM-WARN` 0
+(`vc71_verify.py --no-cache` both sides).
+
+One family borrowed, three bounds already present and now used by name:
+
+| Family | Bound | Where the bound is proven | Tier |
+|---|---|---|---|
+| `player_powerup` | `NUMBER_OF_PLAYER_POWERUPS = 2` | assert at `players.c` 0xaea reads `powerup_type<NUMBER_OF_PLAYER_POWERUPS` against a `cmp 2`; `player_update_weapon_timers` walks exactly two `int16_t` from `player+0x68` | T2 (`name_source: halocea`) |
+| `NUMBER_OF_UNIT_GRENADE_TYPES` | 2, already in `types.h:270` | assert text `desired_grenade_index <= NUMBER_OF_UNIT_GRENADE_TYPES` | T1 |
+| `MAXIMUM_WEAPONS_PER_UNIT` | 4, already in `types.h:269` | assert text `desired_weapon_index <= MAXIMUM_WEAPONS_PER_UNIT` | T1 |
+
+13 sites converted: the powerup guard and its slot-0 branches in `player_handle_powerup`,
+`player_set_respawn_timer`, `player_update_weapon_timers`, the two camo flag helpers
+(`FUN_000bb1c0` / `FUN_000bb1f0`), the equipment-powerup slot mapping at 0xac7, and the four
+grenade/weapon range guards.
+
+Two findings worth carrying forward:
+
+- **Display-string-to-slot-offset pairing is a real corroboration class, and it is T2, not T1.**
+  `hud.c` formats `"ACTIVE-CAMOUFLAGE "` from the `int16_t` at `player+0x68` and
+  `"FULL-SPECTRUM VISION "` from the one at `player+0x6a`, which fixes slot 0 = active camouflage
+  and slot 1 = full-spectrum vision *from our own binary*. But display text is not an identifier:
+  the spellings `_player_powerup_active_camouflage` / `_player_powerup_full_spectrum_vision` are
+  still borrowed, so `name_source: halocea` (T2) with the mapping cited. This is deliberately
+  *not* batch 3's T1-by-exhaustion, where the identifiers themselves were in assert strings.
+  The class should generalize — many of the remaining families have HUD or console labels.
+- **A TU with `assert_halt` cannot take a top-of-file insertion.** `players.c` has four
+  `assert_halt(...)` sites (lines 143/160/495/1919) which stamp `__LINE__`; any inserted line above
+  one changes its immediate and moves VC71 across the whole TU. The enum therefore went into the two
+  force-included headers (`src/common.h` for clang `-include`, `src/xdk_common.h` for VC71 `/FI`) —
+  the same routing `common.h` already documents for the `TAG_GROUP_*` codes. Adding lines to an
+  included header does not shift `__LINE__` in the includer. Verified no header included *after* the
+  insertion point (`nv097.h`) contains an assert of its own. Both edits to the two `ctl.` guards
+  wrap onto a second line, which is why they were placed below line 1919.
+
+Not done here: the `assert_halt(respawn_type >= 0 && respawn_type < 2)` at `players.c:1919` keeps
+its literal. `assert_halt` stringizes its condition, so naming the bound would change the `.rdata`
+string length and shift every string address below it in the TU — a whole-TU immediate change for
+one site. `MAXIMUM_NUMBER_OF_LOCAL_PLAYERS` needed no work: already `#define`d 4 in both
+force-included headers and already used by name at all seven sites. Note that the shared-bounds
+extraction matched it on the `NUMBER_OF_` substring, so that queue row was a prefix artifact rather
+than a distinct family — re-rank remaining candidate TUs with word-boundary matching.
+
 ## Hazards
 
 - **Line-counting a halocea enum is not reading it.** The first pass counted
