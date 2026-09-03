@@ -9636,7 +9636,6 @@
     "0x11f750": "void *stack_memory_pool_alloc_or_resize(int new_size@<eax>, void *pool@<ecx>, void *block_hdr, const char *file, unsigned int line);",
     "0x120620": "char FUN_00120620(int animation@<esi>);",
     "0x120d10": "short FUN_00120d10(unsigned short *keyframe_frame_indices, short target_frame_index, short keyframe_count@<edi>);",
-    "0x125ce0": "void FUN_00125ce0(void *message_packet@<edi>, void *param_1);",
     "0x125fb0": "void FUN_00125fb0(unsigned short reason@<eax>, void *client@<esi>);",
     "0x126000": "void FUN_00126000(void *server /* @<ebx> */);",
     "0x1260c0": "bool FUN_001260c0(void *server /* @<esi> */);",
@@ -9985,15 +9984,16 @@
     "0x1e9380": "void D3DDevice_SetRenderState_Deferred(uint32_t reg_index@<ecx>, uint32_t value@<edx>);",
     "0x1e9410": "void __stdcall D3DDevice_SetTextureStageState(uint32_t stage@<ecx>, uint32_t state@<edx>, uint32_t value);",
     "0x224881": "int __stdcall bind(void *xnet@<ecx>, unsigned int socket, const void *name, int namelen);",
-    "0x00224881": "int __stdcall bind(void *xnet@<ecx>, unsigned int socket, const void *name, int namelen);",
     "0x224904": "int __stdcall connect(void *xnet@<ecx>, unsigned int socket, const void *name, int namelen);",
-    "0x00224904": "int __stdcall connect(void *xnet@<ecx>, unsigned int socket, const void *name, int namelen);",
     "0x225021": "int __stdcall socket(void *xnet@<ecx>, int af, int type, int protocol);",
-    "0x00225021": "int __stdcall socket(void *xnet@<ecx>, int af, int type, int protocol);",
     "0x2256bb": "int __stdcall recv(void *xnet@<ecx>, unsigned int socket, char *buf, int len, int flags);",
-    "0x002256bb": "int __stdcall recv(void *xnet@<ecx>, unsigned int socket, char *buf, int len, int flags);",
     "0x2258a4": "int __stdcall send(void *xnet@<ecx>, unsigned int socket, const char *buf, int len, int flags);",
+    "0x00224881": "int __stdcall bind(void *xnet@<ecx>, unsigned int socket, const void *name, int namelen);",
+    "0x00224904": "int __stdcall connect(void *xnet@<ecx>, unsigned int socket, const void *name, int namelen);",
+    "0x00225021": "int __stdcall socket(void *xnet@<ecx>, int af, int type, int protocol);",
+    "0x002256bb": "int __stdcall recv(void *xnet@<ecx>, unsigned int socket, char *buf, int len, int flags);",
     "0x002258a4": "int __stdcall send(void *xnet@<ecx>, unsigned int socket, const char *buf, int len, int flags);",
-    "0x169200": "bool FUN_00169200(float *point, float radius, float *out_extent, float *out_screen @<ebx>);"
+    "0x169200": "bool FUN_00169200(float *point, float radius, float *out_extent, float *out_screen @<ebx>);",
+    "0x125ce0": "void FUN_00125ce0(void *message_packet@<edi>, void *param_1);"
   }
 }
