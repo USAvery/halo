@@ -897,6 +897,49 @@ void *FUN_00060070(void *obstacles, int16_t disc_index)
   return base + 8 + disc_index * 0x18;
 }
 
+/* 0x000600c0 - obstacle-disc link accessor.
+ *
+ * The fingerprinted Ghidra artifact for this attempt held only
+ * {"error":"Ghidra is not reachable at http://localhost:8089"} in every
+ * field (decompile, disassembly, callees, call_site_audit, struct_offsets),
+ * so the evidence below is read directly from the pristine XBE
+ * (halo-patched/cachebeta.xbe) with capstone, bounded 0x600c0-0x600e4 per
+ * the committed tools/verify/function_bounds.json entry:
+ *
+ *   PUSH EBP; MOV EBP,ESP
+ *   MOV EAX,[EBP+0xc]        ; disc_index
+ *   CMP AX,0xffff            ; == NONE (-1)?
+ *   JE  0x600df
+ *   PUSH EAX                 ; arg2 = disc_index
+ *   MOV EAX,[EBP+8]          ; obstacles
+ *   PUSH EAX                 ; arg1 = obstacles
+ *   CALL 0x60070             ; FUN_00060070 (bounds-checked disc accessor)
+ *   MOVSX EAX,word [EAX+2]   ; sign-extended int16_t at disc+0x2
+ *   ADD ESP,8                ; cdecl cleanup, 2 stack args
+ *   POP EBP; RET
+ *  0x600df:
+ *   OR EAX,0xffffffff        ; return -1
+ *   POP EBP; RET
+ *
+ * cdecl, two stack args only, no register args. Sole callee is
+ * FUN_00060070 above (already ported, same TU), whose bounds check is the
+ * only side effect on the taken path.
+ *
+ * Field meaning: +0x2 within the 24-byte (0x18) disc record is an int16_t,
+ * sign-extended to a 32-bit int return (the reference MOVSX on the found
+ * path and OR EAX,-1 on the sentinel path together prove the return is a
+ * full dword, not a word). The -1 sentinel pass-through is consistent with
+ * a disc-link field, but no string or assert evidence names it at this
+ * call site, so it stays field_02 (offset accessed, meaning unproven).
+ */
+int FUN_000600c0(void *obstacles, int16_t disc_index)
+{
+  if (disc_index != -1) {
+    return *(short *)((char *)FUN_00060070(obstacles, disc_index) + 2);
+  }
+  return -1;
+}
+
 /* 0x000600f0 — obstacle-avoidance step bounds-checked accessor (inline
  * function; instantiated standalone in path.obj, same pattern as
  * FUN_00060070 above). __FILE__ in the assert string is
@@ -1061,6 +1104,45 @@ int16_t FUN_000601a0(int16_t heap_index)
   return (int16_t)((heap_index - 1) >> 1);
 }
 
+/* 0x000601e0 — 0-based binary-heap LEFT-child-index helper.
+ *
+ * The fingerprinted Ghidra artifact for this attempt was invalid: every
+ * field (decompile_c, disassembly, callees, call_site_audit) held only
+ * {"error":"Ghidra is not reachable at http://localhost:8089"}, and the
+ * live MCP bridge was down this session too. Evidence below is read
+ * directly out of the pristine XBE (halo-patched/cachebeta.xbe) with
+ * tools/verify/xbe_reference.py emit --addr 0x601e0 — the same bytes
+ * vc71_verify.py's own reference derives from — bounded 0x601e0-0x601eb
+ * per the committed function_bounds.json entry (end 0x601ec).
+ *
+ * Full 12 bytes: 55 8b ec 8b 45 08 8d 44 00 01 5d c3
+ *   PUSH EBP; MOV EBP,ESP
+ *   MOV EAX,[EBP+8]           ; heap_index
+ *   LEA EAX,[EAX+EAX*1+0x1]   ; eax = 2*heap_index + 1
+ *   POP EBP; RET
+ *
+ * Single basic block, no calls, no asserts (a child-index formula needs
+ * no index>0 guard, unlike the parent helper FUN_000601a0 above). This
+ * completes the standard 0-based binary-heap index triple in this file:
+ * FUN_000601a0 parent (heap_index-1)>>1, this left child 2i+1, and
+ * FUN_000601f0 below right child 2i+2 — byte-identical to this function
+ * except for the LEA displacement (0x2 instead of 0x1).
+ *
+ * No source-side callers exist (grep over src/); the binary caller set
+ * was NOT enumerated this attempt, because the fingerprinted artifact's
+ * caller/xref lists were invalid (Ghidra unreachable) — so no caller is
+ * known to pin the parameter/return width. int16_t matches
+ * the established heap-index convention of both siblings, and the
+ * identically-shaped FUN_000601f0 scores 100% VC71 with that typing, so
+ * the narrowing is codegen-free here. EAX carries the full 32-bit result
+ * and is never truncated before RET, so the width is a convention choice,
+ * not disassembly-provable.
+ */
+int16_t FUN_000601e0(int16_t heap_index)
+{
+  return (int16_t)(heap_index * 2 + 1);
+}
+
 /* 0x000601f0 — 0-based binary-heap right-child-index helper.
  *
  * Ghidra was unreachable for this attempt (cached artifact held only
@@ -1079,7 +1161,7 @@ int16_t FUN_000601a0(int16_t heap_index)
  *
  * The sibling function FUN_000601a0 immediately above computes the
  * 0-based binary-heap PARENT index (heap_index-1)>>1. The immediately
- * preceding address FUN_000601e0 (still unported) is byte-identical
+ * preceding address FUN_000601e0 (now ported above) is byte-identical
  * except for its LEA displacement (0x1 instead of 0x2):
  * [EAX+EAX*1+0x1] = 2*heap_index+1. Together this is the standard 0-based
  * binary-heap index triple (parent, left child, right child):

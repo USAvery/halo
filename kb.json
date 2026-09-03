@@ -15,7 +15,7 @@
   "ported": true
  },
  "0x12ad0": {
-  "decl": "float FUN_00012ad0(int actor_handle @<ebx>, int action_type @<esi>, void *charge_state);",
+  "decl": "float FUN_00012ad0(int actor_handle@<ebx>, int action_type@<esi>, void *charge_state);",
   "name": "FUN_00012ad0",
   "obj": "actors.obj",
   "ported": false
@@ -77,7 +77,7 @@
   "source_path": "src/halo/networking/network_server_message_handler.c"
  },
  "0x13dd0": {
-  "decl": "int FUN_00013dd0(int actor_handle @<eax>, float *source_pos @<esi>);",
+  "decl": "int FUN_00013dd0(int actor_handle@<eax>, float *source_pos@<esi>);",
   "name": "FUN_00013dd0",
   "obj": "actor_looking.obj",
   "ported": true
@@ -113,7 +113,7 @@
   "ported": true
  },
  "0x14e90": {
-  "decl": "char FUN_00014e90(int actor_handle @<eax>, char *state_data);",
+  "decl": "char FUN_00014e90(int actor_handle@<eax>, char *state_data);",
   "name": "FUN_00014e90",
   "obj": "actor_looking.obj",
   "ported": true
@@ -125,7 +125,7 @@
   "ported": true
  },
  "0x153e0": {
-  "decl": "bool FUN_000153e0(int actor_handle @<ebx>);",
+  "decl": "bool FUN_000153e0(int actor_handle@<ebx>);",
   "name": "FUN_000153e0",
   "obj": "actor_looking.obj",
   "ported": true
@@ -205,7 +205,7 @@
   "ported": true
  },
  "0x169a0": {
-  "decl": "void FUN_000169a0(int actor_handle, int unit_handle, short scenario_idx, int param_4, char *out_index, void *state_ptr @<esi>);",
+  "decl": "void FUN_000169a0(int actor_handle, int unit_handle, short scenario_idx, int param_4, char *out_index, void *state_ptr@<esi>);",
   "name": "FUN_000169a0",
   "obj": "actor_looking.obj",
   "ported": true
@@ -516,7 +516,7 @@
  },
  "0xa5f00": {
   "addr": "0xa5f00",
-  "decl": "int16_t FUN_000a5f00(float *cone_spec /* @<edi> */, int16_t starting_cluster, float *point, float *direction, float *arg4, float *arg5, int max_count, void *out_buffer);",
+  "decl": "int16_t FUN_000a5f00(float *cone_spec /*@<edi> */, int16_t starting_cluster, float *point, float *direction, float *arg4, float *arg5, int max_count, void *out_buffer);",
   "ported": false,
   "reg_args": {
    "cone_spec": "edi"
@@ -920,7 +920,7 @@
     },
     {
      "addr": "0x1dbdec",
-     "comment": "LIBCMT _except_handler3 — VC7 frame-based SEH dispatcher (installed by __SEH_prolog @0x1dd5c8). Referenced by clang's __try/__except lowering in FUN_001d6ca8/FUN_001d703b; resolves to the original runtime via forwarding thunk.",
+     "comment": "LIBCMT _except_handler3 \u2014 VC7 frame-based SEH dispatcher (installed by __SEH_prolog @0x1dd5c8). Referenced by clang's __try/__except lowering in FUN_001d6ca8/FUN_001d703b; resolves to the original runtime via forwarding thunk.",
      "decl": "int __cdecl _except_handler3(void *ExceptionRecord, void *EstablisherFrame, void *ContextRecord, void *DispatcherContext);"
     },
     {
@@ -7026,7 +7026,7 @@
     {
      "addr": "0x9ca70",
      "decl": "void effects_information_get(int effect_ptr@<ebx>, uint32_t flags_hi@<edi>, unsigned int *seed, float *velocity_out, float min_val, float max_val, uint32_t flags_lo);",
-     "note": "hidden reg deps (EDI=flags_hi, EBX=effect_ptr) — callers pass these in registers; all known callers inlined",
+     "note": "hidden reg deps (EDI=flags_hi, EBX=effect_ptr) \u2014 callers pass these in registers; all known callers inlined",
      "ported": true
     },
     {
@@ -7087,7 +7087,7 @@
     {
      "addr": "0x9dcf0",
      "decl": "void FUN_0009dcf0(float *position, void *effect, void *location, void *part, float *forward, float *up, float scale);",
-     "note": "4 reg args (EAX,EDX,ECX,ESI) — inlined into FUN_0009e310, cannot be thunked separately",
+     "note": "4 reg args (EAX,EDX,ECX,ESI) \u2014 inlined into FUN_0009e310, cannot be thunked separately",
      "ported": true
     },
     {
@@ -38722,7 +38722,8 @@
     },
     {
      "addr": "0x600c0",
-     "decl": "void FUN_000600c0(void);"
+     "decl": "int FUN_000600c0(void *obstacles, int16_t disc_index);",
+     "ported": true
     },
     {
      "addr": "0x600f0",
@@ -38741,7 +38742,9 @@
     },
     {
      "addr": "0x601e0",
-     "decl": "void FUN_000601e0(void);"
+     "decl": "int16_t FUN_000601e0(int16_t heap_index);",
+     "ported": true,
+     "source_path": "src/halo/ai/path.c"
     },
     {
      "addr": "0x601f0",
