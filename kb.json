@@ -6732,7 +6732,8 @@
     },
     {
      "addr": "0x85b60",
-     "decl": "void FUN_00085b60(void);"
+     "decl": "void dead_camera_new(void);",
+     "comment": "[NAME: dead_camera_new — CEA PDB line-containment (high_confidence), cea-deferred 2026-09-03]"
     },
     {
      "addr": "0x85c80",
@@ -7590,7 +7591,8 @@
    "functions": [
     {
      "addr": "0x199d40",
-     "decl": "void FUN_00199d40(void);"
+     "decl": "void datastore_read(void);",
+     "comment": "[NAME: datastore_read — CEA PDB line-containment (probable), cea-deferred 2026-09-03]"
     },
     {
      "addr": "0x19a020",
@@ -13477,7 +13479,8 @@
     },
     {
      "addr": "0xe0110",
-     "decl": "void FUN_000e0110(void);"
+     "decl": "void interface_draw_bitmap_modulated_p32(void);",
+     "comment": "[NAME: interface_draw_bitmap_modulated_p32 — CEA PDB line-containment (high_confidence), cea-deferred 2026-09-03]"
     }
    ],
    "name": "interface.obj",
@@ -13584,7 +13587,8 @@
     },
     {
      "addr": "0xf5900",
-     "decl": "void FUN_000f5900(void);"
+     "decl": "void virtual_keyboard_tab_left(void);",
+     "comment": "[NAME: virtual_keyboard_tab_left — CEA PDB line-containment (probable), cea-deferred 2026-09-03]"
     },
     {
      "addr": "0xf5f10",
@@ -23408,7 +23412,8 @@
     },
     {
      "addr": "0x1c4850",
-     "decl": "void FUN_001c4850(void);"
+     "decl": "void enumerate_memory_units_test(void);",
+     "comment": "[NAME: enumerate_memory_units_test — CEA PDB line-containment (high_confidence), cea-deferred 2026-09-03]"
     },
     {
      "addr": "0x1c4990",
@@ -24974,7 +24979,8 @@
     },
     {
      "addr": "0x1bab60",
-     "decl": "void FUN_001bab60(void);"
+     "decl": "void get_write_buffer_size(void);",
+     "comment": "[NAME: get_write_buffer_size — CEA PDB line-containment (probable), cea-deferred 2026-09-03]"
     },
     {
      "addr": "0x1bac00",
@@ -27016,11 +27022,13 @@
     },
     {
      "addr": "0xeb710",
-     "decl": "void FUN_000eb710(void);"
+     "decl": "void netgame_join_player(void);",
+     "comment": "[NAME: netgame_join_player — CEA PDB line-containment (probable), cea-deferred 2026-09-03]"
     },
     {
      "addr": "0xeba70",
-     "decl": "void FUN_000eba70(void);"
+     "decl": "void player_profiles_list_initialize(void);",
+     "comment": "[NAME: player_profiles_list_initialize — CEA PDB line-containment (probable), cea-deferred 2026-09-03]"
     },
     {
      "addr": "0xebff0",
@@ -27028,11 +27036,13 @@
     },
     {
      "addr": "0xec2c0",
-     "decl": "void FUN_000ec2c0(void);"
+     "decl": "void playlist_profile_begin_editing(void);",
+     "comment": "[NAME: playlist_profile_begin_editing — CEA PDB line-containment (probable), cea-deferred 2026-09-03]"
     },
     {
      "addr": "0xec840",
-     "decl": "void FUN_000ec840(void);"
+     "decl": "void playlist_profile_change_name(void);",
+     "comment": "[NAME: playlist_profile_change_name — CEA PDB line-containment (probable), cea-deferred 2026-09-03]"
     },
     {
      "addr": "0xecb60",
@@ -27091,11 +27101,13 @@
     },
     {
      "addr": "0xee500",
-     "decl": "void FUN_000ee500(void);"
+     "decl": "void playlist_profile_change_item_options(void);",
+     "comment": "[NAME: playlist_profile_change_item_options — CEA PDB line-containment (probable), cea-deferred 2026-09-03]"
     },
     {
      "addr": "0xee810",
-     "decl": "void FUN_000ee810(void);"
+     "decl": "void playlist_profile_change_indicator_options(void);",
+     "comment": "[NAME: playlist_profile_change_indicator_options — CEA PDB line-containment (probable), cea-deferred 2026-09-03]"
     },
     {
      "addr": "0xeea10",
@@ -27291,7 +27303,8 @@
     },
     {
      "addr": "0xf2560",
-     "decl": "void FUN_000f2560(void);"
+     "decl": "void player_profile_3wide_list_update(void);",
+     "comment": "[NAME: player_profile_3wide_list_update — CEA PDB line-containment (probable), cea-deferred 2026-09-03]"
     },
     {
      "addr": "0xf2690",
@@ -29241,7 +29254,8 @@
     },
     {
      "addr": "0x1b8570",
-     "decl": "void FUN_001b8570(void);"
+     "decl": "void vehicle_update(void);",
+     "comment": "[NAME: vehicle_update — CEA PDB line-containment (high_confidence), cea-deferred 2026-09-03]"
     },
     {
      "addr": "0x1b8f10",
@@ -30628,7 +30642,8 @@
     },
     {
      "addr": "0x17e800",
-     "decl": "void FUN_0017e800(void);"
+     "decl": "void rasterizer_debug_triangle_shaded(void);",
+     "comment": "[NAME: rasterizer_debug_triangle_shaded — CEA PDB line-containment (probable), cea-deferred 2026-09-03]"
     },
     {
      "addr": "0x17eb10",
@@ -36357,7 +36372,8 @@
     },
     {
      "addr": "0x74a30",
-     "decl": "void FUN_00074a30(void);"
+     "decl": "void TIFFWriteTile(void);",
+     "comment": "[NAME: TIFFWriteTile — CEA PDB line-containment (high_confidence), cea-deferred 2026-09-03]"
     }
    ],
    "name": "tif_write.obj",
