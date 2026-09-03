@@ -76,7 +76,15 @@ All edits target **that path**, not a hardcoded `/mnt/g/dev/halo`.
 2. Resolve target by name or address in `kb.json` and Ghidra.
 3. **Gather context & recover literals.** Callers, callees, globals, strings,
    imports, existing declarations. Recover string/constant literals pushed by
-   address from `cachebeta.xbe`.
+   address from `cachebeta.xbe`. If the target has a name- or address-resolvable
+   match in the Halo CEA (Anniversary, Xbox 360) decompiled corpus, run
+   `rtk python3 tools/analysis/cea_body.py <target>` to read that source beside
+   the Ghidra decompile — advisory context only. It does not change step 4:
+   disassembly verification against `cachebeta.xbe` is still mandatory and still
+   the only authority. Per `naming-confidence`, CEA names and struct layouts are
+   T2 evidence at most, never T1, and files flagged `owner_divergence` in the CEA
+   index are the port author's own back-ports to 2276, not independent Xbox 360
+   evidence — the tool calls this out loudly when it applies.
 4. **Cross-check decompilation against raw disassembly.** Mandatory call-site
    verification: for every CALL, trace each PUSH backward. Watch for register
    aliasing, push-then-fstp, struct field rotation. Use `lift-decompiler-traps`
@@ -120,6 +128,7 @@ If it fails, stop and tell the user.
 
 - `rtk python3 tools/analysis/kb_meta.py list --object <obj>` for scoped symbols
 - `rtk python3 tools/lift_pipeline.py --target <name_or_addr> ...` for staged verify
+- `rtk python3 tools/analysis/cea_body.py <name_or_addr>` for CEA-360 source, advisory only (T2 max)
 - `rtk python3 tools/llm_auto_lift.py select --limit 20` for target selection
 - Keep MCP passes staged: resolve → decompile → callers/callees → disassembly only if needed
 - One target per run; summarize evidence minimally

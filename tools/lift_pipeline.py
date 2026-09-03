@@ -514,6 +514,17 @@ def run_pipeline(args: argparse.Namespace) -> int:
   stages.append(StageResult("crossbuild_context", ran=True, ok=True,
                             details=crossbuild_detail))
 
+  # CEA-360 (Halo: Combat Evolved Anniversary) source correspondence is the
+  # same kind of advisory research aid, never a gate: see cea_body.py.
+  cea_proc = run_command(
+    ["python3", "tools/analysis/cea_body.py", target.addr, "--raw"],
+    cwd=ROOT,
+    log_path=artifact_dir / "cea_body.log",
+  )
+  cea_detail = ("CEA-360 match found (see cea_body.log) [T2 max]"
+                if cea_proc.returncode == 0 else "no CEA-360 match")
+  stages.append(StageResult("cea_body", ran=True, ok=True, details=cea_detail))
+
   if args.extract_cmd:
     cmd = args.extract_cmd.format(
       target_addr=target.addr,
