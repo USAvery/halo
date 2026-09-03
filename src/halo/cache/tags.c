@@ -122,6 +122,40 @@ int tag_get_group_tag(int tag_index)
   return entry[0];
 }
 
+/* 0x1ba5d0 — FUN_001ba5d0: if the cache-copy worker is currently busy,
+ * signal the "queue end" event.
+ *
+ * Sole caller is cache_files_precache_map_queue_end (xref 0x1bc719,
+ * unconditional call), which owns the copy_in_progress assert; this
+ * function itself has no assert and no stack frame (disassembly starts
+ * at MOV EAX,[0x0032ea98] and ends at RET, 12 instructions total).
+ *
+ * The globals block is reached through the POINTER global at 0x32ea98,
+ * the same block written by FUN_001bc280 in cache_files_windows.c. The
+ * original reloads that pointer after the first call (MOV EAX,[0x32ea98]
+ * at 0x1ba5d0 and MOV EDX,[0x32ea98] at 0x1ba5e7), which the repeated
+ * deref below reproduces.
+ *
+ *   +0x954  event polled with a zero timeout (WaitForSingleObject with
+ *           PUSH 0x0 as the timeout, PUSH ECX as the handle). Created by
+ *           FUN_001bc280 as manual-reset, initially SIGNALED -- inferred
+ *           role "worker idle" from those CreateEventA arguments, not
+ *           from an assert string.
+ *   +0x950  event signalled when the poll returns non-zero, i.e. when
+ *           +0x954 was NOT signalled (WAIT_OBJECT_0 == 0 is the only
+ *           value skipped by TEST EAX,EAX / JZ). Created by FUN_001bc280
+ *           as manual-reset, initially non-signaled.
+ *
+ * Type asymmetry between the two calls follows the kb decls:
+ * WaitForSingleObject takes an int handle, SetEvent takes void *. */
+void FUN_001ba5d0(void)
+{
+  if (WaitForSingleObject(*(int *)(*(unsigned char **)0x32ea98 + 0x954), 0) !=
+      0) {
+    SetEvent(*(void **)(*(unsigned char **)0x32ea98 + 0x950));
+  }
+}
+
 /* 0x1ba8b0 — FUN_001ba8b0: wait for the pending synchronous cache-copy
  * read to complete, then clear the "raw read in progress" bit.
  *
