@@ -18747,6 +18747,26 @@
     "0x1c7f80": {
       "kind": "function",
       "status": "ported"
+    },
+    "0x180050": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x183390": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x18ca40": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x18d2c0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x355f0": {
+      "kind": "function",
+      "status": "ported"
     }
   }
 }

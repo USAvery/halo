@@ -254,6 +254,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sync_parser.add_argument('--dry-run', action='store_true',
                              help='Print what would change without saving')
+    sync_parser.add_argument('--address', action='append', metavar='HEX',
+                             help='Only sync the specified address (repeatable)')
 
     return ap
 
@@ -419,10 +421,13 @@ def main():
     if args.command == 'sync-ported':
         import re
         updated = []
+        addresses = {normalize_addr(address) for address in args.address} if args.address else None
         for sym in kb.symbols:
             if not isinstance(sym, Function) or sym.addr is None:
                 continue
             addr = normalize_addr(hex(sym.addr))
+            if addresses is not None and addr not in addresses:
+                continue
             meta = store.symbols.get(addr)
             if meta and meta.status in ('ported', 'verified'):
                 continue
