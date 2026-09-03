@@ -514,18 +514,29 @@ def run_pipeline(args: argparse.Namespace) -> int:
   stages.append(StageResult("crossbuild_context", ran=True, ok=True,
                             details=crossbuild_detail))
 
-  # CEA-360 (Halo: Combat Evolved Anniversary) source correspondence is the
-  # same kind of advisory research aid, never a gate: see cea_body.py. Not
-  # run with --raw, so the full provenance banner lands in the log too.
+  # CEA-360 source correspondence is advisory and never a gate. Parse the
+  # machine-readable result so missing inputs and a genuine no-match remain
+  # distinct, without scraping human-readable stdout.
   cea_proc = run_command(
-    ["python3", "tools/analysis/cea_body.py", target.addr],
+    ["python3", "tools/analysis/cea_body.py", "--json", target.addr],
     cwd=ROOT,
     log_path=artifact_dir / "cea_body.log",
   )
-  cea_name = next((ln.split(":", 1)[1].strip() for ln in cea_proc.stdout.splitlines()
-                   if ln.startswith("CEA function")), "")
-  cea_detail = (f"{cea_name} [T2 max] (see cea_body.log)" if cea_proc.returncode == 0
-                else "no CEA-360 match")
+  try:
+    cea_result = json.loads(cea_proc.stdout)
+  except json.JSONDecodeError:
+    cea_result = {}
+  (artifact_dir / "cea_body.json").write_text(
+    json.dumps(cea_result, indent=2) + "\n", encoding="utf-8")
+  summary["cea_body"] = cea_result
+  if cea_proc.returncode == 0 and cea_result.get("ok"):
+    cea_detail = f"{cea_result.get('cea_function', '?')} [T2 max] (see cea_body.log)"
+  elif cea_proc.returncode == 1 and not cea_result.get("missing_input", False):
+    cea_detail = "no CEA-360 match"
+  elif cea_proc.returncode == 2 or cea_result.get("missing_input", False):
+    cea_detail = "unavailable (missing CEA corpus/index input)"
+  else:
+    cea_detail = "unavailable (CEA helper failed)"
   stages.append(StageResult("cea_body", ran=True, ok=True, details=cea_detail))
 
   if args.extract_cmd:

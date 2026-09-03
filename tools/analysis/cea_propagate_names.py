@@ -79,7 +79,41 @@ _ROOT_DIR = os.path.abspath(os.path.join(_ANALYSIS_DIR, '..', '..'))
 if _ANALYSIS_DIR not in sys.path:
     sys.path.insert(0, _ANALYSIS_DIR)
 
+import cea_corpus_index  # noqa: E402
 import knowledge  # noqa: E402
+
+DEFAULT_CORPUS_PATH = None
+
+
+def check_corpus_staleness(cea_index_path, corpus_root):
+    """Return a mismatch record, or None when the indexed corpus is current.
+
+    The indexer's full path-plus-size signature is used rather than the cheap
+    path-only fingerprint: proposal output must not be based on source files
+    whose contents changed in place after indexing. A missing local corpus
+    path is an unverifiable warning, not a reason to discard otherwise usable
+    indexed data.
+    """
+    try:
+        with open(cea_index_path, encoding='utf-8') as f:
+            index = json.load(f)
+    except (OSError, json.JSONDecodeError) as exc:
+        return {'unverifiable': True, 'reason': f'could not read CEA index for staleness check: {exc}'}
+    signature = index.get('corpus_signature')
+    if not signature or not signature.get('hash'):
+        return {'unverifiable': True, 'reason': 'index.json has no recorded corpus_signature.hash'}
+    try:
+        live = cea_corpus_index.compute_corpus_signature(corpus_root)
+    except OSError as exc:
+        return {'unverifiable': True, 'reason': f'could not walk live corpus: {exc}'}
+    if live['file_count'] == signature.get('file_count') and live['hash'] == signature.get('hash'):
+        return None
+    return {
+        'recorded_hash': signature.get('hash'),
+        'recorded_file_count': signature.get('file_count'),
+        'live_hash': live['hash'],
+        'live_file_count': live['file_count'],
+    }
 
 DEFAULT_CALLGRAPH = os.path.join(_ROOT_DIR, 'artifacts', 'ntsc_callgraph', 'callgraph.json')
 DEFAULT_CEA_INDEX = os.path.join(_ROOT_DIR, 'artifacts', 'cea_corpus', 'index.json')
@@ -164,13 +198,71 @@ def build_seeds(kb, cea_by_name, rename_rows):
     *current* name at that address (i.e. actually applied -- old_name/
     new_name in the row itself can be stale relative to kb.json's live
     state, so "applied" is checked empirically, not trusted from the row).
+
+    A clause-1 candidate is trusted only when nothing else contradicts it:
+
+    * Conflict with rename_mapping: if a rename_mapping row for that same
+      address proposes a *different* CEA function name (also a real CEA
+      name, not just any string), the two clauses disagree about what this
+      address is and neither should be trusted as ground truth. The seed
+      is dropped and recorded in seed_conflicts rather than kept on the
+      strength of clause 1 alone. Example: kb names 0xa7260 "game_tick"
+      (a real CEA name, so clause 1 would seed it), but rename_mapping has
+      a line-containment row for the same address naming it "game_frame"
+      (also a real CEA name) -- one of the two is wrong, so it is dropped.
+
+    * Ambiguous CEA name: if the same CEA name would be seeded at two or
+      more distinct NTSC addresses (i.e. two different kb.json functions
+      happen to carry the identical decl-derived name), the name cannot
+      anchor a 1:1 address match and every address claiming it is dropped.
     """
     seeds = {}
+    seed_conflicts = []
     clause1 = 0
+    clause1_dropped_rename_conflict = 0
+    rows_by_addr = defaultdict(list)
+    for row in rename_rows:
+        rows_by_addr[int(row['addr'], 16)].append(row)
+
+    clause1_candidates = {}
     for addr, name in kb.name_by_addr.items():
         if name in cea_by_name:
-            seeds[addr] = name
+            clause1_candidates[addr] = name
             clause1 += 1
+
+    for addr, name in clause1_candidates.items():
+        conflicting_row = None
+        for row in rows_by_addr.get(addr, []):
+            if row['new_name'] != name and row['new_name'] in cea_by_name:
+                conflicting_row = row
+                break
+        if conflicting_row is not None:
+            clause1_dropped_rename_conflict += 1
+            seed_conflicts.append({
+                'addr': f'0x{addr:x}',
+                'reason': 'rename_mapping_conflict',
+                'clause1_name': name,
+                'rename_mapping_new_name': conflicting_row['new_name'],
+                'rename_mapping_tier': conflicting_row.get('tier'),
+            })
+            continue
+        seeds[addr] = name
+
+    name_to_addrs = defaultdict(set)
+    for addr, name in seeds.items():
+        name_to_addrs[name].add(addr)
+    clause1_dropped_ambiguous_name = 0
+    for name, addrs in name_to_addrs.items():
+        if len(addrs) < 2:
+            continue
+        clause1_dropped_ambiguous_name += len(addrs)
+        seed_conflicts.append({
+            'reason': 'ambiguous_cea_name',
+            'cea_name': name,
+            'addrs': sorted(f'0x{a:x}' for a in addrs),
+        })
+        for a in addrs:
+            del seeds[a]
 
     applied = 0
     stale = 0
@@ -188,13 +280,16 @@ def build_seeds(kb, cea_by_name, rename_rows):
 
     stats = {
         'clause1_seeds': clause1,
+        'clause1_dropped_rename_conflict': clause1_dropped_rename_conflict,
+        'clause1_dropped_ambiguous_name': clause1_dropped_ambiguous_name,
         'rename_mapping_rows': len(rename_rows),
         'rename_mapping_applied': applied,
         'rename_mapping_stale': stale,
         'clause2_net_new_seeds': clause2_new,
         'total_seeds': len(seeds),
+        'seed_conflicts': len(seed_conflicts),
     }
-    return seeds, stats
+    return seeds, stats, seed_conflicts
 
 
 # ---------------------------------------------------------------------------
@@ -466,11 +561,15 @@ def cmd_holdout(args):
     cea_by_name = load_cea_index(args.cea_index)
     rename_rows = load_rename_mapping(args.rename_mapping)
     ntsc_func, ntsc_callers = load_callgraph(args.callgraph)
-    all_seeds, seed_stats = build_seeds(kb, cea_by_name, rename_rows)
+    all_seeds, seed_stats, seed_conflicts = build_seeds(kb, cea_by_name, rename_rows)
 
     print('=== seeds ===')
     for k, v in seed_stats.items():
         print(f'  {k}: {v}')
+    if seed_conflicts and args.show_seed_conflicts:
+        print(f'=== seed_conflicts ({len(seed_conflicts)}) ===')
+        for c in seed_conflicts:
+            print(f'  {c}')
 
     grid = []
     if args.grid:
@@ -522,11 +621,40 @@ def cmd_propose(args):
     cea_by_name = load_cea_index(args.cea_index)
     rename_rows = load_rename_mapping(args.rename_mapping)
     ntsc_func, ntsc_callers = load_callgraph(args.callgraph)
-    seeds, seed_stats = build_seeds(kb, cea_by_name, rename_rows)
+    seeds, seed_stats, seed_conflicts = build_seeds(kb, cea_by_name, rename_rows)
 
     print('=== seeds ===')
     for k, v in seed_stats.items():
         print(f'  {k}: {v}')
+    if seed_conflicts and args.show_seed_conflicts:
+        print(f'=== seed_conflicts ({len(seed_conflicts)}) ===')
+        for c in seed_conflicts:
+            print(f'  {c}')
+
+    # Measure precision on a held-out slice of these same seeds before
+    # trusting the algorithm to propose anything live. A tier label is only
+    # as good as the precision behind it; refuse to write proposals.json
+    # when that measured precision falls short of --min-precision, unless
+    # the caller explicitly overrides with --force.
+    holdout_result = run_holdout_once(
+        kb, cea_by_name, seeds, ntsc_func, ntsc_callers,
+        args.holdout_frac, args.rng_seed, args.min_anchors, args.min_containment,
+        args.margin, confusion_n=args.confusion_sample)
+    precision = holdout_result['precision']
+    precision_s = f'{precision:.4f}' if precision is not None else 'n/a'
+    print('=== precision_holdout (pre-write gate) ===')
+    print(f'  holdout={holdout_result["holdout_size"]} predictions={holdout_result["predictions_made"]} '
+          f'tp={holdout_result["true_positives"]} fp={holdout_result["false_positives"]} '
+          f'no_call={holdout_result["no_call"]}')
+    print(f'  precision={precision_s} (min required: {args.min_precision})')
+    precision_ok = precision is not None and precision >= args.min_precision
+    if not precision_ok and not args.force:
+        print(f'refusing to write {args.out}: measured holdout precision {precision_s} is below '
+              f'--min-precision {args.min_precision}. Re-run with --force to override.')
+        return
+    if not precision_ok and args.force:
+        print(f'--force set: writing {args.out} despite holdout precision {precision_s} < '
+              f'--min-precision {args.min_precision}')
 
     excluded_names = set(kb.all_function_names)
     cea_callees, cea_callers = build_cea_graph(cea_by_name)
@@ -558,7 +686,18 @@ def cmd_propose(args):
             # emit the same new_name twice.
             continue
         used_names.add(candidate)
-        tier = 'high_confidence' if (best['containment'] >= 1.0 and best['anchors'] >= 3) else 'probable'
+        # Containment 1.0 with 3+ anchors alone is not enough evidence for
+        # high_confidence: the callgraph-only signal can still be fooled
+        # (see the quaternion_normalize / sphere_intersects_rectangle3d
+        # holdout false positive, which has this exact shape but zero
+        # shared strings and zero shared globals). Require at least one
+        # independent corroborating signal -- a shared string literal or a
+        # shared global data reference -- before granting the top tier;
+        # otherwise the row is downgraded to probable.
+        has_corroboration = bool(best['shared_strings']) or bool(best['shared_globals'])
+        tier = ('high_confidence'
+                if (best['containment'] >= 1.0 and best['anchors'] >= 3 and has_corroboration)
+                else 'probable')
         row = {
             'addr': f'{addr:08x}',
             'old_name': kb.name_by_addr[addr],
@@ -594,9 +733,16 @@ def cmd_propose(args):
     for tier, count in sorted(by_tier.items()):
         print(f'  {tier}: {count}')
 
+    metadata = {
+        'precision_holdout': precision,
+        'precision_holdout_min_required': args.min_precision,
+        'precision_holdout_forced': (not precision_ok) and args.force,
+        'seed_stats': seed_stats,
+        'seed_conflicts': seed_conflicts,
+    }
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
     with open(args.out, 'w') as f:
-        json.dump(proposals, f, indent=2)
+        json.dump({'metadata': metadata, 'proposals': proposals}, f, indent=2)
     print(f'wrote {args.out}')
 
     if args.second_round_estimate:
@@ -636,6 +782,11 @@ def add_common_args(p):
     p.add_argument('--min-anchors', type=int, default=3)
     p.add_argument('--min-containment', type=float, default=1.0)
     p.add_argument('--margin', type=float, default=1.5)
+    p.add_argument('--show-seed-conflicts', action='store_true',
+                    help='Print the full seed_conflicts list from build_seeds '
+                         '(clause-1 seeds dropped for disagreeing with '
+                         'rename_mapping.json, or for an ambiguous CEA name '
+                         'shared by two or more NTSC addresses).')
 
 
 def main():
@@ -657,6 +808,16 @@ def main():
     p_propose.add_argument('--out', default=DEFAULT_PROPOSALS_OUT)
     p_propose.add_argument('--second-round-estimate', action='store_true', default=True)
     p_propose.add_argument('--no-second-round-estimate', dest='second_round_estimate', action='store_false')
+    p_propose.add_argument('--holdout-frac', type=float, default=0.2,
+                            help='Held-out fraction used for the pre-write precision gate.')
+    p_propose.add_argument('--rng-seed', type=int, default=42)
+    p_propose.add_argument('--confusion-sample', type=int, default=10)
+    p_propose.add_argument('--min-precision', type=float, default=0.97,
+                            help='Refuse to write --out unless the pre-write holdout precision '
+                                 'is at least this. Override with --force.')
+    p_propose.add_argument('--force', action='store_true',
+                            help='Write --out even if the measured holdout precision is below '
+                                 '--min-precision.')
     p_propose.set_defaults(func=cmd_propose)
 
     args = parser.parse_args()
