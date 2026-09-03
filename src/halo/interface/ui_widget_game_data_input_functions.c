@@ -1,3 +1,50 @@
+/* multiplayer playlist profile edit dispose (0x0eea10) — asserts event_data is
+ * non-null (halts and exits otherwise), then commits pending edits to the
+ * multiplayer playlist profile. If nothing changed it reports the no-op, ends
+ * the edit session, closes the widget's last child and marks *widget_deleted.
+ * A dirty default profile whose name was never edited is instead routed
+ * through the rename prompt. Otherwise the profile is saved and the save
+ * result is returned. */
+bool ui_widget_multiplayer_profile_save_changes(void *widget, void *event_data,
+                                                bool *widget_deleted)
+{
+  void *last_child;
+  bool result;
+
+  result = false;
+
+  if (event_data == NULL) {
+    display_assert(
+      "event",
+      "c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 0xdb6,
+      1);
+    system_exit(-1);
+  }
+
+  if (player_ui_edit_profile_is_dirty()) {
+    if (player_ui_edit_profile_is_default_profile() &&
+        !player_ui_edit_profile_name_is_dirty()) {
+      if (!player_ui_prompt_user_to_rename_edit_profile()) {
+        error(2, "failed to prompt user to rename profile");
+      }
+      return result;
+    }
+
+    result = player_ui_save_profile();
+    if (!result) {
+      error(2, "failed to save changes to multiplayer playlist profile");
+    }
+  } else {
+    error(2, "no changes to playlist profile detected; not saving to disk");
+    player_ui_end_editing_profile();
+    last_child = ui_widget_get_last_child(widget);
+    ui_widget_close(last_child);
+    *widget_deleted = 1;
+  }
+
+  return result;
+}
+
 /* color picker menu dispose (event handler table index 62, 0x0eebe0) — frees
  * the child widget cached at +0x40 back to the widget pool, if present. */
 bool ui_widget_color_picker_menu_dispose(void *widget, void *event_data,
@@ -1107,8 +1154,8 @@ void FUN_000f28e0(void *widget)
  * "mp game settings text" data-driven text box widget update. Requires the
  * widget to be a text box (type == 1 at +0xe); otherwise asserts + exits
  * (reference PUSH immediates at 0xf2e6e/0xf2e70/0xf2e75/0xf2e7a). Fetches
- * the active network game object (network_game_get_game); if one exists, writes a
- * 2-state code to the widget's +0x40 word — 0xc when the game object's byte
+ * the active network game object (network_game_get_game); if one exists, writes
+ * a 2-state code to the widget's +0x40 word — 0xc when the game object's byte
  * at +0xc0 equals 1, else 0xd. If there is no active network game, reports
  * error(2, "no network game") instead (reference PUSH immediates at
  * 0xf2eaf/0xf2eb4). Evidence: reference disassembly at 0xf2e60-0xf2ec1. */
@@ -1140,19 +1187,16 @@ void FUN_000f2e60(void *widget)
  * variant). Requires the widget to be a text box (type == 1 at +0xe);
  * otherwise asserts + exits (reference PUSH immediates at
  * 0xf2f6e/0xf2f70/0xf2f75/0xf2f7a). Fetches the active network game object
- * (network_game_get_game); if one exists, dispatches on the game object's dword field
- * at +0xbc (jump table at 0xf2ff8, values 1-5) to write the widget's +0x40
- * word:
- *   1                                -> 0x16
- *   2, or any value outside 1..5 (the out-of-range default falls into the
- *     same code as case 2 -- reference 0xf2fa1 JA 0xf2fb3)  -> 0x18
- *   3     -> 0x18 if the game object's dword at +0x100 == 2, else 0x17
- *   4     -> 0x17
- *   5     -> 0x19
- * If there is no active network game, reports error(2, "no network game")
- * instead (reference PUSH immediates at 0xf2fe6/0xf2feb). Evidence:
- * reference disassembly at 0xf2f60-0xf2ff8 plus jump table dwords at
- * 0xf2ff8-0xf300c (0xf2faa/0xf2fb3/0xf2fbc/0xf2fd4/0xf2fdd). */
+ * (network_game_get_game); if one exists, dispatches on the game object's dword
+ * field at +0xbc (jump table at 0xf2ff8, values 1-5) to write the widget's
+ * +0x40 word: 1                                -> 0x16 2, or any value
+ * outside 1..5 (the out-of-range default falls into the same code as case 2 --
+ * reference 0xf2fa1 JA 0xf2fb3)  -> 0x18 3     -> 0x18 if the game object's
+ * dword at +0x100 == 2, else 0x17 4     -> 0x17 5     -> 0x19 If there is no
+ * active network game, reports error(2, "no network game") instead (reference
+ * PUSH immediates at 0xf2fe6/0xf2feb). Evidence: reference disassembly at
+ * 0xf2f60-0xf2ff8 plus jump table dwords at 0xf2ff8-0xf300c
+ * (0xf2faa/0xf2fb3/0xf2fbc/0xf2fd4/0xf2fdd). */
 void FUN_000f2f60(void *widget)
 {
   int game;
@@ -1194,13 +1238,13 @@ void FUN_000f2f60(void *widget)
 /* FUN_000f3280 (0xf3280)
  * "mp game settings text" numeric text box widget update. Requires the
  * widget to be a text box (type == 1 at +0xe). Looks up the current network
- * game via network_game_get_game(); if none is active, reports error 2 "no network
- * game" and leaves the widget's text buffer untouched. Otherwise reallocates
- * the widget's text buffer (+0x3c) to 8 bytes (4 wchar_t) and formats a
- * signed 16-bit game field at game+0x224 into it with "%d", explicitly
- * null-terminating at wchar index 3 (byte offset 6) regardless of how many
- * digits were written. Evidence: disassembly at 0xf3280-0xf3311 (assert
- * string/line are the reference's own PUSH immediates at
+ * game via network_game_get_game(); if none is active, reports error 2 "no
+ * network game" and leaves the widget's text buffer untouched. Otherwise
+ * reallocates the widget's text buffer (+0x3c) to 8 bytes (4 wchar_t) and
+ * formats a signed 16-bit game field at game+0x224 into it with "%d",
+ * explicitly null-terminating at wchar index 3 (byte offset 6) regardless of
+ * how many digits were written. Evidence: disassembly at 0xf3280-0xf3311
+ * (assert string/line are the reference's own PUSH immediates at
  * 0xf3291/0xf3296/0xf329b; ui_widget_realloc call at 0xf32bd-0xf32ca; error
  * call at 0xf32fe-0xf3305). */
 void FUN_000f3280(void *widget)

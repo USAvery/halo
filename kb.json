@@ -17967,7 +17967,7 @@
     },
     {
      "addr": "0xe0d80",
-     "decl": "void player_ui_edit_profile_is_default_profile(void);"
+     "decl": "bool player_ui_edit_profile_is_default_profile(void);"
     },
     {
      "addr": "0xe0dd0",
@@ -27112,7 +27112,8 @@
     },
     {
      "addr": "0xeea10",
-     "decl": "bool ui_widget_multiplayer_profile_save_changes(void *widget, void *event_data, bool *widget_deleted);"
+     "decl": "bool ui_widget_multiplayer_profile_save_changes(void *widget, void *event_data, bool *widget_deleted);",
+     "ported": true
     },
     {
      "addr": "0xeead0",
