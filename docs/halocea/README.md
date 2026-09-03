@@ -272,8 +272,58 @@ force-included headers and already used by name at all seven sites. Note that th
 extraction matched it on the `NUMBER_OF_` substring, so that queue row was a prefix artifact rather
 than a distinct family — re-rank remaining candidate TUs with word-boundary matching.
 
+## Batch 5 — `enum equipment_powerup_type` (2026-09-03)
+
+Gates: `players.c` 245 of 245 scored functions byte-identical, `IMM-WARN` 0; `units.c` 208 of 208
+byte-identical, `IMM-WARN` 2 (both pre-existing, unchanged). All measured `--no-cache` both sides.
+
+Prompted by a question that turned out to expose a missing distinction: *isn't overshield a powerup?*
+It is — but not a `player_powerup`. Batch 4's enum indexes the two-entry `int16_t` timer array at
+`player+0x68`, and a slot exists there only for a powerup needing a per-player countdown. Overshield
+and health are instant unit-state changes; double speed accumulates on a *global* timer at
+`players_globals+0x26`. Only camo and full-spectrum vision get slots, which is why the
+binary-proven bound of 2 is not evidence of anything missing.
+
+The enum overshield actually belongs to is the `'eqip'` tag field at +0x308, now
+`enum equipment_powerup_type` in `types.h`. Evidence splits by value:
+
+| Value | Name | Evidence | Tier |
+|---|---|---|---|
+| 0 | `_equipment_powerup_none` | `units.c` 0x1ca1 assert `powerup_type!=_equipment_powerup_none` guards `== 0` | **T1** |
+| 6 | `_equipment_powerup_grenade` | `units.c` 0x1c72 (`==`, guards `!= 6`) and 0x1ca2 (`!=`, guards `== 6`) | **T1** |
+| 1-5 | `_double_speed`, `_over_shield`, `_active_camouflage`, `_full_spectrum_vision`, `_health` | halocea DB-verified (`types_enum_values _270498BB874CAD5ECABAECA7DA81ECAE`); meaning confirmed independently by our dispatch routing each to an already-named handler | T2 |
+
+8 sites converted: 5 in `player_set_action_result_for_equipment`, 3 in the `units.c` equipment
+asserts.
+
+Two results worth keeping:
+
+- **2276 names the prefix, so halocea's rename is rejected.** Their header states plainly that the
+  DB enum uses `_equipment_powerup_*` and that its own `_powerup_type_*` identifiers are
+  "consumer-facing names" — i.e. halocea's editorial choice, not a recovered symbol. Three 2276
+  assert strings spell `_equipment_powerup_none` / `_equipment_powerup_grenade` verbatim, which
+  settles it: we take the DB prefix. Borrowing the consumer-facing form would have laundered a
+  halocea rename as recovered evidence.
+- **The initial triage of this family was backwards.** Before reading the code, values 0 and 6 were
+  written off as "no 2276 evidence at all" and 1-5 treated as the confirmed part. The reverse is
+  true: 0 and 6 are the only two the binary names outright. Grepping `src/` for the halocea
+  identifier before planning the batch would have caught it — `units.c` already had all three
+  strings, and two doc comments already referenced `_equipment_powerup_grenade (6)` by name.
+
+Not adopted: `NUMBER_OF_POWERUP_TYPES = 7`. Six is the largest value our binary compares against,
+which does not prove seven is the count, and batch 3's T1-by-exhaustion needs an independently
+proven bound — there is none here. No site needs it.
+
 ## Hazards
 
+- **A halocea "consumer-facing" name is not a recovered name.** `equipment_powerup_type.h` renames
+  the DB's `_equipment_powerup_*` members to `_powerup_type_*` and says so in its own provenance
+  line. Borrowing the visible identifier rather than the one the header cites promotes a corpus
+  editorial decision to T2 evidence. Read which name the provenance line attributes to the DB.
+- **Grep `src/` for the halocea identifier before planning a batch.** Batch 5's two T1 names were
+  already sitting in `units.c` assert strings and doc comments; the batch was scoped from the
+  halocea header alone and got the evidence split exactly inverted. One `rtk rg` reorders the whole
+  tier table.
 - **Line-counting a halocea enum is not reading it.** The first pass counted
   `unit_control_flags` at 17 members and reported an apparent divergence from our binary-proven 15.
   The two extra lines were trailing `UNIT_CONTROL_DRIVER_MASK` / `UNIT_CONTROL_GUNNER_MASK`

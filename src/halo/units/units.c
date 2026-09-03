@@ -5491,7 +5491,7 @@ bool unit_try_add_grenade(int unit_handle, int equipment_handle)
   grenade = (char *)tag_block_get_element(
     (char *)game_globals_get() + 0x128, grenade_type, 0x44);
 
-  if (*(int16_t *)(equipment_tag + 0x308) != 6) {
+  if (*(int16_t *)(equipment_tag + 0x308) != _equipment_powerup_grenade) {
     display_assert("equipment_definition->equipment.powerup_type==_equipment_"
                    "powerup_grenade",
                    "c:\\halo\\SOURCE\\units\\units.c", 0x1c72, 1);
@@ -5590,13 +5590,13 @@ bool unit_pickup_equipment(int unit_handle, int equipment_handle, short flag)
   equipment_def = (int)tag_get(0x65716970, *equipment_obj);
   unit_obj = (char *)object_get_and_verify_type(unit_handle, 3);
 
-  if (*(short *)(equipment_def + 0x308) == 0) {
+  if (*(short *)(equipment_def + 0x308) == _equipment_powerup_none) {
     display_assert(
       "equipment_definition->equipment.powerup_type!=_equipment_powerup_none",
       "c:\\halo\\SOURCE\\units\\units.c", 0x1ca1, 1);
     system_exit(NONE);
   }
-  if (*(short *)(equipment_def + 0x308) == 6) {
+  if (*(short *)(equipment_def + 0x308) == _equipment_powerup_grenade) {
     display_assert("equipment_definition->equipment.powerup_type!=_equipment_"
                    "powerup_grenade",
                    "c:\\halo\\SOURCE\\units\\units.c", 0x1ca2, 1);
