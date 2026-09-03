@@ -50851,16 +50851,16 @@
     "ai_handle_spatial_effect": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 40.5,
+      "abi_modeled_mnemonic_pct": 86.5,
       "addr": "0x425c0",
       "end": "0x42a2a",
       "kind": "auto",
       "n_r": 311,
-      "opnd_percent": 20.1,
-      "raw_mnemonic_pct": 40.5,
+      "opnd_percent": 46.3,
+      "raw_mnemonic_pct": 86.5,
       "ref": "synth",
       "ref_sha": "50e2af125659ddba",
-      "score": 40.5,
+      "score": 86.5,
       "source": "src/halo/ai/ai.c"
     },
     "ai_handle_unit_approach": {
