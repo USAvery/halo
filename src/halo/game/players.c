@@ -2685,25 +2685,25 @@ void player_set_action_result_for_equipment(int player_handle,
 
   powerup_type = *(int16_t *)(tag + 0x308);
 
-  if (powerup_type == 1) {
+  if (powerup_type == _equipment_powerup_double_speed) {
     /* Double speed: accumulate ticks and set flag. */
     *(int16_t *)((char *)players_globals + 0x26) += ticks;
     game_set_players_are_double_speed(true);
-  } else if (powerup_type == 2) {
+  } else if (powerup_type == _equipment_powerup_over_shield) {
     /* Overshield: check if unit can receive it. */
     if (!object_double_charge_shield(*(int *)(player + 0x34)))
       return;
     player_apply_overshield_effect(player_handle);
-  } else if (powerup_type == 5) {
+  } else if (powerup_type == _equipment_powerup_health) {
     /* Health: check if unit can receive it. */
     if (!object_restore_body(*(int *)(player + 0x34)))
       return;
     player_apply_health_effect(player_handle);
   } else {
     /* Active camo (3) or full-spectrum vision (4). */
-    if (powerup_type == 3) {
+    if (powerup_type == _equipment_powerup_active_camouflage) {
       powerup_index = _player_powerup_active_camouflage;
-    } else if (powerup_type == 4) {
+    } else if (powerup_type == _equipment_powerup_full_spectrum_vision) {
       powerup_index = _player_powerup_full_spectrum_vision;
     } else {
       display_assert(0, "c:\\halo\\SOURCE\\game\\players.c", 0xac7, 1);
