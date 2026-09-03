@@ -31,7 +31,7 @@ public class CeaPdbExtract extends GhidraScript {
     String[] a = getScriptArgs();
     // Paths hardcoded because the CEA PDB path contains spaces/parens that
     // Ghidra's whitespace arg-splitting cannot survive. args override if given.
-    String pdbPath = "C:\\Users\\stian\\Downloads\\Halo_1_Combat_Evolved_Anniversary_(Jun_24,_2011)\\en_us\\HCEX_Release.pdb";
+    String pdbPath = "C:\\path\\to\\Halo_1_Combat_Evolved_Anniversary_(Jun_24,_2011)\\en_us\\HCEX_Release.pdb";
     String outPath = "G:\\dev\\halo\\artifacts\\ghidra_groom\\cea_corpus\\cea_procs_raw.tsv";
     if (a.length >= 1 && !a[0].isEmpty()) pdbPath = a[0];
     if (a.length >= 2 && !a[1].isEmpty()) outPath = a[1];

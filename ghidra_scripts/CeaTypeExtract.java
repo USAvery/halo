@@ -98,7 +98,7 @@ public class CeaTypeExtract extends GhidraScript {
 
   public void run() throws Exception {
     String[] a = getScriptArgs();
-    String pdbPath = "C:\\Users\\stian\\Downloads\\Halo_1_Combat_Evolved_Anniversary_(Jun_24,_2011)\\en_us\\HCEX.pdb";
+    String pdbPath = "C:\\path\\to\\Halo_1_Combat_Evolved_Anniversary_(Jun_24,_2011)\\en_us\\HCEX.pdb";
     String outPath = "G:\\dev\\halo\\artifacts\\ghidra_groom\\type_corpus\\cea_debug_types_raw.json";
     if (a.length >= 1 && !a[0].isEmpty()) pdbPath = a[0];
     if (a.length >= 2 && !a[1].isEmpty()) outPath = a[1];

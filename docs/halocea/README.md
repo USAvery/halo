@@ -1,7 +1,7 @@
 # halocea corpus — usability assessment for the 2276 lift
 
-Assessment date: 2026-09-03. Source: `surreptitiousresearch/halocea`, local copy at
-`G:\H1 Performance Build 2.0 Beta 1 LOCAL 2v2\release-package-local\...\src`.
+Assessment date: 2026-09-03. Source: `surreptitiousresearch/halocea` (upstream), consulted
+via a local checkout pointed to by `HALO_CEA_CORPUS=/path/to/halocea/src/engine`.
 
 ## What the corpus actually is
 

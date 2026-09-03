@@ -9,20 +9,20 @@ These scripts support the Halo CE Anniversary (CEA) PDB/type corpus workflow. Ru
 Extracts Halo `.obj` procedure symbols and source-line ranges from a PDB without modifying the open program.
 
 - **Overrides:** `getScriptArgs()[0]` = PDB path; `[1]` = output TSV path. Empty values retain the defaults.
-- **Default input:** `C:\Users\stian\Downloads\Halo_1_Combat_Evolved_Anniversary_(Jun_24,_2011)\en_us\HCEX_Release.pdb`
+- **Default input:** `C:\path\to\Halo_1_Combat_Evolved_Anniversary_(Jun_24,_2011)\en_us\HCEX_Release.pdb` (placeholder; supply the real PDB path via `getScriptArgs()[0]`)
 - **Default output:** `G:\dev\halo\artifacts\ghidra_groom\cea_corpus\cea_procs_raw.tsv`
 - **Artifact:** tab-separated module/procedure/segment/offset/length/source-file/line-range records, including totals printed in the Ghidra console.
-- **Remaining non-portable paths:** both default Windows paths above; the extractor also filters PDB module names containing `\\halo\\` and ending in `.obj`.
+- **Remaining non-portable paths:** both default Windows paths are compiled-in constants (Ghidra scripts have no config-file or env-var lookup, only positional `getScriptArgs()`), so a placeholder is baked into the class; always pass the real PDB path explicitly. The extractor also filters PDB module names containing `\\halo\\` and ending in `.obj`.
 
 ### `CeaTypeExtract.java`
 
 Extracts named and anonymous structs, unions, enums, fields, and type references from a PDB's type information without modifying the open program.
 
 - **Overrides:** `getScriptArgs()[0]` = PDB path; `[1]` = output JSON path. Empty values retain the defaults.
-- **Default input:** `C:\Users\stian\Downloads\Halo_1_Combat_Evolved_Anniversary_(Jun_24,_2011)\en_us\HCEX.pdb`
+- **Default input:** `C:\path\to\Halo_1_Combat_Evolved_Anniversary_(Jun_24,_2011)\en_us\HCEX.pdb` (placeholder; supply the real PDB path via `getScriptArgs()[0]`)
 - **Default output:** `G:\dev\halo\artifacts\ghidra_groom\type_corpus\cea_debug_types_raw.json`
 - **Artifact:** JSON array of composite and enum type records, including sizes, fields, offsets, type indices, and enum members.
-- **Remaining non-portable paths:** both default Windows paths above.
+- **Remaining non-portable paths:** both default Windows paths are compiled-in constants, same limitation as `CeaPdbExtract` above; always pass the real PDB path explicitly.
 
 ### `CeaAssertLines.java`
 

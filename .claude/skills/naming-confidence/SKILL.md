@@ -95,7 +95,7 @@ Rules:
 3. **Our binary wins every disagreement**, and the disagreement gets recorded — halocea
    has already corrected two of its own usage-derived `actor_datum` names against a
    later ground-truth dump.
-4. **The local "H1 Performance Build" tree is a Windows x86 port** of that corpus, one
+4. **The local checkout is a Windows x86 port** of that corpus, one
    step removed from the `.xex`. For a load-bearing layout question, prefer upstream.
 
 ## Downgrades
