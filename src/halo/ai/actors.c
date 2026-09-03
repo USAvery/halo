@@ -5507,7 +5507,7 @@ int actor_new(int actv_tag_index)
   ((actor_t *)actor)->field_5d8 = (short)-1;
   ((actor_t *)actor)->field_5f0 = (short)-1;
   ((actor_t *)actor)->control_secondary_look_type = 0;
-  ((actor_t *)actor)->field_548 = 0;
+  ((actor_t *)actor)->secondary_look_timer = 0;
 
   ((actor_t *)actor)->field_6cc = 0;
   ((actor_t *)actor)->field_6ce = 0x1e;

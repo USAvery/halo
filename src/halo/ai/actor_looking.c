@@ -7734,9 +7734,9 @@ void FUN_00027870(int actor_handle)
       ai_debug_describe_actor(actor_handle, -1, 0, error_string_buffer, 0x100);
     console_printf(0, "%s: look-stop", desc);
   }
-  ((actor_t *)actor)->field_546 = 0;
+  ((actor_t *)actor)->secondary_look_priority = 0;
   ((actor_t *)actor)->control_secondary_look_type = 0;
-  ((actor_t *)actor)->field_548 = 0;
+  ((actor_t *)actor)->secondary_look_timer = 0;
 }
 
 /* FUN_000278e0 (0x278e0)
@@ -8029,8 +8029,8 @@ after_prop_check:
   }
 
   /* Write look spec to actor */
-  ((actor_t *)actor)->field_546 = priority;
-  ((actor_t *)actor)->field_548 = (short)tick_count;
+  ((actor_t *)actor)->secondary_look_priority = priority;
+  ((actor_t *)actor)->secondary_look_timer = (short)tick_count;
   ((actor_t *)actor)->control_secondary_look_type = look_type;
   *(int *)(actor + 0x54c) = *(int *)look_buf;
   ((actor_t *)actor)->control_secondary_look_direction_prop_index =
@@ -8686,10 +8686,10 @@ void actor_look_update(int actor_handle)
   /* Secondary look mode */
   secondary_mode = 0;
   if (((actor_t *)actor)->control_secondary_look_type >= 0 &&
-      ((actor_t *)actor)->field_548 > 0) {
+      ((actor_t *)actor)->secondary_look_timer > 0) {
     if (look_spec_28660_safe(actor_handle, actor, (short *)(actor + 0x54c),
                              secondary_vec)) {
-      secondary_mode = ((actor_t *)actor)->field_546;
+      secondary_mode = ((actor_t *)actor)->secondary_look_priority;
     }
   }
 
@@ -8723,9 +8723,9 @@ void actor_look_update(int actor_handle)
   }
 
   /* Decrement look timer */
-  if (((actor_t *)actor)->field_548 > 0) {
-    sVar8 = ((actor_t *)actor)->field_548 - 1;
-    ((actor_t *)actor)->field_548 = sVar8;
+  if (((actor_t *)actor)->secondary_look_timer > 0) {
+    sVar8 = ((actor_t *)actor)->secondary_look_timer - 1;
+    ((actor_t *)actor)->secondary_look_timer = sVar8;
     if (sVar8 == 0) {
       if (*(char *)0x5aca5d) {
         console_printf(0, "%s: look timer expire",
@@ -8733,7 +8733,7 @@ void actor_look_update(int actor_handle)
                                                (char *)0x5ab100, 0x100));
       }
       ((actor_t *)actor)->control_secondary_look_type = 0;
-      ((actor_t *)actor)->field_546 = 0;
+      ((actor_t *)actor)->secondary_look_priority = 0;
     }
   }
 

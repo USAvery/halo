@@ -1434,8 +1434,8 @@ typedef struct {
   char field_530;                                    /* +0x530  accessed 5x, meaning unproven */
   char pad_531[0x13];
   int16_t control_secondary_look_type;                /* +0x544  CMP word [ESI+0x544],0 @0x6443d */
-  int16_t field_546;                                 /* +0x546  accessed 4x, meaning unproven */
-  int16_t field_548;                                 /* +0x548  accessed 6x, meaning unproven */
+  int16_t secondary_look_priority;                   /* +0x546  NTSC writes priority and consumes secondary mode priority as int16_t; name_source: halocea */
+  int16_t secondary_look_timer;                      /* +0x548  NTSC writes tick_count, decrements while positive, and expires at zero as int16_t; name_source: halocea */
   char pad_54a[0x2];
   int16_t control_secondary_look_direction_type;      /* +0x54c  CMP word [ESI+0x54c],1 @0x64447 */
   char pad_54e[0x2];
@@ -1580,6 +1580,8 @@ co(actor_t, stimuli_panic_prop_index,                      0x30c);
 co(actor_t, firing_positions_current_position_index,       0x3b8);
 co(actor_t, control_path_destination_orders_ignore_target_object_index, 0x480);
 co(actor_t, control_secondary_look_type,                   0x544);
+co(actor_t, secondary_look_priority,                     0x546);
+co(actor_t, secondary_look_timer,                        0x548);
 co(actor_t, control_secondary_look_direction_type,         0x54c);
 co(actor_t, control_secondary_look_direction_prop_index,   0x550);
 co(actor_t, control_idle_major_active,                     0x55c);

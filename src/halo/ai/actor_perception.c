@@ -731,10 +731,10 @@ void FUN_000355f0(int actor_handle)
 
   if (((actor_t *)actor)->field_284 == 0) {
     if (((actor_t *)actor)->control_secondary_look_type == 0xc) {
-      remaining = ((actor_t *)actor)->field_546;
+      remaining = ((actor_t *)actor)->secondary_look_priority;
       if (remaining > 5)
         remaining = 5;
-      ((actor_t *)actor)->field_546 = remaining;
+      ((actor_t *)actor)->secondary_look_priority = remaining;
     }
     if (((actor_t *)actor)->field_28a != 0) {
       ((actor_t *)actor)->field_287 = 1;

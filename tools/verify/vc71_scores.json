@@ -5160,21 +5160,6 @@
       "score": 96.9,
       "source": "src/halo/ai/actors.c"
     },
-    "FUN_0003c410": {
-      "abi_model": "raw",
-      "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 90.4,
-      "addr": "0x3c410",
-      "end": "0x3c7b5",
-      "kind": "auto",
-      "n_r": 230,
-      "opnd_percent": 69.6,
-      "raw_mnemonic_pct": 90.4,
-      "ref": "synth",
-      "ref_sha": "7e5a36a1881f3256",
-      "score": 90.4,
-      "source": "src/halo/ai/actors.c"
-    },
     "FUN_0003cb50": {
       "abi_model": "regparam_stripped_saves",
       "abi_model_items": 4,
@@ -49077,6 +49062,21 @@
       "ref_sha": "b3da961f46fe5652",
       "score": 68.7,
       "source": "src/halo/ai/actor_moving.c"
+    },
+    "actor_new": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 90.4,
+      "addr": "0x3c410",
+      "end": "0x3c7b5",
+      "kind": "auto",
+      "n_r": 230,
+      "opnd_percent": 69.6,
+      "raw_mnemonic_pct": 90.4,
+      "ref": "synth",
+      "ref_sha": "7e5a36a1881f3256",
+      "score": 90.4,
+      "source": "src/halo/ai/actors.c"
     },
     "actor_path_3d_available": {
       "abi_model": "raw",
