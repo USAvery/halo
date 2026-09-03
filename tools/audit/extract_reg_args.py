@@ -58,6 +58,14 @@ GHIDRA_PREFLIGHT = _tools_dir / "audit" / "check_ghidra_mcp.py"
 _REG_ANNOTATION_RE = re.compile(r"@<(\w+)>")
 _COMMENTED_REG_RE = re.compile(r"/\*\s*@<(\w+)>\s*\*/")
 
+# Whitespace immediately before an @<reg> annotation is a formatting choice,
+# not a semantic difference: "int x @<eax>" and "int x@<eax>" name the same
+# parameter and the same register. Collapse it out before any decl-text
+# comparison so kb.json and kb_reg_baseline.json can disagree on spacing
+# without registering as drift.
+_WS_BEFORE_AT_RE = re.compile(r"\s+(?=@<)")
+_WS_RUN_RE = re.compile(r"\s+")
+
 REG_PARENT: dict[str, str] = {
     "eax": "eax", "ax": "eax", "al": "eax", "ah": "eax",
     "ecx": "ecx", "cx": "ecx", "cl": "ecx", "ch": "ecx",
@@ -153,6 +161,67 @@ def _has_active_reg_args(decl: str) -> bool:
     return bool(_parse_reg_annotations(decl))
 
 
+def _normalize_decl_text(decl: str) -> str:
+    """Canonicalize whitespace for decl-text comparison.
+
+    Collapses runs of whitespace to a single space and drops any space
+    directly before an ``@<reg>`` annotation, so ``"int x @<eax>"`` and
+    ``"int x@<eax>"`` compare equal.
+    """
+    collapsed = _WS_RUN_RE.sub(" ", decl.strip())
+    return _WS_BEFORE_AT_RE.sub("", collapsed)
+
+
+def _decls_match(kb_decl: str, baseline_decl: str) -> bool:
+    """True if two decl strings describe the same signature and reg args.
+
+    Used by ``--check`` to decide drift. Two signals must both agree:
+    normalized decl text (so whitespace-only differences are ignored) and
+    the extracted register-per-parameter mapping (so a real change to
+    which register a parameter is pinned to is never masked by an
+    incidental text match).
+    """
+    if _normalize_decl_text(kb_decl) != _normalize_decl_text(baseline_decl):
+        return False
+    return _parse_reg_annotations(kb_decl) == _parse_reg_annotations(baseline_decl)
+
+
+def _stale_addrs(baseline_fns: dict[str, str], kb_reg_addrs: set[str]) -> list[dict]:
+    """Baseline entries whose address has no corresponding @<reg> function in kb.json.
+
+    ``kb_reg_addrs`` holds canonical (``_norm_addr``-normalized) addresses.
+    Baseline keys are normalized before the membership test so that two raw
+    spellings of the same address (e.g. ``"0x224881"`` and zero-padded
+    ``"0x00224881"``) are recognized as the same function instead of one of
+    them being reported as stale.
+    """
+    stale: list[dict] = []
+    for raw_addr, decl in baseline_fns.items():
+        try:
+            norm_addr = _norm_addr(raw_addr)
+        except (ValueError, OverflowError):
+            norm_addr = raw_addr
+        if norm_addr not in kb_reg_addrs:
+            stale.append({"addr": raw_addr, "decl": decl})
+    return stale
+
+
+def _normalized_baseline(baseline_fns: dict[str, str]) -> dict[str, str]:
+    """Baseline dict re-keyed by canonical (``_norm_addr``-normalized) address.
+
+    kb_reg_baseline.json can hold more than one raw key spelling for the
+    same address; lookups by a kb.json-derived (already normalized) address
+    must not depend on which spelling happens to be present.
+    """
+    result: dict[str, str] = {}
+    for raw_addr, decl in baseline_fns.items():
+        try:
+            result[_norm_addr(raw_addr)] = decl
+        except (ValueError, OverflowError):
+            continue
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Normalize address to canonical 0x<lower-hex> form (no leading zeros beyond "0x")
 # ---------------------------------------------------------------------------
@@ -191,7 +260,8 @@ class FuncEntry:
 
     def baseline_decl(self) -> str:
         """Return the declaration as it should appear in kb_reg_baseline.json."""
-        return self.decl.strip().rstrip(";") + ";"
+        text = self.decl.strip().rstrip(";") + ";"
+        return _normalize_decl_text(text)
 
 
 def _iter_objects(kb: dict):
@@ -408,6 +478,7 @@ def mode_check(kb: dict, target: Optional[str], obj_name: Optional[str], json_ou
     """Compare kb.json declarations against kb_reg_baseline.json and report drift."""
     baseline = _load_baseline()
     baseline_fns = baseline.get("functions", {})
+    norm_baseline = _normalized_baseline(baseline_fns)
 
     # Build candidate set from kb.json
     if target:
@@ -430,13 +501,13 @@ def mode_check(kb: dict, target: Optional[str], obj_name: Optional[str], json_ou
         addr = fn.addr
         expected_decl = fn.baseline_decl()
 
-        if addr not in baseline_fns:
+        if addr not in norm_baseline:
             if fn.reg_args:
                 missing.append({"addr": addr, "name": fn.name, "decl": expected_decl})
             continue
 
-        actual_decl = baseline_fns[addr]
-        if actual_decl.strip() != expected_decl.strip():
+        actual_decl = norm_baseline[addr]
+        if not _decls_match(expected_decl, actual_decl):
             drifts.append({
                 "addr": addr,
                 "name": fn.name,
@@ -450,9 +521,7 @@ def mode_check(kb: dict, target: Optional[str], obj_name: Optional[str], json_ou
     kb_reg_addrs = {fn.addr for fn in _all_functions(kb) if fn.reg_args}
     stale: list[dict] = []
     if not target and not obj_name:
-        for addr, decl in baseline_fns.items():
-            if addr not in kb_reg_addrs:
-                stale.append({"addr": addr, "decl": decl})
+        stale = _stale_addrs(baseline_fns, kb_reg_addrs)
 
     rc = 0
     if drifts or missing or stale:
@@ -554,6 +623,94 @@ _SELF_TEST_ADDRS = [
 ]
 
 
+def _regression_checks() -> list[tuple[str, bool]]:
+    """Synthetic regression cases for the two --check false positives fixed here.
+
+    Each case exercises the actual comparison function used by mode_check
+    (``_decls_match`` / ``_stale_addrs``), not just a helper in isolation, so
+    a case here fails if the real bug it targets ever comes back — and each
+    fix also carries a negative case, so the check can't have been made
+    vacuous (always "match"/always "not stale").
+    """
+    cases: list[tuple[str, bool]] = []
+
+    # --- Whitespace-before-@<reg> drift (kb.json vs kb_reg_baseline.json) ---
+    # Real case: 0x18b010, object_handle @<esi> (kb.json) vs object_handle@<esi>
+    # (baseline) — same register, whitespace only, must not be drift.
+    cases.append((
+        "whitespace before @<reg> is not drift (0x18b010-style)",
+        _decls_match(
+            "int FUN_0018b010(int object_handle @<esi>);",
+            "int FUN_0018b010(int object_handle@<esi>);",
+        ) is True,
+    ))
+    # Negative: a genuinely different register must still be reported as drift.
+    cases.append((
+        "a real register change is still drift (negative case)",
+        _decls_match(
+            "int FUN_0018b010(int object_handle @<esi>);",
+            "int FUN_0018b010(int object_handle@<edi>);",
+        ) is False,
+    ))
+
+    # --- Stale detection must normalize baseline addresses ---
+    # Real case: 0x224881 (bind) present in the baseline under both the
+    # canonical spelling and a zero-padded "0x00224881" spelling. Neither
+    # should be reported stale when kb.json still has the @<reg> function.
+    cases.append((
+        "zero-padded baseline address alias is not stale (0x224881-style)",
+        _stale_addrs(
+            {
+                "0x224881": "int __stdcall bind(void *xnet@<ecx>, unsigned int socket, const void *name, int namelen);",
+                "0x00224881": "int __stdcall bind(void *xnet@<ecx>, unsigned int socket, const void *name, int namelen);",
+            },
+            {"0x224881"},
+        ) == [],
+    ))
+    # Negative: an address kb.json no longer has @<reg> for must still be stale.
+    cases.append((
+        "an address absent from kb.json's reg-arg set is still stale (negative case)",
+        [s["addr"] for s in _stale_addrs(
+            {"0x224881": "...", "0x999999": "..."},
+            {"0x224881"},
+        )] == ["0x999999"],
+    ))
+
+    # --- Calling-convention keywords parse correctly (lock-in; verified not
+    # broken, but the task flagged it as a suspect for the stale reports) ---
+    stdcall_fn = FuncEntry(
+        "0x224881",
+        "int __stdcall bind(void *xnet@<ecx>, unsigned int socket, const void *name, int namelen);",
+        "<xdk_stubs>",
+    )
+    cases.append((
+        "__stdcall decl: name and reg-arg parse correctly",
+        stdcall_fn.name == "bind" and stdcall_fn.reg_args == [(0, "ecx")],
+    ))
+    cdecl_fn = FuncEntry(
+        "0x1",
+        "int __cdecl sort_desired_local_player_controllers(const void *a1@<eax>, const void *a2);",
+        "test",
+    )
+    cases.append((
+        "__cdecl decl: name and reg-arg parse correctly",
+        cdecl_fn.name == "sort_desired_local_player_controllers"
+        and cdecl_fn.reg_args == [(0, "eax")],
+    ))
+    fastcall_fn = FuncEntry(
+        "0x2",
+        "void __fastcall FUN_000922a0(int skip@<ecx>, int32_t *frames@<edx>, uint32_t max, uint32_t *count);",
+        "test",
+    )
+    cases.append((
+        "__fastcall decl: name and multi reg-arg parse correctly",
+        fastcall_fn.name == "FUN_000922a0"
+        and fastcall_fn.reg_args == [(0, "ecx"), (1, "edx")],
+    ))
+
+    return cases
+
+
 def mode_self_test(kb: dict) -> int:
     baseline = _load_baseline()
     baseline_fns = baseline.get("functions", {})
@@ -581,7 +738,8 @@ def mode_self_test(kb: dict) -> int:
 
         extracted = fn.baseline_decl()
         baseline_val = baseline_fns.get(fn.addr, "(not in baseline)")
-        match = "OK" if extracted.strip() == baseline_val.strip() else "DRIFT"
+        is_match = fn.addr in baseline_fns and _decls_match(extracted, baseline_val)
+        match = "OK" if is_match else "DRIFT"
         if match == "DRIFT":
             all_pass = False
 
@@ -598,11 +756,24 @@ def mode_self_test(kb: dict) -> int:
         )
 
     print()
-    if all_pass:
-        print("Self-test PASSED: all 5 functions match baseline.")
+    print("Regression checks (--check false-positive fixes)")
+    print("-" * 60)
+    regression_pass = True
+    for desc, passed in _regression_checks():
+        status = "OK" if passed else "FAIL"
+        if not passed:
+            regression_pass = False
+        print(f"[{status}] {desc}")
+
+    print()
+    if all_pass and regression_pass:
+        print("Self-test PASSED: all 5 functions match baseline, all regression checks OK.")
         return 0
     else:
-        print("Self-test FAILED: one or more functions have drift or were not found.")
+        if not all_pass:
+            print("Self-test FAILED: one or more functions have drift or were not found.")
+        if not regression_pass:
+            print("Self-test FAILED: one or more regression checks failed.")
         return 1
 
 
