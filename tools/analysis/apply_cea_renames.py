@@ -1,13 +1,35 @@
 #!/usr/bin/env python3
 """
-apply_cea_renames.py — apply deferred Halo CE Anniversary (CEA) PDB
-line-containment renames to kb.json and the matching src/ call sites.
+apply_cea_renames.py — single apply path for every CEA-derived function-name
+proposal (rename_mapping.json's line-containment rows plus the three
+cea_propagation corpora), applied to kb.json and the matching src/ call
+sites, with honest per-row provenance.
 
-Background: artifacts/ghidra_groom/rename_mapping.json holds NTSC-address ->
-CEA-PDB-name proposals (tier: confirmed / high_confidence / probable) from an
-earlier line-containment pass. A prior campaign (2026-07-10) already applied
-the easy majority; this script picks up the rows that are still literally
-named FUN_<addr8> in kb.json today.
+Background: two distinct evidence pipelines produce FUN_<addr8> -> name
+proposals for this binary, and neither is ground truth:
+
+  - artifacts/ghidra_groom/rename_mapping.json (method: line_containment)
+    comes from the real HCEX PDB (see artifacts/ghidra_groom/cea_corpus/
+    cea_procs.json) via a line-containment match against our own build.
+    name_source = "cea-pdb".
+  - artifacts/cea_propagation/{proposals,window_proposals,string_proposals}.json
+    (methods: callgraph_propagation, anchored_window, exact_string) are
+    derived from the decompiled 0563 halocea corpus, not our PDB.
+    name_source = "halocea".
+
+Per the naming-confidence skill's "Cross-build corpora" section, cross-build
+evidence — a different build's PDB, or a different build's decompiled
+corpus — never self-justifies a T1 name; both pipelines here are capped at
+T2 regardless of the row's own confidence tier (confirmed / high_confidence
+/ probable, which measures match quality within its own pipeline, not
+evidentiary tier). A row's name_source must never be mislabeled as PDB
+evidence when it is actually corpus-derived, or vice versa.
+
+rename_mapping.json also carries "punpckhdq_only" rows — a THIRD, unrelated
+cross-build PDB corpus (a different retail/PC debug build; see
+artifacts/ghidra_groom/CHARTER.md). Those already have their own apply path,
+tools/analysis/apply_punpckhdq_renames.py, and are excluded here rather than
+mislabeled as cea-pdb or halocea.
 
 Two kb.json storage shapes hold function records:
   - kb["objects"][*]["functions"][*]   (the vast majority)
@@ -18,6 +40,18 @@ Subcommands:
   plan                         Compute and print the batch plan (no writes).
   apply --batch N [--dry-run]  Apply one batch. Without --dry-run, writes
                                 kb.json and rewrites src/**/*.c, src/**/*.h.
+
+Shared options (plan and apply):
+  --mapping PATH   Repeatable. Default: artifacts/ghidra_groom/
+                   rename_mapping.json only. Also accepts
+                   artifacts/cea_propagation/proposals.json,
+                   window_proposals.json, string_proposals.json — same row
+                   schema, "method" says which pipeline produced the row.
+  --min-tier T     confirmed / high_confidence / probable (default
+                   high_confidence). Rows below this are held back, never
+                   batched.
+  --exclude ADDR   Repeatable. Drops one address (8-hex or 0x-prefixed)
+                   from consideration across every mapping file.
 
 Batching:
   - Batch 0 = every candidate row whose FUN_<addr8> token appears nowhere in
@@ -30,17 +64,30 @@ Batching:
 Per applied row:
   - FUN_<addr8> -> new_name, whole-word, in kb.json's "decl" and "name"
     (when present).
-  - An evidence plate is appended to "comment" (created if absent):
-      [NAME: <new_name> — CEA PDB line-containment (<tier>), <batch tag>]
+  - An evidence plate is appended to "comment" (created if absent — always
+    append-only, never edits or removes a prior plate):
+      [NAME: <new_name> — name_source=<src> method=<method> tier=<tier>
+       (T2), <batch tag> <date>]
   - FUN_<addr8> -> new_name, whole-word, across every src/**/*.c and
     src/**/*.h file that contains it.
 
 Rows are dropped (never applied, reported separately) when:
+  - Their method has no known name_source ("unsupported_method") — e.g.
+    punpckhdq_only rows; route those through apply_punpckhdq_renames.py
+    instead of guessing at their provenance here.
+  - Two rows (usually from two different mapping files) propose different
+    new_name values for the same address ("cross_file_disagreement") — all
+    sides are dropped and reported. When they instead agree on the same
+    new_name, they are deduplicated to one candidate — preferring
+    cea-pdb/line_containment as the cited provenance when a halocea row
+    merely corroborates the same name (recorded as "_corroborated_by").
+  - Below --min-tier ("held back").
   - The mapping's new_name already exists as a real (non-FUN_) function name
     anywhere in kb.json ("exists_in_kb").
-  - Two or more candidate rows in this run propose the same new_name
-    ("duplicate_target_in_mapping") — applying either would create a name
-    collision the other introduces.
+  - Two or more candidate rows in this run propose the same new_name for
+    different addresses ("duplicate_target_in_mapping") — applying either
+    would create a name collision the other introduces.
+  - Explicitly excluded via --exclude.
 
 kb.json is rewritten with json.dump(kb, f, indent=1, ensure_ascii=False) and
 no trailing newline, matching the file's existing exact byte format (verified
@@ -53,18 +100,45 @@ import os
 import re
 import sys
 from collections import Counter, defaultdict
+from datetime import date
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 KB_PATH = os.path.join(REPO_ROOT, "kb.json")
-MAPPING_PATH = os.path.join(REPO_ROOT, "artifacts", "ghidra_groom", "rename_mapping.json")
+DEFAULT_MAPPING_PATH = os.path.join(REPO_ROOT, "artifacts", "ghidra_groom", "rename_mapping.json")
 SRC_ROOT = os.path.join(REPO_ROOT, "src")
 
-BATCH_TAG = "cea-deferred 2026-09-03"
+BATCH_TAG_LABEL = "cea-apply-unified"
 BATCH_SIZE_TARGET = 50
 
 FUN_TOKEN_RE = re.compile(r'\bFUN_[0-9a-fA-F]{8}\b')
 FUN_NAME_RE = re.compile(r'^FUN_[0-9a-fA-F]{8}$')
 DECL_NAME_RE = re.compile(r'^(.*?)\b(\w+)\s*\((.*)\)\s*;?\s*$', re.DOTALL)
+
+# method -> evidence-plate name_source. A method missing from this table is
+# reported and dropped as "unsupported_method" rather than guessed at.
+METHOD_TO_SOURCE = {
+    "line_containment": "cea-pdb",
+    "callgraph_propagation": "halocea",
+    "anchored_window": "halocea",
+    "exact_string": "halocea",
+}
+
+# When two+ mapping files agree on the same address and new_name, this order
+# picks whose (method, mapping_file) is cited as primary in the plate —
+# prefer the real PDB match over corpus inference.
+METHOD_PRIORITY = {
+    "line_containment": 0,
+    "callgraph_propagation": 1,
+    "anchored_window": 2,
+    "exact_string": 3,
+}
+
+TIER_RANK = {"confirmed": 3, "high_confidence": 2, "probable": 1}
+TIER_CHOICES = tuple(TIER_RANK)
+
+
+def batch_tag():
+    return f"{BATCH_TAG_LABEL} {date.today().isoformat()}"
 
 
 # =============================================================================
@@ -81,14 +155,28 @@ def save_kb(kb):
         json.dump(kb, f, indent=1, ensure_ascii=False)
 
 
-def load_mapping():
-    with open(MAPPING_PATH, encoding="utf-8") as f:
-        return json.load(f)
+def load_mapping_rows(paths):
+    """Load and concatenate rows from every --mapping path, tagging each row
+    with the (repo-relative) file it came from, for reporting only."""
+    rows = []
+    for path in paths:
+        with open(path, encoding="utf-8") as f:
+            file_rows = json.load(f)
+        rel = os.path.relpath(path, REPO_ROOT)
+        for row in file_rows:
+            rows.append(dict(row, _mapping_file=rel))
+    return rows
 
 
 def norm_addr(addr8):
     """8-hex-digit address string (no 0x) -> kb.json's '0x...' key format."""
     return "0x" + format(int(addr8, 16), "x")
+
+
+def norm_exclude_arg(arg):
+    """--exclude value (8-hex or 0x-prefixed, any case) -> row['addr']
+    format: 8 lowercase hex digits, no 0x."""
+    return format(int(arg, 16), "08x")
 
 
 def parse_decl_name(decl):
@@ -178,19 +266,32 @@ class DSU:
             self.parent[ra] = rb
 
 
-def compute_candidates(kb, mapping):
-    """Return (candidates, not_found) — rows whose kb record still literally
-    contains FUN_<addr8>, and rows whose address isn't in kb at all."""
+def split_unsupported(rows):
+    """Partition rows by whether their method has a known name_source.
+    Returns (supported, unsupported)."""
+    supported, unsupported = [], []
+    for row in rows:
+        if row.get("method") in METHOD_TO_SOURCE:
+            supported.append(row)
+        else:
+            unsupported.append(row)
+    return supported, unsupported
+
+
+def compute_candidates(kb, rows):
+    """Return (candidates, not_found) for method-supported rows — rows whose
+    kb record still literally contains FUN_<addr8>, and rows whose address
+    isn't in kb at all."""
     addr_index = build_addr_index(kb)
     candidates = []
     not_found = []
-    for row in mapping:
+    for row in rows:
         addr8 = row["addr"]
-        # Derive the token from the address itself, not row["old_name"]: the
-        # mapping also carries rows from an earlier pass whose "old_name" is
-        # already a real synced name (not a FUN_ placeholder), which must
-        # never be treated as still-FUN_ just because that string happens to
-        # appear in the (already correct) current decl.
+        # Derive the token from the address itself, not row["old_name"]: a
+        # mapping file can also carry rows from an earlier pass whose
+        # "old_name" is already a real synced name (not a FUN_ placeholder),
+        # which must never be treated as still-FUN_ just because that string
+        # happens to appear in the (already correct) current decl.
         old_name = f"FUN_{addr8}"
         kb_addr = norm_addr(addr8)
         recs = addr_index.get(kb_addr)
@@ -201,18 +302,80 @@ def compute_candidates(kb, mapping):
         # carries the FUN_ placeholder; apply_batch_rows renames every
         # matching record, not just one, so dual-shape addresses stay in sync.
         if any(old_name in r.get("decl", "") or old_name in r.get("name", "") for r in recs):
-            candidates.append({"row": row, "kb_addr": kb_addr, "recs": recs, "old_name": old_name})
+            method = row["method"]
+            candidates.append({
+                "row": row, "kb_addr": kb_addr, "recs": recs, "old_name": old_name,
+                "method": method, "source": METHOD_TO_SOURCE[method],
+                "mapping_file": row["_mapping_file"], "tier": row["tier"],
+                "new_name": row["new_name"],
+            })
     return candidates, not_found
+
+
+def resolve_cross_file(candidates):
+    """Group candidates by address. Addresses where every candidate agrees
+    on new_name are deduplicated to one representative (lowest
+    METHOD_PRIORITY wins — cea-pdb over halocea — with the rest recorded in
+    "_corroborated_by"); addresses that disagree are dropped entirely and
+    reported. Returns (resolved, disagreements)."""
+    by_addr = defaultdict(list)
+    for c in candidates:
+        by_addr[c["kb_addr"]].append(c)
+
+    resolved = []
+    disagreements = []
+    for kb_addr, group in by_addr.items():
+        names = {c["new_name"] for c in group}
+        if len(names) > 1:
+            disagreements.append({"kb_addr": kb_addr, "candidates": group})
+            continue
+        group_sorted = sorted(group, key=lambda c: METHOD_PRIORITY.get(c["method"], 99))
+        primary = group_sorted[0]
+        if len(group_sorted) > 1:
+            primary = dict(primary)
+            primary["_corroborated_by"] = [
+                {"mapping_file": c["mapping_file"], "method": c["method"]}
+                for c in group_sorted[1:]
+            ]
+        resolved.append(primary)
+    return resolved, disagreements
+
+
+def apply_excludes(candidates, exclude_set):
+    """Split out explicitly --excluded rows. Runs on raw per-mapping-file
+    candidates, before resolve_cross_file, so an excluded address is reported
+    as excluded rather than surfacing as a cross-file disagreement or
+    agreement it never got a chance to join."""
+    if not exclude_set:
+        return candidates, []
+    kept, excluded = [], []
+    for c in candidates:
+        if c["row"]["addr"].lower() in exclude_set:
+            excluded.append(c)
+        else:
+            kept.append(c)
+    return kept, excluded
+
+
+def split_by_tier(candidates, min_tier):
+    min_rank = TIER_RANK[min_tier]
+    tier_ok, held_back = [], []
+    for c in candidates:
+        if TIER_RANK[c["tier"]] >= min_rank:
+            tier_ok.append(c)
+        else:
+            held_back.append(c)
+    return tier_ok, held_back
 
 
 def split_collisions(candidates, name_index):
     """Drop rows whose new_name already exists in kb, or is duplicated by
     another candidate row in this same run. Returns (kept, collisions)."""
-    name_counts = Counter(c["row"]["new_name"] for c in candidates)
+    name_counts = Counter(c["new_name"] for c in candidates)
     kept = []
     collisions = []
     for c in candidates:
-        new_name = c["row"]["new_name"]
+        new_name = c["new_name"]
         if new_name in name_index:
             collisions.append(dict(c, reason="exists_in_kb"))
         elif name_counts[new_name] > 1:
@@ -264,17 +427,29 @@ def compute_batches(kept, token_to_files):
     return batches
 
 
-def compute_plan(kb, mapping):
-    candidates, not_found = compute_candidates(kb, mapping)
+def compute_plan(kb, mapping_paths, min_tier="high_confidence", exclude_addrs=()):
+    rows = load_mapping_rows(mapping_paths)
+    rows_by_file = Counter(r["_mapping_file"] for r in rows)
+    supported_rows, unsupported_rows = split_unsupported(rows)
+    candidates, not_found = compute_candidates(kb, supported_rows)
+    exclude_set = {norm_exclude_arg(a) for a in exclude_addrs}
+    excl_kept, excluded = apply_excludes(candidates, exclude_set)
+    resolved, disagreements = resolve_cross_file(excl_kept)
+    tier_ok, held_back = split_by_tier(resolved, min_tier)
     name_index = build_name_index(kb)
-    kept, collisions = split_collisions(candidates, name_index)
+    kept, collisions = split_collisions(tier_ok, name_index)
     token_to_files = build_token_to_files()
     batches = compute_batches(kept, token_to_files)
     return {
-        "candidates": candidates,
+        "rows_by_file": rows_by_file,
+        "unsupported_rows": unsupported_rows,
         "not_found": not_found,
-        "kept": kept,
+        "candidates_count": len(candidates),
+        "disagreements": disagreements,
+        "excluded": excluded,
+        "held_back": held_back,
         "collisions": collisions,
+        "kept": kept,
         "batches": batches,
         "token_to_files": token_to_files,
     }
@@ -286,28 +461,75 @@ def compute_plan(kb, mapping):
 
 def cmd_plan(args):
     kb = load_kb()
-    mapping = load_mapping()
-    plan = compute_plan(kb, mapping)
+    plan = compute_plan(kb, args.mapping, args.min_tier, args.exclude)
 
-    print(f"Mapping rows loaded: {len(mapping)}")
-    print(f"Still FUN_ in kb.json (candidates): {len(plan['candidates'])}")
+    print("Mapping rows loaded:")
+    for path, count in plan["rows_by_file"].items():
+        print(f"  {path}: {count}")
+    print(f"  total: {sum(plan['rows_by_file'].values())}")
+
+    if plan["unsupported_rows"]:
+        by_method = Counter(r["method"] for r in plan["unsupported_rows"])
+        print(f"\nUnsupported method rows (not this script's apply path): {len(plan['unsupported_rows'])}")
+        for method, count in by_method.items():
+            hint = " -> use tools/analysis/apply_punpckhdq_renames.py" if method == "punpckhdq_only" else ""
+            print(f"  {method}: {count}{hint}")
+
+    print(f"\nStill FUN_ in kb.json (candidates, pre-dedup): {plan['candidates_count']}")
+
     if plan["not_found"]:
         print(f"Address not present in kb.json: {len(plan['not_found'])}")
         for row in plan["not_found"][:10]:
-            print(f"  0x{row['addr']} -> {row['new_name']}")
-    print(f"Collisions (dropped): {len(plan['collisions'])}")
+            print(f"  0x{row['addr']} -> {row['new_name']} ({row['_mapping_file']})")
+
+    if plan["disagreements"]:
+        print(f"\nCross-file disagreements (dropped, all sides): {len(plan['disagreements'])}")
+        for d in plan["disagreements"]:
+            proposals = ", ".join(
+                f"{c['new_name']} [{c['mapping_file']}/{c['method']}]" for c in d["candidates"]
+            )
+            print(f"  {d['kb_addr']}: {proposals}")
+
+    if plan["excluded"]:
+        print(f"\nExplicitly excluded (--exclude): {len(plan['excluded'])}")
+        for c in plan["excluded"]:
+            print(f"  {c['kb_addr']} {c['old_name']} -> {c['new_name']}")
+
+    if plan["held_back"]:
+        by_tier = Counter(c["tier"] for c in plan["held_back"])
+        print(f"\nHeld back (below --min-tier {args.min_tier}): {len(plan['held_back'])}")
+        for tier in sorted(by_tier, key=lambda t: -TIER_RANK[t]):
+            print(f"  {tier}: {by_tier[tier]}")
+
+    print(f"\nCollisions (dropped): {len(plan['collisions'])}")
     for c in plan["collisions"]:
-        print(f"  {c['kb_addr']} {c['old_name']} -> {c['row']['new_name']} "
-              f"({c['row']['tier']}) [{c['reason']}]")
-    print(f"Kept for application: {len(plan['kept'])}")
+        print(f"  {c['kb_addr']} {c['old_name']} -> {c['new_name']} "
+              f"({c['tier']}) [{c['reason']}]")
+
+    print(f"\nKept for application: {len(plan['kept'])}")
     print()
     print(f"Batch plan ({len(plan['batches'])} batches, target ~{BATCH_SIZE_TARGET} rows/batch "
           f"except batch 0):")
     for i, batch in enumerate(plan["batches"]):
         files = set()
         for c in batch:
-            files |= c["_files"] if "_files" in c else set()
+            files |= c.get("_files", set())
+        by_source = Counter(c["source"] for c in batch)
+        by_method = Counter(c["method"] for c in batch)
+        by_mapping = Counter(c["mapping_file"] for c in batch)
         print(f"  batch {i}: {len(batch)} rows, {len(files)} distinct src file(s)")
+        print(f"    by name_source: {dict(by_source)}")
+        print(f"    by method: {dict(by_method)}")
+        print(f"    by mapping file: {dict(by_mapping)}")
+        if files:
+            file_counts = Counter()
+            for c in batch:
+                for f in c.get("_files", set()):
+                    file_counts[f] += 1
+            for f, count in sorted(file_counts.items(), key=lambda kv: (-kv[1], kv[0])):
+                print(f"    {os.path.relpath(f, REPO_ROOT)}: {count} row(s)")
+        else:
+            print("    (kb.json only — no src/ references)")
     return 0
 
 
@@ -317,17 +539,24 @@ def cmd_plan(args):
 
 def apply_batch_rows(kb, batch_rows, token_to_files, dry_run):
     """Mutate kb records in place (unless dry_run) and rewrite src files
-    (unless dry_run). Returns (row_results, touched_files)."""
+    (unless dry_run). Returns (row_results, touched_files). The evidence
+    plate is always computed (even under --dry-run) so a dry run shows
+    exactly what would be written; only the actual mutation/write is
+    gated on `not dry_run`."""
     file_edits = defaultdict(list)  # path -> [(old_name, new_name), ...]
     row_results = []
+    tag = batch_tag()
 
     for c in batch_rows:
         recs = c["recs"]
-        row = c["row"]
         old_name = c["old_name"]
-        new_name = row["new_name"]
-        tier = row["tier"]
+        new_name = c["new_name"]
+        tier = c["tier"]
+        method = c["method"]
+        source = c["source"]
         token_re = re.compile(r'\b' + re.escape(old_name) + r'\b')
+        plate = (f"[NAME: {new_name} — name_source={source} method={method} "
+                 f"tier={tier} (T2), {tag}]")
 
         # Rename every record sharing this address (objects[] copy AND any
         # legacy top-level duplicate), not just one, so a dual-shape address
@@ -354,7 +583,6 @@ def apply_batch_rows(kb, batch_rows, token_to_files, dry_run):
                 if name_changed:
                     rec["name"] = token_re.sub(new_name, rec["name"])
                 if decl_changed or name_changed:
-                    plate = f"[NAME: {new_name} — CEA PDB line-containment ({tier}), {BATCH_TAG}]"
                     if rec.get("comment"):
                         rec["comment"] = rec["comment"].rstrip() + " " + plate
                     else:
@@ -366,7 +594,8 @@ def apply_batch_rows(kb, batch_rows, token_to_files, dry_run):
 
         row_results.append({
             "addr": c["kb_addr"], "old_name": old_name, "new_name": new_name,
-            "tier": tier, "decl_changed": any_decl_changed, "name_changed": any_name_changed,
+            "tier": tier, "method": method, "source": source, "plate": plate,
+            "decl_changed": any_decl_changed, "name_changed": any_name_changed,
             "files": touched, "records_touched": records_touched,
         })
 
@@ -388,8 +617,7 @@ def apply_batch_rows(kb, batch_rows, token_to_files, dry_run):
 
 def cmd_apply(args):
     kb = load_kb()
-    mapping = load_mapping()
-    plan = compute_plan(kb, mapping)
+    plan = compute_plan(kb, args.mapping, args.min_tier, args.exclude)
     batches = plan["batches"]
 
     if args.batch < 0 or args.batch >= len(batches):
@@ -403,9 +631,11 @@ def cmd_apply(args):
     row_results, touched_files = apply_batch_rows(kb, batch_rows, plan["token_to_files"], args.dry_run)
 
     for r in sorted(row_results, key=lambda x: x["addr"]):
-        print(f"  {r['addr']}: {r['old_name']} -> {r['new_name']} ({r['tier']}) "
+        print(f"  {r['addr']}: {r['old_name']} -> {r['new_name']} "
+              f"({r['tier']}, {r['source']}/{r['method']}) "
               f"decl={'Y' if r['decl_changed'] else 'n'} name={'Y' if r['name_changed'] else 'n'} "
               f"files={len(r['files'])} recs={r['records_touched']}")
+        print(f"    {r['plate']}")
 
     print(f"\nRows applied: {len(row_results)}")
     print(f"Distinct src files touched: {len(touched_files)}")
@@ -421,17 +651,31 @@ def cmd_apply(args):
     return 0
 
 
+def add_common_args(p):
+    p.add_argument("--mapping", action="append", dest="mapping", metavar="PATH",
+                    help="Mapping JSON path (repeatable). Default: "
+                         "artifacts/ghidra_groom/rename_mapping.json")
+    p.add_argument("--min-tier", choices=TIER_CHOICES, default="high_confidence",
+                    help="Minimum row tier to apply (default: high_confidence)")
+    p.add_argument("--exclude", action="append", default=[], dest="exclude", metavar="ADDR",
+                    help="Address to drop from consideration (repeatable)")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command")
 
-    sub.add_parser("plan", help="Compute and print the batch plan")
+    p_plan = sub.add_parser("plan", help="Compute and print the batch plan")
+    add_common_args(p_plan)
 
     p_apply = sub.add_parser("apply", help="Apply one batch")
+    add_common_args(p_apply)
     p_apply.add_argument("--batch", type=int, required=True, help="Batch index to apply")
     p_apply.add_argument("--dry-run", action="store_true", help="Print what would change; write nothing")
 
     args = parser.parse_args()
+    if args.command in ("plan", "apply"):
+        args.mapping = args.mapping or [DEFAULT_MAPPING_PATH]
     if args.command == "plan":
         return cmd_plan(args)
     elif args.command == "apply":
