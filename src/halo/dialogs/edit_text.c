@@ -1,3 +1,82 @@
+/* Render the device debug overlay string for one device object (0x96d70).
+ *
+ * Binary evidence (0x96d70..0x96f19, cdecl, one stack arg at [EBP+8] loaded
+ * into EDI; kb decl said (void) but MOV EDI,[EBP+0x8] proves the parameter,
+ * and xrefs_to reports no callers so no call site is affected):
+ *
+ * 1. Resolve the object with object_get_and_verify_type(handle, 0x380) into
+ *    ESI -- same type mask device_group_set_object_value (0x97040) uses.
+ * 2. Gate the whole body on the debug flag byte at 0x5aa8c4 (TEST AL,AL /
+ *    JZ 0x96f14). The object lookup happens before the gate.
+ * 3. Build the text in a 512-byte stack buffer (SUB ESP,0x20c = 512 + the
+ *    12-byte vector3_t), seeded with csstrcpy(buffer, "").
+ * 4. Four appends, each addressed as buffer + csstrlen(buffer):
+ *      "power %.2f/vel %.2f"      <- +0x1ac (power), +0x1b0 (velocity)
+ *      " (group %d desired %.2f)" <- when the int16 at +0x1a8 is not NONE
+ *      "|nposition %.2f/vel %.2f" <- +0x1b8 (position), +0x1bc (velocity)
+ *      " (group %d desired %.2f)" <- when the int16 at +0x1b4 is not NONE
+ *    "|n" is the engine's own line-break escape; string-table spacing
+ *    (0x269b34/0x269b50/0x269b6c, 28 bytes apart) confirms the 24-char
+ *    literal rather than a "\n" escape.
+ *    The float operand order is taken from the FSTP double slots, not the
+ *    decompiler: MSVC stores the LAST double first (reusing the still-live
+ *    pushed args of the preceding call as its slot at 0x96db2 / 0x96e0c /
+ *    0x96e9b), then SUB ESP for the first one.
+ * 5. Both group blocks datum_get the device-group record out of the pool at
+ *    0x5aa8c8 (the pool devices.c uses) and print its float at +0x04 as
+ *    "desired". The index is sign-extended (MOVSX) for datum_get but
+ *    zero-extended (MOVZX) for the %d -- both forms are in the disassembly
+ *    at 0x96df8/0x96e02 and 0x96e81/0x96e94, so they are kept distinct.
+ * 6. Finally take the object's world position and lift it by
+ *    up_vector * 0.4f (the .rdata constant at 0x253524 = 0x3ECCCCCD, the
+ *    same up-vector/offset pair vehicles.c already documents for 0x31fc44)
+ *    before handing position, text and the color word at 0x2ee6c4 to the
+ *    debug-string renderer at 0x189cb0.
+ *
+ * Note on the hazard scan: the ARG_COUNT findings are expected. crt_sprintf
+ * is variadic, so its 0x18/0x14 cleanups are 4+4+8+8 and 4+4+4+8; and the
+ * 0x18 after FUN_00189cb0 (0x96f11) is its own 16 bytes plus the 8 bytes of
+ * object_get_world_position's args that MSVC never popped separately. */
+void FUN_00096d70(int object_handle)
+{
+  char *object;
+  char *device_group;
+  float *up;
+  char buffer[512];
+  vector3_t position;
+
+  object = (char *)object_get_and_verify_type(object_handle, 0x380);
+  if (*(char *)0x5aa8c4 != '\0') {
+    csstrcpy(buffer, "");
+    crt_sprintf(buffer + csstrlen(buffer), "power %.2f/vel %.2f",
+                (double)*(float *)(object + 0x1ac),
+                (double)*(float *)(object + 0x1b0));
+    if (*(int16_t *)(object + 0x1a8) != -1) {
+      device_group = (char *)datum_get(*(data_t **)0x5aa8c8,
+                                       (int)*(int16_t *)(object + 0x1a8));
+      crt_sprintf(buffer + csstrlen(buffer), " (group %d desired %.2f)",
+                  (int)*(uint16_t *)(object + 0x1a8),
+                  (double)*(float *)(device_group + 4));
+    }
+    crt_sprintf(buffer + csstrlen(buffer), "|nposition %.2f/vel %.2f",
+                (double)*(float *)(object + 0x1b8),
+                (double)*(float *)(object + 0x1bc));
+    if (*(int16_t *)(object + 0x1b4) != -1) {
+      device_group = (char *)datum_get(*(data_t **)0x5aa8c8,
+                                       (int)*(int16_t *)(object + 0x1b4));
+      crt_sprintf(buffer + csstrlen(buffer), " (group %d desired %.2f)",
+                  (int)*(uint16_t *)(object + 0x1b4),
+                  (double)*(float *)(device_group + 4));
+    }
+    object_get_world_position(object_handle, &position);
+    up = *(float **)0x31fc44;
+    position.x = up[0] * 0.4f + position.x;
+    position.y = up[1] * 0.4f + position.y;
+    position.z = up[2] * 0.4f + position.z;
+    FUN_00189cb0('\0', &position, buffer, *(int *)0x2ee6c4);
+  }
+}
+
 /* Sets a device group's cached value and, if it actually changed, notifies
  * every live device attached to that group (0x96f20).
  *
@@ -107,6 +186,70 @@ void FUN_00097040(int object_handle, float value)
     if (device_group_index != -1) {
       device_group_set_actual_value(device_group_index, value);
     }
+  }
+}
+
+/* Seed a device-family object's two device-effect group indices from its
+ * definition record (0x97080). Resolves object_handle as a device|control|
+ * machine object (type_mask 0x380), touches its 'devi' tag definition
+ * (tag_get(0x64657669, *(int *)object) -- result discarded), then:
+ *   - int16 at record+0x00 -> object+0x1a8; if it is NONE (-1) a fresh
+ *     device effect is created first with initial value
+ *     (record_flags & 2) ? 0.0f : 1.0f and flags 4.
+ *   - int16 at record+0x02 -> object+0x1b4; if NONE, initial value
+ *     (record_flags & 1) ? 1.0f : 0.0f and flags ((record_flags & 4) | 0x10)
+ *     >> 2 (i.e. 4 or 5).
+ * Both indices are then looked up in the device-group pool at 0x5aa8c8 and
+ * the dword at +0x04 of each record is cached into object+0x1ac / +0x1b8.
+ * The reference issues two further datum_get calls on the same two indices
+ * whose results are discarded (0x97165, 0x97179) -- reproduced verbatim.
+ * Finally record_flags bits 0x8 and 0x10 OR 1 and 2 into the object flags
+ * word at +0x1a4.
+ * Stack-cleanup note: ADD ESP,0x10 at 0x970a8 covers
+ * object_get_and_verify_type + tag_get; ADD ESP,0x20 at 0x97181 covers all
+ * four datum_get calls -- both ARG_COUNT hazards are grouped cleanups, not
+ * extra arguments. */
+void FUN_00097080(int object_handle, void *a2)
+{
+  char *object;
+  char *record;
+  char *device_group;
+  int16_t index;
+  uint32_t record_flags;
+
+  object = (char *)object_get_and_verify_type(object_handle, 0x380);
+  tag_get(0x64657669 /* 'devi' */, *(int *)object);
+  record = (char *)a2;
+
+  index = *(int16_t *)record;
+  if (index == -1) {
+    index =
+      device_effect_new((*(uint8_t *)(record + 4) & 2) != 0 ? 0.0f : 1.0f, 4);
+  }
+  *(int16_t *)(object + 0x1a8) = index;
+
+  index = *(int16_t *)(record + 2);
+  if (index == -1) {
+    record_flags = *(uint32_t *)(record + 4);
+    index = device_effect_new((record_flags & 1) != 0 ? 1.0f : 0.0f,
+                              (short)(((record_flags & 4) | 0x10) >> 2));
+  }
+  *(int16_t *)(object + 0x1b4) = index;
+
+  device_group =
+    (char *)datum_get(*(data_t **)0x5aa8c8, (int)*(int16_t *)(object + 0x1a8));
+  *(int *)(object + 0x1ac) = *(int *)(device_group + 4);
+  device_group =
+    (char *)datum_get(*(data_t **)0x5aa8c8, (int)*(int16_t *)(object + 0x1b4));
+  *(int *)(object + 0x1b8) = *(int *)(device_group + 4);
+  datum_get(*(data_t **)0x5aa8c8, (int)*(int16_t *)(object + 0x1a8));
+  datum_get(*(data_t **)0x5aa8c8, (int)*(int16_t *)(object + 0x1b4));
+
+  if ((*(uint8_t *)(record + 4) & 8) != 0) {
+    *(uint32_t *)(object + 0x1a4) |= 1;
+  }
+  if ((*(uint8_t *)(record + 4) & 0x10) != 0) {
+    *(uint32_t *)(object + 0x1a4) |= 2;
   }
 }
 

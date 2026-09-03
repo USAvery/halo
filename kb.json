@@ -32596,7 +32596,8 @@
     },
     {
      "addr": "0x96d70",
-     "decl": "void FUN_00096d70(void);"
+     "decl": "void FUN_00096d70(int object_handle);",
+     "ported": true
     },
     {
      "addr": "0x96f20",
@@ -32610,7 +32611,8 @@
     },
     {
      "addr": "0x97080",
-     "decl": "void FUN_00097080(int object_handle, void *a2);"
+     "decl": "void FUN_00097080(int object_handle, void *a2);",
+     "ported": true
     },
     {
      "addr": "0x97220",
