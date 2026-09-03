@@ -48,6 +48,32 @@ extern "C" {
 #define PAGE_READWRITE                 0x04
 #define TICKS_PER_SECOND               (*(float *)0x253394) /* 30.0f */
 
+/* Player powerup slots.  The BOUND is proven by our own binary: the assert at
+ * players.c line 0xaea reads
+ * "powerup_type>=0 && powerup_type<NUMBER_OF_PLAYER_POWERUPS" against a
+ * `cmp 2`, and player_update_weapon_timers walks exactly two int16_t entries
+ * from player+0x68.
+ *
+ * The member SPELLINGS are borrowed from halocea's player_powerup.h
+ * (name_source: halocea, T2 — DB-verified there via types_enum_values
+ * _7631F5BC00EB2EC7672D4CE153F5F765, but the identifiers themselves appear
+ * nowhere in 2276).  What 2276 proves independently is the slot MAPPING:
+ * hud.c formats "ACTIVE-CAMOUFLAGE " from the int16_t at player+0x68 and
+ * "FULL-SPECTRUM VISION " from the one at player+0x6a, so slot 0 is active
+ * camouflage and slot 1 is full-spectrum vision.  Corroborating a mapping via
+ * display text is weaker evidence than an identifier in an assert string, so
+ * these stay T2 rather than being promoted the way batch 3's
+ * _name_filename_bit was.
+ *
+ * Defined here (and in the mirror force-included header) rather than at the
+ * top of players.c: that TU has four `assert_halt` sites, and every line
+ * inserted above one shifts its __LINE__ immediate. */
+enum player_powerup {
+  _player_powerup_active_camouflage = 0,
+  _player_powerup_full_spectrum_vision = 1,
+  NUMBER_OF_PLAYER_POWERUPS = 2
+};
+
 #include "nv097.h"
 
 static const int _scenario_type_main_menu = 2;

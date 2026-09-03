@@ -4,6 +4,68 @@
 typedef void *(*zlib_zalloc_fn)(void *, int, int);
 typedef void (*zlib_zfree_fn)(void *, void *);
 
+/* periodic_functions.c selectors.
+ *
+ * Bounds are binary-proven from THIS build: FUN_0010a5e0 rejects
+ * function_type >= 0xc against "function_type>=0 &&
+ * function_type<NUMBER_OF_PERIODIC_FUNCTIONS", transition_function_evaluate
+ * rejects >= 6 against the NUMBER_OF_TRANSITION_FUNCTIONS assert, and
+ * periodic_functions_dispose (0x10a570) frees 12 periodic + 6 transition
+ * tables.
+ *
+ * name_source for the BOUND identifiers: halocea+assert — the names are stamped
+ * verbatim into our own 2276 assert strings, so both name and value are proven
+ * here.
+ *
+ * name_source for the periodic MEMBER names: halocea-guess. The halocea corpus
+ * (RE-derived from the 2011 HCEA prototype, Blam! 01.00.01.0563) marks
+ * periodic_function.h explicitly as a reconciliation with no ground-truth
+ * compiled enum behind it — the DB types the selector as a plain __int16. Two
+ * slots are independently corroborated against 2276 and are the more solid
+ * ones: _periodic_function_one, because FUN_0010a5e0 short-circuits type 0 to
+ * the 1.0f constant at 0x2533c8; and the slide pair, because the 0xc0 mask
+ * below selects exactly types 6 and 7 for the sawtooth wraparound fixup (v0
+ * high and v1 low across the discontinuity => add 1.0), which no non-sawtooth
+ * curve needs. The remaining member names are plausible, not proven — treat a
+ * disagreement with 2276 behaviour as our binary winning.
+ *
+ * name_source for the transition MEMBER names: halocea. That corpus reports
+ * transition_function.h as carried verbatim by a compiled enum in the 0563
+ * binary, so the names are cited rather than reconciled — but the citation is
+ * from a different build. _transition_function_linear is corroborated here:
+ * transition_function_evaluate returns the clamped t unchanged for type 0.
+ */
+enum periodic_function {
+  _periodic_function_one = 0x0,
+  _periodic_function_zero = 0x1,
+  _periodic_function_cosine = 0x2,
+  _periodic_function_cosine_with_random_period = 0x3,
+  _periodic_function_diagonal_wave = 0x4,
+  _periodic_function_diagonal_wave_with_random_period = 0x5,
+  _periodic_function_slide = 0x6,
+  _periodic_function_slide_with_random_period = 0x7,
+  _periodic_function_noise = 0x8,
+  _periodic_function_jitter = 0x9,
+  _periodic_function_wander = 0xA,
+  _periodic_function_spark = 0xB,
+  NUMBER_OF_PERIODIC_FUNCTIONS = 0xC
+};
+
+/* The two sawtooth curves, as a bit set over periodic_function. Folds to the
+ * 0xc0 immediate the original tests. */
+#define PERIODIC_FUNCTION_SLIDE_MASK \
+  ((1 << _periodic_function_slide) | (1 << _periodic_function_slide_with_random_period))
+
+enum transition_function {
+  _transition_function_linear = 0,
+  _transition_function_early = 1,
+  _transition_function_very_early = 2,
+  _transition_function_late = 3,
+  _transition_function_very_late = 4,
+  _transition_function_cosine = 5,
+  NUMBER_OF_TRANSITION_FUNCTIONS = 6
+};
+
 /* 0x1acb0 — 2D scale-add: out = base + scale * dir. */
 void FUN_0001acb0(float *base, float *dir, float scale, float *out)
 {
@@ -1295,11 +1357,11 @@ float FUN_0010a5e0(int16_t function_type, float input)
   float v1;
   float result;
 
-  if (function_type == 0) {
+  if (function_type == _periodic_function_one) {
     return *(float *)0x2533c8;
   }
 
-  if (function_type < 0 || function_type >= 0xc) {
+  if (function_type < 0 || function_type >= NUMBER_OF_PERIODIC_FUNCTIONS) {
     display_assert(
       "function_type>=0 && function_type<NUMBER_OF_PERIODIC_FUNCTIONS",
       "c:\\halo\\SOURCE\\math\\periodic_functions.c", 0x9d, 1);
@@ -1319,7 +1381,7 @@ float FUN_0010a5e0(int16_t function_type, float input)
     v0 = (float)table[idx] * *(float *)0x261518;
     v1 = (float)table[(idx + 1) & 0x3ff] * *(float *)0x261518;
 
-    if ((1 << function_type & 0xc0) != 0) {
+    if ((1 << function_type & PERIODIC_FUNCTION_SLIDE_MASK) != 0) {
       if (v0 > *(float *)0x25afcc && v1 < *(float *)0x25337c) {
         v1 = v1 + *(float *)0x2533c8;
       }
@@ -1368,11 +1430,11 @@ float transition_function_evaluate(short function_type, float t)
     t = 1.0f;
   }
 
-  if (function_type == 0) {
+  if (function_type == _transition_function_linear) {
     return t;
   }
 
-  if (function_type < 0 || function_type >= 6) {
+  if (function_type < 0 || function_type >= NUMBER_OF_TRANSITION_FUNCTIONS) {
     display_assert(
       "function_type>=0 && function_type<NUMBER_OF_TRANSITION_FUNCTIONS",
       "c:\\halo\\SOURCE\\math\\periodic_functions.c", 0xd8, 1);

@@ -65,6 +65,39 @@ looks like health"). If you can't cite the evidence in one line, the name is T3 
 4. Renames are codegen-neutral: `vc71_regression.py check --source <file>` must show
    zero movement. Any movement means the commit wasn't rename-only — split it.
 
+## Cross-build corpora (halocea)
+
+The `halocea` corpus (`surreptitiousresearch/halocea`) is RE-derived from a 2011 HCEA
+prototype `.xex` carrying verbose symbols — Blam! `01.00.01.0563`, roughly two years
+after our 2276. It supplies developer-chosen names we cannot recover from our own
+binary. It is *evidence from a different build*, so it never self-justifies, exactly as
+with `apply_punpckhdq_renames.py` above. Assessment and measured overlap:
+`docs/halocea/README.md`.
+
+Tier by how the name was obtained — always record which, in the source comment or the
+kb.json entry, as `name_source:`:
+
+| `name_source` | What it means | Tier |
+|---|---|---|
+| `halocea+assert` | The identifier is also stamped into a **2276** assert/format string. Our own binary proves it; halocea only corroborates. | T1 |
+| `halocea` | halocea cites a compiled symbol or DB enum in the 0563 binary, but the name appears nowhere in ours. | **T2** — semantic name allowed, must carry the citation |
+| `halocea-guess` | halocea's own header marks it a reconciliation with no ground-truth symbol behind it (see their `periodic_function.h`). | **T3** — mechanical name, *unless* our binary independently corroborates that specific slot, which promotes that slot alone to T2 |
+
+Rules:
+
+1. **Read their provenance line before borrowing.** halocea headers state their own
+   evidence ("DB-verified via types_enum_values …" vs "GUESS: enum recovered by
+   reconciliation"). A DB-verified header and a guessed one are different tiers, and
+   the distinction is per-header, not per-corpus.
+2. **Never borrow a layout.** Names and enum member *ordering* transfer well; struct
+   offsets, bitfield allocation order and 8-byte alignment do not. Every borrowed
+   struct is a hypothesis to confirm with `cs()`/`co()` against 2276.
+3. **Our binary wins every disagreement**, and the disagreement gets recorded — halocea
+   has already corrected two of its own usage-derived `actor_datum` names against a
+   later ground-truth dump.
+4. **The local "H1 Performance Build" tree is a Windows x86 port** of that corpus, one
+   step removed from the `.xex`. For a load-bearing layout question, prefer upstream.
+
 ## Downgrades
 
 When later evidence contradicts a name, **downgrading is mandatory**, not optional:

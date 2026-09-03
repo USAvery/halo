@@ -269,6 +269,43 @@ typedef struct {
 #define MAXIMUM_WEAPONS_PER_UNIT 4
 #define NUMBER_OF_UNIT_GRENADE_TYPES 2
 
+/* Equipment powerup kind, stored in the 'eqip' tag at +0x308 (the
+ * `powerup_type` field below).  Distinct from `enum player_powerup`, which
+ * indexes the two-entry per-player timer array at player+0x68: only camo and
+ * full-spectrum vision get a slot there, because only they need a per-player
+ * countdown.
+ *
+ * The `_equipment_powerup_` prefix is 2276's own, verbatim from three assert
+ * strings in units.c, so halocea's consumer-facing `_powerup_type_*` renames
+ * are deliberately not used here.
+ *
+ * Values 0 and 6 are T1 — identifier and value both from our binary:
+ *   units.c 0x1ca1  `powerup_type != _equipment_powerup_none`     guards == 0
+ *   units.c 0x1c72  `powerup_type == _equipment_powerup_grenade`  guards != 6
+ *   units.c 0x1ca2  `powerup_type != _equipment_powerup_grenade`  guards == 6
+ *
+ * Values 1-5 are T2 (name_source: halocea, DB-verified there via
+ * types_enum_values _270498BB874CAD5ECABAECA7DA81ECAE).  Our binary proves
+ * their MEANING independently — the dispatch in
+ * player_set_action_result_for_equipment routes each to an already-named
+ * handler: game_set_players_are_double_speed (1), object_double_charge_shield
+ * + player_apply_overshield_effect (2), powerup slot 0 (3), powerup slot 1
+ * (4), object_restore_body + player_apply_health_effect (5).  The spellings
+ * are still borrowed.
+ *
+ * No bound is named: 6 is the largest value our binary compares against, which
+ * does not prove 7 is the count.  halocea states NUMBER_OF_POWERUP_TYPES = 7;
+ * that stays unadopted until a 2276 site needs it. */
+enum equipment_powerup_type {
+  _equipment_powerup_none = 0,
+  _equipment_powerup_double_speed = 1,
+  _equipment_powerup_over_shield = 2,
+  _equipment_powerup_active_camouflage = 3,
+  _equipment_powerup_full_spectrum_vision = 4,
+  _equipment_powerup_health = 5,
+  _equipment_powerup_grenade = 6
+};
+
 // OBJE -> UNIT
 /// size=0x424
 typedef struct {

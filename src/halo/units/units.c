@@ -11,6 +11,98 @@
 #define MAXIMUM_WEAPONS_PER_UNIT 4
 #define MAXIMUM_COLLISION_USER_STACK_DEPTH 32
 
+/* Unit selector enums. See docs/halocea/README.md for the corpus and
+ * .claude/skills/naming-confidence for the name_source tiers.
+ *
+ * Every BOUND below was read out of this build before the corpus was consulted,
+ * and all six agree with it exactly — the 0563 binary added no unit selector in
+ * this group:
+ *
+ *   speech priority     unit_dialogue.c:0x82  rejects priority > 10      => 11
+ *   scream type         units.c              rejects >= 6                => 6
+ *   control flags       units.c              rejects & 0xffff8000        => 15
+ *   grenade type        units.c              rejects >= 2                => 2
+ *   unit state          units.c              rejects >= 0x2c             => 44
+ *   vocalization type   unit_dialogue.c:0x90 rejects > 0xd0              => 209
+ *
+ * The bound identifiers themselves are stamped into our own assert strings, so
+ * they are T1. So is _unit_speech_none: unit_dialogue.c:0x16e asserts
+ * "unit->unit.speech.current.priority > _unit_speech_none" verbatim in THIS
+ * binary, which independently confirms the corpus's member name and its value
+ * of 0 (the assert guards against an empty current-speech slot).
+ *
+ * The remaining member names are name_source: halocea, T2 — halocea cites each
+ * of these four to a compiled enum in the 0563 binary (types_enum_values
+ * _33B1D83D…, _67894A93…, _C04139DE…, _DAB55C4E…), but that citation is one
+ * build away from ours. Two behavioural facts in this TU corroborate the
+ * ordering rather than merely the values: priorities 2/7/10 are exactly the set
+ * that may interrupt a line already playing, consistent with pain/involuntary/
+ * death outranking conversational speech; and priority 6 is the single slot
+ * exempted from the priority cap in FUN_001a6b60 (`priority != 6 && !bVar`),
+ * which is what a scripted, designer-authored line needs and what no
+ * conversational priority would need.
+ */
+enum unit_speech_priority {
+  _unit_speech_none = 0,
+  _unit_speech_idle = 1,
+  _unit_speech_pain = 2,
+  _unit_speech_talk = 3,
+  _unit_speech_communicate = 4,
+  _unit_speech_shout = 5,
+  _unit_speech_scripted = 6,
+  _unit_speech_involuntary = 7,
+  _unit_speech_exclamation = 8,
+  _unit_speech_scream = 9,
+  _unit_speech_death = 10,
+  NUMBER_OF_UNIT_SPEECH_PRIORITIES = 11
+};
+
+enum unit_scream_type {
+  _unit_scream_falling = 0,
+  _unit_scream_grenade_attached_to_us = 1,
+  _unit_scream_burning_to_death = 2,
+  _unit_scream_destroyed_limb = 3,
+  _unit_scream_destroyed_head = 4,
+  _unit_scream_resurrection = 5,
+  NUMBER_OF_UNIT_SCREAM_TYPES = 6
+};
+
+/* Bit INDICES, not masks — use as (1 << _bit). NUMBER_OF_UNIT_GRENADE_TYPES is
+ * already defined in types.h, so only the members are introduced here. */
+enum unit_grenade_type {
+  _unit_grenade_human_fragmentation = 0,
+  _unit_grenade_covenant_plasma = 1
+};
+
+enum unit_control_flags {
+  _unit_control_crouch_modifier_bit = 0x0,
+  _unit_control_jump_bit = 0x1,
+  _unit_control_user_animation1_bit = 0x2,
+  _unit_control_user_animation2_bit = 0x3,
+  _unit_control_integrated_light_bit = 0x4,
+  _unit_control_exact_facing_bit = 0x5,
+  _unit_control_action_bit = 0x6,
+  _unit_control_use_equipment_bit = 0x7,
+  _unit_control_look_dont_turn_bit = 0x8,
+  _unit_control_force_alert_bit = 0x9,
+  _unit_control_weapon_reload_bit = 0xA,
+  _unit_control_weapon_primary_trigger_bit = 0xB,
+  _unit_control_weapon_secondary_trigger_bit = 0xC,
+  _unit_control_throw_grenade_bit = 0xD,
+  _unit_control_swap_weapons_bit = 0xE,
+  NUMBER_OF_UNIT_CONTROL_FLAGS = 0xF
+};
+
+/* Bits at or above NUMBER_OF_UNIT_CONTROL_FLAGS; what VALID_FLAGS rejects. */
+#define UNIT_CONTROL_FLAGS_INVALID_MASK 0xffff8000
+
+/* Bounds only. The 44 unit states and 209 vocalization types are not referenced
+ * by name in this TU, so their member lists are deliberately not imported.
+ * NUMBER_OF_VOCALIZATION_TYPES documents the value; the site that checks it
+ * tests `> 208` and keeps its literal (see the note there). */
+#define NUMBER_OF_UNIT_STATES 44
+#define NUMBER_OF_VOCALIZATION_TYPES 209
+
 char *FUN_0008dc30(char *destination, const char *source)
 {
   const char *source_cursor;
@@ -1272,7 +1364,7 @@ short FUN_001a68d0(int unit_handle, short priority, char param_3, char param_4,
                    "c:\\halo\\SOURCE\\units\\unit_dialogue.c", 0x81, 1);
     system_exit(-1);
   }
-  if (priority < 0 || priority > 10) {
+  if (priority < 0 || priority > _unit_speech_death) {
     display_assert(
       "(priority >= 0) && (priority < NUMBER_OF_UNIT_SPEECH_PRIORITIES)",
       "c:\\halo\\SOURCE\\units\\unit_dialogue.c", 0x82, 1);
@@ -1290,6 +1382,8 @@ short FUN_001a68d0(int unit_handle, short priority, char param_3, char param_4,
   if (snd_def_idx == NONE && *(int *)(unit + 0x334) != NONE && voc_type != -1) {
     udlg_tag = (int)tag_get(0x75646c67, *(int *)(unit + 0x334));
     do {
+      /* Literal 0xd0 deliberately: the original tests `> 208`, and spelling it
+       * `>= NUMBER_OF_VOCALIZATION_TYPES` would emit CMP 0xd1. */
       if (voc_type < 0 || voc_type > 0xd0) {
         display_assert("(vocalization_type >= 0) && (vocalization_type < "
                        "NUMBER_OF_VOCALIZATION_TYPES)",
@@ -1303,7 +1397,7 @@ short FUN_001a68d0(int unit_handle, short priority, char param_3, char param_4,
   }
 
   /* Check if unit can speak (flag check and game connection) */
-  if ((*(uint8_t *)(unit + 0xb6) & 4) != 0 && priority != 10) {
+  if ((*(uint8_t *)(unit + 0xb6) & 4) != 0 && priority != _unit_speech_death) {
     goto done;
   }
   if (game_connection() == 0 && *(char *)0x5ac9cd != '\0') {
@@ -1314,7 +1408,7 @@ short FUN_001a68d0(int unit_handle, short priority, char param_3, char param_4,
 
   /* Evaluate speech slot priority */
   slot_priority = *(short *)(unit + 0x338);
-  if (slot_priority == 0) {
+  if (slot_priority == _unit_speech_none) {
     result = 2;
   } else {
     slot_secondary = *(short *)(unit + 0x368);
@@ -1325,17 +1419,20 @@ short FUN_001a68d0(int unit_handle, short priority, char param_3, char param_4,
 
     priority_int = (int)priority;
 
-    /* High-priority interrupt check (priority 2, 7, or 10) */
-    if ((priority_int == 2 || priority_int == 7 || priority_int == 10) &&
+    /* Only pain, involuntary and death may interrupt a line already playing. */
+    if ((priority_int == _unit_speech_pain ||
+         priority_int == _unit_speech_involuntary ||
+         priority_int == _unit_speech_death) &&
         *(char *)(unit + 0x3a4) != '\0' && *(short *)(unit + 0x3aa) == 0 &&
         max_priority < priority) {
-      slot_priority = 0;
+      slot_priority = _unit_speech_none;
       max_priority = slot_secondary;
     }
 
     if (priority_table[priority_int] >= max_priority) {
       result = 3;
-    } else if (priority >= 7 && priority_table[priority_int] >= slot_priority) {
+    } else if (priority >= _unit_speech_involuntary &&
+               priority_table[priority_int] >= slot_priority) {
       result = 2;
     } else if (param_4 != '\0' && timing_table[priority_int] != 0.0f) {
       timing_threshold = timing_table[priority_int];
@@ -1354,10 +1451,11 @@ short FUN_001a68d0(int unit_handle, short priority, char param_3, char param_4,
       if (priority <= max_priority) {
         if (priority <= *(short *)(unit + 0x368))
           goto done;
-        if (slot_priority == 2 || slot_priority == 7) {
+        if (slot_priority == _unit_speech_pain ||
+            slot_priority == _unit_speech_involuntary) {
           bVar = 1;
         }
-        if (priority != 6 && !bVar)
+        if (priority != _unit_speech_scripted && !bVar)
           goto done;
       }
       result = 1;
@@ -1599,7 +1697,7 @@ void FUN_001a6e20(int unit_handle, void *speech_item, short priority)
         speech_name = "<unknown>";
       }
     }
-    if (priority == 2) {
+    if (priority == _unit_speech_pain) {
       lost_type = "waiting";
     } else {
       lost_type = "queued";
@@ -1647,13 +1745,13 @@ void FUN_001a6ef0(int unit_handle, short priority, void *speech_item)
     system_exit(-1);
   }
 
-  /* If unit has AI-controlled speech bit set, only allow priority 10 (override)
-   */
-  if ((*(uint8_t *)(unit + 0xb6) & 4) != 0 && *(int16_t *)speech_item != 10) {
+  /* If unit has AI-controlled speech bit set, only death speech gets through. */
+  if ((*(uint8_t *)(unit + 0xb6) & 4) != 0 &&
+      *(int16_t *)speech_item != _unit_speech_death) {
     return;
   }
 
-  if (priority >= 2) {
+  if (priority >= _unit_speech_pain) {
     /* Promoting to current slot — log existing speech being evicted */
     if (*(int16_t *)(unit + 0x338) > 0 && *(char *)(unit + 0x3a4) == '\0') {
       FUN_001a6e20(unit_handle, unit + 0x338, 2);
@@ -1662,8 +1760,8 @@ void FUN_001a6ef0(int unit_handle, short priority, void *speech_item)
     /* Copy 0x30 bytes of speech data to current slot (unit+0x338) */
     memcpy(unit + 0x338, speech_item, 0x30);
 
-    /* If priority == 3, clear backup slot if it exists and isn't the same */
-    if (priority == 3 && *(int16_t *)(unit + 0x368) > 0) {
+    /* Talk clears the backup slot if it exists and isn't the same item. */
+    if (priority == _unit_speech_talk && *(int16_t *)(unit + 0x368) > 0) {
       if (speech_item != (void *)(unit + 0x368)) {
         FUN_001a6e20(unit_handle, unit + 0x368, 1);
       }
@@ -1699,7 +1797,7 @@ void FUN_001a6ef0(int unit_handle, short priority, void *speech_item)
     return;
   }
 
-  if (priority == 1) {
+  if (priority == _unit_speech_idle) {
     /* Queue to backup slot */
     if (*(int16_t *)(unit + 0x338) < 1) {
       display_assert("unit->unit.speech.current.priority > _unit_speech_none",
@@ -1721,12 +1819,13 @@ void FUN_001a70d0(int unit_handle, int sound_tag, int sound_handle)
 
   unit = (char *)object_get_and_verify_type(unit_handle, 3);
   l_8 = -1;
-  result = FUN_001a68d0(unit_handle, 6, 0, 0, 0, (int16_t *)&l_8, &result);
+  result = FUN_001a68d0(unit_handle, _unit_speech_scripted, 0, 0, 0,
+                        (int16_t *)&l_8, &result);
   if ((int16_t)result < 3) {
     result = 2;
   }
   csmemset(speech_buf, 0, 0x30);
-  *(int16_t *)(speech_buf + 0x00) = 6;
+  *(int16_t *)(speech_buf + 0x00) = _unit_speech_scripted;
   *(int16_t *)(speech_buf + 0x02) = -1;
   *(int *)(speech_buf + 0x04) = sound_tag;
   *(int16_t *)(speech_buf + 0x0c) = 0x18;
@@ -1887,9 +1986,10 @@ char FUN_001a71c0(int unit_handle, int *param_2, char param_3, char param_4,
 
   dialogue_obj_handle = -1;
   if (param_3 == '\0') {
-    priority = (int16_t)(urgent ? 7 : 2);
+    priority =
+      (int16_t)(urgent ? _unit_speech_involuntary : _unit_speech_pain);
   } else {
-    priority = 10;
+    priority = _unit_speech_death;
   }
 
   speech_count = FUN_001a68d0(unit_handle, (int)priority, 1, 0, 0,
@@ -1958,7 +2058,8 @@ char FUN_001a74d0(int unit_handle, int scream_type)
   unit = (char *)object_get_and_verify_type(unit_handle, 3);
   dialogue_index = (int16_t)scream_type;
 
-  if ((int16_t)scream_type < 0 || (int16_t)scream_type >= 6) {
+  if ((int16_t)scream_type < 0 ||
+      (int16_t)scream_type >= NUMBER_OF_UNIT_SCREAM_TYPES) {
     display_assert(
       "(scream_type >= 0) && (scream_type < NUMBER_OF_UNIT_SCREAM_TYPES)",
       "c:\\halo\\SOURCE\\units\\unit_dialogue.c", 599, 1);
@@ -2634,7 +2735,7 @@ void unit_persistent_control(int unit_handle, int animation_ticks,
 {
   char *unit = (char *)object_get_and_verify_type(unit_handle, 3);
 
-  if ((control_flags & 0xffff8000) != 0) {
+  if ((control_flags & UNIT_CONTROL_FLAGS_INVALID_MASK) != 0) {
     display_assert(
       "VALID_FLAGS(persistent_control_flags, NUMBER_OF_UNIT_CONTROL_FLAGS)",
       "c:\\halo\\SOURCE\\units\\units.c", 0x605, 1);
@@ -5390,7 +5491,7 @@ bool unit_try_add_grenade(int unit_handle, int equipment_handle)
   grenade = (char *)tag_block_get_element(
     (char *)game_globals_get() + 0x128, grenade_type, 0x44);
 
-  if (*(int16_t *)(equipment_tag + 0x308) != 6) {
+  if (*(int16_t *)(equipment_tag + 0x308) != _equipment_powerup_grenade) {
     display_assert("equipment_definition->equipment.powerup_type==_equipment_"
                    "powerup_grenade",
                    "c:\\halo\\SOURCE\\units\\units.c", 0x1c72, 1);
@@ -5454,7 +5555,7 @@ int16_t unit_set_grenade_count(int unit_handle, int16_t grenade_type,
     system_exit(-1);
   }
 
-  if ((grenade_type < 0) || (grenade_type >= 2)) {
+  if ((grenade_type < 0) || (grenade_type >= NUMBER_OF_UNIT_GRENADE_TYPES)) {
     display_assert(
       "(grenade_type >= 0) && (grenade_type < NUMBER_OF_UNIT_GRENADE_TYPES)",
       "c:\\halo\\SOURCE\\units\\units.c", 0x1c8e, 1);
@@ -5489,13 +5590,13 @@ bool unit_pickup_equipment(int unit_handle, int equipment_handle, short flag)
   equipment_def = (int)tag_get(0x65716970, *equipment_obj);
   unit_obj = (char *)object_get_and_verify_type(unit_handle, 3);
 
-  if (*(short *)(equipment_def + 0x308) == 0) {
+  if (*(short *)(equipment_def + 0x308) == _equipment_powerup_none) {
     display_assert(
       "equipment_definition->equipment.powerup_type!=_equipment_powerup_none",
       "c:\\halo\\SOURCE\\units\\units.c", 0x1ca1, 1);
     system_exit(NONE);
   }
-  if (*(short *)(equipment_def + 0x308) == 6) {
+  if (*(short *)(equipment_def + 0x308) == _equipment_powerup_grenade) {
     display_assert("equipment_definition->equipment.powerup_type!=_equipment_"
                    "powerup_grenade",
                    "c:\\halo\\SOURCE\\units\\units.c", 0x1ca2, 1);
@@ -10890,7 +10991,7 @@ short unit_update_animation(int unit_handle, char *anim_state)
   result = 0;
   apply_flag = 0;
 
-  if (desired_state < 0 || desired_state >= 0x2c) {
+  if (desired_state < 0 || desired_state >= NUMBER_OF_UNIT_STATES) {
     display_assert("desired_state>=0 && desired_state<NUMBER_OF_UNIT_STATES",
                    "c:\\halo\\SOURCE\\units\\units.c", 0xb61, 1);
     system_exit(-1);
