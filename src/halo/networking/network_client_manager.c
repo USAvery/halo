@@ -1010,12 +1010,14 @@ bool FUN_001260c0(void *server)
  * assert is written as one combined condition rather than two.
  *
  * The success path is ADD ESI,0x4 / PUSH ESI / CALL 0x125ce0 / ADD ESP,0x4 —
- * one cdecl argument, caller-cleanup. kb.json declared FUN_00125ce0 as
- * void(void), which contradicts the single push and the ADD ESP,0x4; the
- * callee decl is corrected to take one pointer. EDI is loaded only to serve
- * the TEST EDI,EDI of the assert; message_packet is NOT passed to the callee
- * and is not otherwise read, so its only observable use in this function is
- * the null check.
+ * one cdecl stack argument, caller-cleanup. EDI (message_packet) is not
+ * reloaded between 0x12670a and the CALL, so it is still live at the call
+ * site: FUN_00125ce0 reads it as a register argument (confirmed by its own
+ * disassembly — the first real instruction after its prologue is
+ * TEST byte ptr [EDI+0x102],0x2, and EDI is read at many further offsets
+ * throughout the function body, never reloaded from the stack). kb.json
+ * declares FUN_00125ce0 with message_packet as an @<edi> register argument
+ * alongside the one cdecl stack argument.
  *
  * The pointee at client+4 is NOT identified here — nothing in this function
  * dereferences it, so the callee argument keeps a mechanical form rather than
@@ -1026,7 +1028,7 @@ void network_game_client_new_advertised_game(void *client, void *message_packet)
   assert_halt_at("c:\\halo\\SOURCE\\networking\\network_client_manager.c",
                  0x2fc, client && message_packet);
 
-  FUN_00125ce0((char *)client + 4);
+  FUN_00125ce0(message_packet, (char *)client + 4);
 }
 
 /* network_game_client_game_shutdown (0x126750)

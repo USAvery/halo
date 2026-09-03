@@ -14709,7 +14709,7 @@
     },
     {
      "addr": "0x125ce0",
-     "decl": "void FUN_00125ce0(void *param_1);"
+     "decl": "void FUN_00125ce0(void *message_packet @<edi>, void *param_1);"
     },
     {
      "addr": "0x125fb0",
