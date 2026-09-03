@@ -34523,7 +34523,7 @@
    "functions": [
     {
      "addr": "0x57330",
-     "decl": "void FUN_00057330(void);"
+     "decl": "short FUN_00057330(int16_t scenario_index@<eax>, void *record@<esi>, int field_1a8_val, int child_handle, int reserved);"
     },
     {
      "addr": "0x57380",
