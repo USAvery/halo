@@ -60,6 +60,10 @@ Two independent checks, both positive:
    further name matches from the bare-identifier-only set, so the overlap is cross-build confirmation,
    not convention convergence. Our 2276 assert strings are therefore a native verification channel for
    borrowed enum names — the name can be confirmed against our own binary rather than assumed.
+3. The same channel reaches enum **members**, not only bounds. 89 of halocea's 4128 enum member
+   identifiers appear inside our own string literals
+   (`enum_members_shared_assert_proven.txt`) — for example `_unit_speech_none`, which
+   `unit_dialogue.c:0x16e` asserts verbatim in this binary. Those are T1 on our own evidence.
 
 This is evidence that Bungie identifiers are stable across the gap. It is not evidence that layout
 is stable: treat every struct as a hypothesis to confirm with `cs()`/`co()` against 2276.
@@ -146,8 +150,55 @@ Cost: two enums, four call sites, one TU. The mechanism is what generalises — 
 `NUMBER_OF_*` families are named in halocea with no counterpart here, and 39 of the 40
 assert-proven bounds remain unconverted.
 
+## Batch 2 — `src/halo/units/units.c` (2026-09-03)
+
+208 scored functions, no `__LINE__`. Six bounds proven from 2276 before the corpus was
+consulted; **all six agree exactly**, so the 0563 build added no unit selector in this group:
+
+| enum | proven from 2276 | value |
+|---|---|---|
+| `NUMBER_OF_UNIT_SPEECH_PRIORITIES` | `unit_dialogue.c:0x82` rejects `priority > 10` | 11 |
+| `NUMBER_OF_UNIT_SCREAM_TYPES` | rejects `>= 6` | 6 |
+| `NUMBER_OF_UNIT_CONTROL_FLAGS` | rejects `& 0xffff8000` | 15 |
+| `NUMBER_OF_UNIT_GRENADE_TYPES` | rejects `>= 2` | 2 |
+| `NUMBER_OF_UNIT_STATES` | rejects `>= 0x2c` | 44 |
+| `NUMBER_OF_VOCALIZATION_TYPES` | `unit_dialogue.c:0x90` rejects `> 0xd0` | 209 |
+
+The strongest single result is a member name, not a bound. Our own binary asserts verbatim at
+`units.c:1705`:
+
+```c
+display_assert("unit->unit.speech.current.priority > _unit_speech_none",
+               "c:\\halo\\SOURCE\\units\\unit_dialogue.c", 0x16e, 1);
+```
+
+That is a T1 confirmation of a halocea enum **member** — 2276 stamps the identifier itself into a
+string. It prompted a repo-wide member-name sweep: **89 enum member names** appear both in our
+2276 assert/format strings and in halocea (`enum_members_shared_assert_proven.txt`), a much larger
+T1 surface than the 40 shared bounds alone.
+
+Two further slots got behavioural corroboration on our side: priorities 2/7/10 are exactly the set
+allowed to interrupt a line already playing, and priority 6 is the single slot exempted from the
+priority cap in `FUN_001a6b60` — what a designer-authored scripted line needs and no conversational
+priority does.
+
+Deliberately left as literals: the `result = 2` / `result = 3` return codes near line 1813 overlap
+the priority value space but were not proven to *be* priorities; and the vocalization bound site
+keeps `> 0xd0`, because spelling it `>= NUMBER_OF_VOCALIZATION_TYPES` would emit `CMP 0xd1`.
+
+**Gate: all 208 VC71 scores byte-identical to baseline (re-run with `--no-cache`), `IMM-WARN` 2 =
+baseline 2.** 22 call sites converted.
+
 ## Hazards
 
+- **Line-counting a halocea enum is not reading it.** The first pass counted
+  `unit_control_flags` at 17 members and reported an apparent divergence from our binary-proven 15.
+  The two extra lines were trailing `UNIT_CONTROL_DRIVER_MASK` / `UNIT_CONTROL_GUNNER_MASK`
+  convenience masks; the header's own `NUMBER_OF_UNIT_CONTROL_FLAGS = 0xF` agreed all along. Read
+  the header before believing either an agreement or a divergence.
+- **A byte-identical gate cannot catch a wrong name.** Substituting a same-valued but
+  wrongly-named constant is byte-identical by construction. The gate proves the edit was
+  codegen-neutral, nothing more — tier discipline is the only check on the name itself.
 - **`__LINE__` shift.** Adding `#include` lines shifts `__LINE__` for every `assert_halt` below,
   changing immediates and moving VC71 across the whole TU. The `header-recovery` skill documents this
   and carries the byte-identical gate; follow it before adding headers to `src/`.
