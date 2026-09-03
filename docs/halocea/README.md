@@ -189,6 +189,44 @@ keeps `> 0xd0`, because spelling it `>= NUMBER_OF_VOCALIZATION_TYPES` would emit
 **Gate: all 208 VC71 scores byte-identical to baseline (re-run with `--no-cache`), `IMM-WARN` 2 =
 baseline 2.** 22 call sites converted.
 
+## Batch 3 — `src/halo/tag_files/files.c` (2026-09-03)
+
+28 scored functions, no `__LINE__`. Four flag families, all four bounds proven from 2276 before
+the corpus was consulted, **all four agreeing**: reference-info 1 (`& 0xfffe`), name 4
+(`& 0xfff0`), find-files 2 (`& ~3`), permission 3 (`& ~7`).
+
+This TU is the best case for the lane so far, because most **member** names are T1 — 2276 stamps
+the identifiers into assert strings *and* those asserts pin the bit values:
+
+| member | 2276 evidence | bit |
+|---|---|---|
+| `_has_filename_bit` | `!TEST_FLAG(info->flags, _has_filename_bit)` at `files.c:0x8a`, guarding `& 1` | 0 |
+| `_name_directory_bit` / `_name_extension_bit` | `flags!=(FLAG(_name_directory_bit)\|FLAG(_name_extension_bit))` at `0xbc`, guarding `== 9` | {0,3} |
+| `_name_parent_directory_bit` | `_name_directory_bit` vs `_name_parent_directory_bit` at `0xbd`, guarding `(flags&1)&&(flags&2)` — fixes directory=0, hence extension=3 | 1 |
+| `_permission_read_bit` / `_permission_write_bit` | `flags & (FLAG(_permission_read_bit)\|FLAG(_permission_write_bit))` at `files_windows.c:0x135`, guarding `& 3` | {0,1} |
+| `_permission_append_bit` | `_permission_write_bit` vs `_permission_append_bit` at `0x136`, guarding `(flags&2)==0 && (flags&4)!=0` — fixes write=1, hence read=0 and append=2 | 2 |
+
+`_name_filename_bit` is **T1 by exhaustion**, and the mechanism generalises: bits 0, 1 and 3 are
+each named verbatim above, and `NUMBER_OF_NAME_FLAGS` is exactly 4 (proven by the `0xfff0`
+reject), so bit 2 is forced. Both halves are load-bearing — the partial member names alone would
+not pin it without the bound, and the bound alone would not name it. Where a family has T1 bounds
+plus T1 members for all but one slot, the remainder is T1, not a borrowed name.
+
+Behavioural corroboration on our side: permission bit 0 maps to `GENERIC_READ` (0x80000000), bit 1
+to `GENERIC_WRITE` (0x40000000), and bit 2 to a seek-to-end — exactly read/write/append.
+
+`find_files` members carry no 2276 string and stay `name_source: halocea`, T2.
+
+**Gate: all 28 VC71 scores byte-identical to baseline (`--no-cache`), `IMM-WARN` 1 = baseline 1.**
+The `flags == 9` site was the one composite-value substitution and it folded cleanly.
+
+Deliberately not done here: the existing `FIND_FILES_RECURSIVE_BIT` / `FIND_FILES_DIRECTORIES_BIT`
+defines hold *masks* under a `_BIT` name. Correcting that is a rename across 6 sites, not a
+constants change; mixing it in would have made any gate movement unattributable. Follow-up commit.
+Likewise the `_has_filename_bit` conversion covers only the two assert-adjacent sites — the other
+five read `ref->unk_4[0]`, an unnamed byte array, where naming the bit while the container stays
+anonymous would read as more recovery than was done. Those want a `structize` field split first.
+
 ## Hazards
 
 - **Line-counting a halocea enum is not reading it.** The first pass counted

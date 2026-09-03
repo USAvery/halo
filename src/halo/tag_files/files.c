@@ -3,6 +3,84 @@
 #define FIND_FILES_RECURSIVE_BIT 1
 #define FIND_FILES_DIRECTORIES_BIT 2
 
+/* File-reference flag families. See docs/halocea/README.md for the corpus and
+ * .claude/skills/naming-confidence for the name_source tiers.
+ *
+ * All four BOUNDS were read out of this build before the corpus was consulted,
+ * and all four agree with it exactly:
+ *
+ *   reference_info flags  files.c:0x1fe          rejects & 0xfffe  => 1
+ *   name flags            files.c:0xba           rejects & 0xfff0  => 4
+ *   find_files flags      files_windows.c:0x224  rejects & ~3      => 2
+ *   permission flags      files_windows.c:0x134  rejects & ~7      => 3
+ *
+ * Unusually for this lane, most MEMBER names are T1 here too: 2276 stamps the
+ * identifiers themselves into assert strings, and those asserts also pin the
+ * bit values.
+ *
+ *   _has_filename_bit           files.c:0x8a and files_windows.c:0x225 assert
+ *                               !TEST_FLAG(info->flags, _has_filename_bit)
+ *                               against `& 1`                       => bit 0
+ *   _name_directory_bit         0xbc asserts flags != (FLAG(_name_directory_bit)
+ *   _name_extension_bit         | FLAG(_name_extension_bit)) against `== 9`,
+ *                               so the pair is bits 0 and 3; 0xbd asserts
+ *                               _name_directory_bit vs _name_parent_directory_bit
+ *                               against `(flags&1) && (flags&2)`, fixing
+ *                               directory=0, so extension=3.
+ *   _name_parent_directory_bit  from the same 0xbd pair                => bit 1
+ *   _name_filename_bit          T1 BY EXHAUSTION: bits 0, 1 and 3 are each named
+ *                               verbatim above and NUMBER_OF_NAME_FLAGS is 4
+ *                               (proven by the 0xfff0 reject), so bit 2 is
+ *                               forced. Both halves are needed for this to be
+ *                               T1 rather than a guess.
+ *   _permission_read_bit        0x135 asserts flags & (FLAG(_permission_read_bit)
+ *   _permission_write_bit       | FLAG(_permission_write_bit)) against `& 3`;
+ *                               0x136 asserts _permission_write_bit against
+ *                               `& 2`, so write=1 and read=0.
+ *   _permission_append_bit      named at 0x136 against `& 4`           => bit 2
+ *                               Corroborated below: bit 0 maps to GENERIC_READ,
+ *                               bit 1 to GENERIC_WRITE, bit 2 to a seek-to-end.
+ *
+ * find_files members carry no 2276 string and are name_source: halocea, T2 —
+ * DB-verified there (types_enum_values _3BB901B9596B139CD611B9F64EADD532), and
+ * consistent with the existing FIND_FILES_*_BIT masks above, which this commit
+ * deliberately leaves alone (they are masks under a *_BIT name; correcting that
+ * is a rename, not a constants change, and belongs in its own commit).
+ */
+enum reference_info_flags {
+  _has_filename_bit = 0,
+  NUMBER_OF_REFERENCE_INFO_FLAGS = 1
+};
+
+enum name_flags {
+  _name_directory_bit = 0,
+  _name_parent_directory_bit = 1,
+  _name_filename_bit = 2,
+  _name_extension_bit = 3,
+  NUMBER_OF_NAME_FLAGS = 4
+};
+
+enum find_files_flags {
+  _find_files_recursive_bit = 0,
+  _find_files_enumerate_directories_bit = 1,
+  NUMBER_OF_FIND_FILES_FLAGS = 2
+};
+
+enum permission_flags {
+  _permission_read_bit = 0,
+  _permission_write_bit = 1,
+  _permission_append_bit = 2,
+  NUMBER_OF_PERMISSION_FLAGS = 3
+};
+
+/* Bits at or above each bound; what the VALID_FLAGS guards reject. Spelled to
+ * keep the original immediate: the reference-info and name sites load a 16-bit
+ * word, the find-files and permission sites a 32-bit one. */
+#define REFERENCE_INFO_FLAGS_INVALID_MASK 0xfffe
+#define NAME_FLAGS_INVALID_MASK 0xfff0
+#define FIND_FILES_FLAGS_INVALID_MASK (~3)
+#define PERMISSION_FLAGS_INVALID_MASK (~7)
+
 typedef int(__stdcall *find_first_file_fn)(const char *path, void *find_data);
 typedef bool(__stdcall *find_next_file_fn)(int handle, void *find_data);
 typedef bool(__stdcall *close_handle_fn)(int handle);
@@ -143,7 +221,7 @@ file_ref_t *file_reference_verify(file_ref_t *info)
                    "c:\\halo\\SOURCE\\tag_files\\files.c", 0x1fd, true);
     system_exit(-1);
   }
-  if ((*(uint16_t *)&info->unk_4[0] & 0xfffe) != 0) {
+  if ((*(uint16_t *)&info->unk_4[0] & REFERENCE_INFO_FLAGS_INVALID_MASK) != 0) {
     display_assert("VALID_FLAGS(info->flags, NUMBER_OF_REFERENCE_INFO_FLAGS)",
                    "c:\\halo\\SOURCE\\tag_files\\files.c", 0x1fe, true);
     system_exit(-1);
@@ -179,7 +257,7 @@ file_ref_t *file_reference_add_directory(file_ref_t *info,
                    true);
     system_exit(-1);
   }
-  if (ref->unk_4[0] & 1) {
+  if (ref->unk_4[0] & (1 << _has_filename_bit)) {
     display_assert("!TEST_FLAG(info->flags, _has_filename_bit)",
                    "c:\\halo\\SOURCE\\tag_files\\files.c", 0x8a, true);
     system_exit(-1);
@@ -257,7 +335,7 @@ char *file_reference_get_name(file_ref_t *info, int flags, char *name_out)
     display_assert("name", "c:\\halo\\SOURCE\\tag_files\\files.c", 0xb9, true);
     system_exit(-1);
   }
-  if ((*(uint16_t *)&ref->unk_4[0] & 0xfff0) != 0) {
+  if ((*(uint16_t *)&ref->unk_4[0] & NAME_FLAGS_INVALID_MASK) != 0) {
     display_assert("VALID_FLAGS(info->flags, NUMBER_OF_NAME_FLAGS)",
                    "c:\\halo\\SOURCE\\tag_files\\files.c", 0xba, true);
     system_exit(-1);
@@ -265,13 +343,15 @@ char *file_reference_get_name(file_ref_t *info, int flags, char *name_out)
   if (flags == 0) {
     display_assert("flags", "c:\\halo\\SOURCE\\tag_files\\files.c", 0xbb, true);
     system_exit(-1);
-  } else if (flags == 9) {
+  } else if (flags ==
+             ((1 << _name_directory_bit) | (1 << _name_extension_bit))) {
     display_assert(
       "flags!=(FLAG(_name_directory_bit)|FLAG(_name_extension_bit))",
       "c:\\halo\\SOURCE\\tag_files\\files.c", 0xbc, true);
     system_exit(-1);
   }
-  if ((flags & 1) && (flags & 2)) {
+  if ((flags & (1 << _name_directory_bit)) &&
+      (flags & (1 << _name_parent_directory_bit))) {
     display_assert(
       "!TEST_FLAG(flags, _name_directory_bit) || !TEST_FLAG(flags, "
       "_name_parent_directory_bit)",
@@ -279,7 +359,7 @@ char *file_reference_get_name(file_ref_t *info, int flags, char *name_out)
     system_exit(-1);
   }
 
-  has_dir_flag = flags & 1;
+  has_dir_flag = flags & (1 << _name_directory_bit);
 
   path_from_file_reference(ref->unk_6, ref->unk_8, path);
   path_split(path, &dir_part, &parent_part, &file_part, &ext_part,
@@ -290,13 +370,13 @@ char *file_reference_get_name(file_ref_t *info, int flags, char *name_out)
   if (has_dir_flag) {
     path_add_directory(name_out, dir_part);
   }
-  if (flags & 2) {
+  if (flags & (1 << _name_parent_directory_bit)) {
     path_add_directory(name_out, parent_part);
   }
-  if (flags & 4) {
+  if (flags & (1 << _name_filename_bit)) {
     path_add_directory(name_out, file_part);
   }
-  if (flags & 8) {
+  if (flags & (1 << _name_extension_bit)) {
     path_add_extension(name_out, ext_part);
   }
 
@@ -354,12 +434,12 @@ void find_files_begin(int flags, file_ref_t *dir)
 
   ref = file_reference_verify(dir);
 
-  if ((flags & ~3) != 0) {
+  if ((flags & FIND_FILES_FLAGS_INVALID_MASK) != 0) {
     display_assert("VALID_FLAGS(flags, NUMBER_OF_FIND_FILES_FLAGS)",
                    "c:\\halo\\SOURCE\\tag_files\\files_windows.c", 0x224, true);
     system_exit(-1);
   }
-  if ((ref->unk_4[0] & 1) != 0) {
+  if ((ref->unk_4[0] & (1 << _has_filename_bit)) != 0) {
     display_assert("!TEST_FLAG(info->flags, has_filename_bit)",
                    "c:\\halo\\SOURCE\\tag_files\\files_windows.c", 0x225, true);
     system_exit(-1);
@@ -681,18 +761,20 @@ bool file_open(file_ref_t *info, int flags)
 
   csmemset(path, 0, sizeof(path));
 
-  if ((flags & ~7) != 0) {
+  if ((flags & PERMISSION_FLAGS_INVALID_MASK) != 0) {
     display_assert("VALID_FLAGS(flags, NUMBER_OF_PERMISSION_FLAGS)",
                    "c:\\halo\\SOURCE\\tag_files\\files_windows.c", 0x134, true);
     system_exit(-1);
   }
-  if ((flags & 3) == 0) {
+  if ((flags & ((1 << _permission_read_bit) | (1 << _permission_write_bit))) ==
+      0) {
     display_assert(
       "flags & (FLAG(_permission_read_bit)|FLAG(_permission_write_bit))",
       "c:\\halo\\SOURCE\\tag_files\\files_windows.c", 0x135, true);
     system_exit(-1);
   }
-  if (((flags & 2) == 0) && ((flags & 4) != 0)) {
+  if (((flags & (1 << _permission_write_bit)) == 0) &&
+      ((flags & (1 << _permission_append_bit)) != 0)) {
     display_assert(
       "TEST_FLAG(flags, _permission_write_bit) || !TEST_FLAG(flags, "
       "_permission_append_bit)",
@@ -703,17 +785,17 @@ bool file_open(file_ref_t *info, int flags)
   path_from_file_reference(ref->unk_6, ref->unk_8, path);
 
   access = 0;
-  if ((flags & 1) != 0) {
+  if ((flags & (1 << _permission_read_bit)) != 0) {
     access = 0x80000000;
   }
-  if ((flags & 2) != 0) {
+  if ((flags & (1 << _permission_write_bit)) != 0) {
     access |= 0x40000000;
   }
 
   handle = XCreateFile(path, access, 0, NULL, 3, 0x80, 0);
   if (handle != -1) {
     *(int *)&ref->unk_8[256] = handle;
-    if ((flags & 4) == 0) {
+    if ((flags & (1 << _permission_append_bit)) == 0) {
       return true;
     }
 
