@@ -49888,6 +49888,21 @@
       "score": 98.1,
       "source": "src/halo/ai/ai.c"
     },
+    "ai_communication_consider_speech": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 95.9,
+      "addr": "0x430d0",
+      "end": "0x43267",
+      "kind": "auto",
+      "n_r": 144,
+      "opnd_percent": 77.2,
+      "raw_mnemonic_pct": 95.9,
+      "ref": "synth",
+      "ref_sha": "44e77f645bd42ac5",
+      "score": 95.9,
+      "source": "src/halo/ai/ai_communication.c"
+    },
     "ai_communication_dispose": {
       "abi_model": "raw",
       "abi_model_items": 0,

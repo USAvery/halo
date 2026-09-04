@@ -1503,6 +1503,10 @@
         "No direct code or data xref to 0x43090 was found, so any indirect dispatch caller remains unresolved."
       ]
     },
+    "0x430d0": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0x43270": {
       "kind": "function",
       "status": "ported"
