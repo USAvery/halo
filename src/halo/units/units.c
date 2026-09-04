@@ -6463,7 +6463,7 @@ void unit_detach_weapon(int unit_handle, int weapon_handle)
 
   /* Scale direction by random amount */
   seed = get_global_random_seed_address();
-  scale = random_real_range(seed, 0.026666667f, 0.04f);
+  scale = random_real_range(seed, 0.026666667f, 0.040000003f); /* 0x3d23d70b, not 0.04f (0x3d23d70a) */
   direction[0] *= scale;
   direction[1] *= scale;
   direction[2] *= scale;

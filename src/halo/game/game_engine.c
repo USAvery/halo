@@ -8874,6 +8874,7 @@ void FUN_000b3470(int killer_handle, int param_2, int param_3, int dead_player,
   int player;
   int i;
   int first_empty;
+  char can_score;
 
   variant = (int)game_engine_get_variant();
   if (*(int *)(variant + 0x5c) < 1 || 2 < *(int *)(variant + 0x5c))
@@ -8889,28 +8890,22 @@ void FUN_000b3470(int killer_handle, int param_2, int param_3, int dead_player,
   if (param_2 == -1 || param_5 != 0)
     goto clear_dead;
   player = (int)datum_get(player_data, param_2);
-  if (!FUN_000b2890(dead_player)) {
-    if (!FUN_000b2890(param_2)) {
-      if (FUN_000b28c0())
-        goto score_check;
-    } else {
-      *(int16_t *)(player + 0xc4) = *(int16_t *)(player + 0xc4) + 1;
-      if (!FUN_000b2bc0())
-        goto find_slot;
-      if (game_engine_can_score())
-        goto score_check;
-    }
-  score_check:
-    if (1)
-      FUN_000b2740(param_2);
-  } else {
+  if (FUN_000b2890(dead_player)) {
     *(int16_t *)(player + 0xc2) = *(int16_t *)(player + 0xc2) + 1;
     variant = (int)game_engine_get_variant();
-    if (*(int *)(variant + 0x5c) == 2) {
-      if (game_engine_can_score())
-        FUN_000b2740(param_2);
-    }
+    if (*(int *)(variant + 0x5c) != 2)
+      goto find_slot;
+    can_score = (char)game_engine_can_score();
+  } else if (FUN_000b2890(param_2)) {
+    *(int16_t *)(player + 0xc4) = *(int16_t *)(player + 0xc4) + 1;
+    if (!FUN_000b2bc0())
+      goto find_slot;
+    can_score = (char)game_engine_can_score();
+  } else {
+    can_score = (char)FUN_000b28c0();
   }
+  if (can_score)
+    FUN_000b2740(param_2);
 find_slot:
   if (*(int *)(player + 0x34) != -1) {
     first_empty = -1;
