@@ -24557,11 +24557,13 @@
     },
     {
      "addr": "0x1ac0a0",
-     "decl": "void FUN_001ac0a0(int param_1, int param_2);"
+     "decl": "void FUN_001ac0a0(int param_1, int param_2);",
+     "ported": true
     },
     {
      "addr": "0x1ac0e0",
-     "decl": "int16_t FUN_001AC0E0(int handle);"
+     "decl": "int16_t FUN_001AC0E0(int handle);",
+     "ported": true
     },
     {
      "addr": "0x1ac150",

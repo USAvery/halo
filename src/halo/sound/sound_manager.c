@@ -49,6 +49,96 @@ void FUN_001ac070(int param_1, int param_2)
   }
 }
 
+/* FUN_001ac0a0 (0x1ac0a0)
+ *
+ * Sets or clears bit 0x4000 of the flags dword at (unit-type object)+0x1b4,
+ * selected by the low byte of param_2 (non-zero sets, zero clears).  Bit
+ * meaning is UNKNOWN -- no assert/string evidence names it; kept as FUN_
+ * per naming-confidence rules.  No-op when param_1 == -1 (the reference
+ * jumps straight to the epilogue, skipping the object lookup as well).
+ *
+ * Reference reads the selector as a byte (MOV CL,byte ptr [EBP+0xc];
+ * TEST CL,CL) and loads the flags dword once before the branch, storing
+ * from both arms.  The set path takes its OWN epilogue (MOV/POP EBP/RET at
+ * 0x1ac0c9-0x1ac0d0); only the clear path falls into the shared bottom
+ * epilogue that the param_1 == -1 guard's JZ also targets -- hence the
+ * early return rather than a merged store.  The one call site in the XBE
+ * (players.c, HaloScript builtin dispatcher; per check_arg_counts.py
+ * --callee 0x1ac0a0: sites=1, push=2) passes a zero-extended byte, so the
+ * kb decl stays int. */
+void FUN_001ac0a0(int param_1, int param_2)
+{
+  char *obj;
+  uint32_t flags;
+
+  if (param_1 != -1) {
+    obj = (char *)object_get_and_verify_type(param_1, 3);
+    flags = *(uint32_t *)(obj + 0x1b4);
+
+    if ((char)param_2 != 0) {
+      *(uint32_t *)(obj + 0x1b4) = flags | 0x4000;
+      return;
+    }
+
+    *(uint32_t *)(obj + 0x1b4) = flags & ~0x4000u;
+  }
+}
+
+/* FUN_001AC0E0 (0x1ac0e0)
+ *
+ * Returns the number of animation frames remaining in a unit's currently
+ * playing animation, clamped at zero.  Looks up the unit-type object, and
+ * only proceeds when the byte at object+0x253 equals 0x1c (meaning of the
+ * byte and of the 0x1c selector are UNKNOWN -- no assert/string evidence).
+ * The object's 'antr' (model_animations) tag index lives at object+0x7c and
+ * the animation index (signed 16-bit) at object+0x80; the animation block is
+ * at antr_tag+0x74 with 0xb4-byte elements.  Frame count is the signed
+ * 16-bit field at element+0x22, current frame the signed 16-bit field at
+ * object+0x82.
+ *
+ * Binary evidence (0x1ac0e0-0x1ac14c, 41 instructions, cdecl, no FPU):
+ *   CMP EAX,-0x1 / JZ epilogue -> handle == -1 returns 0 (XOR AX,AX; the
+ *   result is 16-bit in AX, which is why the decl returns int16_t).
+ *   MOV AL,byte ptr [ESI+0x253] / CMP AL,0x1c / JNZ epilogue -- signed byte
+ *   compare, and the object pointer is dereferenced unguarded (the reference
+ *   does NOT null-check object_get_and_verify_type).
+ *   PUSH EAX([ESI+0x7c]) / PUSH 0x616e7472 -> tag_get('antr', tag_index).
+ *   PUSH 0xb4 / PUSH ECX(MOVSX [ESI+0x80]) / PUSH EAX(tag+0x74) ->
+ *   tag_block_get_element(block, index, 0xb4).
+ *   MOVSX EAX,[EAX+0x22] / MOVSX EDX,[ESI+0x82] / SUB EAX,EDX / ADD EAX,-0x2
+ *   then XOR ECX,ECX / TEST EAX,EAX / SETLE CL / DEC ECX / AND EAX,ECX --
+ *   the branchless max(count, 0).
+ *   One combined ADD ESP,0x14 (5 dwords) after the tag_block_get_element
+ *   CALL folds that call's 3 args with tag_get's 2 (adjacent-call cleanup);
+ *   the ARG_COUNT warning on 0x19b210 ("cleanup=5 vs decl=3") is that merge
+ *   -- tag_block_get_element really takes 3 args, do NOT "fix" its decl.
+ *
+ * Sole caller FUN_000bef80 (players.c, HaloScript builtin dispatcher)
+ * zero-extends the 16-bit result and forwards it to hs_return. */
+int16_t FUN_001AC0E0(int handle)
+{
+  char *obj;
+  char *antr;
+  char *element;
+  int count;
+
+  if (handle != -1) {
+    obj = (char *)object_get_and_verify_type(handle, 3);
+
+    if (*(char *)(obj + 0x253) == 0x1c) {
+      antr = (char *)tag_get(0x616e7472, *(int *)(obj + 0x7c));
+      element = (char *)tag_block_get_element(
+        antr + 0x74, (int)*(int16_t *)(obj + 0x80), 0xb4);
+
+      count = (int)*(int16_t *)(element + 0x22) -
+              (int)*(int16_t *)(obj + 0x82) - 2;
+      return (int16_t)(count > 0 ? count : 0);
+    }
+  }
+
+  return 0;
+}
+
 /* sound_object_apply_pitch_delta (0x1ac2f0)
  *
  * Computes a clamped pitch delta and accumulates it onto the object's
