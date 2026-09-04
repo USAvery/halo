@@ -1,3 +1,225 @@
+/* Refresh every local player's HUD weapon state (0xda980).
+ * Source: c:\halo\SOURCE\interface\hud_weapon.c line 0xd4.
+ * Stack-guard idiom: 0x200-byte 0x62 fill plus a return-address canary
+ * (FUN_000d1540), both asserted after the per-player loop. */
+void hud_update_weapon(void)
+{
+  int guard[128];
+  unsigned char weapon_state[32];
+  int empty_state[8];
+  int return_addr;
+  int unit_handle;
+  int weapon_handle;
+  int update_handle;
+  int update_tag_index;
+  void *update_state;
+  void *player;
+  void *unit;
+  void *other_unit;
+  void *weapon_tag;
+  unsigned char *weapon_entry;
+  void *hud_weapon_state;
+  volatile int *p;
+  int n;
+  short local_player_index;
+  short i;
+  short corrupt_index;
+
+  return_addr = FUN_000d1540();
+  csmemset(guard, 0x62, 0x200);
+
+  local_player_index = local_player_get_next(-1);
+  while (local_player_index != -1) {
+    if (local_player_get_player_index(local_player_index) == -1) {
+      goto next_player;
+    }
+    player = datum_get(*(data_t **)0x5aa6d4,
+                       local_player_get_player_index(local_player_index));
+    unit_handle = *(int *)((char *)player + 0x34);
+    if (unit_handle == -1) {
+      goto next_player;
+    }
+
+    unit = object_get_and_verify_type(unit_handle, 3);
+    weapon_handle =
+      unit_get_weapon(unit_handle, *(unsigned short *)((char *)unit + 0x2a2));
+    if (weapon_handle != -1) {
+      goto have_weapon;
+    }
+
+    /* No weapon in hand: try the unit this one is riding (parent at +0xcc)
+     * when its seat (+0x2a0) is flagged 0x8 in the unit tag's seat block. */
+    unit = object_get_and_verify_type(unit_handle, 3);
+    if (*(int *)((char *)unit + 0xcc) != -1 &&
+        *(short *)((char *)unit + 0x2a0) != -1) {
+      weapon_entry = (unsigned char *)tag_block_get_element(
+        (char *)tag_get(0x756e6974, *(int *)object_get_and_verify_type(
+                                      *(int *)((char *)unit + 0xcc), 3)) +
+          0x2e4,
+        (int)*(short *)((char *)unit + 0x2a0), 0x11c);
+      if ((*weapon_entry & 8) == 0) {
+        goto store_weapon;
+      }
+      other_unit = object_get_and_verify_type(*(int *)((char *)unit + 0xcc), 3);
+      weapon_handle =
+        unit_get_weapon(*(int *)((char *)unit + 0xcc),
+                        *(unsigned short *)((char *)other_unit + 0x2a2));
+      if (weapon_handle != -1) {
+        goto have_weapon;
+      }
+    }
+
+    if (unit_count_weapons(unit_handle) != 0) {
+      goto store_weapon;
+    }
+    empty_state[0] = 0;
+    p = (volatile int *)empty_state + 1;
+    for (n = 7; n != 0; n--) {
+      *p = 0;
+      p++;
+    }
+    update_handle = -1;
+    update_tag_index = *(int *)((char *)*(void **)0x46bd0c + 0x2cc);
+    update_state = empty_state;
+    goto update_hud;
+
+  have_weapon:
+    weapon_tag =
+      tag_get(0x77656170, *(int *)object_get_and_verify_type(weapon_handle, 4));
+    weapon_build_weapon_interface_state(weapon_handle, (int)weapon_state);
+    if (*(int *)((char *)weapon_tag + 0x48c) == -1) {
+      goto store_weapon;
+    }
+    update_handle = weapon_handle;
+    update_tag_index = *(int *)((char *)weapon_tag + 0x48c);
+    update_state = weapon_state;
+
+  update_hud:
+    FUN_000d9960(local_player_index, update_handle, update_tag_index,
+                 update_state);
+
+  store_weapon:
+    hud_weapon_state = FUN_000d8bc0(local_player_index);
+    *(int *)((char *)hud_weapon_state + 0x20) = weapon_handle;
+
+  next_player:
+    local_player_index = local_player_get_next(local_player_index);
+  }
+
+  corrupt_index = -1;
+  for (i = 0x7f; i >= 0; i--) {
+    if (guard[(int)i] != 0x62626262) {
+      corrupt_index = i;
+      break;
+    }
+  }
+
+  if (FUN_000d1540() != return_addr) {
+    display_assert("corrupt return address!",
+                   "c:\\halo\\SOURCE\\interface\\hud_weapon.c", 0xd4, 1);
+    system_exit(-1);
+  }
+
+  if (corrupt_index != -1) {
+    display_assert(
+      csprintf((char *)0x5ab100, "corrupt stack at %d!", (int)corrupt_index),
+      "c:\\halo\\SOURCE\\interface\\hud_weapon.c", 0xd4, 1);
+    system_exit(-1);
+  }
+}
+
+/* Classify a unit relative to a local player, for the motion sensor / event
+ * display (0xdaee0).  Takes local_player_index in @<ebx> and the unit object
+ * handle in @<esi>; the result byte is returned in AL.
+ *
+ * Observed result codes (meanings inferred from the branches, names unknown):
+ *   5  unit_handle == -1
+ *   0  the unit belongs to this same local player
+ *   2  the object is not a unit (object_try_and_get_and_verify_type(,3) NULL)
+ *   1/2  biped:   game_allegiance_get_team_is_friendly(...) + 1
+ *   3/4  vehicle: game_allegiance_get_team_is_friendly(...) + 3
+ *   3/4  empty vehicle: 4 when the unit tag's second block element names
+ *        "c_dropship", else 3
+ * The AL width leaves char vs unsigned char undecidable here; char is used.
+ *
+ * Shape notes (binary-derived, do not "simplify"):
+ *   - the local player's team at player+0x20 is read BEFORE the
+ *     unit_handle == -1 early return;
+ *   - player_index_from_unit_index is called twice (000daf0b, 000daf1d);
+ *   - the occupant branch re-fetches the unit with a fresh
+ *     object_get_and_verify_type(occupant_handle, 3) instead of reusing `unit`;
+ *   - the biped branch re-derives the local player's team with a second
+ *     local_player_get_player_index/datum_get pair rather than reusing the
+ *     [EBP-4] copy. */
+char FUN_000daee0(int local_player_index, int unit_handle)
+{
+  int local_team;
+  int unit_player_index;
+  void *player;
+  void *unit;
+  void *vehicle;
+  int occupant_handle;
+  void *occupant;
+  void *unit_tag;
+  void *seat;
+
+  player =
+    datum_get(player_data, local_player_get_player_index(local_player_index));
+  local_team = *(int *)((char *)player + 0x20);
+  if (unit_handle == -1) {
+    return 5;
+  }
+  if (player_index_from_unit_index(unit_handle) == -1) {
+    unit_player_index = -1;
+  } else {
+    unit_player_index =
+      *(int16_t *)((char *)datum_get(
+                     player_data, player_index_from_unit_index(unit_handle)) +
+                   2);
+  }
+  if (unit_player_index == local_player_index) {
+    return 0;
+  }
+  if (object_try_and_get_and_verify_type(unit_handle, 3) == 0) {
+    return 2;
+  }
+  unit = object_get_and_verify_type(unit_handle, 3);
+  if (object_try_and_get_and_verify_type(unit_handle, 2) != 0) {
+    vehicle = object_get_and_verify_type(unit_handle, 2);
+    occupant_handle = *(int *)((char *)vehicle + 0x2d8);
+    if (occupant_handle != -1) {
+      occupant = object_get_and_verify_type(occupant_handle, 3);
+      return (char)(game_allegiance_get_team_is_friendly(
+                      *(uint16_t *)((char *)occupant + 0x68), local_team) +
+                    3);
+    }
+    {
+      occupant_handle = *(int *)((char *)vehicle + 0x2d4);
+      if (occupant_handle == -1) {
+        unit_tag = tag_get(0x756e6974, *(int *)vehicle);
+        if (*(int *)((char *)unit_tag + 0x2e4) > 1) {
+          seat = tag_block_get_element((char *)unit_tag + 0x2e4, 0, 0x11c);
+          if (csstrncmp((char *)seat + 4, "c_dropship", 10) == 0) {
+            return 4;
+          }
+        }
+        return 3;
+      }
+    }
+    occupant = object_get_and_verify_type(occupant_handle, 3);
+    return (char)(game_allegiance_get_team_is_friendly(
+                    *(uint16_t *)((char *)occupant + 0x68), local_team) +
+                  3);
+  }
+  player =
+    datum_get(player_data, local_player_get_player_index(local_player_index));
+  local_team = *(int *)((char *)player + 0x20);
+  return (char)(game_allegiance_get_team_is_friendly(
+                  *(uint16_t *)((char *)unit + 0x68), local_team) +
+                1);
+}
+
+
 /* Per-local-player motion sensor state accessor (0xdb0b0).
  * Takes local_player_index in @<si>; the state block allocated by
  * motion_sensor_initialize holds 4 records of 0x568 bytes (0x15a8 total).

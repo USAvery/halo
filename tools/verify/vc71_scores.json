@@ -25123,6 +25123,21 @@
       "score": 4.7,
       "source": "src/halo/unported_thunks.c"
     },
+    "FUN_000daee0": {
+      "abi_model": "regparam_stripped_saves",
+      "abi_model_items": 18,
+      "abi_modeled_mnemonic_pct": 94.9,
+      "addr": "0xdaee0",
+      "end": "0xdb03f",
+      "kind": "auto",
+      "n_r": 138,
+      "opnd_percent": 88.2,
+      "raw_mnemonic_pct": 90.3,
+      "ref": "synth",
+      "ref_sha": "f4f6d9cc0900425a",
+      "score": 94.9,
+      "source": "src/halo/interface/event_manager.c"
+    },
     "FUN_000db0b0": {
       "abi_model": "regparam_stripped_saves",
       "abi_model_items": 3,
@@ -59191,31 +59206,31 @@
     "event_manager_tab_check": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 85.7,
+      "abi_modeled_mnemonic_pct": 83.9,
       "addr": "0xdc070",
       "end": "0xdc109",
       "kind": "auto",
       "n_r": 55,
-      "opnd_percent": 76.8,
-      "raw_mnemonic_pct": 85.7,
+      "opnd_percent": 75.0,
+      "raw_mnemonic_pct": 83.9,
       "ref": "synth",
       "ref_sha": "01e90946a7d86c1f",
-      "score": 85.7,
+      "score": 83.9,
       "source": "src/halo/interface/event_manager.c"
     },
     "event_manager_tab_process": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 95.1,
+      "abi_modeled_mnemonic_pct": 92.7,
       "addr": "0xdc140",
       "end": "0xdc1c7",
       "kind": "auto",
       "n_r": 41,
-      "opnd_percent": 92.7,
-      "raw_mnemonic_pct": 95.1,
+      "opnd_percent": 90.2,
+      "raw_mnemonic_pct": 92.7,
       "ref": "synth",
       "ref_sha": "806c0472f4b539a7",
-      "score": 95.1,
+      "score": 92.7,
       "source": "src/halo/interface/event_manager.c"
     },
     "event_manager_update": {
@@ -65067,6 +65082,21 @@
       "ref_sha": "a30bf91f8038ee8c",
       "score": 80.0,
       "source": "src/halo/interface/hud.c"
+    },
+    "hud_update_weapon": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 92.3,
+      "addr": "0xda980",
+      "end": "0xdabe1",
+      "kind": "auto",
+      "n_r": 187,
+      "opnd_percent": 72.2,
+      "raw_mnemonic_pct": 92.3,
+      "ref": "synth",
+      "ref_sha": "7e53457f8d6bdb44",
+      "score": 92.3,
+      "source": "src/halo/interface/event_manager.c"
     },
     "hud_weapon_dispose": {
       "abi_model": "raw",

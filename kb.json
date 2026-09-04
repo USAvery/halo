@@ -7354,7 +7354,7 @@
    "functions": [
     {
      "addr": "0xd9960",
-     "decl": "void FUN_000d9960(void);"
+     "decl": "void FUN_000d9960(int16_t local_player_index@<eax>, int weapon_handle, int tag_index, void *interface_state);"
     },
     {
      "addr": "0xd9f20",
@@ -7362,7 +7362,8 @@
     },
     {
      "addr": "0xda980",
-     "decl": "void hud_update_weapon(void);"
+     "decl": "void hud_update_weapon(void);",
+     "ported": true
     },
     {
      "addr": "0xdabf0",
@@ -7378,7 +7379,8 @@
     },
     {
      "addr": "0xdaee0",
-     "decl": "void FUN_000daee0(void);"
+     "decl": "char FUN_000daee0(int local_player_index@<ebx>, int unit_handle@<esi>);",
+     "ported": true
     },
     {
      "addr": "0xdb0b0",
