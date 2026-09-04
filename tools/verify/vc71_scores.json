@@ -69481,17 +69481,17 @@
     "network_game_client_remove_player": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 6.0,
+      "abi_modeled_mnemonic_pct": 100.0,
       "addr": "0x126590",
       "end": "0x1266f5",
       "kind": "auto",
       "n_r": 129,
-      "opnd_percent": 4.5,
-      "raw_mnemonic_pct": 6.0,
+      "opnd_percent": 96.9,
+      "raw_mnemonic_pct": 100.0,
       "ref": "synth",
       "ref_sha": "997db56504759be4",
-      "score": 6.0,
-      "source": "src/halo/unported_thunks.c"
+      "score": 100.0,
+      "source": "src/halo/networking/network_client_manager.c"
     },
     "network_game_client_request_remove_player": {
       "abi_model": "raw",

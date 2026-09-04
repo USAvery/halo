@@ -14731,7 +14731,9 @@
     },
     {
      "addr": "0x126590",
-     "decl": "char network_game_client_remove_player(void *client, void *message, int arg3);"
+     "decl": "char network_game_client_remove_player(void *client, void *player, int tick);",
+     "name": "network_game_client_remove_player",
+     "ported": true
     },
     {
      "addr": "0x126700",

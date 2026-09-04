@@ -278,8 +278,9 @@ int16_t FUN_00124D00(void *client)
  * connection pointer via network_game_client_get_seconds_to_game_start, then
  * calls this wrapper with the resulting connection pointer, a message buffer,
  * its size, a dest_address, and reliable=0. */
-bool network_game_client_write(void *connection, void *message, unsigned short size,
-                  int dest_address, int reliable)
+bool network_game_client_write(void *connection, void *message,
+                               unsigned short size, int dest_address,
+                               int reliable)
 {
   return network_connection_write(connection, message, size, dest_address,
                                   reliable);
@@ -647,8 +648,8 @@ char network_game_client_switch_to_pregame(void *client)
 /* 0x125710 — Asserts client is non-null and returns the connection handle
  * (int) stored at offset 0x82c in the client structure. The returned handle
  * is used by the caller (network_game_client_end_frame) as the first argument
- * to network_game_client_write (which forwards it to network_connection_write to send a
- * network message). */
+ * to network_game_client_write (which forwards it to network_connection_write
+ * to send a network message). */
 int network_game_client_get_seconds_to_game_start(void *client)
 {
   if (client == NULL) {
@@ -991,6 +992,105 @@ bool FUN_001260c0(void *server)
                        "network_game_client_process_incoming_messages()");
   } while (result);
   return result;
+}
+
+
+/* network_game_client_remove_player (0x126590)
+ *
+ * Removes the player identified by a remove-player message from the client's
+ * network game. Asserts both pointers (line 0x273, reason "client && player"),
+ * then scans the 16-entry 0x20-byte client player table based at client+0xa82
+ * for a live entry whose two bytes at +0x1c/+0x1d match player+0x1c/+0x1d.
+ * No match -> return 0. On a match, the entry byte at +0x1f (client + i*0x20 +
+ * 0xaa1) is sign-extended and run through unstrip_player_index to get the real
+ * player index, then network_game_remove_player(client+0x85c, player) does the
+ * removal. Only when that succeeded AND the flag at client+0xc8c is set does
+ * the rest run: a phony index (0 or -1) is reported and returns 0; otherwise
+ * the player datum is fetched and, when tick != -1, the quit tick is logged and
+ * stored at datum+0xcc. Finally the table is rescanned for any live entry whose
+ * signed byte at +0x1c equals the unsigned int16 at client+0; if none remains,
+ * network_game_client_all_local_players_have_quit() runs and the exit message
+ * is logged. Returns the network_game_remove_player result.
+ *
+ * Evidence / decompiler corrections (0x126590-0x1266f4):
+ *  - Ghidra renders 0x125180 as `FUN_00125180()` with an `extraout_EAX`. The
+ *    disassembly has PUSH EAX (0x12660f) and MOV ESI,EAX (0x126620), so it is
+ *    a real one-argument call returning the player index.
+ *  - The two table scans compare DIFFERENTLY and are intentionally not
+ *    symmetric. Scan 1 is an 8-bit CMP CL,[EAX+0x1c] / CMP DL,[EAX+0x1d]
+ *    (char vs char). Scan 2 is MOVSX EDX,byte[EDI] against MOVZX ECX,
+ *    word[EAX] with a 32-bit CMP: a signed byte widened against an UNSIGNED
+ *    16-bit read of client+0.
+ *  - Scan 2 re-reads [EBP+8] inside the loop (0x1266a5) because EBX was
+ *    reused for the datum pointer at 0x126669, so `client` stays a parameter
+ *    deref here rather than being hoisted into a local.
+ *  - The "%x quit of of game at tick %d (now %d)" doubled "of" is verbatim
+ *    from the original .rdata at 0x292aa8; it is a Bungie typo, not ours.
+ *  - Call-site-audit ARG_COUNT flags are all accounted for and no callee decl
+ *    is changed: the ADD ESP,0xc at 0x126627 folds unstrip_player_index's one
+ *    push with network_game_remove_player's two (so remove_player really does
+ *    take 2 args); error()'s cleanup=5 and cleanup=3 are its vararg slots; and
+ *    network_game_log's cleanup=1 is a fmt-only call to a varargs decl.
+ *  - No struct is recovered for the client or player records, so every access
+ *    stays a raw offset cast. */
+char network_game_client_remove_player(void *client, void *player, int tick)
+{
+  char *entry;
+  void *player_datum;
+  int index;
+  int player_index;
+  int now;
+  bool result;
+
+  assert_halt_at("c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+                 0x273, client && player);
+
+  index = 0;
+  entry = (char *)client + 0xa9e;
+  while (!network_player_is_valid(entry - 0x1c) ||
+         entry[0] != *((char *)player + 0x1c) ||
+         entry[1] != *((char *)player + 0x1d)) {
+    index++;
+    entry += 0x20;
+    if (index >= 0x10)
+      return 0;
+  }
+
+  player_index = unstrip_player_index(
+    (int)*(signed char *)((char *)client + (index << 5) + 0xaa1));
+  result = network_game_remove_player((char *)client + 0x85c, player);
+  if (result && *((char *)client + 0xc8c) != 0) {
+    if (player_index == 0 || player_index == -1) {
+      error(2,
+            "network game tried to delete a player with a phony player index "
+            "(#0x%08lX)",
+            player_index);
+      return 0;
+    }
+    player_datum = datum_get(*(data_t **)0x5aa6d4, player_index);
+    if (tick != -1) {
+      now = game_time_get();
+      error(2, "%x quit of of game at tick %d (now %d)", player_index, tick,
+            now);
+      *(int *)((char *)player_datum + 0xcc) = tick;
+    }
+
+    index = 0;
+    entry = (char *)client + 0xa9e;
+    do {
+      if (network_player_is_valid(entry - 0x1c) &&
+          (int)*(signed char *)entry == (int)*(unsigned short *)client)
+        break;
+      index++;
+      entry += 0x20;
+    } while (index < 0x10);
+    if (index == 0x10) {
+      network_game_client_all_local_players_have_quit();
+      network_game_log("no local players remain in the game, exiting the game "
+                       "now");
+    }
+  }
+  return (char)result;
 }
 
 /* 0x126700 — network_game_client_new_advertised_game
