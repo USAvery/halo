@@ -802,6 +802,10 @@
       "kind": "function",
       "status": "ported"
     },
+    "0x32b50": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0x355f0": {
       "kind": "function",
       "status": "ported"
@@ -1506,6 +1510,10 @@
         "The semantic meaning of actor record field +0x04 is unproven; types.h names it field_004.",
         "No direct code or data xref to 0x43090 was found, so any indirect dispatch caller remains unresolved."
       ]
+    },
+    "0x430d0": {
+      "kind": "function",
+      "status": "ported"
     },
     "0x43270": {
       "kind": "function",

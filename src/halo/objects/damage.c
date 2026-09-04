@@ -1,3 +1,7 @@
+#ifdef HALO_RNG_TRACE
+#include "halo/math/rng_trace.h"
+#endif
+#line 1
 
 /* object_get_maximum_shield_vitality (0x136700) — Return the object's maximum
  * shield vitality, optionally scaled by the value_type-2 modifier for the
@@ -541,6 +545,11 @@ void FUN_00136f40(int object_handle, void *damage_data, unsigned int flags,
 
   dd = (char *)damage_data;
   obj = (int *)object_get_and_verify_type(object_handle, -1);
+#ifdef HALO_RNG_TRACE
+  RNG_TRACE_EX(RNG_TRACE_KIND_BODY_AFTER, *(unsigned int *)((char *)obj + 0x90), object_handle);
+  RNG_TRACE_EX(RNG_TRACE_KIND_SHIELD_AFTER, *(unsigned int *)((char *)obj + 0x94), object_handle);
+#endif
+#line 544
   obje_tag = (char *)tag_get(0x6f626a65, *obj);
   jpt_tag = (char *)tag_get(0x6a707421, *(int *)dd);
 
@@ -1162,6 +1171,10 @@ after_modifier:
 
   /* Get the root object's definition tag */
   obj = (char *)object_get_and_verify_type(object_handle, -1);
+#ifdef HALO_RNG_TRACE
+  RNG_TRACE_EX(RNG_TRACE_KIND_BODY_BEFORE, *(unsigned int *)(obj + 0x90), object_handle);
+#endif
+#line 1165
   obj_tag = (int)tag_get(0x6f626a65, *(int *)obj);
 
   /* Check collision model for body damage flag */
@@ -1260,6 +1273,10 @@ after_modifier:
   }
 
   /* Main damage loop: apply damage to each object while scale > 0 */
+#ifdef HALO_RNG_TRACE
+  RNG_TRACE_EX(RNG_TRACE_KIND_DAMAGE_SCALE, RNG_TRACE_BITS(damage_scale), object_handle);
+#endif
+#line 1263
   if (!(damage_scale > 0.0f))
     return;
 

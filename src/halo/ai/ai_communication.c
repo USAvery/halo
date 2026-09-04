@@ -302,8 +302,7 @@ bool FUN_00042d80(int param_1, int param_2, int param_3)
     if (prop_index != -1) {
       prop = (char *)datum_get(prop_data, prop_index);
       if (*(float *)(prop + 0x11c) < *(float *)0x254cc4) {
-        if (*(int16_t *)(prop + 0x38) == 0 ||
-            *(int16_t *)(prop + 0x38) == 1) {
+        if (*(int16_t *)(prop + 0x38) == 0 || *(int16_t *)(prop + 0x38) == 1) {
           result = 1;
         }
       }
@@ -368,8 +367,7 @@ bool FUN_00042df0(int param_1, int param_2, int param_3)
     if (prop_index != -1) {
       prop = (char *)datum_get(prop_data, prop_index);
       if (*(float *)(prop + 0x11c) > *(float *)0x254cc4 ||
-          (*(int16_t *)(prop + 0x38) != 0 &&
-           *(int16_t *)(prop + 0x38) != 1)) {
+          (*(int16_t *)(prop + 0x38) != 0 && *(int16_t *)(prop + 0x38) != 1)) {
         result = 1;
       }
     }
@@ -586,6 +584,93 @@ char FUN_00043090(int param_1, int param_2, int param_3)
       result = 1;
   }
   return result;
+}
+
+/* ai_communication_consider_speech (0x430d0) — decide whether a unit should
+ * vocalize now, and scale the caller's weight accordingly.
+ *
+ * ABI (disasm 0x430d0-0x43266): three register arguments plus seven cdecl
+ * stack slots. ECX -> ESI = vocalization_type, EAX -> EBX =
+ * sound_definition_index_reference, EDX -> EDI = priority (the assert string
+ * at 0xc1a names the first two and `weight`; the callee decl of FUN_001a68d0
+ * names unit_handle/priority). Stack: [EBP+0x08] unit_handle, [EBP+0x0c]
+ * param_5, [EBP+0x10] param_6, [EBP+0x14] param_7, [EBP+0x18] param_8,
+ * [EBP+0x1c] weight, [EBP+0x20] failure_reason. Returns short: both exits do
+ * MOV AX,BX where BX holds the play type (kb's earlier `void(void)` decl was
+ * a placeholder).
+ *
+ * Confirmed details:
+ *   - 0x4311e..0x43114 pushes seven args (ADD ESP,0x1c) in the order
+ *     (unit_handle, priority, param_7, 1, &last_speech_time,
+ *      vocalization_type, sound_definition_index_reference).
+ *   - 0x43147 ADD ESP,0x10 merges FUN_001a6ca0's one-dword cleanup into
+ *     crt_sprintf's three, so the name lookup stays nested in the call.
+ *   - 0x431a2 MOV ECX,0 / SETS CL / DEC ECX / AND ECX,EAX clamps the elapsed
+ *     tick delta at zero (branchless `delta < 0 ? 0 : delta`).
+ *   - 0x431b9 indexes a 0x28-byte-stride table at 0x257cd8 by param_5 and
+ *     reads its leading float; FIADD of the spilled sign-extended param_6
+ *     confirms the tolerance is added as an int.
+ *   - 0x431d8 stores the zeroed EBX through weight, so suppressing speech
+ *     also clears the returned play type and skips the trailing assert.
+ *   - 0x43230 FCOMP [0x2533c0] / TEST AH,0x41 / JZ is `*weight > 0.0f`.
+ * Unknown: param_5 (table selector, must be < 5), param_6 (tick tolerance),
+ * param_7 (forwarded char flag), param_8 (enable flag). */
+short ai_communication_consider_speech(int *sound_definition_index_reference,
+                                       short *vocalization_type, short priority,
+                                       int unit_handle, short param_5,
+                                       short param_6, char param_7,
+                                       char param_8, float *weight,
+                                       char *failure_reason)
+{
+  short play_type;
+  short elapsed;
+  short threshold;
+  int last_speech_time;
+  int delta;
+  int tolerance;
+
+  assert_halt_at("c:\\halo\\SOURCE\\ai\\ai_communication.c", 0xc1a,
+                 vocalization_type && sound_definition_index_reference &&
+                   weight);
+
+  play_type = FUN_001a68d0(unit_handle, priority, param_7, 1, &last_speech_time,
+                           vocalization_type, sound_definition_index_reference);
+  if (play_type == 0) {
+    if (failure_reason != 0) {
+      crt_sprintf(failure_reason, "nospch-%s", FUN_001a6ca0(priority));
+    }
+  } else if (play_type == 1) {
+    *weight = *weight * *(float *)0x2533e4;
+  }
+
+  if ((game_connection() != 0 || *(char *)0x5aca47 == 0) && param_8 != 0 &&
+      param_5 < 5 && last_speech_time != -1) {
+    delta = game_time_get() - last_speech_time;
+    elapsed = (short)(delta < 0 ? 0 : delta);
+    tolerance = param_6;
+    threshold =
+      (short)(*(float *)(0x257cd8 + param_5 * 0x28) * *(float *)0x253394 +
+              tolerance);
+    if (elapsed <= threshold) {
+      play_type = 0;
+      *weight = 0.0f;
+      if (failure_reason != 0) {
+        crt_sprintf(failure_reason, "spk%d<tol%d+%d", (int)elapsed, tolerance,
+                    (int)threshold - tolerance);
+      }
+      return play_type;
+    }
+    if ((int)elapsed < (int)threshold + 60) {
+      *weight =
+        (float)((int)elapsed - (int)threshold) * *weight * *(float *)0x25634c;
+    }
+  }
+
+  assert_halt_msg_at(
+    "(play_type == _unit_play_speech_none) || (*weight > 0.0f)",
+    "c:\\halo\\SOURCE\\ai\\ai_communication.c", 0xc49,
+    play_type == 0 || *weight > *(float *)0x2533c0);
+  return play_type;
 }
 
 /* actor_communication_team (0x43270) — classify an actor's communication

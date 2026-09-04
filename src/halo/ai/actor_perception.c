@@ -569,8 +569,41 @@ done_vision:
   return (float)sum * 10.0f + 5.0f / (*(float *)(prop + 0x11c) * 0.1f + 1.0f) +
          local_c;
 }
-/* actor_perception_update (0x355f0): actor_perception_update — the per-tick perception
- * pass for one actor.
+
+/* actor_perception_tried_to_uncover: mark a prop as having been uncovered.
+ *
+ * Early-out when prop_handle == -1 (CMP ESI,-1 / JZ epilogue).
+ * Fetches the actor record (datum_get(actor_data, actor_handle), EDI) and the
+ * prop record (datum_get(prop_data, prop_handle), EAX), sets the prop's
+ * +0xb9 byte flag to 1, then — if the prop is the actor's current target
+ * (actor_t.target_target_prop_index, +0x270) — refreshes target and combat
+ * status.
+ *
+ * Confirmed: both cdecl cleanups are coalesced (ADD ESP,0x10 for the two
+ * 2-arg datum_get calls; ADD ESP,0x8 for the two 1-arg situation calls), so
+ * the ARG_COUNT audit hazards are cdecl mis-grouping, not extra arguments.
+ *
+ * No __FILE__ string. */
+void actor_perception_tried_to_uncover(int actor_handle, int prop_handle)
+{
+  char *actor;
+  char *prop;
+
+  if (prop_handle == -1)
+    return;
+
+  actor = (char *)datum_get(actor_data, actor_handle);
+  prop = (char *)datum_get(prop_data, prop_handle);
+  *(char *)(prop + 0xb9) = 1;
+
+  if (prop_handle == ((actor_t *)actor)->target_target_prop_index) {
+    actor_situation_update_target_status(actor_handle);
+    actor_situation_combat_status_update(actor_handle);
+  }
+}
+
+/* actor_perception_update (0x355f0): actor_perception_update — the per-tick
+ * perception pass for one actor.
  *
  * Phase 1 (skipped when actor+0x13 is set): refresh perception and the danger
  * zone, then advance the alertness/awareness ramp on actor+0x280..0x28c using
@@ -1221,8 +1254,8 @@ iterate_props:
           *(char *)(prop + 0x122) < 3 &&
           *(float *)(prop + 0x11c) < *(float *)0x2548f4) {
         ((actor_t *)actor)->field_377 = 1;
-        ai_communication_event(0x19, ((actor_t *)actor)->field_018, *(int *)(prop + 0x18),
-                     2, -1, -1, 0);
+        ai_communication_event(0x19, ((actor_t *)actor)->field_018,
+                               *(int *)(prop + 0x18), 2, -1, -1, 0);
         FUN_00036a20(actor_handle, iter[0], 0);
       }
 
@@ -1243,8 +1276,9 @@ iterate_props:
           team_info.prop_team = *(int16_t *)(prop + 0x12);
           team_info.actor_team = ((actor_t *)actor)->field_03e;
           team_info.is_friendly = is_friendly;
-          ai_communication_event(8, ((actor_t *)actor)->field_018, *(int *)(prop + 0x18),
-                       (is_friendly != 0) * 2 + 2, -1, 1, (int)&team_info);
+          ai_communication_event(
+            8, ((actor_t *)actor)->field_018, *(int *)(prop + 0x18),
+            (is_friendly != 0) * 2 + 2, -1, 1, (int)&team_info);
         }
       }
 
@@ -1285,14 +1319,15 @@ iterate_props:
               if (((actor_t *)actor)->field_06a < 3) {
                 if (*(char *)(prop + 0x12c) != 0) {
                   ai_communication_event(0xf, *(int *)(prop + 0x18),
-                               ((actor_t *)actor)->field_018, 2, -1, 2, 0);
+                                         ((actor_t *)actor)->field_018, 2, -1,
+                                         2, 0);
                 }
               } else if (FUN_0003b120(actor_handle) != 0 &&
                          actor_is_fighting(actor_handle) == 0 &&
                          *(char *)(prop + 0x12b) != 0 &&
                          *(int16_t *)(prop + 0x32) > 1) {
                 ai_communication_event(0xf, ((actor_t *)actor)->field_018,
-                             *(int *)(prop + 0x18), 2, -1, 2, 0);
+                                       *(int *)(prop + 0x18), 2, -1, 2, 0);
               }
             }
           }

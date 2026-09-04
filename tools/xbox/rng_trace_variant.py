@@ -80,14 +80,27 @@ def read_kb() -> tuple[bytes, dict]:
     return raw, json.loads(raw.decode("utf-8"))
 
 
+_TRAILING_NEWLINE = b"\n"
+_ENSURE_ASCII = False
+
+
 def serialize(data: dict) -> bytes:
-    """kb.json is `json.dumps(..., indent=1, ensure_ascii=False)` with no
-    trailing newline.  Verified by round-tripping HEAD's kb.json."""
-    return json.dumps(data, indent=1, ensure_ascii=False).encode("utf-8")
+    """kb.json is `json.dumps(..., indent=1)`; over time it has been written
+    with and without a trailing newline and with ensure_ascii on and off, so
+    the writer mirrors whatever the file it read used (assert_round_trip
+    probes the four combinations and pins the one that round-trips)."""
+    return (json.dumps(data, indent=1, ensure_ascii=_ENSURE_ASCII)
+            .encode("utf-8") + _TRAILING_NEWLINE)
 
 
 def assert_round_trip(raw: bytes, data: dict) -> None:
-    if serialize(data) != raw:
+    global _TRAILING_NEWLINE, _ENSURE_ASCII
+    for nl in (b"\n", b""):
+        for ascii_ in (False, True):
+            _TRAILING_NEWLINE, _ENSURE_ASCII = nl, ascii_
+            if serialize(data) == raw:
+                return
+    if True:
         raise SystemExit(
             "error: kb.json does not round-trip through this writer "
             "(json.dumps indent=1, ensure_ascii=False, no trailing newline).\n"

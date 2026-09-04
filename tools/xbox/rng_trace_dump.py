@@ -67,6 +67,12 @@ KINDS = {
     8: ("network_game_set_random_seed", "info"),
     9: ("game_initialize_for_new_map", "reseed"),
     10: ("periodic_functions_initialize", "reseed"),
+    # Damage-path probes: seed_before carries FLOAT BITS, caller2 the object
+    # handle.  Never part of the seed sequence; excluded from --diff.
+    11: ("probe:damage_scale", "info"),
+    12: ("probe:body_before", "info"),
+    13: ("probe:body_after", "info"),
+    14: ("probe:shield_after", "info"),
 }
 
 
@@ -226,7 +232,10 @@ def decode(blob_header: bytes, blob_records: bytes, write_index: int,
         kind = (tick_kind >> 24) & 0xFF
         kind_name, steps = KINDS.get(kind, (f"kind_{kind}", 1))
         c1 = symbolizer.symbolize(caller)
-        c2 = symbolizer.symbolize(caller2)
+        if kind_name.startswith("probe:"):
+            c2 = {"name": f"handle=0x{caller2:08x}", "offset": 0, "space": "handle"}
+        else:
+            c2 = symbolizer.symbolize(caller2)
         records.append({
             "index": logical,
             "tick": tick_kind & 0x00FFFFFF,
@@ -364,6 +373,46 @@ def capture(args) -> int:
 
 
 # --------------------------------------------------------------------------
+# Damage probes
+# --------------------------------------------------------------------------
+def probes(path: str) -> int:
+    """Print every damage event: scale, victim body vitality before and after,
+    and how close the result sits to the death boundary (0.0)."""
+    import struct
+
+    recs = json.loads(Path(path).read_text(encoding="utf-8"))["records"]
+
+    def f32(bits: int) -> float:
+        return struct.unpack("<f", struct.pack("<I", bits))[0]
+
+    def ulps_from_zero(bits: int) -> int:
+        # magnitude of the float as an integer count of ULPs from +0.0
+        return bits & 0x7FFFFFFF
+
+    n = 0
+    for rec in recs:
+        kind = rec["kind"]
+        if not kind.startswith("probe:"):
+            continue
+        n += 1
+        bits = rec["seed_before"]
+        val = f32(bits)
+        flag = ""
+        if kind in ("probe:body_after", "probe:body_before"):
+            if bits & 0x80000000 or bits == 0:
+                flag = "  <== DEAD (body <= 0)"
+            elif ulps_from_zero(bits) < 0x33D6BF95:  # < 1e-7
+                flag = "  <== within 1e-7 of death boundary"
+        print(f"[{rec['index']:7d}] tick={rec['tick']:<6d} {kind:<20s} "
+              f"{val!r:>16} (0x{bits:08x}) {rec['caller2']}{flag}")
+    if n == 0:
+        print("no probe records (build predates the damage probes, or "
+              "object_cause_damage is not ported in this build)")
+        return 1
+    return 0
+
+
+# --------------------------------------------------------------------------
 # Diff
 # --------------------------------------------------------------------------
 def _key(rec: dict) -> tuple:
@@ -373,6 +422,14 @@ def _key(rec: dict) -> tuple:
 
 
 def _fmt(rec: dict) -> str:
+    if rec["kind"].startswith("probe:"):
+        import struct
+        val = struct.unpack("<f", struct.pack("<I", rec["seed_before"]))[0]
+        return ("  [{index:6d}] tick={tick:<8d} {kind:<28s} value={val!r} "
+                "(0x{bits:08x}) {caller}+0x{off:x} {c2}").format(
+            index=rec["index"], tick=rec["tick"], kind=rec["kind"], val=val,
+            bits=rec["seed_before"], caller=rec["caller"] or "?",
+            off=rec["caller_offset"], c2=rec["caller2"])
     return ("  [{index:6d}] tick={tick:<8d} {kind:<28s} seed=0x{seed:08x} "
             "{caller}+0x{off:x} <- {caller2}").format(
         index=rec["index"], tick=rec["tick"], kind=rec["kind"],
@@ -383,6 +440,9 @@ def _fmt(rec: dict) -> str:
 def diff(path_a: str, path_b: str, context: int = 10) -> int:
     a = json.loads(Path(path_a).read_text(encoding="utf-8"))["records"]
     b = json.loads(Path(path_b).read_text(encoding="utf-8"))["records"]
+    # Probe records exist only in builds whose probed functions are ported.
+    a = [r for r in a if not r["kind"].startswith("probe:")]
+    b = [r for r in b if not r["kind"].startswith("probe:")]
     print(f"A: {path_a}  {len(a)} records")
     print(f"B: {path_b}  {len(b)} records")
 
@@ -449,10 +509,14 @@ def main() -> int:
                     help="diff two previously captured traces (no XBDM needed)")
     ap.add_argument("--context", type=int, default=10,
                     help="records of context each side of the divergence")
+    ap.add_argument("--probes", metavar="A.json",
+                    help="list the damage-path probe records of a capture")
     args = ap.parse_args()
 
     if args.chunk <= 0:
         ap.error("--chunk must be a positive byte count")
+    if args.probes:
+        return probes(args.probes)
     if args.diff:
         return diff(args.diff[0], args.diff[1], args.context)
     return capture(args)

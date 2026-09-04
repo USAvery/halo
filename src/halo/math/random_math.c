@@ -12,12 +12,10 @@
 rng_trace_buffer_t halo_rng_trace = { 0 };
 
 void rng_trace_note(const void *seed, unsigned int kind,
-                    unsigned int seed_before, void *caller, void *frame)
+                    unsigned int seed_before, void *caller, void *extra)
 {
   rng_trace_record_t *rec;
   uint32_t tick;
-
-  (void)frame;
 
   /* Local-seed draws (0x46e3f8) do not participate in network determinism. */
   if ((uint32_t)seed != RNG_TRACE_GLOBAL_SEED_ADDR)
@@ -40,7 +38,7 @@ void rng_trace_note(const void *seed, unsigned int kind,
   rec->tick = (kind << 24) | tick;
   rec->seed_before = seed_before;
   rec->caller = (uint32_t)caller;
-  rec->caller2 = 0;
+  rec->caller2 = (uint32_t)extra;
   halo_rng_trace.write_index++;
 }
 #endif /* HALO_RNG_TRACE */

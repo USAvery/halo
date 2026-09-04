@@ -36,6 +36,12 @@
 #define RNG_TRACE_KIND_NET_SET_SEED  8u /* network_game_set_random_seed  info   */
 #define RNG_TRACE_KIND_MAP_SEED      9u /* game_initialize_for_new_map   reseed */
 #define RNG_TRACE_KIND_PERIODIC_SEED 10u /* periodic_functions_initialize reseed */
+/* Damage-path probes (value = float bits, extra = object handle).  Not seed
+ * events: the dump tool treats every "probe:" kind as informational. */
+#define RNG_TRACE_KIND_DAMAGE_SCALE  11u /* object_cause_damage scale        info */
+#define RNG_TRACE_KIND_BODY_BEFORE   12u /* root object body vitality, entry info */
+#define RNG_TRACE_KIND_BODY_AFTER    13u /* FUN_00136f40 body vitality       info */
+#define RNG_TRACE_KIND_SHIELD_AFTER  14u /* FUN_00136f40 shield vitality     info */
 
 /* 16 bytes. */
 typedef struct {
@@ -63,12 +69,20 @@ __declspec(dllexport) extern rng_trace_buffer_t halo_rng_trace;
 
 /* Records one event.  Ignores every seed pointer other than the global seed. */
 void rng_trace_note(const void *seed, unsigned int kind,
-                    unsigned int seed_before, void *caller, void *frame);
+                    unsigned int seed_before, void *caller, void *extra);
 
 /* Call from inside the primitive itself so that __builtin_return_address(0)
  * names the game function that asked for the draw. */
 #define RNG_TRACE(seed_ptr, kind, before)                                  \
   rng_trace_note((const void *)(seed_ptr), (kind), (unsigned int)(before), \
-                 __builtin_return_address(0), __builtin_frame_address(0))
+                 __builtin_return_address(0), (void *)0)
+
+/* Probe record from inside a game function: `value` is any 32-bit payload
+ * (float bits via RNG_TRACE_BITS), `extra` lands in caller2. */
+#define RNG_TRACE_EX(kind, value, extra)                                   \
+  rng_trace_note((const void *)RNG_TRACE_GLOBAL_SEED_ADDR, (kind),         \
+                 (unsigned int)(value), __builtin_return_address(0),       \
+                 (void *)(extra))
+#define RNG_TRACE_BITS(float_lvalue) (*(const unsigned int *)&(float_lvalue))
 
 #endif /* HALO_MATH_RNG_TRACE_H */

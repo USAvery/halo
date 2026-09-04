@@ -33670,7 +33670,9 @@
     },
     {
      "addr": "0x430d0",
-     "decl": "void ai_communication_consider_speech(void);"
+     "decl": "short ai_communication_consider_speech(int *sound_definition_index_reference @<eax>, short *vocalization_type @<ecx>, short priority @<dx>, int unit_handle, short param_5, short param_6, char param_7, char param_8, float *weight, char *failure_reason);",
+     "name": "ai_communication_consider_speech",
+     "ported": true
     },
     {
      "addr": "0x43270",

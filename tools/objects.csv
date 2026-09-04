@@ -149,8 +149,8 @@ actor_perception.obj,true,0x0002F1A0-0x000357F0,45
 ai_communication.obj,true,0x00042A30-0x00049090,48
 ai_debug.obj,true,0x00048F50-0x00053CF0,73
 ai_profile.obj,true,0x000540B0-0x00055FD0,46
-ai_script.obj,true,0x00058CC0-0x00058F40,2
-encounters.obj,true,0x00053B80-0x0005E1B0,140
+ai_script.obj,true,0x00057330-0x00058F40,4
+encounters.obj,true,0x00053B80-0x0005E1B0,138
 props.obj,true,0x00063E30-0x000653A0,30
 tif_dir.obj,true,0x00064CD0-0x00067070,31
 tif_error.obj,true,0x000689C0-0x00068C10,2
