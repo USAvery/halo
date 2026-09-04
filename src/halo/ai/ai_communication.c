@@ -1030,6 +1030,211 @@ void ai_conversation_finish(int conversation_handle, char param_2, char param_3)
   datum_delete(*(data_t **)0x6324ec, conversation_handle);
 }
 
+/* FUN_00043740 (0x43740) — begin (or force-start) a scenario conversation.
+ * Tries to allocate a fresh conversation datum; if the pool is full and the
+ * caller passed a non-zero param_2, it evicts one running conversation
+ * (lowest +0x4 byte, tie-broken by oldest +0xc timestamp), finishes it, and
+ * reuses its handle.  The resulting datum records the scenario conversation
+ * index at +0x2, an invalid line index (-1) at +0x48, param_2 at +0x4 and the
+ * current game time at +0xc.  Returns the datum index, or -1 on failure.
+ *
+ * Confirmed (disasm 0x43740-0x43860):
+ *   - Signature: `MOV DX,word ptr [EBP+8]` / `MOV AL,byte ptr [EBP+0xc]` —
+ *     two cdecl stack args, a 16-bit and an 8-bit one; Ghidra's
+ *     `void (void)` prototype is wrong.  The return value is real: two
+ *     distinct epilogues load EAX from two different sources (`MOV EAX,EDI`
+ *     at 0x4384e, `MOV EAX,[EBP-4]` at 0x43857), which is return-value
+ *     codegen, not a dead EAX.  Both sources hold the same index value.
+ *   - Sentinel init order is BL=1 (priority), EDI=0x7fffffff (time),
+ *     ESI=-1 (handle) at 0x4377b..0x43782 — all three BEFORE the
+ *     data_iterator_new call at 0x43785, so they are written before it here.
+ *   - `OR ESI,0xffffffff` is the usual -1 sentinel, matching the rest of
+ *     this TU.
+ *   - Eviction test is a mixed-signedness pair: `CMP CL,BL` + `JC` is an
+ *     UNSIGNED byte compare on +0x4, while `CMP dword ptr [EAX+0xc],EDI` +
+ *     `JGE` is a SIGNED dword compare on +0xc.  The update block stores in
+ *     the order time, handle, priority (0x437ac..0x437b2).
+ *   - The first data_iterator_next call is peeled (0x4378e), the loop body
+ *     re-enters at 0x437a0, so a do/while after a leading call is the
+ *     matching shape.
+ *   - iter.datum_handle is read from EBP-0xc with the iterator based at
+ *     EBP-0x14, i.e. iterator offset +0x8 — data_iter_t.datum_handle.
+ *   - tag_block_get_element(scenario+0x468, index, 0x74): pushes are 0x74
+ *     first, then the sign-extended [EBP+8] index, then the block pointer
+ *     (0x437da..0x437e7), matching the kb decl (block, index, element_size).
+ *     NOTE: ai_conversation_advance (0x43520) in this TU passes these two
+ *     swapped; that is a separate pre-existing issue, not touched here.
+ *   - All three ARG_COUNT hazards are merged-ADD-ESP false positives:
+ *     `ADD ESP,0xc` @0x43793 = data_iterator_new's 2 + data_iterator_next's
+ *     1; `ADD ESP,0x18` @0x437fa = tag_block_get_element's 3 +
+ *     console_printf's 3; `ADD ESP,0x14` @0x43813 =
+ *     ai_conversation_finish's 3 + data_new_datum's 2.
+ *   - game_time_get (0xb5aa0) is called with no pushes and its EAX stored as
+ *     a plain dword at conversation+0xc.
+ * Uncertain: semantics of conversation+0x4 (used both as the caller's flag
+ *   and as the eviction key) and of +0x48; no string or struct evidence at
+ *   this call site, so both stay raw offsets and param_2 keeps a mechanical
+ *   name. */
+int FUN_00043740(int16_t scenario_conversation_index, char param_2)
+{
+  data_iter_t iter;
+  char *conversation;
+  char *cur;
+  int index;
+  int best_handle;
+  int best_time;
+  unsigned char best_priority;
+
+  index = data_new_at_index(*(data_t **)0x6324ec);
+  if (index == -1) {
+    if (param_2 == '\0') {
+      return index;
+    }
+    best_priority = 1;
+    best_time = 0x7fffffff;
+    best_handle = -1;
+    data_iterator_new(&iter, *(data_t **)0x6324ec);
+    cur = (char *)data_iterator_next(&iter);
+    if (cur == 0) {
+      return index;
+    }
+    do {
+      if (*(unsigned char *)(cur + 4) < best_priority ||
+          *(int32_t *)(cur + 0xc) < best_time) {
+        best_time = *(int32_t *)(cur + 0xc);
+        best_handle = (int)iter.datum_handle;
+        best_priority = *(unsigned char *)(cur + 4);
+      }
+      cur = (char *)data_iterator_next(&iter);
+    } while (cur != 0);
+    if (best_handle == -1) {
+      return index;
+    }
+    if (*(char *)0x5aca5f != '\0') {
+      console_printf(
+        0,
+        "%s: this conversation is already running or trying to run, overwrite "
+        "it",
+        tag_block_get_element((char *)global_scenario_get() + 0x468,
+                              (int)scenario_conversation_index, 0x74));
+    }
+    ai_conversation_finish(best_handle, '\0', '\0');
+    index = data_new_datum(*(data_t **)0x6324ec, best_handle);
+    if (index == -1) {
+      return index;
+    }
+  }
+  conversation = (char *)datum_get(*(data_t **)0x6324ec, index);
+  *(int16_t *)(conversation + 2) = scenario_conversation_index;
+  *(int16_t *)(conversation + 0x48) = -1;
+  *(char *)(conversation + 4) = param_2;
+  *(int32_t *)(conversation + 0xc) = game_time_get();
+  return index;
+}
+
+/* ai_conversation_line_begin (0x43870) — arm the currently-selected line of one
+ * running scenario conversation: resolve the speaking participant, cache the
+ * speaker/listener object handles and the sound tag reference, and set the line
+ * countdown.  Returns true when the line was armed, false when the participant
+ * index is out of range or that participant is not present in the conversation.
+ *
+ * Confirmed (disasm 0x43870-0x43a1b):
+ *   - Conversation handle arrives in EAX (PUSH EAX at 0x4387f feeds
+ *     datum_get(*(data_t **)0x6324ec, handle) with no prior def of EAX), and
+ *     the result is a bool in AL (XOR AL,AL at 0x438bd, MOV AL,1 at 0x43a13,
+ *     single exit at 0x43a15).
+ *   - tag_block_get_element(scenario+0x468, conversation->scenario_index, 0x74)
+ *     then (conv_tag+0x5c, conversation[0x48], 0x7c) -> the line element.  The
+ *     ADD ESP,0x18 at 0x438ba is MSVC merging the two 3-arg cleanups, not a
+ *     6-arg call.
+ *   - word[line+2] (participant index) is RELOADED at 0x438f7, 0x439a7 and
+ *     0x439db rather than cached across the whole body.
+ *   - Presence test: MOV EBX,1; SHL EBX,CL; TEST [conversation+0x14],EBX.
+ *   - line+0x5c source: MOVSX word[conversation+idx*2+0x18]; SHL EAX,4;
+ *     MOV ECX,[EAX+EDI+0x28] -> line + dialogue_index*0x10 + 0x28.
+ *   - FLD [line+0xc]; FMUL [0x253394] (=30.0f); _ftol2 -> word[conv+0x4c].
+ *   - Trailing zero stores are descending: 0x63, 0x62, 0x61. */
+bool ai_conversation_line_begin(int conversation_handle)
+{
+  char *conversation;
+  char *conv_tag;
+  char *line;
+  char *participant;
+  char *actor;
+  int *participant_count;
+  short participant_index;
+  short other_index;
+  int actor_handle;
+  bool result;
+
+  conversation = (char *)datum_get(*(data_t **)0x6324ec, conversation_handle);
+  conv_tag =
+    (char *)tag_block_get_element((char *)global_scenario_get() + 0x468,
+                                  (int)*(int16_t *)(conversation + 2), 0x74);
+  line = (char *)tag_block_get_element(
+    conv_tag + 0x5c, (int)*(int16_t *)(conversation + 0x48), 0x7c);
+  participant_index = *(int16_t *)(line + 2);
+  result = 0;
+  if (participant_index >= 0) {
+    participant_count = (int *)(conv_tag + 0x50);
+    if ((int)participant_index < *participant_count &&
+        (*(uint32_t *)(conversation + 0x14) &
+         (1 << (participant_index & 0x1f))) != 0) {
+      participant = (char *)tag_block_get_element(participant_count,
+                                                  (int)participant_index, 0x54);
+      actor_handle =
+        *(int32_t *)(conversation + *(int16_t *)(line + 2) * 4 + 0x28);
+      *(int16_t *)(conversation + 0x4a) = *(int16_t *)(line + 2);
+      if (actor_handle == -1) {
+        *(int32_t *)(conversation + 0x50) = -1;
+        *(int32_t *)(conversation + 0x54) = -1;
+        *(int32_t *)(conversation + 0x58) = -1;
+        *(char *)(conversation + 0x60) = 1;
+      } else {
+        actor = (char *)datum_get(*(data_t **)0x6325a4, actor_handle);
+        *(int32_t *)(conversation + 0x50) = actor_handle;
+        *(int32_t *)(conversation + 0x54) = *(int32_t *)(actor + 0x18);
+        *(int32_t *)(conversation + 0x58) = -1;
+        if (*(int16_t *)(line + 4) == 1) {
+          *(int32_t *)(conversation + 0x58) = *(int32_t *)(conversation + 0x10);
+        } else if (*(int16_t *)(line + 4) == 2) {
+          other_index = *(int16_t *)(line + 6);
+          if (other_index >= 0 && (int)other_index < *participant_count) {
+            actor_handle = *(int32_t *)(conversation + other_index * 4 + 0x28);
+            if (actor_handle != -1) {
+              actor = (char *)datum_get(*(data_t **)0x6325a4, actor_handle);
+              *(int32_t *)(conversation + 0x58) = *(int32_t *)(actor + 0x18);
+            }
+          }
+        }
+        *(char *)(conversation + 0x60) = (*(int16_t *)(participant + 4) == 6 ||
+                                          *(int16_t *)(participant + 4) == 7);
+      }
+      assert_halt_msg_at(
+        "(conversation->dialogue_indices[line->participant_index] >= 0) && "
+        "(conversation->dialogue_indices[line->participant_index] < "
+        "MAXIMUM_DIALOGUE_VARIANTS_PER_CONVERSATION_PARTICIPANT)",
+        "c:\\halo\\SOURCE\\ai\\ai_communication.c", 0x146b,
+        *(int16_t *)(conversation + *(int16_t *)(line + 2) * 2 + 0x18) >= 0 &&
+          *(int16_t *)(conversation + *(int16_t *)(line + 2) * 2 + 0x18) < 6);
+      *(int32_t *)(conversation + 0x5c) =
+        *(int32_t *)(line +
+                     *(int16_t *)(conversation + *(int16_t *)(line + 2) * 2 +
+                                  0x18) *
+                       0x10 +
+                     0x28);
+      *(int16_t *)(conversation + 0x4c) =
+        (int16_t)(int)(*(float *)(line + 0xc) * *(float *)0x253394);
+      *(int16_t *)(conversation + 0x4e) = *(int16_t *)line;
+      *(char *)(conversation + 0x63) = 0;
+      *(char *)(conversation + 0x62) = 0;
+      *(char *)(conversation + 0x61) = 0;
+      result = 1;
+    }
+  }
+  return result;
+}
+
 /* actor_communication_update (0x43db0) — per-tick idle/ambient speech tick for
  * one actor.  While the actor is at least state 2 and the AI globals' speech
  * enable byte is set, it (re)arms the countdown whenever the actor's cached
@@ -1113,6 +1318,178 @@ void actor_communication_update(int actor_handle)
     }
   }
 }
+
+/* ai_communication_update_speech_timers (0x43f20) — record that a unit just
+ * spoke: stamp the unit's speech timestamp, raise the per-team "someone is
+ * talking" high-water marks in the AI globals block, and stamp/arm the
+ * dialogue and reply cooldown entries for this speech.
+ *
+ * Confirmed (disasm 0x43f20-0x441b4):
+ *   - Frame PUSH EBP; MOV EBP,ESP; SUB ESP,0xc; PUSH EBX/ESI/EDI.  Locals are
+ *     EBP-0x4 (team index, see below), EBP-0x8 (base_ticks) and EBP-0xc
+ *     (ticks).  Plain RET, so the four stack parameters are cdecl.
+ *   - The unit handle arrives in EAX: PUSH 0x3; PUSH EAX; CALL
+ *     object_get_and_verify_type at 0x43f2b with EAX never written in this
+ *     function beforehand — hence the `@<eax>` annotation in kb.json.
+ *   - Stack parameters are EBP+0x8 (param_2, read as DI/CX — 16-bit),
+ *     EBP+0xc (param_3), EBP+0x10 (dialogue_type_index) and EBP+0x14
+ *     (reply_table_index).  The last two names are recovered verbatim from
+ *     the assert strings at 0x440a6 and 0x44138.
+ *   - EBP-0x8 is stored at 0x43f6f (before ADD ESI,EAX) and EBP-0xc at
+ *     0x43f79 (after), so EBP-0x8 is game_time_get()'s raw result and
+ *     EBP-0xc is that result plus the clamped delay.  EBX is reloaded from
+ *     EBP-0x8 on both paths (0x44043 and 0x44087), so the cooldown entries'
+ *     first dword receives base_ticks, not ticks.
+ *   - MOVSX EAX,[EDI+0x3aa]; ADD EAX,-0x2d; XOR EDX,EDX; TEST EAX,EAX;
+ *     SETL DL; DEC EDX; AND EAX,EDX — a branchless max(0, field-0x2d).
+ *   - XOR ECX,ECX; MOV CX,word ptr [EAX+4] — the actor field at +0x4 is
+ *     zero-extended, so it is read through an unsigned short.
+ *   - TEST AL,0x2 / TEST AL,0x4 on FUN_0003a770's result select team index 0
+ *     and 1 respectively; neither bit set returns without touching anything.
+ *   - The AI globals pointer at 0x632574 is re-loaded for each of the three
+ *     high-water updates (0x43fe1, 0x43ffb, 0x44015), and EBP-0x4 is
+ *     re-read with MOVSX at 0x43fdd, 0x440c6 and 0x44158 — kept as separate
+ *     reads here rather than hoisted into one local.
+ *   - CMP DI,0x5/JG, CMP DI,0x3/JL, CMP DI,0x5/JL are signed 16-bit tests,
+ *     i.e. `param_2 <= 5`, `param_2 >= 3`, `param_2 >= 5`.
+ *   - Dialogue entry address: LEA ESI,[ECX + (team + index*2)*8] off the
+ *     table at 0x331f0c; its definition is LEA [EAX+EAX*4] then
+ *     [EDI*8+0x257e48] = index*0x28, matching the 0x28 stride already
+ *     documented for the comm dialogue table.  Reply entry is off 0x331f14
+ *     with LEA [EAX+EAX*8] then [EDI*4+0x258eb0] = index*0x24.
+ *   - FNSTSW AX; TEST AH,0x41; JNZ skip after FLD f / FCOMP [0x2533c0]
+ *     proceeds only when f is strictly greater than the threshold.
+ *   - The float at +0x14 (dialogue) / +0x1c (reply) is loaded twice (FLD at
+ *     0x440f8 and 0x44108; 0x4418a and 0x4419a) — once to compare, once to
+ *     scale — so it is read from memory twice rather than cached.
+ *   - FLD f; FMUL [0x253394]; FIADD dword ptr [EBP-0xc]; _ftol2 is
+ *     (int)(f * scale + ticks); _ftol2 is written as a plain cast.
+ *   - Hazard ARG_COUNT on FUN_0003a770 (cleanup=3, decl=1) is a false
+ *     positive: the ADD ESP,0xc at 0x43fb1 is MSVC coalescing datum_get's
+ *     two pushes with this call's single push.
+ *   - Hazard ARG_COUNT on error (cleanup=8, decl=3) is likewise expected:
+ *     error is varargs and ADD ESP,0x20 at 0x44082 covers level + format
+ *     + six varargs.
+ * Uncertain: param_2 and param_3 keep mechanical names.  param_2 indexes the
+ *   three high-water slots and picks "talk" vs "chatter"; param_3 is only
+ *   ever handed to FUN_001a67b0 for the debug line.  Neither meaning is
+ *   proven by a string or assert at this call site. */
+void ai_communication_update_speech_timers(int unit_handle, int16_t param_2,
+                                           int16_t param_3,
+                                           int16_t dialogue_type_index,
+                                           int16_t reply_table_index)
+{
+  char *unit;
+  void *actor;
+  int base_ticks;
+  int ticks;
+  int delay;
+  short team_index;
+  int16_t communication_flags;
+  char *ai_globals;
+  int high_water;
+  int32_t *entry;
+  char *definition;
+  const char *speech_kind;
+
+  unit = (char *)object_get_and_verify_type(unit_handle, 3);
+  if (*(int32_t *)(unit + 0x1a4) == -1) {
+    actor = NULL;
+  } else {
+    actor = datum_get(*(data_t **)0x6325a4, *(int32_t *)(unit + 0x1a4));
+  }
+  base_ticks = game_time_get();
+  delay = (int)*(int16_t *)(unit + 0x3aa) - 0x2d;
+  if (delay < 0) {
+    delay = 0;
+  }
+  ticks = base_ticks + delay;
+  *(int32_t *)(unit + 0x3a0) = ticks;
+  if (actor != NULL) {
+    FUN_00043ce0(*(int32_t *)(unit + 0x1a4));
+    actor = datum_get(*(data_t **)0x6325a4, *(int32_t *)(unit + 0x1a4));
+    communication_flags =
+      FUN_0003a770((int16_t) * (uint16_t *)((char *)actor + 4));
+    if ((communication_flags & 2) == 0) {
+      if ((communication_flags & 4) == 0) {
+        return;
+      }
+      team_index = 1;
+    } else {
+      team_index = 0;
+    }
+    if (param_2 <= 5) {
+      ai_globals = *(char **)0x632574;
+      high_water = *(int32_t *)(ai_globals + (int)team_index * 4 + 0x14);
+      if (high_water <= ticks) {
+        high_water = ticks;
+      }
+      *(int32_t *)(ai_globals + (int)team_index * 4 + 0x14) = high_water;
+      if (param_2 >= 3) {
+        ai_globals = *(char **)0x632574;
+        high_water = *(int32_t *)(ai_globals + (int)team_index * 4 + 0x1c);
+        if (high_water <= ticks) {
+          high_water = ticks;
+        }
+        *(int32_t *)(ai_globals + (int)team_index * 4 + 0x1c) = high_water;
+      }
+      if (param_2 >= 5) {
+        ai_globals = *(char **)0x632574;
+        high_water = *(int32_t *)(ai_globals + (int)team_index * 4 + 0x24);
+        if (high_water <= ticks) {
+          high_water = ticks;
+        }
+        *(int32_t *)(ai_globals + (int)team_index * 4 + 0x24) = high_water;
+      }
+      if (*(char *)0x5aca54 != '\0') {
+        speech_kind = "talk";
+        if (param_2 < 3) {
+          speech_kind = "chatter";
+        }
+        error(2, "%s %s %d/%s: %s %d",
+              *(char **)(0x2c8d68 + (int)team_index * 8), FUN_001a6ca0(param_2),
+              (int)dialogue_type_index, FUN_001a67b0(param_3, 1), speech_kind,
+              ticks - base_ticks);
+      }
+    }
+    if (dialogue_type_index != -1) {
+      if (dialogue_type_index < 0 ||
+          dialogue_type_index >= *(int16_t *)0x331f08) {
+        display_assert("(dialogue_type_index >= 0) && (dialogue_type_index < "
+                       "global_dialogue_event_count)",
+                       "c:\\halo\\SOURCE\\ai\\ai_communication.c", 0xc9c, 1);
+        system_exit(-1);
+      }
+      entry = (int32_t *)(*(char **)0x331f0c +
+                          ((int)team_index + (int)dialogue_type_index * 2) * 8);
+      definition = (char *)0x257e48 + (int)dialogue_type_index * 0x28;
+      entry[0] = base_ticks;
+      if ((game_connection() != 0 || *(char *)0x5aca46 == '\0') &&
+          *(float *)(definition + 0x14) > *(float *)0x2533c0) {
+        entry[1] =
+          (int)(*(float *)(definition + 0x14) * *(float *)0x253394 + ticks);
+      }
+    }
+    if (reply_table_index != -1) {
+      if (reply_table_index < 0 || reply_table_index >= *(int16_t *)0x331f10) {
+        display_assert("(reply_table_index >= 0) && (reply_table_index < "
+                       "global_reply_event_count)",
+                       "c:\\halo\\SOURCE\\ai\\ai_communication.c", 0xcaf, 1);
+        system_exit(-1);
+      }
+      entry = (int32_t *)(*(char **)0x331f14 +
+                          ((int)team_index + (int)reply_table_index * 2) * 8);
+      definition = (char *)0x258eb0 + (int)reply_table_index * 0x24;
+      entry[0] = base_ticks;
+      if ((game_connection() != 0 || *(char *)0x5aca46 == '\0') &&
+          *(float *)(definition + 0x1c) > *(float *)0x2533c0) {
+        entry[1] =
+          (int)(*(float *)(definition + 0x1c) * *(float *)0x253394 + ticks);
+      }
+    }
+  }
+}
+
 
 /* ai_conversation_stop (0x44500) — iterate all conversations and finish every
  * one whose index field (+0x2) matches param_1. When the AI debug flag at
@@ -1246,4 +1623,210 @@ void ai_conversation_actor_deleted(int actor_handle)
     }
     conversation = (char *)data_iterator_next(&iter);
   } while (conversation != 0);
+}
+
+/* ai_communication_find_global_actor_to_talk (0x458f0) — scan every live actor
+ * and return the datum handle of the best-scoring conversation partner.
+ *
+ * Walks the global encounter/actor iterator, filters candidates by team
+ * relationship, scores each survivor with FUN_000454a0, and keeps the highest
+ * score (strictly greater). Returns -1 when nothing scores above 0.0f.
+ *
+ * Confirmed (disasm 0x458f0-0x45a08):
+ *   Register params: EDI = object_handle (never saved in the prologue),
+ *   BX = team (CMP BX,-0x1 at 0x45948). Only ESI is saved (PUSH ESI 0x458f6),
+ *   so EDI/EBX are inbound parameters.
+ *   Stack params: [EBP+0x08] param_1 int16_t (MOVSX at 0x4595b, 0/1/2
+ * selector), [EBP+0x0c] param_2 .. [EBP+0x28] param_9. Return: EAX = [EBP-0x4]
+ * (MOV EAX,[EBP-0x4] at 0x45a01). Confirmed frame (SUB ESP,0x3c = 60 bytes):
+ *   [EBP-0x3c] iter        0x1c bytes (actor handle at iter+0x14 = [EBP-0x28],
+ *                          same convention as actors_move_randomly)
+ *   [EBP-0x20] vec_b       float[3]  (address-only; never written here)
+ *   [EBP-0x14] vec_a       float[3]  (unit_get_head_position destination)
+ *   [EBP-0x08] best_score  float
+ *   [EBP-0x04] best_handle int
+ * Confirmed: both unit_get_head_position calls push EDI and LEA [EBP-0x14]
+ *   (0x4590b-0x4590d and 0x4591d-0x4591f) — the second is guarded on
+ *   param_2 != -1 yet still passes object_handle into the same buffer. That
+ *   duplicate is what the binary does; it is preserved deliberately.
+ * Confirmed: ADD ESP,0xc at 0x4593d cleans encounter_iterator_next(8) +
+ *   actor_iterator_next(4) together (cdecl cleanup mis-grouping).
+ * Confirmed: game_allegiance_get_team_is_friendly runs before the selector
+ *   dispatch (CALL 0x45956, MOVSX 0x4595b), so its side effect happens in
+ *   every mode even where mode 0 discards the result.
+ * Confirmed selector dispatch at 0x45962-0x4599c:
+ *   0 -> match = (actor->field_03e == team)  (CMP word[ESI+0x3e],BX / SETZ)
+ *   1 -> match = !friendly                   (TEST AL,AL / SETZ)
+ *   2 -> match = friendly                    (falls through to TEST AL,AL)
+ *   else -> assert "!\"unreachable\"" line 0xdfd = 3581, then system_exit(-1).
+ * Confirmed: ADD ESP,0x2c at 0x459d4 = 11 stack dwords into FUN_000454a0, with
+ *   MOV EAX,EDI at 0x459ca supplying its @<eax> register arg. cdecl push order
+ *   (0x459a7-0x459c9) reverses to
+ *   (iter+0x14, vec_a, param_2, vec_b, param_3..param_9).
+ * Confirmed: FCOM [EBP-0x8] / FNSTSW AX / TEST AH,0x41 / JNZ at 0x459d1 keeps
+ *   the candidate only when the returned score is strictly greater than
+ *   best_score (C3|C0 clear); the reject arm is FSTP ST0 at 0x459e9.
+ * Confirmed: FUN_000454a0 prologue (PUSH EBP / MOV EBP,ESP / SUB ESP,0x10 /
+ *   PUSH EBX / PUSH ESI / MOV ESI,EAX / PUSH EDI) saves EBX, ESI and EDI, so
+ *   EAX is its only register parameter.
+ */
+int ai_communication_find_global_actor_to_talk(int16_t param_1, int param_2,
+                                               int param_3, int param_4,
+                                               int param_5, int param_6,
+                                               int param_7, int param_8,
+                                               int param_9, int object_handle,
+                                               int16_t team)
+{
+  char iter[0x1c];
+  float vec_b[3];
+  float vec_a[3];
+  float best_score;
+  volatile int best_handle;
+  char *actor_record;
+  bool match;
+  float score;
+
+  best_handle = -1;
+  best_score = 0.0f;
+  if (object_handle != -1) {
+    unit_get_head_position(object_handle, vec_a);
+  }
+  if (param_2 != -1) {
+    /* Binary-faithful: the guard tests param_2 but the call still passes
+     * object_handle into vec_a, exactly as at 0x4591a-0x4591f. */
+    unit_get_head_position(object_handle, vec_a);
+  }
+  encounter_iterator_next(iter, 1);
+  while ((actor_record = (char *)actor_iterator_next(iter)) != NULL) {
+    match = 1;
+    if (team != -1) {
+      match = game_allegiance_get_team_is_friendly(
+        team, ((actor_t *)actor_record)->field_03e);
+      switch (param_1) {
+      case 0:
+        match = (((actor_t *)actor_record)->field_03e == team);
+        break;
+      case 1:
+        match = !match;
+        break;
+      case 2:
+        break;
+      default:
+        display_assert("!\"unreachable\"",
+                       "c:\\halo\\SOURCE\\ai\\ai_communication.c", 0xdfd, 1);
+        system_exit(-1);
+        break;
+      }
+    }
+    if (match) {
+      score = FUN_000454a0(object_handle, *(int *)(iter + 0x14), vec_a, param_2,
+                           vec_b, param_3, param_4, param_5, param_6, param_7,
+                           param_8, param_9);
+      if (score > best_score) {
+        best_score = score;
+        best_handle = *(int *)(iter + 0x14);
+      }
+    }
+  }
+  return best_handle;
+}
+
+/* ai_conversation (0x46b60) — script entry point that starts a scenario
+ * conversation by index.  Validates the 16-bit index against the scenario
+ * tag's conversation block count at +0x468, allocates/force-starts the
+ * conversation datum via FUN_00043740, then tries to begin it.  Returns
+ * true when the conversation is running or has been queued to keep trying,
+ * false when the index is out of range or the conversation pool is full.
+ *
+ * Confirmed (disasm 0x46b60-0x46ca1):
+ *   - Prologue is PUSH EBP / MOV EBP,ESP / PUSH EBX/ESI/EDI with NO
+ *     `sub esp`: MSVC parks the ai_conversation_begin out-flag in the dead
+ *     high byte of param_1's incoming slot ([EBP+0xb]), since only CX is
+ *     ever read from that dword.  A normal C local is used here instead;
+ *     the resulting `sub esp` is a permanent frame-shape difference.
+ *   - `TEST CX,CX` / `JL` then `MOVSX ESI,CX` / `CMP ESI,[EAX+0x468]` /
+ *     `JGE`: the range test is on the SIGNED low 16 bits, and the
+ *     sign-extended index in ESI stays live across all four print sites.
+ *   - global_scenario_get() is called once up front (0x46b66) and again at
+ *     EACH print site (0x46ba5, 0x46c06, 0x46c40, 0x46c6e) — four separate
+ *     calls, not a cached pointer.
+ *   - FUN_00043740 (0x46b8f): pushes are [EBP+0xc] then [EBP+8], i.e.
+ *     (param_1, param_2) cdecl.  Ghidra's `void (void)` prototype swallowed
+ *     both args (§7_GETTER_SWALLOWED); `ADD ESP,0x8` proves the 2 args.
+ *   - ai_conversation_begin (0x46bee): pushes are LEA ECX,[EBP+0xb] then
+ *     EDI, i.e. (conversation_handle, &keep_trying) cdecl, with
+ *     `MOV byte ptr [EBP+0xb],0` zeroing the flag before the call and
+ *     `TEST AL,AL` consuming a bool return.  Same §7 swallow; `ADD ESP,0x8`
+ *     proves 2 args.  kb decl corrected from `void (void)`.
+ *   - The 0x46c39..0x46c66 arm ("can't begin yet but will remember and keep
+ *     trying it", string 0x25a308) is REAL; Ghidra dropped it as
+ *     unreachable.  It is taken when begin returned false but set the
+ *     keep-trying flag, and it returns true.
+ *   - The debug flag at 0x5aca5f is loaded once at 0x46c32, above the
+ *     keep_trying branch, and both remaining arms test that same AL.
+ *   - tag_block_get_element(scenario+0x468, index, 0x74): pushes are 0x74,
+ *     then ESI, then the block pointer — (block, index, element_size), the
+ *     kb order.  (ai_conversation_advance at 0x43520 in this TU passes the
+ *     last two swapped; that pre-existing issue is not touched here.)
+ *   - The four `ARG_COUNT: cleanup=6 vs decl=3` hazards on console_printf
+ *     are merged-`ADD ESP,0x18` false positives: tag_block_get_element's 3
+ *     args plus console_printf's 3.
+ *   - Both false exits are `MOV AL,BL` with BL zeroed at 0x46b6e — a bool
+ *     return, not a status variable.
+ * Uncertain: the meaning of param_2 beyond FUN_00043740's force-start flag,
+ *   and of ai_conversation_finish's ('\1','\0') argument pair here. */
+int ai_conversation(int param_1, int param_2)
+{
+  char *scenario;
+  int index;
+  int conversation_handle;
+  char keep_trying;
+  char debug_enabled;
+
+  scenario = (char *)global_scenario_get();
+  index = (int)(short)param_1;
+  if ((short)param_1 >= 0 && index < *(int *)(scenario + 0x468)) {
+    conversation_handle = FUN_00043740((int16_t)param_1, (char)param_2);
+    if (*(char *)0x5aca5f != '\0') {
+      console_printf(0, "%s: script tried to start conversation",
+                     tag_block_get_element(
+                       (char *)global_scenario_get() + 0x468, index, 0x74));
+    }
+    if (conversation_handle == -1) {
+      error(2,
+            "WARNING: too many executing conversations (ran out of "
+            "MAXIMUM_CONVERSATIONS_PER_MAP %d)",
+            0x80);
+      return 0;
+    }
+    keep_trying = '\0';
+    if (ai_conversation_begin(conversation_handle, &keep_trying) != '\0') {
+      if (*(char *)0x5aca5f != '\0') {
+        console_printf(0, "%s: begun successfully",
+                       tag_block_get_element(
+                         (char *)global_scenario_get() + 0x468, index, 0x74));
+      }
+      return 1;
+    }
+    debug_enabled = *(char *)0x5aca5f;
+    if (keep_trying != '\0') {
+      if (debug_enabled != '\0') {
+        console_printf(
+          0, "%s: can't begin yet but will remember and keep trying it",
+          tag_block_get_element((char *)global_scenario_get() + 0x468, index,
+                                0x74));
+      }
+      return 1;
+    }
+    if (debug_enabled != '\0') {
+      console_printf(
+        0,
+        "%s: could not start, and not set to keep trying... aborting "
+        "(status 5)",
+        tag_block_get_element((char *)global_scenario_get() + 0x468, index,
+                              0x74));
+    }
+    ai_conversation_finish(conversation_handle, '\1', '\0');
+  }
+  return 0;
 }
