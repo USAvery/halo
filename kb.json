@@ -38847,7 +38847,8 @@
     },
     {
      "addr": "0x62b20",
-     "decl": "void FUN_00062b20(void);"
+     "decl": "bool FUN_00062b20(unsigned char *param_1 @<eax>, int surface_index @<edx>, unsigned char param_3 @<ebx>, void *bsp_surfaces, unsigned int *breakable_bitmap);",
+     "ported": true
     },
     {
      "addr": "0x62ba0",

@@ -8475,6 +8475,21 @@
       "score": 97.8,
       "source": "src/halo/structures/structures.c"
     },
+    "FUN_00062b20": {
+      "abi_model": "regparam_stripped_saves",
+      "abi_model_items": 5,
+      "abi_modeled_mnemonic_pct": 97.7,
+      "addr": "0x62b20",
+      "end": "0x62b94",
+      "kind": "auto",
+      "n_r": 44,
+      "opnd_percent": 95.5,
+      "raw_mnemonic_pct": 92.5,
+      "ref": "synth",
+      "ref_sha": "f3d42ed55dc21003",
+      "score": 97.7,
+      "source": "src/halo/ai/path_smoothing.c"
+    },
     "FUN_000633b0": {
       "abi_model": "raw",
       "abi_model_items": 0,

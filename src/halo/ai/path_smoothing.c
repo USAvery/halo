@@ -112,6 +112,61 @@ void path_obstacles_debug_render(void *obstacles, float radius)
   return;
 }
 
+/* 0x00062b20 — FUN_00062b20  (TU: c:\halo\SOURCE\ai\path_smoothing.c)
+ *
+ * Register-arg predicate (EAX/EDX/BL in, AL out) — no callers recovered yet
+ * (xrefs_to is empty; reached via an inlined/indirect path), so the argument
+ * meanings below are only as strong as the binary evidence noted.
+ *
+ * Confirmed from disassembly 0x62b20-0x62b93 (bounds-table exact):
+ *   EAX      byte-array base, indexed by EDX   -> param_1 (meaning unproven)
+ *   EDX      index; the SAME index is passed to tag_block_get_element for the
+ *            collision-surface block, so it is the surface index
+ *   BL       flag; nonzero short-circuits the whole body
+ *   [EBP+8]  element whose +0x3c is the collision_surfaces tag_block (the
+ *            "bsp_surfaces" element that FUN_0005e700 obtains via
+ *            tag_block_get_element(structure_bsp + 0xb0, 0, 0x60)) — NOT the
+ *            structure_bsp itself
+ *   [EBP+0xc] dword bitmap indexed by collision_surface->breakable_surface
+ *
+ * collision_surface stride 0xc: flags byte at +8 (bit 3 =
+ * _collision_surface_breakable_bit, named by the display_assert string),
+ * breakable_surface byte at +9.
+ *
+ * `result` is computed unconditionally (SHR AL,6; AND AL,1) before the guard
+ * chain, so all three early exits return that bit; only the fully-guarded
+ * path overwrites it with the bitmap test. Note the polarity is the OPPOSITE
+ * of the sibling FUN_0005e700: here SETNZ, i.e. result is true when the bit
+ * IS set.
+ */
+bool FUN_00062b20(unsigned char *param_1, int surface_index,
+                  unsigned char param_3, void *bsp_surfaces,
+                  unsigned int *breakable_bitmap)
+{
+  unsigned char flags;
+  bool result;
+  unsigned char *collision_surface;
+  unsigned int breakable_index;
+
+  flags = param_1[surface_index];
+  result = (flags >> 6) & 1;
+
+  if (param_3 == 0 && result && (signed char)flags < 0) {
+    collision_surface = (unsigned char *)tag_block_get_element(
+      (char *)bsp_surfaces + 0x3c, surface_index, 0xc);
+    if ((collision_surface[8] & 8) == 0) {
+      display_assert(
+        "TEST_FLAG(collision_surface->flags, _collision_surface_breakable_bit)",
+        "c:\\halo\\SOURCE\\ai\\path_smoothing.c", 0x1e2, 1);
+      system_exit(-1);
+    }
+    breakable_index = collision_surface[9];
+    result = (breakable_bitmap[breakable_index >> 5] &
+              (1u << (breakable_index & 0x1f))) != 0;
+  }
+  return result;
+}
+
 /* 0x00063710 — structure_test_ray2d  (TU:
  * c:\halo\SOURCE\ai\path_structure_bsp.c)
  *
