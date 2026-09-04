@@ -38371,17 +38371,17 @@
     "FUN_0017cfc0": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 66.7,
+      "abi_modeled_mnemonic_pct": 100.0,
       "addr": "0x17cfc0",
       "end": "0x17cfc9",
       "kind": "auto",
       "n_r": 4,
-      "opnd_percent": 66.7,
-      "raw_mnemonic_pct": 66.7,
+      "opnd_percent": 100.0,
+      "raw_mnemonic_pct": 100.0,
       "ref": "synth",
       "ref_sha": "b3e8aa8e16d78225",
-      "score": 66.7,
-      "source": "src/halo/unported_thunks.c"
+      "score": 100.0,
+      "source": "src/halo/rasterizer/rasterizer_sprites.c"
     },
     "FUN_0017cfd0": {
       "abi_model": "raw",

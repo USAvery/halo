@@ -399,7 +399,7 @@
   "name": "ai_communication_event",
   "obj": "ai.obj",
   "ported": false,
-  "comment": "[NAME: FUN_00046f10 — name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03] [NAME: ai_communication_event — name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
+  "comment": "[NAME: FUN_00046f10 \u2014 name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03] [NAME: ai_communication_event \u2014 name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
  },
  "0x803d0": {
   "addr": "0x803d0",
@@ -921,7 +921,7 @@
     },
     {
      "addr": "0x1dbdec",
-     "comment": "LIBCMT _except_handler3 — VC7 frame-based SEH dispatcher (installed by __SEH_prolog @0x1dd5c8). Referenced by clang's __try/__except lowering in FUN_001d6ca8/FUN_001d703b; resolves to the original runtime via forwarding thunk.",
+     "comment": "LIBCMT _except_handler3 \u2014 VC7 frame-based SEH dispatcher (installed by __SEH_prolog @0x1dd5c8). Referenced by clang's __try/__except lowering in FUN_001d6ca8/FUN_001d703b; resolves to the original runtime via forwarding thunk.",
      "decl": "int __cdecl _except_handler3(void *ExceptionRecord, void *EstablisherFrame, void *ContextRecord, void *DispatcherContext);"
     },
     {
@@ -4069,7 +4069,7 @@
      "addr": "0x425c0",
      "decl": "void ai_handle_spatial_effect(int object_handle, float *position, short effect_type, short volume, short count);",
      "ported": true,
-     "comment": "[NAME: ai_handle_spatial_effect — name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
+     "comment": "[NAME: ai_handle_spatial_effect \u2014 name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
     },
     {
      "addr": "0x41590",
@@ -6735,7 +6735,7 @@
     {
      "addr": "0x85b60",
      "decl": "void dead_camera_new(void);",
-     "comment": "[NAME: dead_camera_new — CEA PDB line-containment (high_confidence), cea-deferred 2026-09-03]"
+     "comment": "[NAME: dead_camera_new \u2014 CEA PDB line-containment (high_confidence), cea-deferred 2026-09-03]"
     },
     {
      "addr": "0x85c80",
@@ -7028,7 +7028,7 @@
     {
      "addr": "0x9ca70",
      "decl": "void effects_information_get(int effect_ptr@<ebx>, uint32_t flags_hi@<edi>, unsigned int *seed, float *velocity_out, float min_val, float max_val, uint32_t flags_lo);",
-     "note": "hidden reg deps (EDI=flags_hi, EBX=effect_ptr) — callers pass these in registers; all known callers inlined",
+     "note": "hidden reg deps (EDI=flags_hi, EBX=effect_ptr) \u2014 callers pass these in registers; all known callers inlined",
      "ported": true
     },
     {
@@ -7089,7 +7089,7 @@
     {
      "addr": "0x9dcf0",
      "decl": "void FUN_0009dcf0(float *position, void *effect, void *location, void *part, float *forward, float *up, float scale);",
-     "note": "4 reg args (EAX,EDX,ECX,ESI) — inlined into FUN_0009e310, cannot be thunked separately",
+     "note": "4 reg args (EAX,EDX,ECX,ESI) \u2014 inlined into FUN_0009e310, cannot be thunked separately",
      "ported": true
     },
     {
@@ -7594,7 +7594,7 @@
     {
      "addr": "0x199d40",
      "decl": "void datastore_read(void);",
-     "comment": "[NAME: datastore_read — CEA PDB line-containment (probable), cea-deferred 2026-09-03]"
+     "comment": "[NAME: datastore_read \u2014 CEA PDB line-containment (probable), cea-deferred 2026-09-03]"
     },
     {
      "addr": "0x19a020",
@@ -13483,7 +13483,7 @@
     {
      "addr": "0xe0110",
      "decl": "void interface_draw_bitmap_modulated_p32(void);",
-     "comment": "[NAME: interface_draw_bitmap_modulated_p32 — CEA PDB line-containment (high_confidence), cea-deferred 2026-09-03]"
+     "comment": "[NAME: interface_draw_bitmap_modulated_p32 \u2014 CEA PDB line-containment (high_confidence), cea-deferred 2026-09-03]"
     }
    ],
    "name": "interface.obj",
@@ -13591,7 +13591,7 @@
     {
      "addr": "0xf5900",
      "decl": "void virtual_keyboard_tab_left(void);",
-     "comment": "[NAME: virtual_keyboard_tab_left — CEA PDB line-containment (probable), cea-deferred 2026-09-03]"
+     "comment": "[NAME: virtual_keyboard_tab_left \u2014 CEA PDB line-containment (probable), cea-deferred 2026-09-03]"
     },
     {
      "addr": "0xf5f10",
@@ -19504,7 +19504,7 @@
     {
      "addr": "0x154a50",
      "decl": "int point_physics_update(int flags, int physics_tag_data, int *collision_location, int object_handle, float *position, float *velocity, float *force, float *collision_normal_out, int16_t *surface_index_out, float radius, float delta_time);",
-     "comment": "[NAME: point_physics_update — name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
+     "comment": "[NAME: point_physics_update \u2014 name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
     }
    ],
    "name": "point_physics.obj",
@@ -23418,7 +23418,7 @@
     {
      "addr": "0x1c4850",
      "decl": "void enumerate_memory_units_test(void);",
-     "comment": "[NAME: enumerate_memory_units_test — CEA PDB line-containment (high_confidence), cea-deferred 2026-09-03]"
+     "comment": "[NAME: enumerate_memory_units_test \u2014 CEA PDB line-containment (high_confidence), cea-deferred 2026-09-03]"
     },
     {
      "addr": "0x1c4990",
@@ -23892,7 +23892,7 @@
      "addr": "0x18ca40",
      "decl": "void render_sky(void);",
      "ported": true,
-     "comment": "[NAME: render_sky — name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
+     "comment": "[NAME: render_sky \u2014 name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
     },
     {
      "addr": "0x18cf10",
@@ -23918,7 +23918,7 @@
      "addr": "0x18d2c0",
      "decl": "void build_sprites_begin(uint32_t *param_1, int16_t param_2, uint32_t param_3, int param_4, uint32_t param_5);",
      "ported": true,
-     "comment": "[NAME: build_sprites_begin — name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
+     "comment": "[NAME: build_sprites_begin \u2014 name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
     },
     {
      "addr": "0x18d360",
@@ -24987,7 +24987,7 @@
     {
      "addr": "0x1bab60",
      "decl": "void get_write_buffer_size(void);",
-     "comment": "[NAME: get_write_buffer_size — CEA PDB line-containment (probable), cea-deferred 2026-09-03]"
+     "comment": "[NAME: get_write_buffer_size \u2014 CEA PDB line-containment (probable), cea-deferred 2026-09-03]"
     },
     {
      "addr": "0x1bac00",
@@ -25899,7 +25899,7 @@
      "addr": "0x1963c0",
      "decl": "void structure_decals_update(uint32_t *old_cluster_visibility, uint32_t *new_cluster_visibility, int16_t cluster_count);",
      "ported": true,
-     "comment": "[NAME: structure_decals_update — name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
+     "comment": "[NAME: structure_decals_update \u2014 name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
     }
    ],
    "name": "structure_runtime_decals.obj",
@@ -27031,12 +27031,12 @@
     {
      "addr": "0xeb710",
      "decl": "void netgame_join_player(void);",
-     "comment": "[NAME: netgame_join_player — CEA PDB line-containment (probable), cea-deferred 2026-09-03]"
+     "comment": "[NAME: netgame_join_player \u2014 CEA PDB line-containment (probable), cea-deferred 2026-09-03]"
     },
     {
      "addr": "0xeba70",
      "decl": "void player_profiles_list_initialize(void);",
-     "comment": "[NAME: player_profiles_list_initialize — CEA PDB line-containment (probable), cea-deferred 2026-09-03]"
+     "comment": "[NAME: player_profiles_list_initialize \u2014 CEA PDB line-containment (probable), cea-deferred 2026-09-03]"
     },
     {
      "addr": "0xebff0",
@@ -27045,12 +27045,12 @@
     {
      "addr": "0xec2c0",
      "decl": "void playlist_profile_begin_editing(void);",
-     "comment": "[NAME: playlist_profile_begin_editing — CEA PDB line-containment (probable), cea-deferred 2026-09-03]"
+     "comment": "[NAME: playlist_profile_begin_editing \u2014 CEA PDB line-containment (probable), cea-deferred 2026-09-03]"
     },
     {
      "addr": "0xec840",
      "decl": "void playlist_profile_change_name(void);",
-     "comment": "[NAME: playlist_profile_change_name — CEA PDB line-containment (probable), cea-deferred 2026-09-03]"
+     "comment": "[NAME: playlist_profile_change_name \u2014 CEA PDB line-containment (probable), cea-deferred 2026-09-03]"
     },
     {
      "addr": "0xecb60",
@@ -27110,12 +27110,12 @@
     {
      "addr": "0xee500",
      "decl": "void playlist_profile_change_item_options(void);",
-     "comment": "[NAME: playlist_profile_change_item_options — CEA PDB line-containment (probable), cea-deferred 2026-09-03]"
+     "comment": "[NAME: playlist_profile_change_item_options \u2014 CEA PDB line-containment (probable), cea-deferred 2026-09-03]"
     },
     {
      "addr": "0xee810",
      "decl": "void playlist_profile_change_indicator_options(void);",
-     "comment": "[NAME: playlist_profile_change_indicator_options — CEA PDB line-containment (probable), cea-deferred 2026-09-03]"
+     "comment": "[NAME: playlist_profile_change_indicator_options \u2014 CEA PDB line-containment (probable), cea-deferred 2026-09-03]"
     },
     {
      "addr": "0xeea10",
@@ -27313,7 +27313,7 @@
     {
      "addr": "0xf2560",
      "decl": "void player_profile_3wide_list_update(void);",
-     "comment": "[NAME: player_profile_3wide_list_update — CEA PDB line-containment (probable), cea-deferred 2026-09-03]"
+     "comment": "[NAME: player_profile_3wide_list_update \u2014 CEA PDB line-containment (probable), cea-deferred 2026-09-03]"
     },
     {
      "addr": "0xf2690",
@@ -29264,7 +29264,7 @@
     {
      "addr": "0x1b8570",
      "decl": "void vehicle_update(void);",
-     "comment": "[NAME: vehicle_update — CEA PDB line-containment (high_confidence), cea-deferred 2026-09-03]"
+     "comment": "[NAME: vehicle_update \u2014 CEA PDB line-containment (high_confidence), cea-deferred 2026-09-03]"
     },
     {
      "addr": "0x1b8f10",
@@ -29892,7 +29892,7 @@
      "decl": "int rasterizer_geometry_get_vertex_size(short param_1);",
      "name": "rasterizer_geometry_get_vertex_size",
      "ported": true,
-     "comment": "[NAME: rasterizer_geometry_get_vertex_size — name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
+     "comment": "[NAME: rasterizer_geometry_get_vertex_size \u2014 name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
     },
     {
      "addr": "0x1800b0",
@@ -30122,7 +30122,7 @@
      "addr": "0x183390",
      "decl": "int rasterizer_xbox_bitmap_rebuild_hardware_format(int bitmap);",
      "ported": false,
-     "comment": "[NAME: rasterizer_xbox_bitmap_rebuild_hardware_format — name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
+     "comment": "[NAME: rasterizer_xbox_bitmap_rebuild_hardware_format \u2014 name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
     },
     {
      "addr": "0x183650",
@@ -30492,7 +30492,8 @@
     },
     {
      "addr": "0x17cfc0",
-     "decl": "void FUN_0017cfc0(int param_1, int param_2);"
+     "decl": "void FUN_0017cfc0(int param_1, int param_2);",
+     "ported": true
     },
     {
      "addr": "0x17cfd0",
@@ -30554,7 +30555,7 @@
     {
      "addr": "0x17d2b0",
      "decl": "void rasterizer_debug_model_vertices(void);",
-     "comment": "[NAME: rasterizer_debug_model_vertices — name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
+     "comment": "[NAME: rasterizer_debug_model_vertices \u2014 name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
     },
     {
      "addr": "0x17d8f0",
@@ -30655,7 +30656,7 @@
     {
      "addr": "0x17e800",
      "decl": "void rasterizer_debug_triangle_shaded(void);",
-     "comment": "[NAME: rasterizer_debug_triangle_shaded — CEA PDB line-containment (probable), cea-deferred 2026-09-03]"
+     "comment": "[NAME: rasterizer_debug_triangle_shaded \u2014 CEA PDB line-containment (probable), cea-deferred 2026-09-03]"
     },
     {
      "addr": "0x17eb10",
@@ -32646,7 +32647,7 @@
     {
      "addr": "0x19c5d0",
      "decl": "void draw_string(void *callback, void *screen_pos, const void *color, void *clip_bounds, int flags, char *text);",
-     "comment": "[NAME: draw_string — name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
+     "comment": "[NAME: draw_string \u2014 name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
     },
     {
      "addr": "0x19c960",
@@ -33052,7 +33053,7 @@
     {
      "addr": "0xfe910",
      "decl": "void weapon_update(void);",
-     "comment": "[NAME: weapon_update — name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
+     "comment": "[NAME: weapon_update \u2014 name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
     }
    ],
    "name": "weapons.obj",
@@ -33084,7 +33085,7 @@
     {
      "addr": "0x22dc0",
      "decl": "void actor_combat_update(int actor_handle);",
-     "comment": "[NAME: actor_combat_update — name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
+     "comment": "[NAME: actor_combat_update \u2014 name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
     },
     {
      "addr": "0x20f80",
@@ -33567,7 +33568,7 @@
      "decl": "void actor_perception_update(int actor_handle);",
      "ported": true,
      "source_path": "src/halo/ai/actor_perception.c",
-     "comment": "[NAME: actor_perception_update — name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
+     "comment": "[NAME: actor_perception_update \u2014 name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
     }
    ],
    "name": "actor_perception.obj",
@@ -33811,7 +33812,7 @@
     {
      "addr": "0x46f10",
      "decl": "void ai_communication_event(int type, int unit_handle, int param3, int param4, int param5, int param6, int param7);",
-     "comment": "[NAME: FUN_00046f10 — name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03] [NAME: ai_communication_event — name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
+     "comment": "[NAME: FUN_00046f10 \u2014 name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03] [NAME: ai_communication_event \u2014 name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
     },
     {
      "addr": "0x48e90",
@@ -35276,7 +35277,7 @@
      "addr": "0x64100",
      "decl": "void props_initialize(void);",
      "ported": true,
-     "comment": "[NAME: props_initialize — name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
+     "comment": "[NAME: props_initialize \u2014 name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
     },
     {
      "addr": "0x64140",
@@ -36395,7 +36396,7 @@
     {
      "addr": "0x74a30",
      "decl": "void TIFFWriteTile(void);",
-     "comment": "[NAME: TIFFWriteTile — CEA PDB line-containment (high_confidence), cea-deferred 2026-09-03]"
+     "comment": "[NAME: TIFFWriteTile \u2014 CEA PDB line-containment (high_confidence), cea-deferred 2026-09-03]"
     }
    ],
    "name": "tif_write.obj",
@@ -36962,7 +36963,7 @@
     {
      "addr": "0x123ed0",
      "decl": "void render_model(int model_ref, float distance, void *node_matrices, void *arg4, void *node_transforms, void *node_matrices2, int lighting, void *position, int arg9, void *effect_record, int object_handle, int arg12, int render_flag);",
-     "comment": "[NAME: render_model — name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
+     "comment": "[NAME: render_model \u2014 name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
     }
    ],
    "name": "model_animations.obj",
@@ -38553,7 +38554,7 @@
     {
      "addr": "0x149680",
      "decl": "void collision_bsp_test_pill(void);",
-     "comment": "[NAME: collision_bsp_test_pill — name_source=cea-pdb method=line_containment tier=high_confidence (T2), cea-apply-unified 2026-09-03]"
+     "comment": "[NAME: collision_bsp_test_pill \u2014 name_source=cea-pdb method=line_containment tier=high_confidence (T2), cea-apply-unified 2026-09-03]"
     },
     {
      "addr": "0x149c60",
@@ -38726,7 +38727,7 @@
     {
      "addr": "0x5f740",
      "decl": "char path_state_traverse(unsigned int *path_buf);",
-     "comment": "[NAME: path_state_traverse — name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
+     "comment": "[NAME: path_state_traverse \u2014 name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
     },
     {
      "addr": "0x5ff70",
