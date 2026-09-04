@@ -14907,6 +14907,10 @@
       "kind": "function",
       "status": "ported"
     },
+    "0x17d910": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0x17da40": {
       "kind": "function",
       "status": "unknown",
@@ -14916,6 +14920,10 @@
       "uncertain": [
         "The semantic meanings of FUN_0017da40's five parameters and the 0x47e4d4 target structure remain unidentified."
       ]
+    },
+    "0x17db40": {
+      "kind": "function",
+      "status": "ported"
     },
     "0x180050": {
       "kind": "function",
