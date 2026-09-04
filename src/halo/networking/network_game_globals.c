@@ -1,3 +1,7 @@
+#ifdef HALO_RNG_TRACE
+#include "halo/math/rng_trace.h"
+#endif
+#line 1
 #include "network_connection.h"
 /* FUN_00129130 (0x129130)
  * Disconnect a client connection from a server connection's client list.
@@ -303,6 +307,10 @@ void network_game_set_random_seed(int seed)
 {
   int game;
   int server = *(int *)0x46e8bc;
+#ifdef HALO_RNG_TRACE
+  RNG_TRACE(RNG_TRACE_GLOBAL_SEED_ADDR, RNG_TRACE_KIND_NET_SET_SEED, seed);
+#endif
+#line 306
   if (server != 0) {
     game = network_game_server_get_game((void *)server);
     *(int *)(game + 0x428) = seed;
@@ -313,6 +321,7 @@ void network_game_set_random_seed(int seed)
     *(int *)(game + 0x428) = seed;
   }
 }
+#line 316
 
 /* Return the active game object: server's game if server exists,
  * else client's machine index, else NULL.

@@ -32,6 +32,11 @@ from analysis.knowledge import Function, KnowledgeBase
 
 
 log = logging.getLogger(__name__)
+
+# EXE data exports that exist only for host-side tooling (their runtime VA is
+# resolved from the appended PE export table).  They are not re-implementations
+# of anything in the original XBE, so patch.py must not try to redirect them.
+DIAGNOSTIC_DATA_EXPORTS = frozenset({'halo_rng_trace'})
 root_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../.."))
 KB_REG_BASELINE_PATH = os.path.join(root_dir, 'tools', 'kb_reg_baseline.json')
 KB_OVERLAY_ENV = 'HALO_KB_OVERLAY'
@@ -1531,8 +1536,13 @@ def main():
     xbe.header.entry_addr = entry_addr ^ (Xbe.ENTRY_DEBUG if xbe.is_debug else Xbe.ENTRY_RETAIL)
     special_exports['_start'] = entry_addr
 
-    # Hook all functions in the XBE that have been re-implemented
-    patch_functions = [n for n in export_name_to_addr if n not in special_exports]
+    # Hook all functions in the XBE that have been re-implemented.
+    # DIAGNOSTIC_DATA_EXPORTS are exported only so host tools can resolve their
+    # runtime VA (see tools/xbox/symbolize_exception.py); they have no original
+    # XBE counterpart and are never patch targets.
+    patch_functions = [n for n in export_name_to_addr
+                       if n not in special_exports
+                       and n not in DIAGNOSTIC_DATA_EXPORTS]
 
     # Map from (possibly decorated) export name to kb.json symbol name
     export_to_kb_name = {n: strip_stdcall_decoration(n) for n in patch_functions}

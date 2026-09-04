@@ -6,6 +6,7 @@ set(CMAKE_C_STANDARD 90)
 
 option(ENABLE_XDK_HYBRID "Compile select TUs with XDK MSVC 7.1 for matching FPU codegen" OFF)
 option(HALO_TEST_HARNESS "Build with in-engine test harness enabled" OFF)
+option(HALO_RNG_TRACE "Build with the diagnostic RNG draw trace enabled (docs/rng-trace.md)" OFF)
 set(HALO_DUAL_ORACLE_TARGET "" CACHE STRING "Build one in-engine dual-oracle harness target")
 option(HALO_RETAIL64 "Build experimental 64MB retail-compatible runtime profile" OFF)
 
@@ -157,6 +158,10 @@ target_sources(halo PRIVATE
 if(HALO_TEST_HARNESS)
 	target_compile_definitions(halo PRIVATE TEST_HARNESS=1)
 	target_sources(halo PRIVATE src/halo/test_harness.c)
+endif()
+
+if(HALO_RNG_TRACE)
+	target_compile_definitions(halo PRIVATE HALO_RNG_TRACE=1)
 endif()
 
 if(HALO_DUAL_ORACLE_TARGET)

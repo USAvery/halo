@@ -31453,21 +31453,6 @@
       "score": 85.9,
       "source": "src/halo/networking/network_game_globals.c"
     },
-    "FUN_0012a0a0": {
-      "abi_model": "raw",
-      "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 100.0,
-      "addr": "0x12a0a0",
-      "end": "0x12a0c9",
-      "kind": "auto",
-      "n_r": 16,
-      "opnd_percent": 100.0,
-      "raw_mnemonic_pct": 100.0,
-      "ref": "synth",
-      "ref_sha": "c8cec31d9ba1d6c6",
-      "score": 100.0,
-      "source": "src/halo/networking/network_game_globals.c"
-    },
     "FUN_0012a190": {
       "abi_model": "raw",
       "abi_model_items": 0,
@@ -69537,6 +69522,21 @@
       "ref_sha": "44df6d1f35373c57",
       "score": 84.7,
       "source": "src/halo/networking/network_game_manager.c"
+    },
+    "network_game_get_game": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 100.0,
+      "addr": "0x12a0a0",
+      "end": "0x12a0c9",
+      "kind": "auto",
+      "n_r": 16,
+      "opnd_percent": 100.0,
+      "raw_mnemonic_pct": 100.0,
+      "ref": "synth",
+      "ref_sha": "c8cec31d9ba1d6c6",
+      "score": 100.0,
+      "source": "src/halo/networking/network_game_globals.c"
     },
     "network_game_get_number_of_games_played": {
       "abi_model": "raw",

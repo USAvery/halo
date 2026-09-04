@@ -1,3 +1,7 @@
+#ifdef HALO_RNG_TRACE
+#include "halo/math/rng_trace.h"
+#endif
+#line 1
 void FUN_000a6a80(void)
 {
   /* One contiguous placement buffer (matches original frame at EBP-0x114).
@@ -557,8 +561,13 @@ bool game_is_cooperative(void)
 }
 void set_random_seed(int seed)
 {
+#ifdef HALO_RNG_TRACE
+  RNG_TRACE(RNG_TRACE_GLOBAL_SEED_ADDR, RNG_TRACE_KIND_SET_SEED, seed);
+#endif
+#line 560
   *get_global_random_seed_address() = seed;
 }
+#line 562
 bool game_load(game_options_t *options)
 {
   game_globals_t *globals;
@@ -589,6 +598,10 @@ void game_initialize_for_new_map(void)
   assert_halt(!game_globals->active);
 
   random_seed = game_globals->game_options.random_seed;
+#ifdef HALO_RNG_TRACE
+  RNG_TRACE(RNG_TRACE_GLOBAL_SEED_ADDR, RNG_TRACE_KIND_MAP_SEED, random_seed);
+#endif
+#line 592
   *get_global_random_seed_address() = random_seed;
   game_engine_dispose();
   game_engine_initialize(&game_variant_global);

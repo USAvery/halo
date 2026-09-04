@@ -1,3 +1,50 @@
+/* --- RNG draw trace instrumentation (diagnostic; see docs/rng-trace.md) -----
+ * Present only when HALO_RNG_TRACE is defined.  The `#line 1` below restores
+ * the original physical line numbering so that assert_halt()'s __LINE__
+ * immediates -- and therefore the codegen and VC71 score of every function in
+ * this file -- are unchanged when the flag is off.
+ */
+#ifdef HALO_RNG_TRACE
+#include "halo/math/rng_trace.h"
+
+/* Zero-initialised so the 1 MiB ring lands in .bss (no XBE file-size cost);
+ * the header fields are stamped lazily on the first recorded event. */
+rng_trace_buffer_t halo_rng_trace = { 0 };
+
+void rng_trace_note(const void *seed, unsigned int kind,
+                    unsigned int seed_before, void *caller, void *frame)
+{
+  rng_trace_record_t *rec;
+  uint32_t tick;
+
+  (void)frame;
+
+  /* Local-seed draws (0x46e3f8) do not participate in network determinism. */
+  if ((uint32_t)seed != RNG_TRACE_GLOBAL_SEED_ADDR)
+    return;
+
+  if (halo_rng_trace.magic != RNG_TRACE_MAGIC) {
+    halo_rng_trace.version = RNG_TRACE_VERSION;
+    halo_rng_trace.capacity = RNG_TRACE_CAPACITY;
+    halo_rng_trace.write_index = 0;
+    halo_rng_trace.magic = RNG_TRACE_MAGIC;
+  }
+
+  /* game_time_globals is NULL before game_time_initialize(). */
+  tick = 0xffffffu;
+  if (game_time_globals != 0)
+    tick = game_time_globals->time & 0xffffffu;
+
+  rec = &halo_rng_trace.records[halo_rng_trace.write_index &
+                                (RNG_TRACE_CAPACITY - 1)];
+  rec->tick = (kind << 24) | tick;
+  rec->seed_before = seed_before;
+  rec->caller = (uint32_t)caller;
+  rec->caller2 = 0;
+  halo_rng_trace.write_index++;
+}
+#endif /* HALO_RNG_TRACE */
+#line 1
 #include "x87_math.h"
 
 /* Fill a 0x400-byte periodic function lookup table for one of 6 types:
@@ -214,6 +261,10 @@ void periodic_functions_initialize(void)
     system_exit(-1);
   }
   *(uint8_t *)0x46e39c = 1;
+#ifdef HALO_RNG_TRACE
+  RNG_TRACE(RNG_TRACE_GLOBAL_SEED_ADDR, RNG_TRACE_KIND_PERIODIC_SEED, 0x20f3f660);
+#endif
+#line 217
   *get_global_random_seed_address() = 0x20f3f660;
 
   tables = (int *)0x46e3b8;
@@ -541,6 +592,10 @@ __declspec(noinline) float random_math_real(unsigned int *seed)
 {
   unsigned int s;
 
+#ifdef HALO_RNG_TRACE
+  RNG_TRACE(seed, RNG_TRACE_KIND_REAL, *seed);
+#endif
+#line 544
   s = *seed * 0x19660d + 0x3c6ef35f;
   *seed = s;
   return (float)(s >> 16) / 65535.0f;
@@ -554,6 +609,10 @@ float random_real_range(int *seed, float min, float max)
   unsigned int s;
   float fraction;
 
+#ifdef HALO_RNG_TRACE
+  RNG_TRACE(seed, RNG_TRACE_KIND_REAL_RANGE, *seed);
+#endif
+#line 557
   s = (unsigned int)*seed * 0x19660d + 0x3c6ef35f;
   *seed = (int)s;
   fraction = (float)(s >> 16) * *(float *)0x2647f4;
@@ -565,6 +624,10 @@ uint16_t random_seed_step(unsigned int *seed)
 {
   unsigned int s;
 
+#ifdef HALO_RNG_TRACE
+  RNG_TRACE(seed, RNG_TRACE_KIND_SEED_STEP, *seed);
+#endif
+#line 568
   s = *seed * 0x19660d + 0x3c6ef35f;
   *seed = s;
   return (uint16_t)(s >> 16);
@@ -578,6 +641,10 @@ int16_t random_range(unsigned int *seed, int16_t min, int16_t max)
 {
   unsigned int s;
 
+#ifdef HALO_RNG_TRACE
+  RNG_TRACE(seed, RNG_TRACE_KIND_RANGE, *seed);
+#endif
+#line 581
   s = *seed * 0x19660d + 0x3c6ef35f;
   *seed = s;
   return (int16_t)(((unsigned int)((int)(max - min) * (s >> 16)) >> 16) + (int)min);
@@ -587,6 +654,7 @@ int16_t random_range(unsigned int *seed, int16_t min, int16_t max)
  * (0x10b300). Asserts the table is initialized and index is in range. Copies 3
  * floats from table[index] to result and returns result. Register args: index
  * in SI, result in EBX. */
+#line 590
 float *random_direction_table_get_element(int16_t index, float *result)
 {
   float *element = (float *)(*(int *)0x46e3e8 + (int)index * 12);
@@ -610,6 +678,10 @@ void random_seed_get_direction3d(unsigned int *seed, float *out)
   int16_t table_size;
   int16_t index;
 
+#ifdef HALO_RNG_TRACE
+  RNG_TRACE(seed, RNG_TRACE_KIND_DIRECTION3D, *seed);
+#endif
+#line 613
   s = *seed * 0x19660d + 0x3c6ef35f;
   *seed = s;
 
@@ -633,6 +705,10 @@ void seed_random_orientation(unsigned int *seed, float *facing, float *up)
   float az_sin, az_cos, el_sin, el_cos;
   float azimuth, elevation, roll;
 
+#ifdef HALO_RNG_TRACE
+  RNG_TRACE(seed, RNG_TRACE_KIND_ORIENTATION, *seed);
+#endif
+#line 636
   s1 = *seed * 0x19660d + 0x3c6ef35f;
   azimuth = (float)(s1 >> 16) * *(float *)0x2647f4 * *(float *)0x255a54;
   s2 = s1 * 0x19660d + 0x3c6ef35f;
@@ -691,6 +767,10 @@ void random_direction3d(int *seed, float *forward, float zero, float angle,
 
   /* Pick a random direction from the precomputed sphere table.
    * Inlines: index = random_range(seed, 0, table_size) then table lookup. */
+#ifdef HALO_RNG_TRACE
+  RNG_TRACE(seed, RNG_TRACE_KIND_DIR3D_INLINE, *seed);
+#endif
+#line 694
   *seed = (int)((unsigned int)*seed * 0x19660d + 0x3c6ef35f);
   index = (int16_t)(((int)*(int16_t *)0x46e3ec *
                      (int)((unsigned int)*seed >> 16)) >> 16);
