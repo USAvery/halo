@@ -1053,12 +1053,14 @@ void object_cause_damage(void *damage_params, int object_handle,
   int child_unit;
   unsigned int saved_flags;
   int driver_handle;
-  int player_idx;
+  /* (player index lookups are inline call arguments; see ref 0x137e2a) */
   short count_short;
   char cVar;
   float fVar;
   float modifier;
-  int *seed;
+  float random_value;
+  float random_min;
+  float random_max;
   int obj_tag;
   int coll_ref;
 
@@ -1083,22 +1085,19 @@ void object_cause_damage(void *damage_params, int object_handle,
     *(int *)0x46f070 = object_handle;
   }
 
-  /* BUG3-FIX: get_global_random_seed_address takes ZERO args.
-   * The min/max values come from the jpt tag at offsets 0x1d4 and 0x1d8
-   * (relative to jpt_tag base, which is jpt_offset+0x10 and jpt_offset+0x14).
-   */
-  seed = get_global_random_seed_address();
-  damage_scale = random_real_range(
-    seed, *(float *)(jpt_offset + 0x10), /* min = *(jpt_tag + 0x1d4) */
-    *(float *)(jpt_offset + 0x14)); /* max = *(jpt_tag + 0x1d8) */
+  /* BUG3-FIX: seed fn takes ZERO args; ref 0x137d93 home-stores min/max. */
+  random_min = *(float *)(jpt_offset + 0x10);
+  random_max = *(float *)(jpt_offset + 0x14);
+  random_value = random_real_range(get_global_random_seed_address(),
+                                   random_min, random_max);
 
   /* Compute initial damage scale:
    * scale = (random * damage_params[0x40] + (1.0 - damage_params[0x40]) *
    * jpt_offset[0xc])
    *         * damage_params[0x44] */
   damage_scale =
-    (damage_scale * *(float *)((char *)dp + 0x40) +
-     (1.0f - *(float *)((char *)dp + 0x40)) * *(float *)(jpt_offset + 0xc)) *
+    ((1.0f - *(float *)((char *)dp + 0x40)) * *(float *)(jpt_offset + 0xc) +
+     random_value * *(float *)((char *)dp + 0x40)) *
     *(float *)((char *)dp + 0x44);
 
   /* Check if attacker has a player owner; if so, apply AI damage modifier */
@@ -1109,8 +1108,9 @@ void object_cause_damage(void *damage_params, int object_handle,
         unit_check =
           (char *)object_get_and_verify_type(*(int *)(unit_check + 0x2d8), 3);
       }
-      i = *(int *)(unit_check + 0x1a8);
-      if (i == -1) {
+      if (*(int *)(unit_check + 0x1a8) != -1) {
+        i = *(int *)(unit_check + 0x1a8);
+      } else {
         i = *(int *)(unit_check + 0x1a4);
       }
       if (i != -1) {
@@ -1123,10 +1123,10 @@ void object_cause_damage(void *damage_params, int object_handle,
   cVar = game_engine_running();
   if (cVar != 0) {
     /* Game engine path: get player indices for both sides */
-    player_idx = FUN_00136890(object_handle);
-    i = FUN_00136890(dp[3]);
-    modifier = game_engine_get_damage_multiplier(i, player_idx);
-    was_modified = 0;
+    /* Ref 0x137e2a-0x137e40: both index lookups are evaluated inline as the
+     * multiplier's arguments (right-to-left: object_handle's index first). */
+    modifier = game_engine_get_damage_multiplier(FUN_00136890(dp[3]),
+                                                 FUN_00136890(object_handle));
   } else {
     /* Campaign path: check team allegiance for difficulty scale */
     if (*(short *)((char *)dp + 0x10) == -1)
@@ -1206,9 +1206,9 @@ after_modifier:
     unit_data = (char *)object_get_and_verify_type(object_handle, 3);
     unit_tag = (int)tag_get(0x756e6974, *(int *)unit_data);
     /* Modify damage multiplier for seated damage */
+    child_handle = *(int *)(unit_data + 0xc8);
     *(float *)((char *)dp + 0x44) =
       (1.0f - *(float *)(jpt_offset + 0x18)) * *(float *)(unit_tag + 0x184);
-    child_handle = *(int *)(unit_data + 0xc8);
     while (child_handle != -1) {
       child_obj = (char *)object_get_and_verify_type(child_handle, -1);
       if ((unsigned short)damaged_object_count >= 16) {
@@ -1261,9 +1261,9 @@ after_modifier:
           /* No driver: check global flag */
           if (*(char *)0x5aa895 == 0)
             goto skip_player_effect;
-          player_idx = local_player_get_player_index(0);
-          FUN_000a3b80(player_idx, damage_params, (char *)dp + 0x34,
-                       *(float *)((char *)dp + 0x40), damage_scale);
+          FUN_000a3b80(local_player_get_player_index(0), damage_params,
+                       (char *)dp + 0x34, *(float *)((char *)dp + 0x40),
+                       damage_scale);
         }
       }
     skip_player_effect:
@@ -1283,20 +1283,20 @@ after_modifier:
   do {
     count_short = (short)damaged_object_count;
     damaged_object_count--;
-    if (count_short < 1)
+    if (count_short <= 0)
       return;
 
     current_object_handle = damaged_object_indices[(short)damaged_object_count];
     object_data = (char *)object_get_and_verify_type(current_object_handle, -1);
     obj_tag = (int)tag_get(0x6f626a65, *(int *)object_data);
 
+    coll_ref = *(int *)(obj_tag + 0x7c);
     shield_damage = 0.0f;
     body_damage = 0.0f;
     effect_ptr = (void *)0;
     damage_flags = 0;
     material_index = -1;
 
-    coll_ref = *(int *)(obj_tag + 0x7c);
     if (coll_ref == -1)
       goto after_collision_block;
 
@@ -1313,8 +1313,10 @@ after_modifier:
         int node_elem;
         node_elem = (int)tag_block_get_element((int *)(coll_data + 0x28c),
                                                (int)node_index, 0x40);
-        material_index = (material_index & 0xffff0000) |
-                         (unsigned int)*(unsigned short *)(node_elem + 0x32);
+        /* Ref 0x138187: MOV [EBP-0x30],DX — a word store into the dword
+         * slot; the high word keeps the NONE (-1) initializer. */
+        *(unsigned short *)&material_index =
+          *(unsigned short *)(node_elem + 0x32);
       }
 
       /* Set modifier flag if applicable */
@@ -1429,13 +1431,17 @@ after_modifier:
           *(unsigned int *)((char *)dp + 0x48) =
             *(unsigned int *)(object_data + 0x94);
         } else {
-          /* Body damage dominates: clamp body vitality to [0, 1] */
-          fVar = 0.0f;
-          if (*(float *)(object_data + 0x90) >= 0.0f) {
+          /* Body damage dominates: clamp body vitality to [0, 1].
+           * Ref 0x1383e0-0x13841c: three disjoint arms, each re-loading
+           * obj+0x90, joining at one FSTPS.  The bounds are strict (`< 0`,
+           * `> 1`): TEST AH,0x05 / JP at 0x1383ee and TEST AH,0x41 / JNE at
+           * 0x138409. */
+          if (*(float *)(object_data + 0x90) < 0.0f) {
+            fVar = 0.0f;
+          } else if (*(float *)(object_data + 0x90) > 1.0f) {
             fVar = 1.0f;
-            if (*(float *)(object_data + 0x90) <= 1.0f) {
-              fVar = *(float *)(object_data + 0x90);
-            }
+          } else {
+            fVar = *(float *)(object_data + 0x90);
           }
           *(float *)((char *)dp + 0x48) = fVar;
         }
@@ -1443,21 +1449,18 @@ after_modifier:
         /* Debug logging */
         if (*(char *)0x5a90c0 != 0 &&
             current_object_handle == *(int *)0x46f070) {
-          const char *mat_name;
-          const char *tag_path;
-          const char *filename;
           /* FUN_000b5490 takes 1 arg (material_type) and returns a name string.
            * Confirmed: ADD ESP,0x4 at 0x13845a (1 cdecl arg).
-           * The material_data, damage doubles are pre-positioned on the stack
-           * for console_printf varargs via MSVC lazy cleanup. */
-          mat_name =
-            FUN_000b5490(*(unsigned short *)((char *)material_data + 0x24));
-          tag_path = tag_get_name(dp[0]);
-          filename = strrchr(tag_path, 0x5c);
-          console_printf(0, "%s: \"%s\" \"%s\" k=%0.2f S[%3.2f] B[%3.2f]",
-                         filename + 1, mat_name, material_data,
-                         (double)*(float *)((char *)dp + 0x40),
-                         (double)shield_damage, (double)body_damage);
+           * Ref 0x138433-0x138482: the three doubles are reserved with one
+           * SUB ESP,0x18, then FUN_000b5490 / tag_get_name / strrchr are
+           * evaluated inline (each with its own ADD ESP cleanup) as the
+           * console_printf arguments, right-to-left. */
+          console_printf(
+            0, "%s: \"%s\" \"%s\" k=%0.2f S[%3.2f] B[%3.2f]",
+            strrchr(tag_get_name(dp[0]), 0x5c) + 1,
+            FUN_000b5490(*(unsigned short *)((char *)material_data + 0x24)),
+            material_data, (double)*(float *)((char *)dp + 0x40),
+            (double)shield_damage, (double)body_damage);
         }
         damage_reported = 1;
       }

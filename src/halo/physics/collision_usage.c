@@ -269,10 +269,18 @@ char FUN_0014cb00(int param_1, void *param_2, void *param_3, void *param_4,
         if (bVar1 != -1) {
           iVar4 = *(int *)(local_10 + 0x34);
           if (0 < iVar4) {
-            iVar5 = (int)bVar1;
-            iVar4 = iVar4 - 1;
-            if (iVar4 < iVar5) {
-              iVar5 = iVar4;
+            /* Ref 0x14cb91-0x14cba2: TEST AX,AX; JGE over XOR EBX,EBX --
+             * a negative-index guard that is dead in practice (the index
+             * comes from MOVZX EAX,BYTE, so 0..255) but present in the
+             * original. */
+            if (bVar1 < 0) {
+              iVar5 = 0;
+            } else {
+              iVar5 = (int)bVar1;
+              iVar4 = iVar4 - 1;
+              if (iVar4 < iVar5) {
+                iVar5 = iVar4;
+              }
             }
             piVar3 = (int *)tag_block_get_element((int *)(local_10 + 0x34),
                                                   (int)(short)iVar5, 0x60);
@@ -1002,9 +1010,7 @@ bool FUN_0014df70(uint32_t collision_flags, float *origin, float *direction,
   float
     local_18[4]; /* fog plane {normal[0..2], d} — must stay contiguous so
                   * &local_18 is a valid real_plane3d for
-                  * plane3d_distance_to_point (matches original EBP-0x1c). */
-  float local_10[3];
-  float local_c;
+                  * plane3d_distance_to_point (matches original EBP-0x18). */
   int iter_state;
   int i;
   float fVar_dist;
@@ -1012,7 +1018,7 @@ bool FUN_0014df70(uint32_t collision_flags, float *origin, float *direction,
   char fog_side;
   int16_t leaf_idx;
   void *scen_elem;
-  int16_t cluster_idx;
+  int cluster_idx;
   void *elem;
   void *pg_list;
   void *pg;
@@ -1036,8 +1042,7 @@ bool FUN_0014df70(uint32_t collision_flags, float *origin, float *direction,
   /* Check if relevant flags are set */
   if ((collision_flags & 0xe0) == 0 || *(char *)0x4761f9 != '\0') {
     /* No BSP test: just compute end point */
-    *(float *)((char *)collision_result + 0x14) =
-      *(float *)((char *)collision_result + 0x14);
+    *(float *)((char *)collision_result + 0x14) = 1.0f;
     ((float *)((char *)collision_result + 0x18))[0] = origin[0] + direction[0];
     ((float *)((char *)collision_result + 0x18))[1] = origin[1] + direction[1];
     ((float *)((char *)collision_result + 0x18))[2] = origin[2] + direction[2];
@@ -1059,17 +1064,23 @@ bool FUN_0014df70(uint32_t collision_flags, float *origin, float *direction,
     collision_flags |= 3;
 
   /* Normalize collision type flags */
-  flags_computed = 0;
-  if (collision_flags & 1)
-    flags_computed |= 1;
+  flags_computed = collision_flags & 1;
   if (collision_flags & 2)
     flags_computed |= 2;
+  else
+    flags_computed &= ~2u;
   if (collision_flags & 4)
     flags_computed |= 4;
+  else
+    flags_computed &= ~4u;
   if (collision_flags & 8)
     flags_computed |= 8;
+  else
+    flags_computed &= ~8u;
   if (collision_flags & 0x10)
     flags_computed |= 0x10;
+  else
+    flags_computed &= ~0x10u;
 
   /* Collision logging omitted — same-TU helpers call QueryPerformanceCounter
    * (IAT) which maps to invalid stub address in Unicorn harness */
@@ -1145,30 +1156,30 @@ bool FUN_0014df70(uint32_t collision_flags, float *origin, float *direction,
     if (*(int *)(local_buf + 0x14) > 0) {
       int obj_ref_first = *(int *)(local_buf + 0x18);
       int obj_ref_last;
-      int16_t cluster_first;
-      int16_t cluster_last;
+      int cluster_first;
+      int cluster_last;
 
       *(int *)((char *)collision_result + 4) = obj_ref_first;
       if (obj_ref_first == -1) {
-        cluster_first = (int16_t)-1;
+        cluster_first = -1;
       } else {
         elem = tag_block_get_element((char *)scenario_get() + 0xe0,
                                      obj_ref_first & 0x7fffffff, 0x10);
         cluster_first = *(int16_t *)((char *)elem + 8);
       }
-      *(int16_t *)((char *)collision_result + 8) = cluster_first;
+      *(int16_t *)((char *)collision_result + 8) = (int16_t)cluster_first;
 
       obj_ref_last =
         *(int *)(local_buf + (*(int *)(local_buf + 0x14)) * 4 + 0x14);
       *(int *)((char *)collision_result + 0xc) = obj_ref_last;
       if (obj_ref_last == -1) {
-        cluster_last = (int16_t)-1;
+        cluster_last = -1;
       } else {
         elem = tag_block_get_element((char *)scenario_get() + 0xe0,
                                      obj_ref_last & 0x7fffffff, 0x10);
         cluster_last = *(int16_t *)((char *)elem + 8);
       }
-      *(int16_t *)((char *)collision_result + 0x10) = cluster_last;
+      *(int16_t *)((char *)collision_result + 0x10) = (int16_t)cluster_last;
     }
   }
 
@@ -1177,7 +1188,7 @@ bool FUN_0014df70(uint32_t collision_flags, float *origin, float *direction,
 
   /* Atmosphere/fog zone test */
   if ((collision_flags & 0x40) && collision_result[8] != -1) {
-    void *scen = scenario_get();
+    void *scen = scenario_h;
     void *bsp_zone = tag_block_get_element(
       (char *)scen + 0x134, (int)(short)collision_result[8], 0x68);
     short zone_ref = *(short *)((char *)bsp_zone + 2);
@@ -1204,7 +1215,7 @@ bool FUN_0014df70(uint32_t collision_flags, float *origin, float *direction,
         local_18[0] = *(float *)((char *)pg_list + 4);
         local_18[1] = *(float *)((char *)pg_list + 8);
         local_18[2] = *(float *)((char *)pg_list + 0xc);
-        local_18[3] = local_c =
+        local_18[3] =
           *(float *)((char *)pg_list + 0x10) - *(float *)((char *)fog + 0x74);
 
         /* Reference (0x14df70): FUN_00099500(&plane, origin) passes the fog
@@ -1214,32 +1225,35 @@ bool FUN_0014df70(uint32_t collision_flags, float *origin, float *direction,
          * a garbage plane distance -> a spurious near fog fraction that
          * collapsed the observer/vehicle chase camera onto the vehicle. */
         fVar_dist = plane3d_distance_to_point(local_18, (float *)origin);
-        fVar_dir_dot = local_18[0] * direction[0] + local_18[1] * direction[1] +
-                       local_18[2] * direction[2];
+        /* Ref 0x14e295-0x14e2ad: FLD [ebp-0x14]*dir[1]; FLD [ebp-0x10]*dir[2];
+         * FADDP; FLD [ebp-0x18]*dir[0]; FADDP -> (n1*d1 + n2*d2) + n0*d0. The
+         * association is not free: x87 rounds each FADDP, so the plain
+         * left-to-right spelling gives a different result and can flip the
+         * four float branches below. */
+        fVar_dir_dot = local_18[1] * direction[1] + local_18[2] * direction[2] +
+                       local_18[0] * direction[0];
 
         if ((fVar_dist > 0.0f) != (fVar_dir_dot > 0.0f) &&
             fabs((double)fVar_dist) < fabs((double)fVar_dir_dot) &&
             fabs((double)fVar_dir_dot) >= *(double *)0x2533d0 &&
             -(fVar_dist / fVar_dir_dot) <
               *(float *)((char *)collision_result + 0x14)) {
-          fog_side = (char)(fVar_dist >= 0.0f ? 1 : 0);
+          /* Ref 0x14e324-0x14e338: MOV BYTE [ebp+0x1b],1; FLD dist;
+           * FCOMP 0.0; TEST AH,5; JNP over MOV BYTE [ebp+0x1b],0 -- i.e.
+           * preset 1 and clear it when dist >= 0. */
+          fog_side = 1;
+          if (fVar_dist >= 0.0f)
+            fog_side = 0;
           *(float *)((char *)collision_result + 0x14) =
             -(fVar_dist / fVar_dir_dot);
 
-          local_10[0] = local_18[0];
-          local_10[1] = local_18[1];
-          local_10[2] = local_18[2];
-          *(float *)((char *)local_10 + 0xc) = local_c;
-
-          *(int *)((char *)collision_result + 0x24) = *(int *)local_10;
-          *(int *)((char *)collision_result + 0x28) = *(int *)(local_10 + 1);
-          *(int *)((char *)collision_result + 0x2c) = *(int *)(local_10 + 2);
-          /* Reference stores the plane d as a float (*(float*)(param_5+0x18) =
-           * local_10); the prior lift truncated it to int ((int)local_c). */
-          *(float *)((char *)collision_result + 0x30) = local_c;
+          *(int *)((char *)collision_result + 0x24) = *(int *)local_18;
+          *(int *)((char *)collision_result + 0x28) = *(int *)(local_18 + 1);
+          *(int *)((char *)collision_result + 0x2c) = *(int *)(local_18 + 2);
+          *(int *)((char *)collision_result + 0x30) = *(int *)(local_18 + 3);
           collision_result[0] = 0;
 
-          if (!fog_side) {
+          if (fog_side) {
             /* Back-facing fog plane: flip the plane so its normal points
              * toward the ray origin. The original calls plane_negate
              * (FUN_000994d0(pfVar2,pfVar2) @0x14e2xx) — the SAME helper the
@@ -1276,8 +1290,10 @@ bool FUN_0014df70(uint32_t collision_flags, float *origin, float *direction,
     i = 0;
     while (i < (int)*(int *)(local_buf + 0x14)) {
       int obj_ref = *(int *)(local_buf + i * 4 + 0x18);
-      cluster_idx = -1;
 
+      /* Ref 0x14e40f: OR EDI,EAX with EAX==-1 -- cluster_idx is a 32-bit
+       * sign-extended int (MOVSX EDI,WORD [EAX+8] at 0x14e42b), not an
+       * int16_t; the int16_t spelling emits XOR+MOVW instead. */
       if (obj_ref == -1) {
         cluster_idx = -1;
       } else {
@@ -1289,12 +1305,15 @@ bool FUN_0014df70(uint32_t collision_flags, float *origin, float *direction,
         cluster_idx = *(int16_t *)((char *)elem + 8);
       }
 
-      if (structure_cluster_mark(cluster_idx)) {
+      /* Ref 0x14e43b / 0x14e45c: TEST AL,AL -- both marker helpers return
+       * their result in AL only (0x1984c0 MOV AL,1 / XOR AL,AL; 0x13ec50
+       * likewise, with EAX[31:8] left holding the generation counter). */
+      if ((char)structure_cluster_mark((int16_t)cluster_idx)) {
         object_handle =
           cluster_partition_object_iter_first(&iter_state, cluster_idx);
         if (object_handle != -1) {
           do {
-            if (object_mark(object_handle)) {
+            if ((char)object_mark(object_handle)) {
               char obj_hit =
                 FUN_0014dce0(object_handle, collision_flags, flags_computed,
                              (int)origin, (int)direction, max_distance,
@@ -1361,16 +1380,16 @@ bool FUN_0014df70(uint32_t collision_flags, float *origin, float *direction,
                                      (char *)collision_result + 0x18);
         if (*(int *)((char *)collision_result + 0xc) == -1) {
           float d;
-          double step;
+          float step;
           d =
             FUN_00013070(direction, (float *)((char *)collision_result + 0x24));
           if (d != 0.0f)
-            step = 0.000244140625 / fabs((double)d);
+            step = (float)(0.000244140625 / fabs((double)d));
           else
-            step = 0.03125;
+            step = 0.03125f;
           for (;;) {
             float frac;
-            frac = (float)(*(float *)((char *)collision_result + 0x14) - step);
+            frac = *(float *)((char *)collision_result + 0x14) - step;
             if (!(frac > 0.0f))
               frac = 0.0f;
             *(float *)((char *)collision_result + 0x14) = frac;

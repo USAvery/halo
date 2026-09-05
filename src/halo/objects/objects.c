@@ -87,8 +87,6 @@ double pow(double x, double y);
   XCALL(0x1d9e59, void *(*)(const char *, const char *))(a, b)
 #define CALL_FUN_001d9260 XCALL(0x1d9260, int (*)(void *, const char *, ...))
 #define CALL_FUN_0013f3b0(a, b) XCALL(0x13f3b0, void (*)(void *, int))(a, b)
-#define CALL_FUN_0018f180(a, b) XCALL(0x18f180, void (*)(void *, void *))(a, b)
-#define CALL_FUN_00140ce0(a, b) XCALL(0x140ce0, void (*)(int, void *))(a, b)
 #define CALL_FUN_00013010(a) XCALL(0x13010, float (*)(void *))(a)
 #define CALL_FUN_001ba1f0(a) XCALL(0x1ba1f0, void (*)(int))(a)
 #define CALL_FUN_0013aed0(a) XCALL(0x13aed0, void (*)(int))(a)
@@ -8077,13 +8075,18 @@ void object_scripting_set_collideable(int param_1, char param_2)
  */
 void object_reset_markers(void)
 {
-  if (object_globals->object_marker_initialized) {
+  object_globals_t *g = object_globals;
+
+  if (g->object_marker_initialized) {
     display_assert("!object_globals->object_marker_initialized",
                    "c:\\halo\\SOURCE\\objects\\objects.c", 0xdaf, 1);
     system_exit(-1);
+    (*(int *)0x5a8d28)++;
+    object_globals->object_marker_initialized = 1;
+    return;
   }
   (*(int *)0x5a8d28)++;
-  object_globals->object_marker_initialized = 1;
+  g->object_marker_initialized = 1;
 }
 
 /*
@@ -8471,19 +8474,18 @@ int find_objects_from_point_vector(int param_1, int param_2, int param_3,
   result = 0;
   bsp_check = FUN_0018e720(param_1);
   if (bsp_check == -1)
-    return 0;
+    goto done;
 
   bsp_ref_index = FUN_0018e720(param_1) & 0x7fffffff;
   bsp_ref_element = tag_block_get_element(
     (void *)((char *)scenario_get() + 0xe0), bsp_ref_index, 0x10);
   bsp_index = *(short *)((char *)bsp_ref_element + 8);
   if (bsp_index == -1)
-    return 0;
+    goto done;
 
   object_reset_markers();
   cluster_data =
     (int *)structure_bsp_get_cluster_sound_data(scenario_get(), bsp_index);
-  cluster_ptr = cluster_data;
 
   {
     void *bsp_data = scenario_get();
@@ -8493,6 +8495,7 @@ int find_objects_from_point_vector(int param_1, int param_2, int param_3,
   if ((short)num_words <= 0)
     goto post_loop;
 
+  cluster_ptr = cluster_data;
   while (1) {
     if (*cluster_ptr != 0) {
       base_cluster = outer_idx << 5;
@@ -8521,11 +8524,10 @@ int find_objects_from_point_vector(int param_1, int param_2, int param_3,
               type_val = (int)*(short *)((char *)obj_body + 0x64);
               type_mask = 1 << (type_val & 0x1f);
               if (type_mask == 0) {
-                csprintf((char *)0x5ab100,
-                         "got an object type we didn't expect "
-                         "(expected one of 0x%08x but got #%d).",
-                         -1, type_val);
-                display_assert((char *)0x5ab100,
+                display_assert(csprintf((char *)0x5ab100,
+                                        "got an object type we didn't expect "
+                                        "(expected one of 0x%08x but got #%d).",
+                                        -1, type_val),
                                "c:\\halo\\SOURCE\\objects\\objects.c", 0x69a,
                                1);
                 system_exit(-1);
@@ -8566,6 +8568,8 @@ post_loop:
     system_exit(-1);
   }
   *(char *)(*(int *)0x46f084 + 1) = 0;
+
+done:
   return result;
 }
 
@@ -9860,7 +9864,7 @@ int16_t object_find_in_cluster(int flags, int16_t cluster_count,
                                int *out_handles)
 {
   int16_t found = 0;
-  int i;
+  int16_t i;
 
   if (flags == 0)
     flags = 0xFFFFFFFF;
@@ -9880,11 +9884,14 @@ int16_t object_find_in_cluster(int flags, int16_t cluster_count,
         object_header_data_t *header =
           (object_header_data_t *)datum_get(*(data_t **)0x5a8d50, handle);
         object_data_t *obj = header->object;
+        uint32_t generation;
 
-        /* (uint8_t) load reviewed vs ref (movswl 0x64): benign — only CL
-         * feeds SHL and type is 0..10; byte load scores 91.0 vs 87.3 (movswl
-         * perturbs 'found'-in-DI register allocation). LOADW-WARN accepted. */
-        if (1 << ((uint8_t)obj->type & 0x1f) == 0) {
+        /* Ref: `movswl 0x64(%edi),%ecx; shll %cl,%edx` — the native int16_t
+         * `type` feeds SHL directly.  An earlier `(uint8_t)type & 0x1f` form
+         * was kept because it scored 91.0 vs 87.3, but that 87.3 was an
+         * anchor collapse (dp_lcs 95.5); re-anchoring via the int16_t loop
+         * index took the pair to 96.8.  Do not reintroduce the byte load. */
+        if ((1 << obj->type) == 0) {
           char *msg =
             csprintf((char *)0x5ab100,
                      "got an object type we didn\\'t expect (expected one of "
@@ -9900,8 +9907,9 @@ int16_t object_find_in_cluster(int flags, int16_t cluster_count,
           system_exit(-1);
         }
 
-        if (obj->marker_generation != *(uint32_t *)0x5a8d28) {
-          obj->marker_generation = *(uint32_t *)0x5a8d28;
+        generation = *(uint32_t *)0x5a8d28;
+        if (obj->marker_generation != generation) {
+          obj->marker_generation = generation;
           if (found >= max_count) {
             if (!object_globals->object_marker_initialized) {
               display_assert("object_globals->object_marker_initialized",
@@ -9927,11 +9935,14 @@ int16_t object_find_in_cluster(int flags, int16_t cluster_count,
         object_header_data_t *header =
           (object_header_data_t *)datum_get(*(data_t **)0x5a8d50, handle);
         object_data_t *obj = header->object;
+        uint32_t generation;
 
-        /* (uint8_t) load reviewed vs ref (movswl 0x64): benign — only CL
-         * feeds SHL and type is 0..10; byte load scores 91.0 vs 87.3 (movswl
-         * perturbs 'found'-in-DI register allocation). LOADW-WARN accepted. */
-        if (1 << ((uint8_t)obj->type & 0x1f) == 0) {
+        /* Ref: `movswl 0x64(%edi),%ecx; shll %cl,%edx` — the native int16_t
+         * `type` feeds SHL directly.  An earlier `(uint8_t)type & 0x1f` form
+         * was kept because it scored 91.0 vs 87.3, but that 87.3 was an
+         * anchor collapse (dp_lcs 95.5); re-anchoring via the int16_t loop
+         * index took the pair to 96.8.  Do not reintroduce the byte load. */
+        if ((1 << obj->type) == 0) {
           char *msg =
             csprintf((char *)0x5ab100,
                      "got an object type we didn\\'t expect (expected one of "
@@ -9947,8 +9958,9 @@ int16_t object_find_in_cluster(int flags, int16_t cluster_count,
           system_exit(-1);
         }
 
-        if (obj->marker_generation != *(uint32_t *)0x5a8d28) {
-          obj->marker_generation = *(uint32_t *)0x5a8d28;
+        generation = *(uint32_t *)0x5a8d28;
+        if (obj->marker_generation != generation) {
+          obj->marker_generation = generation;
           if (found >= max_count) {
             if (!object_globals->object_marker_initialized) {
               display_assert("object_globals->object_marker_initialized",
@@ -10688,12 +10700,6 @@ int16_t object_get_markers_by_string_id(int object_handle, void *marker_name,
 void object_compute_child_marker_position(void *object, void *child_marker,
                                           void *dest_matrix)
 {
-  typedef void (*matrix4x3_from_fup_fn)(void *out, float *pos, float *fwd,
-                                        float *up);
-  typedef void (*matrix_inverse_fn)(void *src, void *dst);
-  typedef void (*matrix4x3_multiply_fn)(void *out, void *a, void *b);
-  typedef int (*valid_real_matrix4x3_fn)(void *mat);
-
   float local_mat[13]; /* 0x34 bytes: scale + forward + left + up + position */
   float inv_mat[13]; /* 0x34 bytes */
   float *obj_position;
@@ -10706,28 +10712,28 @@ void object_compute_child_marker_position(void *object, void *child_marker,
   assert_halt(object != NULL);
   assert_halt(child_marker != NULL);
   assert_halt(dest_matrix != NULL);
-  assert_halt(((valid_real_matrix4x3_fn)0xf6d00)(dest_matrix));
+  assert_halt(valid_real_matrix4x3((float *)dest_matrix));
 
   obj_position = (float *)((char *)object + 0xc);
   obj_forward = (float *)((char *)object + 0x24);
   obj_up = (float *)((char *)object + 0x30);
 
   /* Build a matrix4x3 from the object's orientation and position */
-  ((matrix4x3_from_fup_fn)0x10a110)(local_mat, obj_position, obj_forward,
-                                    obj_up);
+  matrix4x3_from_forward_up_position(local_mat, obj_position, obj_forward,
+                                     obj_up);
 
   /* Invert it */
-  ((matrix_inverse_fn)0x109150)(local_mat, inv_mat);
+  matrix_inverse(local_mat, inv_mat);
 
   /* Multiply by the child marker's matrix at offset 0x38 */
-  ((matrix4x3_multiply_fn)0x109850)(inv_mat, (char *)child_marker + 0x38,
-                                    inv_mat);
+  matrix4x3_multiply(inv_mat, (float *)((char *)child_marker + 0x38),
+                     inv_mat);
 
   /* Invert the result */
-  ((matrix_inverse_fn)0x109150)(inv_mat, inv_mat);
+  matrix_inverse(inv_mat, inv_mat);
 
   /* Multiply dest_matrix by the inverted result, storing in local_mat */
-  ((matrix4x3_multiply_fn)0x109850)(dest_matrix, inv_mat, local_mat);
+  matrix4x3_multiply((float *)dest_matrix, inv_mat, local_mat);
 
   /* Extract position back to object (offsets 0x28..0x30 in matrix = indices
    * 10..12) */
@@ -11118,8 +11124,8 @@ int16_t object_find_in_radius(int flags, unsigned int type_mask,
   int16_t iter_count;
   int16_t i;
 
-  static int16_t cluster_indices[512];
-  static int object_indices[2048];
+  int16_t cluster_indices[512];
+  int object_indices[2048];
 
   if (cluster_info == NULL) {
     display_assert("location", "c:\\halo\\SOURCE\\objects\\objects.c", 0x6f3,
@@ -11152,7 +11158,7 @@ int16_t object_find_in_radius(int flags, unsigned int type_mask,
       (object_header_data_t *)datum_get(*(data_t **)0x5a8d50, handle);
     object_data_t *obj = header->object;
 
-    if ((1 << ((uint8_t)obj->type & 0x1f)) == 0) {
+    if ((1 << obj->type) == 0) {
       char *msg = csprintf((char *)0x5ab100,
                            "got an object type we didn't expect "
                            "(expected one of 0x%08x but got #%d).",
@@ -11161,13 +11167,13 @@ int16_t object_find_in_radius(int flags, unsigned int type_mask,
       system_exit(-1);
     }
 
-    if ((type_mask & (1 << ((uint8_t)obj->type & 0x1f))) != 0) {
+    if ((type_mask & (1 << obj->type)) != 0) {
       float dx = obj->unk_80 - position[0];
       float dy = obj->unk_84 - position[1];
       float dz = obj->unk_88 - position[2];
       float effective_radius = obj->unk_92 + radius;
 
-      if (dx * dx + dy * dy + dz * dz <= effective_radius * effective_radius) {
+      if (dx * dx + dz * dz + dy * dy <= effective_radius * effective_radius) {
         out_handles[found_count] = handle;
         found_count++;
       }
@@ -11188,7 +11194,6 @@ int16_t object_find_in_radius(int flags, unsigned int type_mask,
 /* 0x1417c0 */
 void objects_reconnect_to_structure_bsp(void)
 {
-  int iVar1;
   int local_102c[1028];
   int obj;
   object_iter_t bsp_iter;
@@ -11201,7 +11206,6 @@ void objects_reconnect_to_structure_bsp(void)
   bsp_iter.current_index = 0;
   bsp_iter.last_handle = NONE;
   bsp_iter.cookie = 0x86868686;
-  *(short *)(bsp_data + 4) = -1;
   obj = (int)object_iterator_next(&bsp_iter);
   while (obj != 0) {
     if ((*(unsigned int *)(obj + 4) & 0x800) != 0 &&
@@ -11213,7 +11217,7 @@ void objects_reconnect_to_structure_bsp(void)
         dat_handle = (int)datum_get(*(void **)0x5a8d50, bsp_iter.last_handle);
         *(short *)(dat_handle + 4) = -1;
       }
-      CALL_FUN_0018f180(bsp_data, (void *)(obj + 0x50));
+      scenario_location_from_point(bsp_data, (void *)(obj + 0x50));
       if (*(short *)(bsp_data + 4) == -1) {
         /* Sphere-test the object's bounding sphere against the current BSP.
          * Confirmed 6 cdecl args at 0x14185d-0x141873 (single ADD ESP,0x18):
@@ -11224,9 +11228,7 @@ void objects_reconnect_to_structure_bsp(void)
          * wild access -> the "Loading level..." kernel halt. */
         collision_bsp_test_sphere((int)global_collision_bsp_get(), 0, 0,
                                   obj + 0x50, *(int *)(obj + 0x5c), local_102c);
-        if (local_102c[771] == 0) {
-          CALL_FUN_0018f180(bsp_data, (void *)(obj + 0xc));
-        } else {
+        if (local_102c[771] != 0) {
           /* Hit: record the leaf/cluster index (local_102c[772]) in bsp_data[0]
            * (MOV [EBP-0x8],EAX at 0x14188d — omitted by the original lift),
            * then resolve the structure BSP index from the scenario block. */
@@ -11234,15 +11236,15 @@ void objects_reconnect_to_structure_bsp(void)
           if (local_102c[772] == -1) {
             *(short *)(bsp_data + 4) = -1;
           } else {
-            int sc;
-            sc = (int)scenario_get();
-            iVar1 = (int)tag_block_get_element(
-              (void *)(sc + 0xe0), local_102c[772] & 0x7fffffff, 0x10);
-            *(short *)(bsp_data + 4) = *(short *)(iVar1 + 8);
+            *(short *)(bsp_data + 4) = *(short *)((char *)tag_block_get_element(
+              (char *)scenario_get() + 0xe0, local_102c[772] & 0x7fffffff,
+              0x10) + 8);
           }
+        } else {
+          scenario_location_from_point(bsp_data, (void *)(obj + 0xc));
         }
       }
-      CALL_FUN_00140ce0(bsp_iter.last_handle, bsp_data);
+      object_connect_to_map(bsp_iter.last_handle, bsp_data);
     }
     obj = (int)object_iterator_next(&bsp_iter);
   }

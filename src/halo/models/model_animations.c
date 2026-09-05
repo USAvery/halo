@@ -1,3 +1,7 @@
+#ifdef HALO_RNG_TRACE
+#include "halo/math/rng_trace.h"
+#endif
+#line 1
 /* FUN_00120250 (0x120250) — Allocate a rectangle in a texture page's packed
  * bitmap layout.
  *
@@ -859,6 +863,12 @@ int model_animation_choose_random(int update_kind,
   float random_value;
   char *element;
 
+#ifdef HALO_RNG_TRACE
+  if (update_kind == 1)
+    RNG_TRACE_EX(RNG_TRACE_KIND_ANIM_CHOOSE, (unsigned int)(unsigned short)animation_index,
+                 __builtin_return_address(0));
+#endif
+#line 862
   antr_tag = (char *)tag_get(0x616e7472, animation_graph_tag_index);
   if (update_kind == 1) {
     random_value =

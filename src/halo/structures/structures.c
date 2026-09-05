@@ -2195,27 +2195,37 @@ int FUN_00106030(void *param_1, int param_2, short param_3, int param_4)
 bool FUN_00106130(uint16_t point_count, void *points, void *query_point,
                   float radius)
 {
-  float *pts = (float *)points;
-  float *qp = (float *)query_point;
+  int16_t count = (int16_t)point_count;
   int16_t i;
-  float radius_sq = radius * radius;
+  float radius_sq;
+  float *pts;
+  float *qp;
 
-  for (i = 0; i < (int16_t)point_count; i++) {
+  radius_sq = radius * radius;
+  i = 0;
+  if (count <= 0)
+    return true;
+
+  pts = (float *)points;
+  qp = (float *)query_point;
+
+  do {
     int idx = (int)i;
-    int next = idx + 1;
-    float ex, ey, dx, dy, edge_len_sq, cross;
-
-    if (next >= (int)(int16_t)point_count) {
-      next = 0;
-    }
+    int next = (idx + 1 >= (int)count) ? 0 : idx + 1;
+    float ex, ey, dx, dy, edge_len_sq_st, cross;
+    /* The original stores the edge length via `fsts 0x14(%ebp)` (no pop), so
+     * the != 0 test sees the live 80-bit value while the radius comparison
+     * below reloads the narrowed 32-bit slot.  Keep both. */
+    volatile float edge_len_sq;
 
     ex = pts[next * 2] - pts[idx * 2];
     ey = pts[next * 2 + 1] - pts[idx * 2 + 1];
     dx = qp[0] - pts[idx * 2];
     dy = qp[1] - pts[idx * 2 + 1];
-    edge_len_sq = ex * ex + ey * ey;
+    edge_len_sq_st = ex * ex + ey * ey;
+    edge_len_sq = edge_len_sq_st;
 
-    if (edge_len_sq != 0.0f) {
+    if (edge_len_sq_st != 0.0f) {
       cross = dx * ey - dy * ex;
       if (cross > 0.0f) {
         if (!(cross * cross <= edge_len_sq * radius_sq)) {
@@ -2223,7 +2233,9 @@ bool FUN_00106130(uint16_t point_count, void *points, void *query_point,
         }
       }
     }
-  }
+    i++;
+  } while (i < count);
+
   return true;
 }
 
@@ -2691,14 +2703,14 @@ void cluster_partition_add_object(void *partition, int object_handle,
       {
         data_t *obj_ref_data = (data_t *)part[2];
         int obj_ref_handle = data_new_at_index(obj_ref_data);
-        if (obj_ref_handle == -1) {
-          error(2, "WARNING: maximum %ss per map (%d) exceeded.", obj_ref_data,
-                (int)*(short *)((char *)obj_ref_data + 0x20));
-        } else {
+        if (obj_ref_handle != -1) {
           int *obj_ref = (int *)datum_get(obj_ref_data, obj_ref_handle);
           obj_ref[1] = (int)cluster_index;
           obj_ref[2] = *first_ref;
           *first_ref = obj_ref_handle;
+        } else {
+          error(2, "WARNING: maximum %ss per map (%d) exceeded.", obj_ref_data,
+                (int)*(short *)((char *)obj_ref_data + 0x20));
         }
       }
 
@@ -2715,16 +2727,16 @@ void cluster_partition_add_object(void *partition, int object_handle,
         int *cluster_head = &part[0][(int)cluster_index];
         data_t *cluster_ref_data = (data_t *)part[1];
         int cluster_ref_handle = data_new_at_index(cluster_ref_data);
-        if (cluster_ref_handle == -1) {
-          error(2, "WARNING: maximum %ss per map (%d) exceeded.",
-                cluster_ref_data,
-                (int)*(short *)((char *)cluster_ref_data + 0x20));
-        } else {
+        if (cluster_ref_handle != -1) {
           int *cluster_ref =
             (int *)datum_get(cluster_ref_data, cluster_ref_handle);
           cluster_ref[1] = object_handle;
           cluster_ref[2] = *cluster_head;
           *cluster_head = cluster_ref_handle;
+        } else {
+          error(2, "WARNING: maximum %ss per map (%d) exceeded.",
+                cluster_ref_data,
+                (int)*(short *)((char *)cluster_ref_data + 0x20));
         }
       }
     }
@@ -7028,6 +7040,12 @@ int32_t structure_get_planar_fog_definition_index(void *structure_bsp,
   return result;
 }
 
+/* VC71: the original calls FUN_0018e420 out of line (ref has 11 calls, we
+ * emitted 12 after cl.exe inlined it plus its assert).  Scoped
+ * inline_depth(0) restores the call. */
+#if defined(_MSC_VER) && !defined(__clang__)
+#pragma inline_depth(0)
+#endif
 bool structure_get_planar_fog(void *scenario, int16_t portal_index,
                               float *position, float radius)
 {
@@ -7036,14 +7054,21 @@ bool structure_get_planar_fog(void *scenario, int16_t portal_index,
   float projected_hit[3];
   char *portal =
     tag_block_get_element((char *)scenario + 0x154, (int)portal_index, 0x40);
-  char *structure_bsp = tag_block_get_element((char *)scenario + 0xb0, 0, 0x60);
-  float *portal_plane = tag_block_get_element((int *)(structure_bsp + 0xc),
-                                              *(int *)(portal + 4), 0x10);
-  float plane_distance = portal_plane[1] * position[1] +
-                         portal_plane[2] * position[2] +
-                         position[0] * portal_plane[0] - portal_plane[3];
+  float *portal_plane = tag_block_get_element(
+    (char *)tag_block_get_element((char *)scenario + 0xb0, 0, 0x60) + 0xc,
+    *(int *)(portal + 4), 0x10);
+  /* The original keeps the freshly computed distance live in ST for the
+   * |d| < radius guard (fsts 0xc(%ebp) does not pop), but every later use
+   * reloads the narrowed 32-bit slot.  plane_distance_st is that live ST
+   * value; the volatile float is the single narrowing store. */
+  float plane_distance_st = portal_plane[1] * position[1] +
+                            portal_plane[2] * position[2] +
+                            position[0] * portal_plane[0] - portal_plane[3];
+  volatile float plane_distance;
 
-  if (fabs(plane_distance) < radius) {
+  plane_distance = plane_distance_st;
+
+  if (fabs(plane_distance_st) < radius) {
     float dx = *(float *)(portal + 8) - position[0];
     float dy = *(float *)(portal + 0xc) - position[1];
     float dz = *(float *)(portal + 0x10) - position[2];
@@ -7056,15 +7081,17 @@ bool structure_get_planar_fog(void *scenario, int16_t portal_index,
       uint8_t plane_axis;
       int *portal_vertices = (int *)(portal + 0x34);
       int16_t vertex = 0;
+      float neg_plane_distance;
 
       portal_plane =
         tag_block_get_element((int *)(bsp3d + 0xc), portal_plane_index, 0x10);
       plane_basis = FUN_00099220(portal_plane);
       plane_axis = FUN_00099270(portal_plane, plane_basis);
 
-      projected_hit[0] = -plane_distance * portal_plane[0] + position[0];
-      projected_hit[1] = -plane_distance * portal_plane[1] + position[1];
-      projected_hit[2] = -plane_distance * portal_plane[2] + position[2];
+      neg_plane_distance = -plane_distance;
+      projected_hit[0] = neg_plane_distance * portal_plane[0] + position[0];
+      projected_hit[1] = neg_plane_distance * portal_plane[1] + position[1];
+      projected_hit[2] = neg_plane_distance * portal_plane[2] + position[2];
       FUN_00061df0(projected_hit, plane_basis, plane_axis, projected_center);
 
       if (*portal_vertices > 0) {
@@ -7086,6 +7113,9 @@ bool structure_get_planar_fog(void *scenario, int16_t portal_index,
 
   return false;
 }
+#if defined(_MSC_VER) && !defined(__clang__)
+#pragma inline_depth()
+#endif
 
 int16_t FUN_001989b0(uint16_t cluster_count, float *position, float radius,
                      int max_count, int16_t *out_indices)
@@ -7177,6 +7207,7 @@ int16_t structure_clusters_in_cone(int16_t starting_cluster, float *point,
   int work_depth;
   int next_output;
 
+  output_count = 0;
   if (*(uint8_t *)0x4d92e1 != 0) {
     display_assert("!structure_globals.cluster_marker_initialized",
                    "c:\\halo\\SOURCE\\structures\\structures.c", 0x103, true);
@@ -7189,7 +7220,6 @@ int16_t structure_clusters_in_cone(int16_t starting_cluster, float *point,
   structure_cluster_mark(starting_cluster);
   work_stack[0] = starting_cluster;
   stack_depth = 1;
-  output_count = 0;
 
   do {
     int16_t current_cluster;
@@ -7227,7 +7257,7 @@ int16_t structure_clusters_in_cone(int16_t starting_cluster, float *point,
             FUN_00110210((float *)(portal + 4), *(float *)(portal + 10), point,
                          direction, length, sine, cosine)) {
           structure_cluster_mark(adjacent_cluster);
-          if ((int16_t)work_depth > 0x1ff) {
+          if ((int16_t)work_depth >= 0x200) {
             display_assert("stack_depth<MAXIMUM_CLUSTERS_PER_STRUCTURE",
                            "c:\\halo\\SOURCE\\structures\\structures.c", 0xf5,
                            true);

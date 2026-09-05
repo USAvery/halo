@@ -592,7 +592,14 @@ float normalize3d(float *v)
  * Confirmed: computes a.z*b.z + a.y*b.y + a.x*b.x (accumulation order). */
 float FUN_00013070(float *a, float *b)
 {
-  return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  /* Addend association is load-bearing for lockstep determinism, not style.
+     The original (0x13070) accumulates ((z*z' + y*y') + x*x'): FLD z/FMUL,
+     FLD y/FMUL, FADDP, FLD x/FMUL, FADDP.  Written as x+y+z, clang emits
+     ((x+y)+z), which rounds differently and drifts every dot product in the
+     engine by a ULP -- enough to flip movement/facing threshold branches a
+     tick early and desync a system-link game.  cl.exe reassociates to match
+     the original, so the VC71 lane cannot see this; clang is what ships. */
+  return a[2] * b[2] + a[1] * b[1] + a[0] * b[0];
 }
 
 /* 0x13090 — Subtract two 3D vectors: out = a - b. */

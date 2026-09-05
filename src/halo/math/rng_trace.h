@@ -42,6 +42,10 @@
 #define RNG_TRACE_KIND_BODY_BEFORE   12u /* root object body vitality, entry info */
 #define RNG_TRACE_KIND_BODY_AFTER    13u /* FUN_00136f40 body vitality       info */
 #define RNG_TRACE_KIND_SHIELD_AFTER  14u /* FUN_00136f40 shield vitality     info */
+#define RNG_TRACE_KIND_ANIM_CHOOSE   15u /* model_animation_choose_random: value=anim index, caller2=its caller  info */
+#define RNG_TRACE_KIND_UNIT_STATE    16u /* unit_animation_set_state entry: value=(anim_state<<8)|old_state, caller=its caller, caller2=unit handle  info */
+#define RNG_TRACE_KIND_ANIM_UPDATE_IN 17u /* FUN_001ab870 before original updater: value=state[1]<<16|state[0], caller=unit_update_animation site, caller2=unit handle  info */
+#define RNG_TRACE_KIND_ANIM_UPDATE_OUT 18u /* FUN_001ab870 after original updater: value=state[0]<<16|result, caller=unit_update_animation site, caller2=unit handle  info */
 
 /* 16 bytes. */
 typedef struct {
