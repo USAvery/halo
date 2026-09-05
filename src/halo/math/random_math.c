@@ -933,7 +933,7 @@ float FUN_0010c340(float *v1, float *v2)
   cx = v2[2] * v1[1] - v1[2] * v2[1];
   cy = v1[2] * v2[0] - v2[2] * v1[0];
   cz = v1[0] * v2[1] - v2[0] * v1[1];
-  return sqrtf(cy * cy + cx * cx + cz * cz);
+  return sqrtf(cy * cy + (cx * cx + cz * cz));
 }
 
 /* Linearly interpolate between param_1 and param_2 using a byte fraction
@@ -1084,7 +1084,7 @@ void FUN_0010c7d0(float *param_1, float *param_2, float param_3, float *param_4)
  *
  * 0x10c8e0 / random_math.obj
  */
-void FUN_0010c8e0(float *v, float *n, float *out)
+float *FUN_0010c8e0(float *v, float *n, float *out)
 {
   float dot2;
 
@@ -1092,6 +1092,7 @@ void FUN_0010c8e0(float *v, float *n, float *out)
   out[0] = v[0] - dot2 * n[0];
   out[1] = v[1] - dot2 * n[1];
   out[2] = v[2] - dot2 * n[2];
+  return out;
 }
 
 /* Spherical rotation: rotate v1 toward v2 by angle t (radians), writing

@@ -1725,6 +1725,21 @@
       "score": 100.0,
       "source": "src/halo/math/vector_math.c"
     },
+    "FUN_00012c30": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 95.8,
+      "addr": "0x12c30",
+      "end": "0x12e42",
+      "kind": "auto",
+      "n_r": 129,
+      "opnd_percent": 88.8,
+      "raw_mnemonic_pct": 95.8,
+      "ref": "synth",
+      "ref_sha": "0e47a5d22078b514",
+      "score": 95.8,
+      "source": "src/halo/math/vector_math.c"
+    },
     "FUN_00012e50": {
       "abi_model": "raw",
       "abi_model_items": 0,
@@ -3153,16 +3168,16 @@
     "FUN_0001ad60": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 91.7,
+      "abi_modeled_mnemonic_pct": 100.0,
       "addr": "0x1ad60",
       "end": "0x1ad93",
       "kind": "auto",
       "n_r": 24,
-      "opnd_percent": 66.7,
-      "raw_mnemonic_pct": 91.7,
+      "opnd_percent": 100.0,
+      "raw_mnemonic_pct": 100.0,
       "ref": "synth",
       "ref_sha": "8eee09f5476d404e",
-      "score": 91.7,
+      "score": 100.0,
       "source": "src/halo/math/real_math.c"
     },
     "FUN_0001ada0": {
@@ -13141,16 +13156,16 @@
     "FUN_0009a300": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 63.0,
+      "abi_modeled_mnemonic_pct": 64.7,
       "addr": "0x9a300",
       "end": "0x9a59c",
       "kind": "auto",
       "n_r": 242,
-      "opnd_percent": 19.1,
-      "raw_mnemonic_pct": 63.0,
+      "opnd_percent": 18.3,
+      "raw_mnemonic_pct": 64.7,
       "ref": "synth",
       "ref_sha": "f66bb1cd93578952",
-      "score": 63.0,
+      "score": 64.7,
       "source": "src/halo/effects/decals.c"
     },
     "FUN_0009a5a0": {
@@ -47008,6 +47023,21 @@
       "score": 90.1,
       "source": "src/halo/cache/cache_files_windows.c"
     },
+    "action_alert_perform": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 96.1,
+      "addr": "0x12660",
+      "end": "0x128b4",
+      "kind": "auto",
+      "n_r": 170,
+      "opnd_percent": 95.0,
+      "raw_mnemonic_pct": 96.1,
+      "ref": "synth",
+      "ref_sha": "332820fe2513fa40",
+      "score": 96.1,
+      "source": "src/halo/math/vector_math.c"
+    },
     "action_avoid_perform": {
       "abi_model": "raw",
       "abi_model_items": 0,
@@ -56881,16 +56911,16 @@
     "decal_new_from_collision": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 60.9,
+      "abi_modeled_mnemonic_pct": 61.6,
       "addr": "0x9ac90",
       "end": "0x9c4a2",
       "kind": "auto",
       "n_r": 1782,
-      "opnd_percent": 44.8,
-      "raw_mnemonic_pct": 60.9,
+      "opnd_percent": 44.1,
+      "raw_mnemonic_pct": 61.6,
       "ref": "synth",
       "ref_sha": "faffaedf2e2127da",
-      "score": 60.9,
+      "score": 61.6,
       "source": "src/halo/effects/decals.c"
     },
     "decal_update": {
@@ -59281,16 +59311,16 @@
     "fast_vector_intersects_sphere": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 69.0,
+      "abi_modeled_mnemonic_pct": 93.0,
       "addr": "0x10bc70",
       "end": "0x10bd70",
       "kind": "auto",
       "n_r": 102,
-      "opnd_percent": 64.0,
-      "raw_mnemonic_pct": 69.0,
+      "opnd_percent": 85.0,
+      "raw_mnemonic_pct": 93.0,
       "ref": "synth",
       "ref_sha": "3a9b07ed028d982a",
-      "score": 69.0,
+      "score": 93.0,
       "source": "src/halo/math/real_math.c"
     },
     "file_close": {
@@ -68401,16 +68431,16 @@
     "matrix_inverse": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 81.6,
+      "abi_modeled_mnemonic_pct": 92.0,
       "addr": "0x109150",
       "end": "0x109231",
       "kind": "auto",
       "n_r": 86,
-      "opnd_percent": 75.9,
-      "raw_mnemonic_pct": 81.6,
+      "opnd_percent": 86.2,
+      "raw_mnemonic_pct": 92.0,
       "ref": "synth",
       "ref_sha": "cf0b2b4b5cf39f83",
-      "score": 81.6,
+      "score": 92.0,
       "source": "src/halo/math/real_math.c"
     },
     "matrix_scale_transform_vector": {
@@ -68431,16 +68461,16 @@
     "matrix_transform_point": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 99.0,
+      "abi_modeled_mnemonic_pct": 100.0,
       "addr": "0x109590",
       "end": "0x109605",
       "kind": "auto",
       "n_r": 49,
-      "opnd_percent": 55.7,
-      "raw_mnemonic_pct": 99.0,
+      "opnd_percent": 98.0,
+      "raw_mnemonic_pct": 100.0,
       "ref": "synth",
       "ref_sha": "559824e3cdf7bb62",
-      "score": 99.0,
+      "score": 100.0,
       "source": "src/halo/math/real_math.c"
     },
     "matrix_transform_vector": {
@@ -79096,16 +79126,16 @@
     "real_matrix3x3_transform_vector": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 98.9,
+      "abi_modeled_mnemonic_pct": 100.0,
       "addr": "0x109780",
       "end": "0x1097f0",
       "kind": "auto",
       "n_r": 46,
-      "opnd_percent": 63.7,
-      "raw_mnemonic_pct": 98.9,
+      "opnd_percent": 97.8,
+      "raw_mnemonic_pct": 100.0,
       "ref": "synth",
       "ref_sha": "c6d2113b7b5079ec",
-      "score": 98.9,
+      "score": 100.0,
       "source": "src/halo/math/real_math.c"
     },
     "real_matrix4x3_transform_point": {
@@ -85051,16 +85081,16 @@
     "triple_product3d": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 82.1,
+      "abi_modeled_mnemonic_pct": 100.0,
       "addr": "0x993b0",
       "end": "0x993f4",
       "kind": "auto",
       "n_r": 29,
-      "opnd_percent": 42.9,
-      "raw_mnemonic_pct": 82.1,
+      "opnd_percent": 100.0,
+      "raw_mnemonic_pct": 100.0,
       "ref": "synth",
       "ref_sha": "bdec9d9670059d6a",
-      "score": 82.1,
+      "score": 100.0,
       "source": "src/halo/effects/decals.c"
     },
     "uasctime": {

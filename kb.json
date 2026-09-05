@@ -20230,7 +20230,7 @@
     {
      "addr": "0x10c8e0",
      "comment": "Reflect vector v about surface normal n: out = v - 2*dot(v,n)*n.",
-     "decl": "void FUN_0010c8e0(float *v, float *n, float *out);",
+     "decl": "float *FUN_0010c8e0(float *v, float *n, float *out);",
      "ported": true
     },
     {
@@ -21801,7 +21801,7 @@
     },
     {
      "addr": "0x109590",
-     "decl": "void matrix_transform_point(float *matrix, float *in, float *out);",
+     "decl": "float *matrix_transform_point(float *matrix, float *in, float *out);",
      "ported": true
     },
     {
@@ -21811,7 +21811,7 @@
     },
     {
      "addr": "0x109680",
-     "decl": "void matrix_transform_vector(float *matrix, float *in, float *out);",
+     "decl": "float *matrix_transform_vector(float *matrix, float *in, float *out);",
      "ported": true
     },
     {
@@ -21821,13 +21821,13 @@
     },
     {
      "addr": "0x109780",
-     "decl": "void real_matrix3x3_transform_vector(void *matrix, vector3_t *vec, vector3_t *out);",
+     "decl": "vector3_t *real_matrix3x3_transform_vector(void *matrix, vector3_t *vec, vector3_t *out);",
      "ported": true
     },
     {
      "addr": "0x1097f0",
      "comment": "Transform a 3D point through a 4x3 matrix (rotation only, no translation).",
-     "decl": "void real_matrix4x3_transform_point(void *matrix, void *point, void *out);",
+     "decl": "void *real_matrix4x3_transform_point(void *matrix, void *point, void *out);",
      "ported": true
     },
     {
@@ -21897,7 +21897,7 @@
     },
     {
      "addr": "0x10a1c0",
-     "decl": "void FUN_0010a1c0(float *matrix, float *in_plane, float *out_plane);",
+     "decl": "float *FUN_0010a1c0(float *matrix, float *in_plane, float *out_plane);",
      "ported": true
     },
     {
@@ -33249,7 +33249,7 @@
     },
     {
      "addr": "0x2a540",
-     "decl": "void midpoint3d(float *a, float *b, float *out);",
+     "decl": "float *midpoint3d(float *a, float *b, float *out);",
      "name": "midpoint3d",
      "ported": true
     },

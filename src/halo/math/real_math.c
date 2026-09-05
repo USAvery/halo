@@ -109,10 +109,16 @@ extern double __cdecl fabs(double);
  * Confirmed: cdecl, 2 pointer args. Pure FPU leaf (FSUB/FMUL/FADD/FSQRT). */
 float FUN_0001ad60(float *a, float *b)
 {
-  float dx = a[0] - b[0];
-  float dy = a[1] - b[1];
-  float dz = a[2] - b[2];
-  return sqrtf(dx * dx + dy * dy + dz * dz);
+  float delta[3];
+  float sum;
+
+  delta[0] = b[0] - a[0];
+  delta[1] = b[1] - a[1];
+  delta[2] = b[2] - a[2];
+  sum = delta[0] * delta[0];
+  sum += delta[1] * delta[1];
+  sum += delta[2] * delta[2];
+  return sqrtf(sum);
 }
 
 /* 0x1ada0 — vehicle-action qualification.  actor_handle and vehicle_handle
@@ -502,7 +508,7 @@ __declspec(noinline) void matrix4x3_decompose(float *matrix, float *out_pos,
  * out = rotation * (scale * in) + translation.
  * Matrix layout: [scale +0x00][3x3 rotation +0x04..+0x24][translation
  * +0x28..+0x30]. */
-void matrix_transform_point(float *matrix, float *in, float *out)
+float *matrix_transform_point(float *matrix, float *in, float *out)
 {
   float x = in[0];
   float y = in[1];
@@ -526,6 +532,7 @@ void matrix_transform_point(float *matrix, float *in, float *out)
            y * *(float *)((char *)matrix + 0x18) +
            z * *(float *)((char *)matrix + 0x24) +
            *(float *)((char *)matrix + 0x30);
+  return out;
 }
 
 /* 0x109610 — Scale-transform a vector by a 4x3 matrix.
@@ -549,7 +556,7 @@ void matrix_scale_transform_vector(float *matrix, float *in, float *out)
 /* Transform a 3D vector by a 3x3 rotation matrix (stored at matrix+0x4).
  * out[i] = dot(in, column_i of matrix).
  * The matrix layout is: [scale(4 bytes)][3x3 floats row-major at +0x4]. */
-void matrix_transform_vector(float *matrix, float *in, float *out)
+float *matrix_transform_vector(float *matrix, float *in, float *out)
 {
   float x = in[0];
   float y = in[1];
@@ -564,6 +571,7 @@ void matrix_transform_vector(float *matrix, float *in, float *out)
   out[2] = x * *(float *)((char *)matrix + 0x0c) +
            y * *(float *)((char *)matrix + 0x18) +
            z * *(float *)((char *)matrix + 0x24);
+  return out;
 }
 
 /* real_matrix3x3_transform_point (0x1096e0)
@@ -614,7 +622,7 @@ void real_matrix3x3_transform_point(void *matrix, float *point, float *out)
  * Transform a direction or velocity vector by the rotation part of a
  * 4x3 matrix, normalizing by scale. No translation subtraction —
  * use real_matrix3x3_transform_point (0x1096e0) for positions. */
-void real_matrix3x3_transform_vector(void *matrix, vector3_t *vec,
+vector3_t *real_matrix3x3_transform_vector(void *matrix, vector3_t *vec,
                                      vector3_t *out)
 {
   float *m = (float *)matrix;
@@ -638,6 +646,7 @@ void real_matrix3x3_transform_vector(void *matrix, vector3_t *vec,
   out->z = x * *(float *)((char *)matrix + 0x1c) +
            y * *(float *)((char *)matrix + 0x20) +
            z * *(float *)((char *)matrix + 0x24);
+  return out;
 }
 
 /* Transform a 3D point by the rotation part of a 4x3 matrix (no scale
@@ -645,7 +654,7 @@ void real_matrix3x3_transform_vector(void *matrix, vector3_t *vec,
  *   out[i] = dot(point, column_i of 3x3 rotation at matrix+0x04).
  * Matrix layout: [scale +0x00][3x3 rotation +0x04..+0x24][translation
  * +0x28..+0x30]. Only the 3x3 rotation is used. */
-void real_matrix4x3_transform_point(void *matrix, void *point, void *out)
+void *real_matrix4x3_transform_point(void *matrix, void *point, void *out)
 {
   float *p = (float *)point;
   float *o = (float *)out;
@@ -662,6 +671,7 @@ void real_matrix4x3_transform_point(void *matrix, void *point, void *out)
   o[2] = x * *(float *)((char *)matrix + 0x1c) +
          y * *(float *)((char *)matrix + 0x20) +
          z * *(float *)((char *)matrix + 0x24);
+  return out;
 }
 
 /* Multiply two 4x3 matrices: out = b * a.
@@ -1180,7 +1190,7 @@ void quaternion_to_angle_and_vector(float *mat0, float *mat1, float *out_vec3)
  * part, and the distance (in_plane[3]) is recomputed from the original
  * distance scaled by matrix[0] plus the dot product of the transformed normal
  * with the matrix's translation (matrix[10..12]). */
-void FUN_0010a1c0(float *matrix, float *in_plane, float *out_plane)
+float *FUN_0010a1c0(float *matrix, float *in_plane, float *out_plane)
 {
   float nx = in_plane[0];
   float ny = in_plane[1];
@@ -1191,6 +1201,7 @@ void FUN_0010a1c0(float *matrix, float *in_plane, float *out_plane)
   out_plane[2] = nx * matrix[3] + ny * matrix[6] + nz * matrix[9];
   out_plane[3] = in_plane[3] * matrix[0] + matrix[10] * out_plane[0] +
                  matrix[11] * out_plane[1] + matrix[12] * out_plane[2];
+  return out_plane;
 }
 
 /* Transform a plane by a matrix. Computes new plane distance and normal. */

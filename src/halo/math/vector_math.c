@@ -89,8 +89,9 @@ float distance_squared3d(const float *a, const float *b)
   float dx = b[0] - a[0];
   float dy = b[1] - a[1];
   float dz = b[2] - a[2];
+  float sum = dz * dz + dx * dx;
 
-  return dx * dx + dy * dy + dz * dz;
+  return sum + dy * dy;
 }
 
 float FUN_000121e0(float min, float max)

@@ -3567,8 +3567,16 @@ void bitmap_2d_uncompress_from_mipmap(void *source_bitmap,
  */
 float real_rgb_color_brightness(float *color)
 {
+#if defined(_MSC_VER) && !defined(__clang__)
+  float brightness;
+
+  brightness = color[2] * *(float *)0x2647c8 + color[1] * *(float *)0x2647c4;
+  /* Preserve the reference's final color load before its coefficient multiply. */
+  return brightness + *(volatile float *)color * *(float *)0x2647c0;
+#else
   return color[0] * *(float *)0x2647c0 + color[1] * *(float *)0x2647c4 +
          color[2] * *(float *)0x2647c8;
+#endif
 }
 
 /*

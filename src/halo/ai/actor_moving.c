@@ -78,11 +78,12 @@ float arccosine(float x)
 
 /* midpoint3d (0x2a540) — Compute the midpoint of two 3D vectors.
  * out[i] = (a[i] + b[i]) * 0.5f for i in {0,1,2}. */
-void midpoint3d(float *a, float *b, float *out)
+float *midpoint3d(float *a, float *b, float *out)
 {
-  out[0] = (a[0] + b[0]) * 0.5f;
-  out[1] = (a[1] + b[1]) * 0.5f;
-  out[2] = (a[2] + b[2]) * 0.5f;
+  out[0] = (a[0] + b[0]) * *(const float *)0x253398;
+  out[1] = (a[1] + b[1]) * *(const float *)0x253398;
+  out[2] = (a[2] + b[2]) * *(const float *)0x253398;
+  return out;
 }
 
 /* actor_test_destination (0x2a580) — check whether an actor has reached its

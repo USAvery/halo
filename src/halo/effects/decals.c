@@ -337,15 +337,13 @@ void project_point2d(float *point_2d, float *plane, int16_t projection,
  * p, q, r. Returns a float. */
 float triple_product3d(float *p, float *q, float *r)
 {
-  float cross_x;
-  float cross_y;
-  float cross_z;
+  float cross[3];
 
-  cross_x = p[1] * q[2] - p[2] * q[1];
-  cross_y = p[2] * q[0] - p[0] * q[2];
-  cross_z = p[0] * q[1] - q[0] * p[1];
+  cross[0] = p[1] * q[2] - p[2] * q[1];
+  cross[1] = p[2] * q[0] - p[0] * q[2];
+  cross[2] = p[0] * q[1] - q[0] * p[1];
 
-  return cross_x * r[0] + cross_y * r[1] + cross_z * r[2];
+  return cross[0] * r[0] + cross[1] * r[1] + cross[2] * r[2];
 }
 
 /* plane2d_from_points (0x99400)
