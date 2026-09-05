@@ -73,6 +73,15 @@ KINDS = {
     12: ("probe:body_before", "info"),
     13: ("probe:body_after", "info"),
     14: ("probe:shield_after", "info"),
+    # seed_before = animation index, caller2 = caller of model_animation_choose_random.
+    15: ("anim_choose", "info"),
+    # seed_before = (anim_state << 8) | old_state, caller = caller of
+    # unit_animation_set_state, caller2 = unit handle.
+    16: ("probe:unit_state", "info"),
+    # FUN_001ab870 around original animation_update_internal; caller identifies
+    # the unit_update_animation slot, caller2 is the unit handle.
+    17: ("probe:anim_update_in", "info"),
+    18: ("probe:anim_update_out", "info"),
 }
 
 
@@ -398,13 +407,20 @@ def probes(path: str) -> int:
         bits = rec["seed_before"]
         val = f32(bits)
         flag = ""
+        shown = f"{val!r:>16} (0x{bits:08x})"
         if kind in ("probe:body_after", "probe:body_before"):
             if bits & 0x80000000 or bits == 0:
                 flag = "  <== DEAD (body <= 0)"
             elif ulps_from_zero(bits) < 0x33D6BF95:  # < 1e-7
                 flag = "  <== within 1e-7 of death boundary"
+        elif kind == "probe:anim_update_in":
+            shown = (f"state0=0x{bits & 0xffff:04x} "
+                     f"state1=0x{bits >> 16:04x}")
+        elif kind == "probe:anim_update_out":
+            shown = (f"result=0x{bits & 0xffff:04x} "
+                     f"state0=0x{bits >> 16:04x}")
         print(f"[{rec['index']:7d}] tick={rec['tick']:<6d} {kind:<20s} "
-              f"{val!r:>16} (0x{bits:08x}) {rec['caller2']}{flag}")
+              f"{shown} {rec['caller2']}{flag}")
     if n == 0:
         print("no probe records (build predates the damage probes, or "
               "object_cause_damage is not ported in this build)")

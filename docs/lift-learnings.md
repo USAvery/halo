@@ -2808,3 +2808,91 @@ usable here: on drvfs it raises `PermissionError` when a reader holds the target
 open.) (2) `patch.py.is_self_forwarding_impl`, checked before every redirect: if
 the impl's first 32 bytes contain the original VA as an immediate, the patcher
 aborts instead of building the loop. Self-tested in `reverse_thunk_tests`.
+
+## 57. VC71 Compiles With cl.exe But We Ship clang — Float Association Divergence Is Invisible to the Gate (BUT SEMANTICALLY INERT AT PC=64)
+
+**CORRECTION (same day).** The desync attribution below is **WRONG**. Addend
+association is inert unless the x87 truncates intermediates to 24-bit single
+precision; Halo runs at PC=11 (64-bit) and game code contains zero `fldcw`.
+Measured 0/1,000,000 differing results at 53- and 64-bit versus 31% at 24-bit.
+The blind spot in the *gate* is real and the detector is worth keeping, but it
+finds structural differences that are almost always semantically inert, and it
+did not cause the desync. Read the rest as a description of the gate gap only.
+
+**Symptom.** A system-link game between a pristine build-2276 host and our
+re-implemented client desynced within seconds with `out of sync: client/server
+random seed mismatch`. No combat required. The drift was always a small number
+of RNG draws and went in both directions, i.e. animation state transitions were
+landing one tick apart, not an extra or missing draw site.
+
+**Root cause.** `FUN_00013070` (0x13070, the 3D dot product) was lifted as
+
+```c
+return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+```
+
+The original accumulates in the opposite order:
+
+```
+fld [eax+8]; fmul [ecx+8]   ; z
+fld [eax+4]; fmul [ecx+4]   ; y
+faddp st(1)                 ; (z + y)
+fld [eax];   fmul [ecx]     ; x
+faddp st(1)                 ; ((z + y) + x)
+```
+
+Floating-point addition is commutative but **not associative**: `(x+y)+z` and
+`(z+y)+x` differ by a ULP. Every 3D dot product in the engine — AI facing,
+biped orientation, physics, structure queries — was computing a slightly
+different value from the original. The unported movement/turning classifiers
+(`FUN_001a4c50`, `FUN_001a5300`) read those floats and compare them against
+thresholds, so a ULP flipped a threshold a tick early on one machine, which
+moved the animation state change a tick, which moved the RNG draw a tick.
+
+**Why every gate passed.** VC71 scored `FUN_00013070` at **100.0% (14/14,
+opnd 100.0%)** both before and after the fix. VC71 compiles our C with
+**cl.exe (MSVC 7.1)**, which reassociates the expression back to the original's
+order. The binary we ship is built by **clang**, which honours C's
+left-associativity and emits `((x+y)+z)`. Any float-association difference that
+cl.exe happens to normalise away is invisible to VC71 *by construction* — this
+is a permanent blind spot of the byte-match lane, not a tuning issue.
+
+Two-term reductions are safe: `a+b == b+a` is exact in IEEE, so only 3-or-more
+term chains can diverge.
+
+**Fix.** Write the C in the original's association order so clang reproduces it:
+
+```c
+return a[2] * b[2] + a[1] * b[1] + a[0] * b[0];
+```
+
+VC71 stays at 100.0%. clang then emits `((y+z)+x)`, not the literal source order
+`((z+y)+x)` -- it still schedules the loads its own way. That is fine and is the
+point: the inner two-term add is exact either way, so the result is bit-identical
+to the original. What has to match is the *association*, not the instruction
+order.
+
+**Automation.** `tools/audit/check_fpu_association.py` symbolically executes the
+x87 stream of our clang objects and of the original XBE, builds an expression
+tree for each, canonicalises commutative nodes (so `a+b`/`b+a` compare equal
+while `(a+b)+c`/`a+(b+c)` do not), and reports every structural difference. It
+resolves FPU memory operands to parameter slots so leaves are comparable across
+the two builds, decodes x87 operand direction from the escape opcode rather than
+the printed mnemonic (capstone prints `fmul st(1)` for both `D8` and `DC`
+forms, which mean opposite things), tolerates a uniform parameter-index shift
+(register-passed arguments renumber the slots), and reports SKIP rather than
+guessing on anything outside pure-FPU straight-line code.
+
+It also canonicalises negation placement inside mul/div chains (`-(a/b)` and
+`(-a)/b` are bit-identical) and resolves `.rdata` float literals so a load of a
+zero constant and an `FLDZ` compare equal. Both were needed: the first draft
+reported 41 mismatches, of which 10 were artifacts of a static (rather than
+flow-sensitive) register map, an unnormalised `FCHS` position, and an
+unresolved constant load.
+
+First full sweep after those fixes: **736 functions compared, 31 mismatches
+across 16 functions**, including `distance_squared3d`,
+`plane3d_distance_to_point`, `matrix_transform_point`, `matrix_transform_vector`,
+`real_matrix4x3_transform_point`, `real_matrix3x3_transform_vector`,
+`triple_product3d`, `midpoint3d` and `real_rgb_color_brightness`.
+Report: `artifacts/fpu_assoc/sweep_20260905.txt`.

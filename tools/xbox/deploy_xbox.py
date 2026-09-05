@@ -44,6 +44,13 @@ ROOT_DIR = os.path.abspath(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "../..")
 )
 HALO_PATCHED_DIR = os.path.join(ROOT_DIR, "halo-patched")
+
+
+def build_xbdm_python_command(script_path: str, script_args: list[str]) -> list[str] | None:
+    """Use Linux Python for bridged xemu when Windows cannot reach XBDM."""
+    if os.environ.get("HALO_NATIVE_XBDM") == "1":
+        return [sys.executable, script_path, *script_args]
+    return build_windows_python_command(script_path, script_args)
 DEFAULT_XBCP = os.path.join(
     "C:", os.sep, "Program Files (x86)", "RXDK", "xbox", "bin", "xbcp.exe"
 )
@@ -250,7 +257,7 @@ def launch_xbe(xbox_dest: str, host: str, dry_run: bool) -> int:
     """Launch the deployed XBE on the Xbox via xbdm_rdcp.py magicboot."""
     xbe_xbox_path = xbox_dest.lstrip("x") + "\\default.xbe"
     rdcp_script = os.path.join(ROOT_DIR, "tools", "xbox", "xbdm_rdcp.py")
-    cmd = build_windows_python_command(
+    cmd = build_xbdm_python_command(
         rdcp_script,
         [f"magicboot title={xbe_xbox_path} debug"],
     )
@@ -329,7 +336,7 @@ def fetch_remote_debug_text(host: str, remote_debug_path: str) -> "str | None":
     """Return the running title's debug.txt as text, or None if not yet readable."""
     script = os.path.join(ROOT_DIR, "tools", "xbox", "xbdm_debug_txt.py")
     script_args = ["--lines", "0", "--remote", remote_debug_path, "--output", "-"]
-    cmd = build_windows_python_command(script, script_args)
+    cmd = build_xbdm_python_command(script, script_args)
     if cmd is None:
         cmd = [sys.executable, script, *script_args]
     if host:
@@ -436,7 +443,7 @@ def launch_and_verify(
 
 def run_rdcp_command(host: str, command: str) -> subprocess.CompletedProcess[str]:
     rdcp_script = os.path.join(ROOT_DIR, "tools", "xbox", "xbdm_rdcp.py")
-    cmd = build_windows_python_command(rdcp_script, [command])
+    cmd = build_xbdm_python_command(rdcp_script, [command])
     if cmd is None:
         cmd = [sys.executable, rdcp_script, command]
     if host:
@@ -493,8 +500,9 @@ def prepare_xbdm_for_xbe_replace(host: str, dry_run: bool) -> bool:
 def upload_via_xbdm(local_path: str, xbox_path: str, host: str) -> int:
     """Upload a file via XBDM sendfile. Returns 0 on success."""
     rdcp_script = os.path.join(ROOT_DIR, "tools", "xbox", "xbdm_rdcp.py")
-    src = to_windows_path(local_path) if is_wsl() else local_path
-    cmd = build_windows_python_command(rdcp_script, ["--sendfile", src, xbox_path, "--timeout", "30"])
+    native_xbdm = os.environ.get("HALO_NATIVE_XBDM") == "1"
+    src = to_windows_path(local_path) if is_wsl() and not native_xbdm else local_path
+    cmd = build_xbdm_python_command(rdcp_script, ["--sendfile", src, xbox_path, "--timeout", "30"])
     if cmd is None:
         cmd = [sys.executable, rdcp_script, "--sendfile", local_path, xbox_path, "--timeout", "30"]
     if host:
@@ -556,7 +564,7 @@ def deploy_default_xbe(
 
 def query_remote_file_attributes(host: str, xbox_path: str) -> dict | None:
     rdcp_script = os.path.join(ROOT_DIR, "tools", "xbox", "xbdm_rdcp.py")
-    cmd = build_windows_python_command(
+    cmd = build_xbdm_python_command(
         rdcp_script,
         ["--json", f'getfileattributes name="{xbox_path}"'],
     )
@@ -610,7 +618,7 @@ def delete_remote_file(host: str, xbox_path: str, dry_run: bool) -> int:
       other non-zero — XBDM reported an unexpected error
     """
     rdcp_script = os.path.join(ROOT_DIR, "tools", "xbox", "xbdm_rdcp.py")
-    cmd = build_windows_python_command(
+    cmd = build_xbdm_python_command(
         rdcp_script,
         ["--json", f'delete name="{xbox_path}"'],
     )
@@ -692,7 +700,7 @@ def delete_remote_file(host: str, xbox_path: str, dry_run: bool) -> int:
 def _send_xbdm_reboot(host: str, dry_run: bool) -> bool:
     """Send a warm reboot via XBDM to stop the running title and free file locks."""
     rdcp_script = os.path.join(ROOT_DIR, "tools", "xbox", "xbdm_rdcp.py")
-    cmd = build_windows_python_command(rdcp_script, ["--json", "reboot warm"])
+    cmd = build_xbdm_python_command(rdcp_script, ["--json", "reboot warm"])
     if cmd is None:
         cmd = [sys.executable, rdcp_script, "--json", "reboot warm"]
     if host:
