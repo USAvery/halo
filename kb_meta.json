@@ -806,6 +806,34 @@
       "kind": "function",
       "status": "ported"
     },
+    "0x31440": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x32ac0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x32b50": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x32bb0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x32c10": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x33330": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x355f0": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0x36860": {
       "kind": "function",
       "status": "ported"
@@ -1388,6 +1416,10 @@
       "kind": "function",
       "status": "ported"
     },
+    "0x425c0": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0x42a30": {
       "kind": "function",
       "status": "ported"
@@ -1530,7 +1562,15 @@
       "kind": "function",
       "status": "ported"
     },
+    "0x43870": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0x43db0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x43f20": {
       "kind": "function",
       "status": "ported"
     },
@@ -1565,6 +1605,18 @@
         "The semantic names of conversation offsets +0x10, +0x14, +0x28, +0x54, +0x58, and +0x63 and actor offsets +0x18, +0xa8, and +0x1e0 remain unproven, so the lift keeps raw accesses.",
         "The semantic meaning of param_2 and scenario definition flag bit 0 remains uncertain beyond their observed control-flow roles."
       ]
+    },
+    "0x458f0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x45a10": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x46b60": {
+      "kind": "function",
+      "status": "ported"
     },
     "0x48e90": {
       "kind": "function",
@@ -9222,6 +9274,10 @@
         "The permuter VACUOUS RUN blocker noted above is obsolete as of commit dfeb37285 (run.py now strips __cdecl before pycparser), and a full 100-attempt run on 2026-08-16 completed and wrote nothing: it printed Best LCS 90.9 percent against Baseline 88.9 percent as IMPROVED by 2.0pp, but 90.9 is exactly the unmodified baseline dp_lcs_pct in the score context, so the two figures are different metrics and no candidate improvement exists."
       ]
     },
+    "0xda980": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0xdb0f0": {
       "kind": "function",
       "status": "ported"
@@ -12446,6 +12502,10 @@
       "kind": "function",
       "status": "ported"
     },
+    "0x126590": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0x126700": {
       "kind": "function",
       "status": "ported"
@@ -14857,6 +14917,10 @@
         "The semantic meanings of FUN_0017da40's five parameters and the 0x47e4d4 target structure remain unidentified."
       ]
     },
+    "0x180050": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0x180820": {
       "kind": "function",
       "status": "ported"
@@ -14963,6 +15027,10 @@
       "uncertain": [
         "Ghidra dropped every swizzler argument and the width/height/depth results; the argument lists here are reconstructed from the original push order (2D: dst=temp, src=mip_addr, width in ESI, height in EBX; 3D adds depth from [EBP-0xc]; cubemap walks one source pointer by mip_size/6 and derives dst as src plus a once-computed temp-minus-mip_addr delta). Verified against the disassembly but not against runtime behavior."
       ]
+    },
+    "0x183390": {
+      "kind": "function",
+      "status": "ported"
     },
     "0x183650": {
       "kind": "function",
@@ -15155,7 +15223,15 @@
       "kind": "function",
       "status": "ported"
     },
+    "0x18ca40": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0x18d0b0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x18d2c0": {
       "kind": "function",
       "status": "ported"
     },
@@ -15949,6 +16025,10 @@
         "VC71 47.2% is provably the arithmetic ceiling, not a lift defect: compare_obj._trim_trailing_table_data discards everything after the last RET for any function containing a scaled indirect jump, so the 163-instruction reference is extracted as 91, and 91/193 = 47.2% means the LCS already covers every extracted reference instruction in order.",
         "The meaning of parse result values 2, 5 and 6 and of the three character sets fetched by FUN_0019d3c0(tag_index, 4|5|6) is unproven, so they are left numeric; result 5 is never produced by this function and is only tested in the loop condition."
       ]
+    },
+    "0x19c5d0": {
+      "kind": "function",
+      "status": "ported"
     },
     "0x19d060": {
       "kind": "function",
@@ -18766,62 +18846,6 @@
     },
     "0x5065a4": {
       "kind": "data",
-      "status": "ported"
-    },
-    "0x31440": {
-      "kind": "function",
-      "status": "ported"
-    },
-    "0x32ac0": {
-      "kind": "function",
-      "status": "ported"
-    },
-    "0x32bb0": {
-      "kind": "function",
-      "status": "ported"
-    },
-    "0x32c10": {
-      "kind": "function",
-      "status": "ported"
-    },
-    "0x33330": {
-      "kind": "function",
-      "status": "ported"
-    },
-    "0x32b50": {
-      "kind": "function",
-      "status": "ported"
-    },
-    "0x355f0": {
-      "kind": "function",
-      "status": "ported"
-    },
-    "0x425c0": {
-      "kind": "function",
-      "status": "ported"
-    },
-    "0x430d0": {
-      "kind": "function",
-      "status": "ported"
-    },
-    "0x180050": {
-      "kind": "function",
-      "status": "ported"
-    },
-    "0x183390": {
-      "kind": "function",
-      "status": "ported"
-    },
-    "0x18ca40": {
-      "kind": "function",
-      "status": "ported"
-    },
-    "0x18d2c0": {
-      "kind": "function",
-      "status": "ported"
-    },
-    "0x19c5d0": {
-      "kind": "function",
       "status": "ported"
     }
   }
