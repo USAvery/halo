@@ -7759,3 +7759,23 @@ AUTOLIFT_REVIEW: NEEDS_RUNTIME |
 | encounter_mark_examined_pursuit_position | 0x5b5e0 | encounters.obj | 0 | parked | below_65pct [cohort=retrieval] |
 | FUN_00057380 | 0x57380 | encounters.obj | 81.8 | parked | escalation_exhausted [cohort=retrieval] |
 | FUN_0005c680 | 0x5c680 | encounters.obj | 82.5 | parked | escalation_exhausted [cohort=retrieval] |
+
+## Goal-lift run — 10/12 committed (queue_exhausted) — 2026-09-06
+
+| function | addr | obj | vc71 | action | reason |
+|---|---|---|---|---|---|
+| FUN_00162f90 | 0x162f90 | rasterizer_xbox_environment.obj | 100 | committed | mechanical gate: 100% clean (pass1) [cohort=retrieval] |
+| FUN_00163590 | 0x163590 | rasterizer_xbox_environment.obj | 89.8 | committed | pass1+permute [cohort=none] |
+| FUN_00163c40 | 0x163c40 | rasterizer_xbox_environment.obj | 99.4 | committed | mechanical gate: 99.4% clean (pass1) [cohort=control] |
+| FUN_001640d0 | 0x1640d0 | rasterizer_xbox_environment.obj | 93.8 | committed | mechanical gate: 93.8% clean (pass1) [cohort=retrieval] |
+| FUN_00163910 | 0x163910 | rasterizer_xbox_environment.obj | 92.5 | committed | mechanical gate: 92.5% clean (pass1) [cohort=control] |
+| FUN_00164690 | 0x164690 | rasterizer_xbox_environment.obj | 92.5 | committed | mechanical gate: 92.5% clean (pass1) [cohort=control] |
+| FUN_00164cf0 | 0x164cf0 | rasterizer_xbox_environment.obj | 90.4 | committed | mechanical gate: 90.4% clean (pass1) [cohort=control] |
+| FUN_00165420 | 0x165420 | rasterizer_xbox_environment.obj | 91.8 | committed | mechanical gate: 91.8% clean (pass1) [cohort=control] |
+| FUN_00162560 | 0x162560 | rasterizer_xbox_environment.obj | 95.9 | committed | mechanical gate: 95.9% clean (pass1) [cohort=control] |
+| FUN_00160f50 | 0x160f50 | rasterizer_xbox_environment.obj | 93.5 | committed | pass1 [cohort=retrieval] |
+
+**Summary:** 10/12 committed (queue_exhausted).
+| FUN_00162f90 | 0x162f90 | rasterizer_xbox_environment.obj | 100 | committed | mechanical gate: 100% clean (pass1) [cohort=retrieval] |
+
+**Summary:** 11/12 committed (queue_exhausted).

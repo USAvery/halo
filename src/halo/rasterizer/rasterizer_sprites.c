@@ -16,7 +16,7 @@ void FUN_0017cd60(int object_handle)
  * reached only through a data (function-table) reference at 0x195ff3. */
 void FUN_0017cd70(int arg1, int arg2, int arg3, int arg4, int arg5, int arg6)
 {
-  FUN_00163910(arg1, arg2, arg3, arg4, arg5, arg6);
+  FUN_00163910((void *)arg1, arg2, arg3, arg4, arg5, (void *)arg6);
 }
 
 /* Forwarding wrapper (0x17cdb0).  The original is four instructions:
@@ -39,7 +39,7 @@ void FUN_0017cdb0(void *param_1)
  * data (function-table) reference at 0x195c88 (in FUN_00195c40). */
 void FUN_0017cdc0(int arg1, int arg2, int arg3, int arg4, int arg5, int arg6)
 {
-  FUN_001640d0(arg1, arg2, arg3, arg4, arg5, arg6);
+  FUN_001640d0((void *)arg1, arg2, arg3, arg4, arg5, (void *)arg6);
 }
 
 /* Forwarding wrapper (0x17ce00).  The original is four instructions:
@@ -51,7 +51,7 @@ void FUN_0017cdc0(int arg1, int arg2, int arg3, int arg4, int arg5, int arg6)
  * at 0x195cd8 (in FUN_00195cb0). */
 void FUN_0017ce00(int arg1)
 {
-  FUN_00164590(arg1);
+  FUN_00164590((void *)arg1);
 }
 
 /* Forwarding wrapper (0x17ce10).  The original is four instructions:
@@ -63,7 +63,7 @@ void FUN_0017ce00(int arg1)
  * (function-table) reference at 0x195cd3 (in FUN_00195cb0). */
 void FUN_0017ce10(int arg1, int arg2, int arg3, int arg4, int arg5, int arg6)
 {
-  FUN_001609b0(arg1, arg2, arg3, arg4, arg5, arg6);
+  FUN_001609b0((void *)arg1, arg2, arg3, arg4, arg5, (void *)arg6);
 }
 
 /* Forwarding wrapper (0x17ce50).  The original is four instructions:
@@ -76,7 +76,7 @@ void FUN_0017ce10(int arg1, int arg2, int arg3, int arg4, int arg5, int arg6)
  * at 0x195d20 (in FUN_00195d00). */
 void FUN_0017ce50(int arg1, int arg2, int arg3, int arg4, int arg5, int arg6)
 {
-  FUN_00164690(arg1, arg2, arg3, arg4, arg5, arg6);
+  FUN_00164690((void *)arg1, arg2, arg3, arg4, arg5, (void *)arg6);
 }
 
 /* Forwarding wrapper (0x17ce80).  The original is four instructions:
@@ -115,8 +115,8 @@ void FUN_0017ceb0(void *arg1, int arg2, int arg3, int arg4, int arg5, int arg6,
                   int arg7, void *arg8, int arg9, int arg10, int arg11,
                   int arg12)
 {
-  FUN_00165420(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10,
-               arg11, arg12);
+  FUN_00165420(arg1, arg2, arg3, arg4, arg5, arg6, arg7, (float *)arg8,
+               (uint32_t *)arg9, arg10, arg11, arg12);
 }
 
 /* Forwarding wrapper (0x17cee0).  The original is four instructions:
