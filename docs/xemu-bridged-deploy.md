@@ -41,11 +41,17 @@ rtk python3 tools/build/build.py -q --rng-trace
 ## Deploy
 
 ```bash
+# Preferred: build and deploy through WSL-native XBDM.
+rtk ./tools/xbox/build_deploy_run.sh --xemu-bridged --xbox 10.0.0.21 -q
+
+# Already-built XBE: deploy directly instead.
 HALO_NATIVE_XBDM=1 HALO_WINDOWS_REEXEC=1 python3 tools/xbox/deploy_xbox.py \
     --skip-build --xbe-only -x 10.0.0.21
 ```
 
-Two environment variables, both load-bearing:
+`--xemu-bridged` (also available as `--native-xbdm`) exports both variables for
+the wrapper and all of its XBDM children. Use the explicit variables only for
+direct XBDM scripts or an already-built XBE:
 
 - `HALO_WINDOWS_REEXEC=1` — several XBDM tools call `maybe_reexec_on_windows`
   and hand themselves to Windows Python, which cannot see the bridged guests and

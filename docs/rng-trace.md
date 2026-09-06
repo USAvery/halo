@@ -73,6 +73,10 @@ matcher does not treat it as an unresolved re-implementation.
     rtk python3 tools/xbox/rng_trace_dump.py --host 127.0.0.1 --out b.json
     rtk python3 tools/xbox/rng_trace_variant.py --restore
 
+For a system-link run with bridged xemu guests, replace each local deploy with
+`rtk ./tools/xbox/build_deploy_run.sh --xemu-bridged --xbox <guest-ip> -q`.
+See `docs/xemu-bridged-deploy.md` for the WSL/XBDM transport details.
+
 `--baseline` snapshots `kb.json` to `artifacts/rng_trace/kb.json.pre-baseline`
 and `--restore` puts it back byte for byte. **Never commit the baseline
 kb.json** -- it is a throwaway build; the pre-commit deactivation gate

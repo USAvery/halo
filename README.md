@@ -100,7 +100,7 @@ cmake -Bbuild -S. -DCMAKE_TOOLCHAIN_FILE=$PWD/toolchains/llvm.cmake
 cmake --build build
 ```
 
-When the build is complete, the original game with re-implementation patched in will be at `halo-patched/default.xbe`. To build and deploy to xemu in one step: `./tools/xbox/build_deploy_run.sh -q`. For real Xbox hardware: `./tools/xbox/build_deploy_run_real_hw.sh -q`.
+When the build is complete, the original game with re-implementation patched in will be at `halo-patched/default.xbe`. To build and deploy to xemu in one step: `./tools/xbox/build_deploy_run.sh -q`. For xemu guests on a bridged adapter, use `./tools/xbox/build_deploy_run.sh --xemu-bridged --xbox <guest-ip> -q`; this keeps XBDM on WSL's reachable network path. For real Xbox hardware: `./tools/xbox/build_deploy_run_real_hw.sh -q`.
 
 You'll want to set up a debug environment.
 

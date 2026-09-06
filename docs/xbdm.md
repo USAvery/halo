@@ -703,5 +703,6 @@ xbdm_context_primer:
         - "Add --raw alongside --png to save both PNG and raw .bin output."
 
 see_also:
+  - "docs/xemu-bridged-deploy.md — WSL-native XBDM deployment for bridged xemu guests"
   - "docs/boot-init-and-checkpoints.md — how to control what the build boots into via init.txt and saved game-state cores (checkpoint replay)"
   - "docs/debug-commands-keyboard.md — full HaloScript command reference"

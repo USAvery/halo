@@ -423,17 +423,15 @@ from it.
 Guests are reachable from Linux only; Windows Python times out
 (`WinError 10060`).
 
-    # build (about 5 min)
-    rtk python3 tools/build/build.py -q --rng-trace
-    # push to the patched client
-    HALO_NATIVE_XBDM=1 HALO_WINDOWS_REEXEC=1 python3 tools/xbox/deploy_xbox.py --skip-build --xbe-only -x 10.0.0.21
+    # build (about 5 min) and push to the patched client through WSL-native XBDM
+    rtk ./tools/xbox/build_deploy_run.sh --xemu-bridged --xbox 10.0.0.21 -- -q --rng-trace
     # after reproduction, while still in game (ring is lost on return to dashboard)
     HALO_WINDOWS_REEXEC=1 python3 tools/xbox/rng_trace_dump.py --host 10.0.0.21 --out artifacts/rng_trace/aN.json
     python3 tools/xbox/rng_trace_dump.py --probes artifacts/rng_trace/aN.json
     HALO_WINDOWS_REEXEC=1 python3 tools/xbox/xbdm_debug_txt.py --host 10.0.0.21 --lines 200 --output artifacts/rng_trace/debug_client_aN.txt --timeout 30
     HALO_WINDOWS_REEXEC=1 python3 tools/xbox/xbdm_debug_txt.py --host 10.0.0.24 --lines 200 --output artifacts/rng_trace/debug_host_aN.txt --timeout 30
 
-The push command trips the skill-router gate once; rerun it unchanged.
+The build-and-push command trips the skill-router gate once; rerun it unchanged.
 `debug.txt` on both boxes carries the `out of sync` line with the tick and
 both seeds; correlate its tick with the trace records.
 

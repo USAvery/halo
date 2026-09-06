@@ -39,7 +39,9 @@ checkpoints, so the core travels with the recording.
 ## Prerequisites
 
 - xemu (or a real Xbox) up and reachable over XBDM — the same transport
-  `deploy_xbox.py` uses. Verify: `python3 tools/xbox/xbdm_rdcp.py 'dirlist name="E:\GAMES\halo-patched"'`.
+  `deploy_xbox.py` uses. For bridged xemu guests, deploy with
+  `build_deploy_run.sh --xemu-bridged --xbox <guest-ip>`; see
+  `docs/xemu-bridged-deploy.md`. Verify: `python3 tools/xbox/xbdm_rdcp.py 'dirlist name="E:\GAMES\halo-patched"'`.
 - The debug build running (it reads `d:\init.txt` and the `*.xts` sentinels).
 - For `--start core`: a saved core. Play to the spot, open the console (`~`) and
   run `core_save` first. The tool verifies `d:\core\core.bin` exists and aborts
