@@ -3259,6 +3259,13 @@ void rasterizer_transparent_geometry_group_draw(void *group, int dirty)
           dr = *(float *)(stage + 0x20) - *(float *)(stage + 0x10);
           dg = *(float *)(stage + 0x24) - *(float *)(stage + 0x14);
           db = *(float *)(stage + 0x28) - *(float *)(stage + 0x18);
+          /* 0x176929 FSTP dword [ebp-0xb8] / 0x176935 FSTP dword [ebp-0xb4]:
+           * the original spills only the green and blue deltas to 32-bit
+           * slots and keeps the alpha and red deltas wide in ST.  Force the
+           * same two narrowings; clang was spilling dg by accident and
+           * keeping db at 64-bit significand. */
+          HALO_FLT_ROUNDTRIP(dg);
+          HALO_FLT_ROUNDTRIP(db);
           c[0] = t * da + *(float *)(stage + 0xc);
           c[1] = t * dr + *(float *)(stage + 0x10);
           c[2] = dg * t + *(float *)(stage + 0x14);

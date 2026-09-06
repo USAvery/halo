@@ -5,6 +5,17 @@
 #ifndef X87_MATH_H
 #define X87_MATH_H
 
+/* Force a float32 store/reload of a local.  MSVC 7.1 narrows an intermediate
+ * `float` by spilling it to a dword stack slot; clang -mno-sse may leave the
+ * same value in ST(i) at 64-bit significand.  Where the original binary does
+ * the round trip (FSTP dword / FLD dword) this barrier reproduces it at zero
+ * VC71 cost: cl.exe narrows on its own, so the macro is a no-op there. */
+#if defined(_MSC_VER) && !defined(__clang__)
+#define HALO_FLT_ROUNDTRIP(lv) ((void)0)
+#else
+#define HALO_FLT_ROUNDTRIP(lv) __asm__ __volatile__("" : "+m"(lv))
+#endif
+
 #if defined(_MSC_VER) && !defined(__clang__)
 /* VC71 verify lane only (the shipping clang build takes the asm-volatile
  * branches below; clang defines _MSC_VER under -target i386-pc-win32, hence

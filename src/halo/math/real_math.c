@@ -1,9 +1,4 @@
 #include "x87_math.h"
-#if defined(_MSC_VER) && !defined(__clang__)
-#define HALO_FLT_ROUNDTRIP(lv) ((void)0)
-#else
-#define HALO_FLT_ROUNDTRIP(lv) __asm__ __volatile__("" : "+m"(lv))
-#endif
 #include <xmmintrin.h>
 
 /* matrix_inverse reads each column entry back out of `dst` after storing it
@@ -1390,7 +1385,9 @@ float FUN_0010a5e0(int16_t function_type, float input)
 #endif
   unsigned char *table;
   float scaled;
+  float scaled_narrow;
   float weight;
+  float integer_part;
   unsigned int idx;
   float v0;
   float v1;
@@ -1409,21 +1406,29 @@ float FUN_0010a5e0(int16_t function_type, float input)
 
   if (*(char *)0x46e39c != '\0') {
     scaled = input * *(float *)0x28c838;
-    /* The original narrows here (FST dword [ebp+0xc] at 0x10a639) and again on
-     * the fmod return (FSTP dword [ebp+8] at 0x10a647), so the subtraction
-     * below runs at 24-bit significand.  clang -mno-sse would otherwise keep
-     * both in ST at 64-bit: idx is masked and used as a table index, so a
-     * sub-ULP difference at an integer boundary selects a different entry
-     * rather than a nearby value.  cl.exe narrows on its own, so the barrier
-     * costs nothing in the VC71 lane. */
-    HALO_FLT_ROUNDTRIP(scaled);
+    /* Narrowing follows the original store/reload pattern exactly, because
+     * clang -mno-sse would otherwise keep every intermediate in ST at 64-bit
+     * significand while cl.exe rounds through 32-bit stack slots:
+     *   0x10a639 FST  dword [ebp+0xc]  -- a narrowed COPY of scaled; ST(0)
+     *                                     stays wide and is what fmod gets
+     *   0x10a647 FSTP dword [ebp+8]    -- weight narrowed before every use
+     *   0x10a64a FLD  dword [ebp+0xc]  -- the subtraction reloads the COPY
+     *   0x10a650 FSTP dword [ebp-4]    -- difference narrowed before FISTP
+     * idx is masked and used as a table index, so a sub-ULP difference at an
+     * integer boundary selects a different entry rather than a nearby value.
+     * cl.exe narrows on its own, so the barriers cost nothing in the VC71
+     * lane. */
+    scaled_narrow = scaled;
+    HALO_FLT_ROUNDTRIP(scaled_narrow);
 #if defined(_MSC_VER) && !defined(__clang__)
     weight = (float)fmod((double)scaled, *(double *)0x2573d8);
 #else
     weight = x87_fmod(scaled, *(double *)0x2573d8);
 #endif
     HALO_FLT_ROUNDTRIP(weight);
-    idx = (unsigned int)x87_round_to_int(scaled - weight) & 0x3ff;
+    integer_part = scaled_narrow - weight;
+    HALO_FLT_ROUNDTRIP(integer_part);
+    idx = (unsigned int)x87_round_to_int(integer_part) & 0x3ff;
 
     table = ((unsigned char **)0x46e3b8)[function_type];
     v0 = (float)table[idx] * *(float *)0x261518;

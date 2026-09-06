@@ -65761,16 +65761,16 @@
     "inflate_blocks": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 97.7,
+      "abi_modeled_mnemonic_pct": 98.1,
       "addr": "0x113a90",
       "end": "0x1145f8",
       "kind": "auto",
       "n_r": 999,
-      "opnd_percent": 95.9,
-      "raw_mnemonic_pct": 97.7,
+      "opnd_percent": 96.3,
+      "raw_mnemonic_pct": 98.1,
       "ref": "synth",
       "ref_sha": "6d3b2ae92c94fe5d",
-      "score": 97.7,
+      "score": 98.1,
       "source": "src/halo/math/real_math.c"
     },
     "inflate_blocks_free": {
