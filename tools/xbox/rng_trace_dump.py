@@ -93,6 +93,11 @@ KINDS = {
     # current-facing z that lowers it.  seed_before carries raw float bits.
     21: ("probe:turn_cos_c", "info"),
     22: ("probe:turn_fwd_z", "info"),
+    23: ("probe:turn_des_len2", "info"),
+    24: ("probe:turn_des_x", "info"),
+    25: ("probe:turn_des_y", "info"),
+    26: ("probe:turn_fwd_x", "info"),
+    27: ("probe:turn_fwd_y", "info"),
 }
 
 

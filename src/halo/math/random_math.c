@@ -11,7 +11,23 @@
  * the header fields are stamped lazily on the first recorded event. */
 rng_trace_buffer_t halo_rng_trace = { 0 };
 
-void rng_trace_note(const void *seed, unsigned int kind,
+/* Reserved space for diagnostic binary probes patched into UNPORTED original
+ * code after the link (tools/xbox/patch_fork_probes.py).  FUN_001a4c50 runs
+ * original bytes in our build too, so the host's probes at 0x1a5109 and
+ * 0x1a5142 apply at the same addresses -- but the host patcher hides its caves
+ * inside unit_update_animation's body, which is dead in the baseline build and
+ * live in ours.  This buffer gives our build somewhere safe to put them.
+ * Never executed unless a patch writes to it.
+ *
+ * The non-zero first byte is load-bearing, not decoration.  A zero
+ * initializer puts the array in .bss, which has no raw bytes in the XBE
+ * file, so the post-link patcher writes past the end of the image instead
+ * of into the cave.  Any non-zero initializer forces .data.  0xcc is INT3:
+ * a stray jump to an unpatched cave then breaks into the debugger instead
+ * of running zeros. */
+__declspec(dllexport) unsigned char halo_probe_cave[1024] = { 0xcc };
+
+__declspec(dllexport) void rng_trace_note(const void *seed, unsigned int kind,
                     unsigned int seed_before, void *caller, void *extra)
 {
   rng_trace_record_t *rec;

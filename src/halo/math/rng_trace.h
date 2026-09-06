@@ -67,6 +67,15 @@
  * f.z for that reason. */
 #define RNG_TRACE_KIND_TURN_COS_C    21u /* raw float bits of the reconstructed cosine  info */
 #define RNG_TRACE_KIND_TURN_FWD_Z    22u /* raw float bits of the current facing z (+0x2c)  info */
+/* Components behind kind 21, to separate "the reconstruction is wrong" from
+ * "our simulation is wrong".  Kind 23 is the squared XY length of the desired
+ * facing BEFORE normalization: a value at or near zero means the degenerate
+ * fallback fired and kind 21's 1.0 is an artifact, not a measurement. */
+#define RNG_TRACE_KIND_TURN_DES_LEN2 23u /* |desired facing XY|^2 before normalize  info */
+#define RNG_TRACE_KIND_TURN_DES_X    24u /* raw bits of +0x1d4  info */
+#define RNG_TRACE_KIND_TURN_DES_Y    25u /* raw bits of +0x1d8  info */
+#define RNG_TRACE_KIND_TURN_FWD_X    26u /* raw bits of +0x24   info */
+#define RNG_TRACE_KIND_TURN_FWD_Y    27u /* raw bits of +0x28   info */
 
 /* 16 bytes. */
 typedef struct {
@@ -93,7 +102,7 @@ typedef struct {
 __declspec(dllexport) extern rng_trace_buffer_t halo_rng_trace;
 
 /* Records one event.  Ignores every seed pointer other than the global seed. */
-void rng_trace_note(const void *seed, unsigned int kind,
+__declspec(dllexport) void rng_trace_note(const void *seed, unsigned int kind,
                     unsigned int seed_before, void *caller, void *extra);
 
 /* Call from inside the primitive itself so that __builtin_return_address(0)

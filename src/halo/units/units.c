@@ -1123,27 +1123,6 @@ char FUN_001a6350(int unit_handle)
 
     if ((*(unsigned char *)((char *)biped + 0xb6) & 0x4) == 0) {
 #ifdef HALO_RNG_TRACE
-      {
-        /* Reconstruct the value the fork compares against 0.99, exactly as
-         * FUN_001a4c50 builds it at 0x1a5061..0x1a50cd. */
-        float dvec[3];
-        float cosv;
-        union { float f; unsigned int u; } bits;
-        dvec[0] = *(float *)((char *)biped + 0x1d4);
-        dvec[1] = *(float *)((char *)biped + 0x1d8);
-        dvec[2] = 0.0f;
-        if (normalize3d(dvec) == 0.0f) {
-          dvec[0] = *(float *)((char *)biped + 0x24);
-          dvec[1] = *(float *)((char *)biped + 0x28);
-          dvec[2] = *(float *)((char *)biped + 0x2c);
-        }
-        cosv = dvec[0] * *(float *)((char *)biped + 0x24) +
-               dvec[1] * *(float *)((char *)biped + 0x28);
-        bits.f = cosv;
-        RNG_TRACE_EX(RNG_TRACE_KIND_TURN_COS_C, bits.u, unit_handle);
-        bits.f = *(float *)((char *)biped + 0x2c);
-        RNG_TRACE_EX(RNG_TRACE_KIND_TURN_FWD_Z, bits.u, unit_handle);
-      }
       RNG_TRACE_EX(RNG_TRACE_KIND_TURN_GATES,
                    (unsigned int)*(unsigned char *)((char *)biped + 0x42a) |
                      ((unsigned int)*(unsigned char *)((char *)biped + 0x257)
