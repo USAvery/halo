@@ -1546,3 +1546,35 @@ units are only inferred to be player bipeds from their handle indices, and the
 solo "four sweeping bipeds" that motivated eliminating the AI path was the wrong
 probe column.  Treat it as unranked until the control run says the pinning is
 ours at all.
+
+## VERIFIED 2026-09-06: the host capture really did run original code
+
+The control-run plan assumed `cos_h.json` came from a build with our ports
+deactivated.  That assumption was never checked.  It is now, and it holds.
+
+`rng_trace_dump.py` records a `caller_space` field per record: `"xbe"` when the
+return address falls in the original image, `"impl"` when it falls in our
+appended code.  Every host record is `"xbe"`:
+
+    cos_h.json  probe:anim_update_in   unit_update_animation  0x1b0f5d  xbe
+                probe:unit_state       unit_update_animation  0x1b121c  xbe
+                probe:turn_gates       FUN_001a4c50           0x1a5109  xbe
+                probe:turn_cosine      FUN_001a4c50           0x1a5142  xbe
+                random_math_real       FUN_0010a830           0x10a85d  xbe
+
+    cos_c.json  probe:anim_update_in   unit_update_animation  0x6ecc14  impl
+                probe:unit_state       unit_update_animation  0x6ecd8e  impl
+                probe:turn_gates       object_update          0x785742  impl
+                probe:turn_gates       FUN_001a4c50           0x1a5109  xbe
+                random_math_real       FUN_0010a830           0x725563  impl
+
+The host's kinds 16-18 are binary probes patched at original addresses, not
+source-level probes in ported wrappers.  So the host ran original game code and
+the client ran ours.  The measured cosine divergence is not an artifact of both
+machines running the same build.
+
+This also explains why `xbeinfo running` on 10.0.0.24 now reports a patched
+`default.xbe`: `host_diagnostic.py probes` magicboots `rng_probe.xbe` for the
+capture, and any power cycle returns the console to `default.xbe`.  The host
+needs that magicboot again before the control run.  It does not mean the earlier
+capture was taken from the wrong image.
