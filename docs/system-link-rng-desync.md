@@ -1381,3 +1381,168 @@ is in actor_moving. If +0x5a4 moves but unit+0x1d4 does not, it is downstream.
 
 Captures: artifacts/rng_trace/cos_{c,h}.json, dbg2{1,4}_cos.txt.
 Scripts: artifacts/scratch/{cos_cmp,gate_cmp,find_1d4}.py.
+
+## MEASURED 2026-09-06 (evening): the facing pinning does NOT reproduce solo
+
+Client-only capture, build `7b0dd1fcd` + `patch_fork_probes.py`, campaign c40,
+single console, no host, no desync required.  Probes 28/29/30 record
+`unit+0x1d4`, `unit+0x24` and the full `unit+0x1b4` flag word immediately before
+the `FUN_001a4c50` call in `FUN_001a6350`.  Capture:
+`artifacts/rng_trace/solo_facing.json` (43643 records, 2794 samples per probe).
+
+    unit                 n    eq  uniq_desired  uniq_current
+    handle=0xe52c00ce  163     1           129            81
+    handle=0xe52f00d1  163     2            92            72
+    handle=0xe53200d4  163     1           108            72
+    handle=0xe53500d7  163     2           116            93
+    (5 further units held one value for all 162 samples -- stationary)
+
+    probe:turn_cosine  128 samples, 68 distinct, range 0.309026 .. 1.000000
+
+Four bipeds sweep a real turn.  Compare the system-link capture from the same
+day: the client held 2 distinct cosine values for the whole game and each of its
+four units was pinned to ONE bit-exact value for all 128 samples.
+
+**Conclusion: our engine turns bipeds correctly.  The pinning is specific to the
+system-link game, not a local defect.**  That removes the AI path
+(`actor_moving.c` 3686/3837/3924) as the suspect for the pinning: c40 exercises
+it and it sweeps.
+
+The desync capture ran on `levels\test\prisoner\prisoner`, a multiplayer map with
+no AI actors, so its four units were PLAYER bipeds, which take the `players.c`
+path instead.  Its input-disabled arm (`players.c:3043-3089`, gated on
+`players_globals+0x29 != 0`) copies `unit+0x1d4..0x1dc` into the control it then
+feeds to `unit_set_control`, which writes them straight back to `unit+0x1d4`.
+That freezes the desired facing.  A biped whose desired facing already equals its
+current facing then never turns, so both stay frozen -- exactly the measured
+symptom.
+
+`players_globals+0x29` has exactly one writer, `player_input_enable`
+(`players.c:299`), called from `cinematics.c:35/261` and from the script host in
+`hs.c`.  A multiplayer game runs no cutscene, so the byte should be 0.
+
+NOT YET MEASURED, and the next step: probe `players_globals+0x29` and which arm
+`players.c` takes, per player per tick, then capture one system-link game.  Until
+that runs, "our client takes the input-disabled arm in MP" is a hypothesis built
+on a chain of inference, not a measurement.
+
+## CORRECTION 2026-09-06 (late): the section above overstates its evidence
+
+The section above says the solo capture showed four bipeds sweeping the turn
+cosine.  That is wrong.  Those four handles came from probe kinds 28/29
+(`desired_x` / `current_x`), not from `probe:turn_cosine`.  Re-reading
+`artifacts/rng_trace/solo_facing.json` by kind gives a different picture:
+
+    solo       gates=2924  cosine=128   one unit only, 0xe45f01f0
+               0xe45f01f0  128 samples, 68 distinct, 0.309026 .. 1.000000
+
+One unit sweeps solo, not four.  The claim "our engine turns bipeds correctly"
+was therefore built on the wrong column.  What the solo run does still prove is
+narrower and still useful: our build CAN produce a non-1.0 cosine.
+
+The section above also asserts the four pinned MP units "were PLAYER bipeds".
+That was never checked.  The handle indices support it but do not prove it: the
+four MP units are 0xe271**0002**, 0xe274**0005**, 0xe277**0008**, 0xe27a**000b**
+-- object indices 2, 5, 8, 11, evenly spaced by 3, allocated first.  The two
+others, 0xe45f0**1f0** and 0xe52c0**2b0** (indices 496 and 688), are a different
+family and appear in the solo capture too.  Treat "player biped" as a strong
+lead, not a fact.
+
+## MEASURED 2026-09-06 (late): the client never produces a non-1.0 cosine
+
+Re-reading the paired MP capture (`artifacts/rng_trace/cos_c.json`,
+`cos_h.json`) by kind and by unit:
+
+    mp_client  847 cosine samples over 6 units -- every one exactly 1.0
+    mp_host   1848 cosine samples over 6 units -- two units vary:
+               0xe2770008  17 distinct, -0.986069 .. 0.998360
+               0xe45f01f0  14 distinct,  0.976600 .. 1.000000
+
+A cosine pinned at exactly 1.0 is the self-dot signature: `unit+0x1d4` equals
+`unit+0x24`.  On our client that holds for every unit, every tick, with no
+exception in 847 samples.
+
+Two gate findings, both of which REMOVE suspects rather than adding one:
+
+1. `f257` (`unit+0x257`, bits 8-15 of kind 19) explains the units that never
+   reach the cosine at all.  Every unit with `f257 == 3` reaches it 0% of the
+   time, on the client, on the host, and solo.  That early exit is shared.  It
+   is not the divergence.
+
+2. The apparent "client reaches the cosine 29% of the time, host 99%" is an
+   artifact of mixing two probes.  The client emits kind 19 from BOTH the
+   source-level probe in the ported caller (`object_update+242`) and the binary
+   probe in the fork (`FUN_001a4c50+1209`); the pristine host has only the
+   second.  Counting the fork probe alone, both machines reach the cosine on
+   ~99% of fork entries.  There is no gate divergence.
+
+3. There is no per-tick call-count difference either.  An earlier draft of this
+   section reported the host entering the fork twice per tick against the
+   client's once.  That was a segmentation error.  Both rings wrapped
+   (write_index 71991 and 73943 against capacity 65536), the tick counter
+   resets at every `game_initialize_for_new_map`, and grouping by `tick` alone
+   merged several map instances.  The host's retained window holds the SAME
+   instance twice: segments `[58235:61873]` and `[61898:65536]` produce
+   identical per-unit counts and identical cosine histograms.  Split at the
+   markers, both machines enter the fork once per tick.  Always segment these
+   captures at `game_initialize_for_new_map` before counting anything.
+
+## The divergence, measured within one map instance
+
+Client segment `[62585:65511]`, ticks 0..129, against host segment
+`[58235:61873]`, ticks 0..213.  Same four unit handles, so the same game
+instance and the same objects.  One fork entry per tick on both sides.
+
+    unit          client distinct cos      host distinct cos
+    0xe2710002    1  (1.000000 x128)       1  (1.000000 x212)
+    0xe2740005    1  (1.000000 x128)       1  (1.000000 x212)
+    0xe2770008    1  (1.000000 x128)      17  (0.924332 x144, -0.986069 x2, ...)
+    0xe27a000b    1  (1.000000 x128)       1  (1.000000 x162)
+
+And in the earlier instance, client `[43722:62559]` against host
+`[41770:58209]`:
+
+    0xe45f01f0    1  (1.000000 x167)      14  (1.000000 x180, 0.979389 x1, ...)
+    0xe52c02b0    1  (1.000000 x168)       1  (1.000000 x159)
+
+Three of the four units in the later instance agree at 1.0 on both machines, so
+1.0 is a normal value: it is what a biped that is not turning produces.  The
+divergence is that for 0xe2770008, and for 0xe45f01f0 in the earlier instance,
+the host produces a varying cosine over a sustained run of ticks while our
+client produces exactly 1.0 and never anything else.  0xe2770008's host value
+sits at 0.924332 for 144 of its 164 ticks, so any overlap with the client's
+130-tick window should have shown it.
+
+This also disposes of the host-extra-pass alternative, and it does so without
+having to assume which pass corresponds to the client's entry.  There is only
+one pass per tick on each machine.  The host varies within that single pass and
+the client does not.
+
+Across the whole capture our client emitted 847 cosine samples over six units
+and every one of them was exactly 1.0.  A cosine of exactly 1.0 is the self-dot
+signature: `unit+0x1d4` equals `unit+0x24`.  On our client that holds without a
+single exception.
+
+## What is still not excluded
+
+These two captures still differ in two variables, not one: patched build AND
+client role, against pristine build AND host role.  The pinning could be stock
+client behavior for a unit the client does not simulate authoritatively.
+
+The control that separates them is
+`artifacts/rng_trace/host_rng_baseline.xbe`, a build with every ported function
+deactivated except the ring-logger keep-list -- original game code carrying our
+trace ring.  Deploy it to the CLIENT slot (10.0.0.21), let 10.0.0.24 host, and
+capture one game.
+
+- If that baseline client also pins every cosine at 1.0, the pinning is stock
+  client behavior and the cosine lead dies.
+- If the baseline client varies where ours does not, the pinning is ours, and
+  the writer of `unit+0x1d4` on the client path is the target.
+
+The `players.c` input-disabled-arm hypothesis in the section above is NOT
+supported by anything measured here.  Its two supports both failed: the four MP
+units are only inferred to be player bipeds from their handle indices, and the
+solo "four sweeping bipeds" that motivated eliminating the AI path was the wrong
+probe column.  Treat it as unranked until the control run says the pinning is
+ours at all.
