@@ -130,10 +130,37 @@ int16_t FUN_001AC0E0(int handle)
       element = (char *)tag_block_get_element(
         antr + 0x74, (int)*(int16_t *)(obj + 0x80), 0xb4);
 
-      count = (int)*(int16_t *)(element + 0x22) -
-              (int)*(int16_t *)(obj + 0x82) - 2;
+      count =
+        (int)*(int16_t *)(element + 0x22) - (int)*(int16_t *)(obj + 0x82) - 2;
       return (int16_t)(count > 0 ? count : 0);
     }
+  }
+
+  return 0;
+}
+
+/* FUN_001ac150 (0x1ac150)
+ *
+ * Reports whether a unit-type object's byte at object+0x253 equals 0x1c.
+ * The byte's meaning and the 0x1c selector are UNKNOWN -- no assert/string
+ * evidence names them; the same test gates FUN_001AC0E0 just above.
+ *
+ * Binary evidence (0x1ac150-0x1ac17b, 14 instructions, cdecl, no FPU):
+ *   MOV EAX,[EBP+0x8] / CMP EAX,-0x1 / JZ 0x1ac178 -> handle == -1 takes
+ *   the XOR AL,AL exit (returns 0) without calling anything.
+ *   PUSH 0x3 / PUSH EAX / CALL 0x13d680 (object_get_and_verify_type) with
+ *   ADD ESP,0x8 (cdecl, 2 args).
+ *   MOV DL,byte ptr [EAX+0x253] / CMP DL,0x1c / SETZ CL / MOV AL,CL --
+ *   signed byte compare, the object pointer is dereferenced unguarded (the
+ *   reference does NOT null-check object_get_and_verify_type); the result
+ *   is materialized in AL, hence the unsigned char return. */
+unsigned char FUN_001ac150(int handle)
+{
+  char *obj;
+
+  if (handle != -1) {
+    obj = (char *)object_get_and_verify_type(handle, 3);
+    return (unsigned char)(*(char *)(obj + 0x253) == 0x1c);
   }
 
   return 0;

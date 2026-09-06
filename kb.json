@@ -24590,7 +24590,8 @@
     },
     {
      "addr": "0x1ac150",
-     "decl": "unsigned char FUN_001ac150(int handle);"
+     "decl": "unsigned char FUN_001ac150(int handle);",
+     "ported": true
     },
     {
      "addr": "0x1ac180",

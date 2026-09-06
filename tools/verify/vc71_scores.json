@@ -44311,17 +44311,17 @@
     "FUN_001ac150": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 33.3,
+      "abi_modeled_mnemonic_pct": 94.4,
       "addr": "0x1ac150",
       "end": "0x1ac17c",
       "kind": "auto",
       "n_r": 19,
-      "opnd_percent": 25.0,
-      "raw_mnemonic_pct": 33.3,
+      "opnd_percent": 88.9,
+      "raw_mnemonic_pct": 94.4,
       "ref": "synth",
       "ref_sha": "c6fe1f857dfb2d52",
-      "score": 33.3,
-      "source": "src/halo/unported_thunks.c"
+      "score": 94.4,
+      "source": "src/halo/sound/sound_manager.c"
     },
     "FUN_001ac180": {
       "abi_model": "raw",
