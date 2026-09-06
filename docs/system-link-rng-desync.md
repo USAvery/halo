@@ -1578,3 +1578,58 @@ This also explains why `xbeinfo running` on 10.0.0.24 now reports a patched
 capture, and any power cycle returns the console to `default.xbe`.  The host
 needs that magicboot again before the control run.  It does not mean the earlier
 capture was taken from the wrong image.
+
+## CONTROL RUN 2026-09-06: the cosine pinning belongs to our build
+
+Configuration: 10.0.0.24 hosted `rng_probe.xbe` (original code, binary probes).
+10.0.0.21 joined on `rng_baseline.xbe` (our build, 5439 ports deactivated, the
+same binary fork probes, `random_math.obj` kept so the ring still records).
+Only one variable changed against the earlier capture: the CLIENT now ran
+original game code.
+
+Provenance self-check passed.  On the client, `probe:turn_gates` came only from
+`FUN_001a4c50` in `xbe` space.  The source-level `object_update` probe of the
+ported build did not appear, so the baseline image really was the running title.
+
+**The game did not desync.**
+
+The baseline client produces non-1.0 cosines, and the two machines agree:
+
+    ctrl_c seg[58439:64822]              ctrl_h seg[34115:63629]
+    0xe2ad003e  9 distinct  1.0 x925     0xe2ad003e  9 distinct  1.0 x1506
+    0xe2a40035  1.0 x303, 0.998661 x1    0xe2a40035  1.0 x303, 0.998661 x1
+    0xe2a70038  1.0 x265                 0xe2a70038  1.0 x265
+    0xe2ee006e  1.0 x113                 0xe2ee006e  1.0 x113
+    0xe2aa003b 14 distinct               0xe2aa003b 15 distinct
+    earlier segment, client only:
+    0xe3ee0037  1.0 x689, 0.959091 x259
+    0xe44e0039  0.974928 x499, 0.819021 x86, 0.034873 x1
+
+Same handles, same values, same counts.  That is lockstep.
+
+Compare the ported client: 847 cosine samples over six units, every one exactly
+1.0.  The pinning is therefore NOT stock client behavior and NOT a role effect.
+It is produced by our lifted code.
+
+A cosine of exactly 1.0 is the self-dot signature, so on our build `unit+0x1d4`
+equals `unit+0x24`.  The target is the writer of `unit+0x1d4` on the client
+path.  Three candidates were named earlier: `unit_set_control`'s producer,
+`FUN_001b3690`'s static arm, and `players.c`'s input-disabled arm.
+
+Captures: `artifacts/rng_trace/ctrl_c.json`, `artifacts/rng_trace/ctrl_h.json`.
+
+### Capturing from a baseline image
+
+`build/halo` is normally a non-trace build, so `rng_trace_dump.py` cannot find
+`halo_rng_trace` and the ring VA must be supplied.  For `baseline_client.xbe`
+the ring sits at 0x803d04, read out of the `rng_trace_note` prologue in the XBE
+rather than from a PE export:
+
+    python3 tools/xbox/rng_trace_dump.py --host 10.0.0.21 \
+        --pe artifacts/rng_trace/session_symbols.pe \
+        --runtime-base 0x646404 --out artifacts/rng_trace/ctrl_c.json
+
+0x646404 = 0x642000 + (0x803d04 - 0x7ff900).  The offset shifts impl-space
+symbol names by the same amount, which is harmless for a baseline capture
+because almost every caller is in `xbe` space.  The host ring stays at
+0x7ff900 and needs only `--pe`.
