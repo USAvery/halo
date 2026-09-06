@@ -4807,16 +4807,21 @@ float game_engine_get_distance_rating_for_spawn(int param_1, float *param_2)
 
   float dz;
 
-  float dist_sq;
+  float dist;
 
   float result;
 
   char has_teams;
 
+  uint8_t team_check;
+
   data_iter_t iter;
 
 
   has_teams = current_game_engine == 0;
+
+  /* 0xad9c0..0xad9d7: SETE bl; DEC bl; AND bl,[0x456b14] -- hoisted out of the loop. */
+  team_check = (uint8_t)((has_teams - 1) & *(uint8_t *)0x456b14);
 
   player = (int)datum_get(player_data, param_1);
 
@@ -4838,31 +4843,39 @@ float game_engine_get_distance_rating_for_spawn(int param_1, float *param_2)
 
       dz = param_2[2] - pos[2];
 
-      dist_sq = dx * dx + dy * dy + dz * dz;
+      /* 0xada3d..0xada4f: FSQRT then FSTP dword [ebp-8] -- the ORIGINAL
+       * compares the DISTANCE, not the squared distance, against every
+       * threshold below (0.25 / 1.0 / 2.0 / 5.0) and feeds it into the
+       * (dist - 2) ramp.  The previous lift dropped the FSQRT, which
+       * changed the spawn-point ratings and hence the spawn chosen by
+       * find_best_starting_location_index whenever another unit was
+       * alive (system-link desync at tick 2, unit 0xe2740005).  The
+       * round trip mirrors the dword store so the compares see a
+       * float32 value, as MSVC did. */
+      dist = xbox_sqrtf(dx * dx + dy * dy + dz * dz);
+      HALO_FLT_ROUNDTRIP(dist);
 
-      if (((has_teams - 1) & *(uint8_t *)0x456b14) == 0 ||
+      if (team_check == 0 ||
 
           *(int *)(biped + 0x20) != *(int *)(player + 0x20) ||
 
-          dist_sq <= *(float *)0x25337c) {
-        if (*(float *)0x25337c <= dist_sq) {
-          if (dist_sq < *(float *)0x2533c8)
-
-            result = result * *(float *)0x25496c;
-
-        } else {
+          !(dist > *(float *)0x25337c)) {
+        /* 0xada79..0xadaae: fcomp 0.25 / test ah,5 / jp -> result = 0 on
+         * dist < 0.25 (cold arm first), else fcomp 1.0 -> scale by 0.1. */
+        if (dist < *(float *)0x25337c) {
           result = 0.0f;
+        } else if (dist < *(float *)0x2533c8) {
+          result = result * *(float *)0x25496c;
         }
 
         if (*(int *)(biped + 0x20) != *(int *)(player + 0x20)) {
-          if (*(float *)0x253f40 <= dist_sq) {
-            if (dist_sq <= *(float *)0x254cc4)
-
-              result =
-                (dist_sq - *(float *)0x253f40) * result * *(float *)0x259ec0;
-
-          } else {
+          /* 0xadab9..0xadaf7: fcomp 2.0 / test ah,5 / jp -> result = 0 on
+           * dist < 2.0; fcomp 5.0 / test ah,0x41 / je skips on dist > 5.0. */
+          if (dist < *(float *)0x253f40) {
             result = 0.0f;
+          } else if (!(dist > *(float *)0x254cc4)) {
+            result = (dist - *(float *)0x253f40) * result;
+            result = result * *(float *)0x259ec0;
           }
         }
       }
@@ -4906,10 +4919,21 @@ float FUN_000adb20(int spawn_pos, int player_handle)
                        (position[0] - pos[0]) * (position[0] - pos[0]) +
                        (position[2] - pos[2]) * (position[2] - pos[2]);
             dist = xbox_sqrtf(d2);
+            /* 0xadba9: FSTP dword [ebp-8] narrows dist before every use. */
+            HALO_FLT_ROUNDTRIP(dist);
           }
-          if (1.0f <= dist && dist < *(float *)0x254640) {
-            rating =
-              (float)x87_fmod((double)dist, *(double *)0x26b678) + rating;
+          /* 0xadbb2..0xadbf5.  Second guard is FCOMP 6.0 / TEST AH,0x41 / JP:
+           * continue on dist <= 6.0 (equality included).  Body:
+           *   FLD dist; FSUB 1.0; FMUL 0.2 [0x2549d4]; FSUBR 1.0;
+           *   FLD double 0.6 [0x26c6b0]; CALL _CIpow; FADD rating; FSTP rating
+           * i.e. rating += pow(1.0 - (dist - 1.0) * 0.2, 0.6).  The previous
+           * lift wrote fmod(dist, 1.9) here -- wrong helper AND wrong constant
+           * (0x26b678 is an unrelated double) -- so same-team spawn ratings
+           * diverged from the original. */
+          if (1.0f <= dist && dist <= *(float *)0x254640) {
+            rating = (float)(pow((double)(1.0f - (dist - 1.0f) * *(float *)0x2549d4),
+                                 *(double *)0x26c6b0) +
+                             rating);
           }
         }
         player = (int)data_iterator_next(&iter);

@@ -1799,3 +1799,53 @@ The next question is why unit 0xe2740005 alone is late.  The four handles are
 object indices 2, 5, 8 and 11.  Whether index 5 is the client's own local player
 or a remote one decides between a local-prediction ordering bug and a network
 decode ordering bug.
+
+## CORRECTION 2026-09-07: not a timing error -- unit 0xe2740005 spawned at a different point
+
+The "one tick late" reading above is wrong. Re-reading the same captures with
+`rng_first_divergence.py` restricted to the last segment (the ring had wrapped,
+which is why the first dumps broke at the tick-264 marker record):
+
+- Unit 2's desired-facing update lands at tick 3 on BOTH machines. There is no
+  offset between host and client in when control reaches a unit.
+- At tick 2 the host's unit 5 already faces yaw ~89.8 degrees (cos 0.0036); the
+  client's unit 5 faces (1, 0, 0). Same seeds, same inputs, different pose one
+  tick after the unit exists: the two machines placed unit 5 at different spawn
+  points. Unit 5 is the host's second local player; its controller yaw was
+  seeded from its (correctly placed) unit by player_control_new_unit.
+
+The spawn choice is `find_best_starting_location_index`: argmax over
+`pow(random, 0.5) * rating`. The random draws are identical on both machines,
+so the rating must differ. Two functions in the rating chain were mis-lifted
+in `src/halo/game/game_engine.c`:
+
+1. `game_engine_get_distance_rating_for_spawn` (0xad9b0) dropped the FSQRT at
+   0xada4d. It compared distance SQUARED against the 0.25 / 1.0 / 2.0 / 5.0
+   thresholds and fed it into the `(dist - 2.0) * rating * 0.3333` ramp.
+2. `FUN_000adb20` (same-team proximity) computed `fmod(dist, 1.9)` where the
+   original does `pow(1.0 - (dist - 1.0) * 0.2, 0.6)` via _CIpow (0x26c6b0 is
+   the double 0.6; 0x26b678 is an unrelated double), and used `dist < 6.0` for
+   the `FCOMP / TEST AH,0x41 / JP` guard that means `dist <= 6.0`.
+
+Both also lacked the float32 narrowing of `dist` (`FSTP dword [ebp-8]`), which
+`tools/audit/check_x87_narrowing.py` flagged for exactly these two functions.
+
+Why it is intermittent: the ratings only leave 1.0 when another unit is alive
+within ~5 (enemy) or 6 (teammate) world units of a spawn point, and a wrong
+rating only flips the argmax when the random factors of the top candidates are
+close. The RNG draw COUNT is unchanged by the ratings, so nothing shows until a
+flipped spawn moves a unit and that unit's animation choices consume RNG
+differently. That is why the first visible divergence is an animation draw at
+tick 2, not a spawn.
+
+Fix: both functions rewritten against the disassembly, with
+`HALO_FLT_ROUNDTRIP(dist)` after the sqrt. VC71 shape after the fix:
+`FUN_000adb20` 81.1 -> 95.5, `game_engine_get_distance_rating_for_spawn`
+87.5 -> 95.0 (120/120 insns, FPU-WARN and FCOM-WARN cleared). No other function
+in the TU moved.
+
+Not yet confirmed at runtime. Repro needs two xemu instances in a lobby:
+
+    rtk ./tools/xbox/build_deploy_run.sh --xemu-bridged --xbox 10.0.0.21 -- -q --rng-trace
+
+then re-capture ds_h.json / ds_c.json and run `tools/xbox/rng_first_divergence.py`.
