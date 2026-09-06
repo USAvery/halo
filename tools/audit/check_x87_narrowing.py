@@ -1,0 +1,146 @@
+#!/usr/bin/env python3
+"""Detect lost float32 narrowing between our shipped clang code and the XBE.
+
+Why this check exists
+---------------------
+`check_fpu_association.py` covers addend reassociation.  That class was measured
+inert on this target: Halo runs the x87 at PC=11 (64-bit extended significand),
+so a 3-term reassociation cannot change a result.
+
+This check covers the class that is *not* inert at PC=11.  MSVC 7.1 narrows an
+intermediate `float` to 24-bit significand by storing it to a dword stack slot
+and reloading it (`fstp dword ptr [ebp-X]` / `fld dword ptr [ebp-X]`).  clang
+with `-mno-sse` is free to leave the same value in ST(i) at 64-bit precision and
+skip the round trip.  That is a real 24-bit rounding the original performs and
+we do not -- at any precision control -- and it is enough to flip a threshold
+compare a tick early and desync a lockstep system-link game.
+
+VC71 cannot see it: VC71 compiles our C with cl.exe, which performs the same
+narrowing our shipped clang build omits, so the score stays 100%.
+
+Metric: per function, count dword-width x87 stores to frame-relative slots that
+are later reloaded by an x87 dword load from the same slot.  Report functions
+where ours is lower than the original's.  A lower count means we skipped a
+narrowing; a higher count is only extra spilling and is numerically harmless.
+
+Fix template: `HALO_FLT_ROUNDTRIP(lv)` in `src/halo/math/real_math.c` -- a
+guarded empty `asm volatile ("" : "+m"(lv))` that forces the store/reload at
+zero VC71 cost.
+"""
+
+import argparse
+import json
+import re
+import struct
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from check_fpu_association import (  # noqa: E402
+    BOUNDS, OBJ_ROOT, XBE, disasm_xbe, load_xbe, objdump_functions,
+)
+
+# `fstp dword ptr [ebp - 0x10]` / `fld dword ptr [esp + 0x24]`
+SLOT_RE = re.compile(r"^dword ptr \[\s*(e[bs]p)\s*([+-])\s*(0x[0-9a-fA-F]+|\d+)\s*\]$")
+
+
+def _slot(op_str):
+    m = SLOT_RE.match(op_str.strip())
+    if not m:
+        return None
+    reg, sign, disp = m.groups()
+    return "%s%s%d" % (reg, sign, int(disp, 0))
+
+
+# Ops that can leave ST(0) with more than 24 significant bits.  Sign/exchange
+# ops are excluded: they cannot widen a value, so a round trip after one of them
+# re-rounds nothing.
+ARITH = ("fadd", "fsub", "fmul", "fdiv", "fsqrt", "fprem", "fscale", "frndint",
+         "fsin", "fcos", "fptan", "fpatan", "fyl2x", "f2xm1", "fidiv", "fimul",
+         "fiadd", "fisub")
+
+
+def narrowing_slots(insns):
+    """Slots holding a *computed* value narrowed by a dword store/reload.
+
+    A round trip only re-rounds when the stored value carries more than 24
+    significant bits, i.e. when it came out of an arithmetic op rather than
+    straight off a float32 load.  Counting plain spills instead would flag every
+    register-allocation difference as a numeric one.
+    """
+    computed = False
+    stored, roundtripped = set(), set()
+    for ins in insns:
+        if not ins.mnemonic.startswith("f"):
+            continue
+        if ins.mnemonic in ("fst", "fstp", "fld"):
+            slot = _slot(ins.op_str)
+            if slot is None:
+                computed = ins.mnemonic != "fld"
+                continue
+            if ins.mnemonic == "fld":
+                if slot in stored:
+                    roundtripped.add(slot)
+                computed = False
+            else:
+                if computed:
+                    stored.add(slot)
+                computed = ins.mnemonic == "fst"
+            continue
+        computed = ins.mnemonic.startswith(ARITH)
+    return roundtripped
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("paths", nargs="*", help="restrict to these source files")
+    ap.add_argument("--function", action="append", default=[])
+    ap.add_argument("--min-delta", type=int, default=1,
+                    help="only report when the original has this many more")
+    args = ap.parse_args()
+
+    if not XBE.exists():
+        print("missing %s" % XBE, file=sys.stderr)
+        return 2
+    raw, sections = load_xbe(XBE)
+    bounds = json.loads(BOUNDS.read_text())
+    by_name = {}
+    for addr, ent in bounds.items():
+        n = ent.get("name")
+        if n:
+            by_name[n] = (int(addr, 16), int(ent["end"], 16))
+
+    objs = sorted(OBJ_ROOT.rglob("*.obj"))
+    if args.paths:
+        want = {Path(p).name + ".obj" for p in args.paths}
+        objs = [o for o in objs if o.name in want]
+    if not objs:
+        print("no clang objects under %s -- build first" % OBJ_ROOT, file=sys.stderr)
+        return 2
+
+    findings, checked = [], 0
+    for obj in objs:
+        for name, insns in objdump_functions(obj).items():
+            if args.function and name not in args.function:
+                continue
+            if name not in by_name:
+                continue
+            start, end = by_name[name]
+            ours = narrowing_slots(insns)
+            theirs = narrowing_slots(disasm_xbe(raw, sections, start, end))
+            checked += 1
+            delta = len(theirs) - len(ours)
+            if delta >= args.min_delta:
+                findings.append((delta, name, obj, len(ours), len(theirs)))
+
+    for delta, name, obj, no, nt in sorted(findings, reverse=True):
+        print("[X87-NARROW] %s (%s): ours %d, xbe %d (-%d)"
+              % (name, obj.relative_to(OBJ_ROOT), no, nt, delta))
+
+    print("\n%d compared, %d MISSING-NARROWING" % (checked, len(findings)))
+    return 1 if findings else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1409,11 +1409,20 @@ float FUN_0010a5e0(int16_t function_type, float input)
 
   if (*(char *)0x46e39c != '\0') {
     scaled = input * *(float *)0x28c838;
+    /* The original narrows here (FST dword [ebp+0xc] at 0x10a639) and again on
+     * the fmod return (FSTP dword [ebp+8] at 0x10a647), so the subtraction
+     * below runs at 24-bit significand.  clang -mno-sse would otherwise keep
+     * both in ST at 64-bit: idx is masked and used as a table index, so a
+     * sub-ULP difference at an integer boundary selects a different entry
+     * rather than a nearby value.  cl.exe narrows on its own, so the barrier
+     * costs nothing in the VC71 lane. */
+    HALO_FLT_ROUNDTRIP(scaled);
 #if defined(_MSC_VER) && !defined(__clang__)
     weight = (float)fmod((double)scaled, *(double *)0x2573d8);
 #else
     weight = x87_fmod(scaled, *(double *)0x2573d8);
 #endif
+    HALO_FLT_ROUNDTRIP(weight);
     idx = (unsigned int)x87_round_to_int(scaled - weight) & 0x3ff;
 
     table = ((unsigned char **)0x46e3b8)[function_type];
