@@ -713,6 +713,7 @@ our biped answered yes where the original answered no.
 "the open a10 report of a biped that rotates without translating". That report
 is not open -- it was fixed long ago -- so the cross-reference was wrong and
 carried no evidence either way. Nothing else in this document depends on it.
+
 ### This REOPENS the float-precision lane
 
 The previous section recorded, correctly, that the captured build already had
