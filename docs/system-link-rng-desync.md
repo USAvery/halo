@@ -1086,3 +1086,300 @@ disagreements are all at ticks >= 6634 and the comparison used only the *first*
 draw of each tick. The one-for-one value alignment above comes from the
 6600-6645 zoom, which covers the high-volume ticks in full. The whole proof is
 scoped to ticks >= 591 because the 65536-record ring had wrapped on both sides.
+
+## Gate capture, 2026-09-06: all four remaining integer gates agree; the float does not
+
+Both machines ran with the new probes (client `c3768a1c3`, host
+`host_rng_probe.xbe` with binary probes at `0x1a5109` and `0x1a5142`). The
+desync reproduced. Scoped to the desynced game:
+
+    shared draw ticks           293  (0 .. 1596)
+    agree                       282
+    first divergent seed tick   1478
+    transitions before 1478     client-only: (1474, 0xe33a0035, new=2 old=0)
+                                host-only:   none
+    gate snapshots compared     5579
+    gate snapshots differing    0
+
+**Zero.** Every time both machines reach the fork for the same unit on the same
+tick, all four surviving runtime gate inputs are identical. At the causing tick:
+
+    t=1474  CLIENT  +0x42a=0  +0x257=2  +0x1b4&0x4000=0  +0x1b8&0x100=0
+    t=1474  HOST    +0x42a=0  +0x257=2  +0x1b4&0x4000=0  +0x1b8&0x100=0
+
+So the integer gates are exonerated by measurement, not by argument. **The
+`fcomp` at `0x1a5169` is the only remaining difference.**
+
+### And the float gap is gross, not sub-ULP
+
+The host probe recorded the compared operand. For that unit, on every tick from
+1474 onward:
+
+    probe:turn_cosine  bits=0x3f800000  = 1.0   (exactly)
+
+The threshold is `0.99` (`0x3f7d70a4` at `0x28ace8`), i.e. the cosine of about
+8.1 degrees. Working the branch:
+
+    fld dword [ebp-0xc]     ; ST(0) = cosine
+    fcomp st(1)             ; vs threshold
+    fnstsw ax               ; C0 -> ah bit 0, C2 -> ah bit 2
+    test ah,5               ; C0|C2
+    jp 0x1a5193             ; PF=1 (C0=0, cosine > threshold) -> SKIP the turn
+
+The host's biped was facing **exactly** where it wanted to face, so it correctly
+skipped the turn-in-place animation. Our client took the transition, so our
+cosine was **below 0.99** -- more than eight degrees of facing error against the
+original's zero.
+
+**This retires the sub-ULP precision hypothesis for this site.** A last-bit
+rounding difference cannot move a cosine from 1.0 to below 0.99. Our biped's
+current facing (`+0x24`) and desired facing (`+0x1d4`) genuinely diverge, by a
+visible angle, where the original holds them identical. The x87-narrowing lane
+is not the explanation here; something in the ported facing update is wrong by
+a wide margin, and the knife-edge reading of the six-tick excursion was the
+wrong model.
+
+Two caveats on this run:
+
+- The threshold is selected by `test al,0x20` on `+0x1b8` (`0x1a5151`). Bit 0x20
+  set uses the `0.99` constant; clear uses the tag value at `+0x4c8`. The gate
+  probe records bit 0x100, not bit 0x20, so which threshold applied is not yet
+  captured. It does not change the conclusion: the host was at exactly 1.0 and
+  did not fire.
+- Only the host records `probe:turn_cosine`. `[ebp-0xc]` lives inside the
+  unported fork, so the client needs its own binary probe, or an equivalent
+  value computed in the ported caller, to state our cosine as a number rather
+  than as an inequality.
+
+Note the transition state was **2** this run and **3** in repro B. `setne dl;
+add dl,2` selects on `[ebp-1]`, the turn direction, so that difference is which
+way the biped turned, not a different fault.
+
+## RETRACTED: "our build desyncs against itself"
+
+**Struck 2026-09-06, same day.** The user later reported the opposite: the same
+patched build on both machines does **not** desync. The section below is kept
+for the record but its conclusion is wrong.
+
+Most likely reconciliation, consistent with every observation: the earlier
+patched-against-patched test ran two patched builds at *different revisions*.
+Different code desyncs. Identical code does not.
+
+    pristine    vs pristine    -> no desync
+    patched X   vs patched X   -> no desync   (measured, clean-run baseline below)
+    patched     vs pristine    -> desync      (all captures in this document)
+    patched X   vs patched Y   -> desync      (the misread test)
+
+So the simulation is deterministic and the original framing holds: our code
+computes a different value than the original. The non-determinism hypotheses
+below (uninitialized stack, pointer values, timing) are not supported and are
+not being pursued. The clean-run baseline that follows this section is still
+valid and still useful -- it shows the probes agree bit for bit when both
+machines run identical code, which is the control the instrument needed.
+
+## Superseded reframe: our build desyncs against ITSELF
+
+User report, and it changes the target of the whole investigation:
+
+- pristine `cachebeta` against pristine `cachebeta` -- **no desync**
+- our patched build against our patched build -- **desyncs, either machine hosting**
+- our patched build against pristine -- desyncs (all captures above)
+
+Two *identical* binaries cannot diverge in a lockstep simulation unless the
+simulation is non-deterministic. So the framing used up to this point -- "our
+code computes a different value than the original" -- was wrong, or at least
+incomplete. The defect is that our code computes a different value **than
+another copy of itself**.
+
+That narrows the mechanism class sharply. A deterministic difference from the
+original would reproduce identically on both of our machines and could not
+desync them against each other. What can differ between two machines running
+the same image:
+
+1. **A read of uninitialized stack memory.** The two machines run different
+   non-simulation code between ticks (rendering, audio, input, network), so
+   stale stack contents differ. This is the classic cause.
+2. **A read of uninitialized pool or heap memory** -- a struct field the
+   original initializes and we do not. A `pad_` field that turns out to be read
+   is exactly this bug.
+3. **A pointer value used in arithmetic.** Addresses need not match.
+4. **Dependence on wall-clock or frame timing rather than tick count.**
+
+The facing evidence still stands and becomes more useful: with both machines
+running our build, both log the reconstructed cosine (kind 21) and the forward
+z (kind 22) from source. No binary patch is needed, and any difference between
+the two is by definition our own non-determinism.
+
+### Uninitialized-read sweep: 51 warnings, top candidates are false positives
+
+    clang -Wconditional-uninitialized -Wuninitialized   (full tree, gnu90)
+    -> 51 warnings; artifacts/scratch/uninit.txt
+
+Concentrations: `encounters.c` 9, `units.c` 7, `objects.c` 7,
+`breakable_surfaces.c` 6, `model_animations.c` 3.
+
+The animation-path hits looked promising and are **not** bugs. Both
+`units.c:247/277/298` (`has_rotation`, `has_translation`, `has_scale`) and
+`model_animations.c:1385/1404/1429` (`local_14`, `local_1c`, `local_20`) load
+inside `if ((node_idx & 0x1f) == 0)` in a loop whose index starts at zero, so
+the first iteration always initializes them. clang cannot prove the loop runs
+at least once with index 0. The remaining 45 are unreviewed.
+
+This sweep is worth keeping as a standing check, but it did not find the fault.
+
+### Clean-run baseline, and the `f.z` hypothesis is refuted
+
+Both machines on our build, one full game, no desync. Scoped to that game:
+
+    tick range              2417 .. 4589 on both
+    seed ticks compared     418, all agreeing
+    probe:turn_cos_c        7454 compared, 0 differing
+    probe:turn_fwd_z        7454 compared, 0 differing
+    probe:turn_gates        7454 compared, 0 differing
+
+So when the game does not desync, the two machines agree bit for bit on every
+value this fork reads. The instrument is sound and any difference in a
+desyncing run is real.
+
+**`f.z` is always exactly zero in our build** -- 7454 of 7454 samples, min and
+max both 0. The hypothesis that a non-zero forward z was dragging the 2D dot
+below the threshold is therefore **wrong**. Our cosine falls below 0.99 because
+the biped genuinely is turning in the XY plane, which is the normal case: 1292
+of 7454 samples sit below the threshold in an ordinary game.
+
+What remains is unchanged: get a desyncing run with these probes on both
+machines. The first differing `probe:turn_cos_c` names the tick and unit, and
+from there the question is which input to the facing update went wrong.
+
+## The caller-side cosine reconstruction is INVALID: the fork updates `+0x24` first
+
+Kind 21 samples `+0x1d4` and `+0x24` in the ported caller, immediately before
+`FUN_001a4c50`. That is not equivalent to what the fork compares, because the
+fork **writes the current facing in place** before computing the cosine:
+
+    0x1a4dd5  lea ecx, [esi + 0x24]          ; ecx = current facing
+    ...                                       ; (no reassignment of ecx)
+    0x1a4f08  mov eax, [ebp-0x20]
+    0x1a4f0b  mov edx, [ebp-0x1c]
+    0x1a4f0e  mov [ecx],   eax               ; <-- turns the biped
+    0x1a4f13  mov [ecx+4], edx
+    0x1a4f16  mov [ecx+8], eax
+    ...
+    0x1a5061  lea eax, [esi + 0x1d4]         ; only now is the cosine built
+    0x1a50cd  fstp dword ptr [ebp-0xc]
+
+So kind 21 reads the facing one update too early. It is correct only for a
+biped that is not turning, where the write is a no-op.
+
+The paired capture shows exactly that signature, and it is the reason the
+control failed:
+
+    unit 0xe2710002   128 samples   128 identical   every value exactly 1.0
+    unit 0xe2740005   128 samples   128 identical   every value exactly 1.0
+    unit 0xe27a000b   128 samples   128 identical   every value exactly 1.0
+    unit 0xe2770008   128 samples     0 identical   the only unit that moves
+
+**All 384 agreeing samples are the constant 1.0 from stationary bipeds.** This
+is the vacuous-agreement trap: a control that passes only where the quantity
+under test is constant proves nothing. The one moving unit disagreed on every
+sample, and that disagreement is the probe's error, not a simulation
+divergence. No conclusion about our simulation can be drawn from this capture.
+
+Kinds 23 to 27 (the raw components) have the same defect and are equally
+invalid; they sample the same pre-update values.
+
+**Correct fix:** the client needs the same *binary* probe the host has, at
+`0x1a5142`, reading `[ebp-0xc]`. `FUN_001a4c50` is unported in our build too,
+so the identical patch applies at the identical address. The obstacle is cave
+space: `build_original_probes.py` hides its caves inside
+`unit_update_animation`'s body, which is dead in the baseline build but live in
+ours. Our build needs a dedicated reserved buffer instead.
+
+## MEASURED 2026-09-06: our desired facing never leaves the current facing
+
+First capture with a binary probe on BOTH machines at the same instruction
+(client `tools/xbox/patch_fork_probes.py`, host
+`artifacts/rng_trace/build_original_probes.py`), kind 20 = `[ebp-0xc]` at
+0x1a5142, the operand of the fork's `fcomp`.
+
+    client: 2 distinct cosine values in the whole game
+              0x3f800000 (1.0)          384 samples
+              0x3f7fffff (0.99999994)   128 samples
+    host:  19 distinct values, a real sweep -0.986 .. +0.998 .. -0.99
+
+    shared (tick,unit) cosine keys 511, DIFFERING 127
+    unit 0xe2770008, ticks 2..22: client 1.0 flat, host swings through a
+    full turn (-0.986 -> +0.998 -> +0.924)
+
+Each of the four units is pinned to ONE bit-exact value for all 130 ticks.
+A cosine that never moves off 1.0 by even an ulp means the fork is dotting a
+vector with itself.
+
+The gates are NOT the difference. Same capture, same probe pair:
+
+    shared gate keys 520, DIFFERING 2 (t=1 and t=5, one unit, one-tick phase)
+    every sample: +0x257=2, +0x1b4&0x4000=0, +0x1b8&0x100=0
+
+### Why 1.0 is the self-dot signature
+
+Disassembly of the fork at 0x1a5061..0x1a50cd:
+
+    0x1a5061 copy (+0x1d4,+0x1d8,+0x1dc) to [ebp-0x20], force z = 0
+    0x1a5083 call 0x12f10 (normalize3d), returns length in ST0
+    0x1a5088 fcomp [0x2533c0] ; test ah,0x44 ; jp 0x1a50ac
+             -> length == that constant falls through to the FALLBACK
+    0x1a5098 fallback: copy the CURRENT facing (+0x24) over [ebp-0x20]
+    0x1a50ac cross-z  = d.x*f.y - d.y*f.x            -> [ebp-1] turn direction
+    0x1a50bc cosine   = d.x*f.x + d.y*f.y            -> [ebp-0xc] COMPARED
+    0x1a50e4 fcomp [0x2568c0] ; test ah,5 ; jp 0x1a5109
+
+With d = f the cosine is f.x^2 + f.y^2, which is 1.0 for a normalized facing
+with f.z = 0 (and 0x3f7fffff for one that is an ulp short). So on our build the
+desired facing either normalizes to zero, or already equals the current facing.
+
+### The producer chain, traced to one field
+
+Every instruction in .text that references offset 0x1d4 was decoded (50 sites)
+and mapped to its kb.json function. The per-tick writer is `unit_set_control`
+(0x1af990, ported), at 0x1afcfb:
+
+    unit+0x1d4 <- control+0x1c        (facing_vector)
+    unit+0x1e0 <- control+0x28        (aiming_vector)
+    unit+0x204 <- control+0x34        (looking_vector)
+
+Our C at units.c:10273 matches the original store-for-store. The fault is
+upstream of it. Two producers fill that control block:
+
+    AI     actors.c:7652   control+0x1c <- actor->output_facing_vector (+0x718)
+    player players.c:3074  control+0x1c <- unit+0x1d4 (a self-copy, input off)
+
+and `output_facing_vector` has exactly one writer, actor_looking.c:9303, which
+stores `actor->control_desired_facing_vector` (+0x5a4). That field is written
+by actor_moving.c in three places:
+
+    3686  = actor->input_facing_vector (+0x174)   <- THE DEFAULT, self-facing
+    3837  = normalized (actor+0x12c - actor+0x6a8), guarded by normalize3d != 0
+    3924  = -vec_scratch, vehicle-stuck arm
+
+Line 3686 is the default assignment at the top of the function: desired facing
+:= input facing. Our measurement is exactly what that default produces if no
+later branch overwrites it. `FUN_0002bd80` (actor_moving) was already suspect
+number 1 from the x87-narrowing ranking, reached independently.
+
+### Open, and the next measurement
+
+Which link breaks is NOT yet measured. Three candidates, in order:
+
+1. actor_moving never leaves the 3686 default (a branch condition is wrong).
+2. actor_look_update overwrites +0x5a4 or fails to propagate it.
+3. the units are player bipeds, not actors, and players.c takes the
+   input-disabled arm at 3063 -- which self-copies the facing and would also
+   pin the cosine. Settle this first: it changes which file to read.
+
+A CLIENT-ONLY probe answers 1 and 2 -- no host run needed, because the host's
+behaviour is already measured. Record, per tick and unit: actor+0x5a4,
+actor+0x174, actor+0x718, and unit+0x1d4. If +0x5a4 == +0x174 always, the break
+is in actor_moving. If +0x5a4 moves but unit+0x1d4 does not, it is downstream.
+
+Captures: artifacts/rng_trace/cos_{c,h}.json, dbg2{1,4}_cos.txt.
+Scripts: artifacts/scratch/{cos_cmp,gate_cmp,find_1d4}.py.
