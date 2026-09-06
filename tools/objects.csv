@@ -164,7 +164,7 @@ network_connection.obj,true,0x001282F0-0x00129C30,18
 network_game_manager.obj,true,0x0012A960-0x0012B8B0,20
 bsp3d.obj,true,0x00146BE0-0x001472B0,5
 collision_features.obj,true,0x0014AD40-0x0014C6B0,18
-rasterizer_xbox_dynavobgeom.obj,true,0x0015F1F0-0x0015FAE0,7
+rasterizer_xbox_dynavobgeom.obj,true,0x0015F1F0-0x0015FAE0,8
 cache_files.obj,true,0x001B9890-0x001BA070,8
 sound_definitions.obj,true,0x001C8D90-0x001C8F90,1
 actor_firing_position.obj,true,0x00024000-0x00024DE0,15
