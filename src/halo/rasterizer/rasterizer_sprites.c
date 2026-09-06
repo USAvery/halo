@@ -861,6 +861,108 @@ void FUN_0017da00(char param_1)
   }
 }
 
+/* 0x17dab0.  Arms a cinematic screen effect in the 0x78-byte globals block
+ * allocated by rasterizer_screen_effects_initialize (0x17d910), and is a
+ * no-op when the block was never allocated.  It clears the same flag/state
+ * run that rasterizer_screen_effect_set_video (0x17db40) clears -- the byte
+ * at 0x23, the word at 0x24 and the four dwords at 0x28..0x34 -- then records
+ * four caller dwords at 0x4c..0x58, timestamps the effect at 0x5c/0x60, and
+ * finally writes the caller's byte at 0x20 with 0x21/0x22 cleared.
+ *     0017dab4: MOV  EAX,[0x0047e4d4]
+ *     0017daba: XOR  EBX,EBX
+ *     0017dabc: CMP  EAX,EBX
+ *     0017dabe: JZ   0x0017db18        ; no-op when never allocated
+ *     0017dac0: MOV  ECX,dword ptr [EBP + 0x8]
+ *     0017dac3: MOV  EDX,dword ptr [EBP + 0xc]
+ *     0017dac6: MOV  byte ptr [EAX + 0x23],BL
+ *     0017dac9: MOV  word ptr [EAX + 0x24],BX
+ *     0017dacd: MOV  dword ptr [EAX + 0x28],EBX
+ *     0017dad0: MOV  dword ptr [EAX + 0x2c],EBX
+ *     0017dad3: MOV  dword ptr [EAX + 0x30],EBX
+ *     0017dad6: MOV  dword ptr [EAX + 0x34],EBX
+ *     0017dad9: MOV  dword ptr [EAX + 0x4c],ECX
+ *     0017dadc: MOV  ECX,dword ptr [EBP + 0x10]
+ *     0017dadf: MOV  dword ptr [EAX + 0x50],EDX
+ *     0017dae2: MOV  EDX,dword ptr [EBP + 0x14]
+ *     0017dae5: MOV  dword ptr [EAX + 0x54],ECX
+ *     0017dae8: MOV  dword ptr [EAX + 0x58],EDX
+ *     0017daeb: CALL 0x000b5aa0        ; game_time_get()
+ *     0017daf0: MOV  CL,byte ptr [EBP + 0x18]
+ *     0017daf3: MOV  dword ptr [EBP + -0x4],EAX
+ *     0017daf6: FILD dword ptr [EBP + -0x4]
+ *     0017daf9: MOV  EAX,[0x0047e4d4]  ; re-read AFTER the call
+ *     0017dafe: FMUL float ptr [0x002546a4] ; seconds-per-tick
+ *     0017db04: FLD  ST0
+ *     0017db06: FSTP float ptr [EAX + 0x5c]
+ *     0017db09: FADD float ptr [EBP + 0x1c]
+ *     0017db0c: FSTP float ptr [EAX + 0x60]
+ *     0017db0f: MOV  byte ptr [EAX + 0x20],CL
+ *     0017db12: MOV  byte ptr [EAX + 0x21],BL
+ *     0017db15: MOV  byte ptr [EAX + 0x22],BL
+ * The global is re-read after the call and only there, so it is held in a
+ * local across each call-free run of stores, exactly as sequenced above.
+ *
+ * The 0x5c/0x60 pair is the same seconds-per-tick timestamp idiom as
+ * FUN_0017d8f0 above: game_time_get() spilled to a slot, FILD'd, and
+ * multiplied by the float at 0x2546a4.  Note the FLD ST0 / FSTP / FADD
+ * ordering: the *narrowed* product is stored at +0x5c, but +0x60 adds
+ * param_6 to the still-80-bit x87 copy, not to a reload of +0x5c.  Under
+ * -mno-sse clang keeps the float local wide and reproduces that; adding an
+ * explicit narrowing, a `volatile` local, or a store/reload here would
+ * silently change the +0x60 value, and neither VC71 (mnemonic-only) nor the
+ * equivalence float tolerance would report it.
+ *
+ * The four dwords at 0x4c..0x58 are copied raw -- there is no FLD/FSTP for
+ * them in the original -- so the three float parameters go through a dword
+ * pun like FUN_0017db20 below rather than through float lvalues, which would
+ * double-round.  (Our clang build still lowers the bit-copy through
+ * FLDS/FSTPS because the float parameters are x87-live at entry; that is
+ * value-identical, not a second semantic.)  param_5 is a one-byte value,
+ * proven by MOV CL,byte ptr [EBP + 0x18] / MOV byte ptr [EAX + 0x20],CL.
+ *
+ * The block layout is unknown and the meaning of the stored slots is
+ * unproven, so the offsets stay raw and the name stays FUN_.  The only xref
+ * is the CALL at 0x0c3743 in FUN_000c3700 (hs.c), which forwards a six-slot
+ * evaluated-argument record.
+ *
+ * MATCH-SENSITIVE: `arg_slot` and `end_slot` are pure address hoists of
+ * globals+0x4c and globals+0x60, computed one store early to reproduce the
+ * reference's address-materialization schedule (85.7% -> 96.1% VC71).  They
+ * change no side effect and no ordering -- both are derived from the same
+ * already-loaded `globals` the neighbouring stores use -- but folding them
+ * back into the store expressions costs the match. */
+void FUN_0017dab0(int param_1, float param_2, float param_3, float param_4,
+                  char param_5, float param_6)
+{
+  void *globals;
+  float timestamp;
+  int *arg_slot;
+  float *end_slot;
+
+  globals = cinematic_screen_effect_globals;
+  if (globals != 0) {
+    *(char *)((char *)globals + 0x23) = 0;
+    *(short *)((char *)globals + 0x24) = 0;
+    *(int *)((char *)globals + 0x28) = 0;
+    *(int *)((char *)globals + 0x2c) = 0;
+    *(int *)((char *)globals + 0x30) = 0;
+    arg_slot = (int *)((char *)globals + 0x4c);
+    *(int *)((char *)globals + 0x34) = 0;
+    *arg_slot = param_1;
+    *(unsigned int *)((char *)globals + 0x50) = *(unsigned int *)&param_2;
+    *(unsigned int *)((char *)globals + 0x54) = *(unsigned int *)&param_3;
+    *(unsigned int *)((char *)globals + 0x58) = *(unsigned int *)&param_4;
+    timestamp = (float)game_time_get() * *(float *)0x2546a4;
+    globals = cinematic_screen_effect_globals;
+    end_slot = (float *)((char *)globals + 0x60);
+    *(float *)((char *)globals + 0x5c) = timestamp;
+    *end_slot = timestamp + param_6;
+    *(char *)((char *)globals + 0x20) = param_5;
+    *(char *)((char *)globals + 0x21) = 0;
+    *(char *)((char *)globals + 0x22) = 0;
+  }
+}
+
 /* 0x17db20.  Stores three dwords into the cinematic screen-effect globals
  * block allocated by rasterizer_screen_effects_initialize (0x17d910), at
  * offsets 0x14/0x18/0x1c; no-op when the block was never allocated.
@@ -1804,6 +1906,123 @@ bool FUN_0017eb50(void)
 void FUN_0017eb90(void)
 {
   csmemset((void *)0x5a5400, 0, 0x170);
+}
+
+/* Frame-rate statistics update (0x17ebb0).  Takes one stack pointer argument
+ * (EBX = [EBP+8]) and fills a small float record from a ring of frame
+ * timestamps.  Layout proven by the stores at 0x17ec6d..0x17ecee:
+ *
+ *   +0x00  float   1000 / (now - last)            instantaneous rate
+ *   +0x04  int16   sample count  (word store)
+ *   +0x08  float   (count * 1000) / (now - arr[count-1])   windowed rate
+ *   +0x0c  float   1000 / max inter-sample delta  (slowest frame)
+ *   +0x10  float   1000 / min inter-sample delta  (fastest frame)
+ *
+ * The +0x0c / +0x10 pairing is easy to invert: the FSTP at 0x17ecce consumes
+ * the EDI (running MINIMUM delta) chain and targets +0x10; the FSTP at
+ * 0x17ecee consumes the [EBP-4] (running MAXIMUM delta) chain and targets
+ * +0x0c.  Verified against the disassembly, not the decompiler.
+ *
+ * Globals:
+ *   0x3256ba  int16   gate; only "!= 0" is proven HERE (elsewhere in this tree
+ *                     the same word is tested == 2 and == 3, so no narrower
+ *                     meaning is claimed).
+ *   0x47ec60  int32[] ring of timestamps, newest first; arr[0] is the previous
+ *                     frame's timestamp.  0x47ec60 + 0x3c*4 == 0x47ed50, so
+ *                     the ring holds at most 60 entries -- matching the 0x3c
+ *                     clamp at 0x17ecfa.
+ *   0x47ed50  int16   sample count.  Every access in this function is
+ *                     word-sized (0x17ebd6, 0x17ed00, 0x17ed0e, 0x17ed19);
+ *                     the decompiler's CONCAT22/`& 0xffff0000` dword form is
+ *                     an artifact and 0x47ed52 must never be written.  The one
+ *                     dword READ (`*(volatile int *)0x47ed50`, seeding idx) is
+ *                     deliberate: the original emits `MOV EDX,[0x47ed50]; DEC
+ *                     EDX; TEST DX,DX` there, and `volatile` is what keeps VC71
+ *                     from folding it into the word load above.
+ *   0x254cb8  float   1000.0f (documented at rasterizer.c:960 and elsewhere).
+ *   0x25fb8c  float   the unsigned-to-float fixup addend.
+ *
+ * The `unsigned int -> float` casts are left to the compiler: MSVC's own
+ * lowering IS the reference's MOV/FILD/TEST/JGE/FADD sequence, with 0x25fb8c
+ * as its fixup addend, so no hand-spelled conditional add is needed.
+ *
+ * The loop shifts the ring down by one (arr[i] = arr[i-1]) while accumulating
+ * the min and max adjacent delta.  It never writes arr[0], so the re-read of
+ * 0x47ec60 at 0x17ec3e yields the same value the delta was seeded from; it is
+ * kept because the original re-reads it.
+ *
+ * Explicit unknowns: the meaning of the 0x3256ba gate, and why the delta
+ * clamp floor is 1 rather than 0 (only "values below 2 become 1" is proven). */
+void FUN_0017ebb0(float *stats_out)
+{
+  unsigned int now;
+  unsigned int min_delta;
+  unsigned int max_delta;
+  unsigned int delta;
+  short idx;
+  short count;
+  int *p;
+  int next;
+  float fnum;
+
+  if (*(short *)0x3256ba == 0 || stats_out == 0) {
+    *(short *)0x47ed50 = 0;
+    return;
+  }
+
+  now = system_milliseconds();
+  count = *(short *)0x47ed50;
+  if (count != 0) {
+    min_delta = now - *(unsigned int *)0x47ec60;
+    idx = (short)(*(volatile int *)0x47ed50 - 1);
+    max_delta = min_delta;
+    if (idx > 0) {
+      p = (int *)0x47ec60 + idx;
+      do {
+        if (idx > 1) {
+          delta = (unsigned int)p[-1] - (unsigned int)p[0];
+          if (delta <= min_delta)
+            min_delta = delta;
+          if (delta > max_delta)
+            max_delta = delta;
+        }
+        p[0] = p[-1];
+        idx--;
+        p--;
+      } while (idx > 0);
+      count = *(short *)0x47ed50;
+    }
+
+    delta = now - *(volatile unsigned int *)0x47ec60;
+    if (delta <= 1)
+      delta = 1;
+    fnum = *(const float *)0x254cb8 / (float)delta;
+    *(short *)((char *)stats_out + 4) = count;
+    stats_out[0] = fnum;
+
+    /* 0x47ec5c + count*4 == &arr[count - 1], the oldest retained sample. */
+    delta = now - *(unsigned int *)(0x47ec5c + (int)count * 4);
+    if (delta <= 1)
+      delta = 1;
+    fnum = (float)(int)count * *(const float *)0x254cb8;
+    stats_out[2] = fnum / (float)delta;
+
+    if (min_delta <= 1)
+      min_delta = 1;
+    stats_out[4] = *(const float *)0x254cb8 / (float)min_delta;
+
+    if (max_delta <= 1)
+      max_delta = 1;
+    stats_out[3] = *(const float *)0x254cb8 / (float)max_delta;
+  }
+
+  *(unsigned int *)0x47ec60 = now;
+  next = (int)count + 1;
+  if (next > 0x3c) {
+    *(short *)0x47ed50 = 0x3c;
+    return;
+  }
+  *(short *)0x47ed50 = (short)next;
 }
 
 /* Frame-statistics recording start (0x17ed30).  Nine instructions, no frame,
