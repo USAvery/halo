@@ -76,6 +76,21 @@
 #define RNG_TRACE_KIND_TURN_DES_Y    25u /* raw bits of +0x1d8  info */
 #define RNG_TRACE_KIND_TURN_FWD_X    26u /* raw bits of +0x24   info */
 #define RNG_TRACE_KIND_TURN_FWD_Y    27u /* raw bits of +0x28   info */
+/* Kinds 21-27 are RETIRED: they belonged to the caller-side reconstruction of
+ * the fork's cosine, which reads +0x24 one update too early (the fork rewrites
+ * it at 0x1a4f0e).  The kept definitions only stop the numbers being reused,
+ * so old captures stay readable.
+ *
+ * Kinds 28-30 replace them.  They do NOT reconstruct anything: they report the
+ * two vectors the fork actually dots, plus the flag word that selects which
+ * function last wrote the desired facing.  Paired capture proved our cosine is
+ * a bit-exact constant (self-dot) while the pristine host sweeps a real turn,
+ * so unit+0x1d4 equals unit+0x24 on our build.  Three candidate writers remain
+ * (unit_set_control's producer, FUN_001b3690's static arm, players.c's
+ * input-disabled arm) and +0x1b4 bit 0 picks the second of them. */
+#define RNG_TRACE_KIND_DESIRED_X     28u /* raw bits of unit+0x1d4  info */
+#define RNG_TRACE_KIND_CURRENT_X     29u /* raw bits of unit+0x24   info */
+#define RNG_TRACE_KIND_UNIT_FLAGS    30u /* full dword unit+0x1b4   info */
 
 /* 16 bytes. */
 typedef struct {

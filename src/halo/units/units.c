@@ -1123,6 +1123,18 @@ char FUN_001a6350(int unit_handle)
 
     if ((*(unsigned char *)((char *)biped + 0xb6) & 0x4) == 0) {
 #ifdef HALO_RNG_TRACE
+      /* The two vectors FUN_001a4c50 dots, read here rather than reconstructed.
+       * The x component alone separates "equal" from "different"; the paired
+       * capture already showed the dot is a bit-exact constant, so this only
+       * has to say WHICH of the two is standing still.  +0x1b4 goes out whole
+       * because bit 0 selects FUN_001b3690's static arm, which writes the
+       * current facing into the desired-facing slot. */
+      RNG_TRACE_EX(RNG_TRACE_KIND_DESIRED_X,
+                   *(unsigned int *)((char *)biped + 0x1d4), unit_handle);
+      RNG_TRACE_EX(RNG_TRACE_KIND_CURRENT_X,
+                   *(unsigned int *)((char *)biped + 0x24), unit_handle);
+      RNG_TRACE_EX(RNG_TRACE_KIND_UNIT_FLAGS,
+                   *(unsigned int *)((char *)biped + 0x1b4), unit_handle);
       RNG_TRACE_EX(RNG_TRACE_KIND_TURN_GATES,
                    (unsigned int)*(unsigned char *)((char *)biped + 0x42a) |
                      ((unsigned int)*(unsigned char *)((char *)biped + 0x257)

@@ -98,6 +98,9 @@ KINDS = {
     25: ("probe:turn_des_y", "info"),
     26: ("probe:turn_fwd_x", "info"),
     27: ("probe:turn_fwd_y", "info"),
+    28: ("probe:desired_x", "info"),
+    29: ("probe:current_x", "info"),
+    30: ("probe:unit_flags", "info"),
 }
 
 
