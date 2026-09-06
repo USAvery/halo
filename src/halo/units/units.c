@@ -7845,7 +7845,6 @@ char unit_animation_set_state(int unit_handle, int16_t anim_state)
   char *antr_tag;
   char *unit_mode;
   char *mode_block;
-  int anim_graph_tag_index;
   int16_t mode_anim_index;
   int16_t overlay_index;
   int16_t anim_index;
@@ -7858,8 +7857,7 @@ char unit_animation_set_state(int unit_handle, int16_t anim_state)
 
   unit = (int *)object_get_and_verify_type(unit_handle, 3);
   unit_tag = (char *)tag_get(0x756e6974, *unit);
-  anim_graph_tag_index = *(int *)(unit_tag + 0x44);
-  antr_tag = (char *)tag_get(0x616e7472, anim_graph_tag_index);
+  antr_tag = (char *)tag_get(0x616e7472, *(int *)(unit_tag + 0x44));
 
   unit_mode = (char *)tag_block_get_element(
     antr_tag + 0xc, (int)*(signed char *)((char *)unit + 0x250), 100);
@@ -8086,8 +8084,8 @@ check_early_return:
 
 apply_animation:
   anim_index =
-    (int16_t)model_animation_choose_random(1, anim_graph_tag_index, anim_index);
-  unit_set_animation(unit_handle, anim_graph_tag_index, anim_index);
+    (int16_t)model_animation_choose_random(1, *(int *)(unit_tag + 0x44), anim_index);
+  unit_set_animation(unit_handle, *(int *)(unit_tag + 0x44), anim_index);
 
   old_state = (int16_t)(signed char)*((char *)unit + 0x253);
 
@@ -8119,7 +8117,7 @@ resolve_weapon_idle: {
     }
 
     weapon_idle_anim = (int16_t)model_animation_choose_random(
-      1, anim_graph_tag_index, weapon_idle_anim);
+      1, *(int *)(unit_tag + 0x44), weapon_idle_anim);
     *(int16_t *)((char *)unit + 0x24a) = weapon_idle_anim;
 
     if (*(uint8_t *)0x5054fb != 0 && *(int16_t *)((char *)unit + 0x64) == 0 &&
@@ -8141,7 +8139,7 @@ resolve_weapon_idle: {
         weapon_idle_anim = -1;
       }
       weapon_idle_anim = (int16_t)model_animation_choose_random(
-        1, anim_graph_tag_index, weapon_idle_anim);
+        1, *(int *)(unit_tag + 0x44), weapon_idle_anim);
       *(int16_t *)((char *)unit + 0x24c) = weapon_idle_anim;
 
       if (*(uint8_t *)0x5054fb != 0 && *(int16_t *)((char *)unit + 0x64) == 0 &&
@@ -11008,7 +11006,6 @@ short unit_update_animation(int unit_handle, char *anim_state)
   int anim_element;
   float delta[3];
   char out_matrix[52];
-  void *world_matrix;
   int biped_data;
   int biped_tag;
 
@@ -11107,19 +11104,17 @@ short unit_update_animation(int unit_handle, char *anim_state)
       FUN_001ab870((void *)((int)unit + 0x80), (int)unit[0x1f], unit_handle);
     if (anim_status == 1) {
       unit_anim_byte = *(char *)((int)unit + 0x253);
-      if (unit_anim_byte >= 0x1e && unit_anim_byte <= 0x29) {
-        switch (unit_anim_byte) {
-        case 0x1e:
-        case 0x1f:
-        case 0x29:
-          unit_cause_melee_damage(unit_handle, 0, -1, -1, -1, -1, (float *)0);
-          break;
-        case 0x21:
-          unit_throw_grenade_release(unit_handle, 0);
-          break;
-        default:
-          break;
-        }
+      switch (unit_anim_byte) {
+      case 0x1e:
+      case 0x1f:
+      case 0x29:
+        unit_cause_melee_damage(unit_handle, 0, -1, -1, -1, -1, (float *)0);
+        break;
+      case 0x21:
+        unit_throw_grenade_release(unit_handle, 0);
+        break;
+      default:
+        break;
       }
     } else if (anim_status == 2) {
       unit_anim_byte = *(char *)((int)unit + 0x253);
@@ -11161,8 +11156,8 @@ short unit_update_animation(int unit_handle, char *anim_state)
           (void *)(anim_graph + 0x74), (int)*(short *)(unit + 0x20), 0xb4);
         FUN_001234b0((void *)mode_tag, (void *)anim_element,
                      *(unsigned short *)((int)unit + 0x82), delta);
-        world_matrix = (void *)object_get_world_matrix(unit_handle, out_matrix);
-        matrix_scale_transform_vector((float *)world_matrix, delta, delta);
+        matrix_scale_transform_vector(
+          (float *)object_get_world_matrix(unit_handle, out_matrix), delta, delta);
         unit_exit_seat_end(unit_handle);
         vector3d_add((float *)(unit + 6), delta, (float *)(unit + 6));
         break;
@@ -12830,7 +12825,7 @@ bool unit_board_vehicle(int unit_handle, int vehicle_handle, int16_t seat_index)
   void *anim_tag;
   void *anim_entry;
   int16_t boarding_anim_index;
-  int anim_result;
+  int16_t anim_result;
 
   if (!unit_find_nearby_seat(unit_handle, vehicle_handle, seat_index, 0))
     return false;
@@ -12921,8 +12916,7 @@ bool unit_board_vehicle(int unit_handle, int vehicle_handle, int16_t seat_index)
                                                   boarding_anim_index);
 
       /* Set unit animation graph, index, and reset frame counter */
-      unit_set_animation(unit_handle, anim_graph_tag_index,
-                         (int16_t)anim_result);
+      unit_set_animation(unit_handle, anim_graph_tag_index, anim_result);
 
       /* Set animation state byte */
       *((uint8_t *)unit + 0x253) = 0x1a;

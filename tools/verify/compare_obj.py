@@ -36,9 +36,11 @@ def disassemble(obj_path: str) -> dict[str, list[str]]:
 
     functions: dict[str, list[str]] = OrderedDict()
     _label_positions: dict[str, set[int]] = {}
+    _label_names: dict[str, set[str]] = {}
     current_func = None
     current_lines: list[str] = []
     current_labels: set[int] = set()
+    current_label_names: set[str] = set()
 
     for raw_line in result.stdout.splitlines():
         line = raw_line.rstrip()
@@ -49,6 +51,7 @@ def disassemble(obj_path: str) -> dict[str, list[str]]:
             # and user-goto labels like $not_allowed$33397), never a function.
             if sym.startswith("LAB_") or sym.startswith("switchD_") or sym.startswith("$"):
                 current_labels.add(len(current_lines))
+                current_label_names.add(_branch_target_symbol(sym))
                 continue
             if sym.startswith("FUN_") and current_func and current_lines:
                 # Look back past trailing padding to the last real instruction.
@@ -78,13 +81,16 @@ def disassemble(obj_path: str) -> dict[str, list[str]]:
                     break
                 if last_mnem and last_mnem not in _RET_MNEMS and not had_padding:
                     current_labels.add(len(current_lines))
+                    current_label_names.add(_branch_target_symbol(sym))
                     continue
             if current_func and current_lines:
                 functions[current_func] = current_lines
                 _label_positions[current_func] = current_labels
+                _label_names[current_func] = current_label_names
             current_func = re.sub(r'@\d+$', '', sym.lstrip("_@"))
             current_lines = []
             current_labels = set()
+            current_label_names = {_branch_target_symbol(sym)}
             continue
 
         stripped = line.strip()
@@ -103,12 +109,13 @@ def disassemble(obj_path: str) -> dict[str, list[str]]:
     if current_func and current_lines:
         functions[current_func] = current_lines
         _label_positions[current_func] = current_labels
+        _label_names[current_func] = current_label_names
 
     for fn in functions:
         lines = functions[fn]
         while lines and mnemonic(lines[-1]).lower() in _PAD_MNEMS:
             lines.pop()
-        lines = _trim_trailing_table_data(lines)
+        lines = _trim_trailing_table_data(lines, _label_names.get(fn, set()))
         lines = _trim_trailing_thunks(lines)
         functions[fn] = _trim_unlabeled_bleed(lines, _label_positions.get(fn, set()))
 
@@ -352,11 +359,8 @@ def _first_function_insns_from_text(stdout: str, aliases) -> list[str] | None:
     # (addb %al,(%eax) etc.).  The per-function chunk path previously skipped
     # this, counting ~20 phantom "instructions" per jump-table function and
     # tanking the score (e.g. FUN_001a88b0 read 31 insns vs a real 10).
-    # `defined` lets the trim tell a post-RET shared-epilogue/default arm from
-    # inline table data.  Only this per-function-chunk path supplies it; the
-    # whole-object path in disassemble() tracks label *positions*, not names,
-    # and is left on the previous behaviour to keep this fix's blast radius to
-    # the path that was actually wrong.
+    # As in the whole-object path, label names distinguish post-RET arms that
+    # branch back into the body from inline table data.
     insns = _trim_trailing_table_data(insns, defined)
     return insns or None
 

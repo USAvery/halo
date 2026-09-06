@@ -854,8 +854,9 @@ void animation_frame_get_xy_translation(void *animation, short frame_index,
  * Confirmed: tag_block_get_element(antr_tag+0x74, index, 0xb4) at 0x120f9e.
  * Confirmed: FCOMP [ECX+0x44] + JNP loop exit at 0x120fab-0x120fb3.
  * Confirmed: next animation at element+0x38 (int16_t) at 0x120fb5.
+ * Confirmed: returns the signed 16-bit index in AX at 0x120fc0.
  */
-int model_animation_choose_random(int update_kind,
+int16_t model_animation_choose_random(int update_kind,
                                   int animation_graph_tag_index,
                                   int16_t animation_index)
 {
@@ -888,7 +889,7 @@ int model_animation_choose_random(int update_kind,
       break;
     animation_index = *(int16_t *)(element + 0x38);
   }
-  return (int)animation_index;
+  return animation_index;
 }
 
 /* floor: the original calls MSVC CRT floor (0x1d9c2b).

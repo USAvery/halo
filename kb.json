@@ -36911,7 +36911,7 @@
     },
     {
      "addr": "0x120f20",
-     "decl": "int model_animation_choose_random(int update_kind, int animation_graph_tag_index, int16_t animation_index);",
+     "decl": "int16_t model_animation_choose_random(int update_kind, int animation_graph_tag_index, int16_t animation_index);",
      "ported": true
     },
     {
