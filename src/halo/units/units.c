@@ -867,8 +867,8 @@ void FUN_00123560(int model_tag, int permutation_data, int *node_matrices,
                         FUN_0017cbc0(
                           shader_tag, (int)actual_detail, (int)(part + 0x44),
                           -1, *(int *)(part + 0x48), (int)(part + 0x54), -1);
-                        ((void (*)(int, int *, unsigned char *))rasterizer_debug_model_vertices)(
-                          render_data, node_matrices, part);
+                        rasterizer_debug_model_vertices(render_data,
+                                                        node_matrices, part);
                       } else {
                         actual_detail = detail_level;
                         if (detail_level == 0) {

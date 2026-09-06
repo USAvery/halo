@@ -706,8 +706,9 @@ void FUN_0016f8a0(bool enable_profiling)
  * range check 0 <= profile < 0x1d, then MOVSX ECX,SI / MOV EAX,[ECX*4 +
  * 0x325188] -- the loaded dword is the return value in EAX.  All four
  * original call sites (0x17f8b3, 0x17f8d2, 0x17fdf1, 0x17fe09, all inside
- * FUN_0017ef00) push exactly one dword and clean up with ADD ESP,4, and each
- * pushes the returned EAX straight into a "|t%s|t%.2f|t%d" style formatting
+ * rasterizer_frame_statistics_update) push exactly one dword and clean up
+ * with ADD ESP,4, and each pushes the returned EAX straight into a
+ * "|t%s|t%.2f|t%d" style formatting
  * call -- so the element type is `const char *`, the profile's name string.
  * (The `push eax` / `sub esp,8` / `fstp qword [esp]` sequence preceding the
  * call at 0x17f8b3 belongs to that outer formatting call, not to this one --

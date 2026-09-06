@@ -15000,7 +15000,18 @@
     },
     "0x17d910": {
       "kind": "function",
-      "status": "ported"
+      "status": "ported",
+      "inferred": [
+       "The three-argument cdecl prototype (render_data, skinning, part) is inferred from the three [EBP+8/0xc/0x10] reads, the assert strings naming 'part' and 'skinning->node_matrix_count', and the sole caller FUN_00123560's already-lifted call site; Ghidra recovered no signature at all (in_stack_00000004/8/c).",
+       "The 0x40-byte record layout (float position[3] at +0x00, short index_list[12] at +0x0c, short vertex_list[12] at +0x24, uchar index_count at +0x3c, uchar vertex_count at +0x3d) is derived from the raw MOV destinations plus the ADD ECX/EBX 0x40 strides and the CMP AL,0xc caps; Ghidra types the cursor undefined2* and halves every offset.",
+       "index_list is short and vertex_list is short compared against an unsigned short vertex index: the index membership test is a plain 16-bit CMP while the vertex test widens both sides (MOVSX word vs MOVZX word), which only happens when the operands differ in signedness.",
+       "The constant at 0x290dd8 (0x38000100) is 1.0f/32767.0f, so [vertex+0x1e] is an int16 node weight normalised to 0..1; 0x2533d0 is the double promotion of 1e-4f, which is why the FABS compare is spelled with fabs() rather than fabsf()."
+      ],
+      "uncertain": [
+       "The local at [EBP-0x2c] used as best_distance is read at 0x17d746 and 0x17d753 but never initialised anywhere in the function; the only write is the update at 0x17d769, so the original reads uninitialised stack on the first iteration and the '== -1.0f' test looks like a sentinel that was never stored. The lift reproduces this rather than initialising it.",
+       "The assert __FILE__ is c:\\\\halo\\\\SOURCE\\\\rasterizer\\\\rasterizer.c, which does not match this function's kb object rasterizer_sprites.obj, so the object membership is probably wrong. Not investigated.",
+       "The residual ~10 percent VC71 gap is clang emitting fucompi/fucomp for every float compare where the reference uses FCOMP plus FNSTSW/TEST AH; this is a fixed codegen difference, not a recoverable structural one."
+      ]
     },
     "0x17da40": {
       "kind": "function",
@@ -18954,6 +18965,41 @@
     "0x5065a4": {
       "kind": "data",
       "status": "ported"
+    },
+    "0x17d080": {
+      "kind": "function",
+      "status": "unknown",
+      "inferred": [
+        "Signature void FUN_0017d080(float *point, float radius, float *color) recovered from disassembly: three [ESI+0/4/8] float reads, a 0.5 multiply on the radius written back into the [EBP+0xc] parameter slot, and EDI landing in both the color0 and color1 slots of the callee FUN_0015a7f0 (kb decl void FUN_0015a7f0(float *p0, float *p1, float *color0, float *color1)).",
+        "Body draws three axis-aligned segments: for each of X, Y and Z it builds a point-minus and a point-plus endpoint offset by radius*0.5, then calls FUN_0015a7f0; the three calls share one combined ADD ESP,0x30."
+      ],
+      "uncertain": [
+        "get_xrefs_to returns nothing for 0x17d080, so the function is unreachable dead code; the auto-lift selector's struct_hard flag is therefore on a function no caller exercises.",
+        "With no call sites there is no evidence for what the three segments represent, so the name stays FUN_0017d080 (behaviour-only, tier T3/T4)."
+      ]
+    },
+    "0x17ed70": {
+      "kind": "function",
+      "status": "unknown",
+      "inferred": [
+        "Body is mov ax,[ebp+8] / cmp ax,[ebp+0xc] / jbe / mov al,1, i.e. return (uint16_t)a > (uint16_t)b with an unsigned compare; return type is char because the sole consumer FUN_00091da0 loads the result into a byte register and branches on != 0.",
+        "Named rasterizer_frame_statistics_sort_index_compare: FUN_00091da0 is an explicit-stack quicksort over 16-bit elements driven by a caller-supplied char (*)(uint16_t, uint16_t) predicate, and the array being sorted is rasterizer_frame_statistics_temp_buffer (T1 assert-expression string) at *(void **)0x47ec40, which holds u16 vertex indices."
+      ],
+      "uncertain": [
+        "The name deliberately omits the comparison polarity: the proven semantics are a > b unsigned, but whether that reads as ascending or descending depends on FUN_00091da0's internal convention, which was inferred rather than proven."
+      ]
+    },
+    "0x17ef00": {
+      "kind": "function",
+      "status": "unknown",
+      "inferred": [
+        "Named rasterizer_frame_statistics_update from T1 format strings in its body: a framerate/min/max pane, a vertices/triangles/primitives pane, a GPU-profile pane driven by a 0x1d-iteration loop over the profile table calling FUN_0016fb80 (name), FUN_0016fbd0 (time, float) and FUN_0016fcf0 (data bytes, int) with a \"|t%s|t%.2f|t%d\" style format, an allocation/memory-usage pane, and \"### ERROR failed to open rasterizer profile log (%s)\" for the d:\\r_prof.txt writer.",
+        "Chose _update over _render/_draw because the function does two separable things: it draws the on-screen panes gated on DAT_003256ba in {1,2,3,4}, and it appends to the d:\\r_prof.txt profile log gated on DAT_00325704; a _render/_draw name would describe only the first.",
+        "void(void) confirmed: the original call site at 0x158f90 (FUN_0017ef00();) pushes nothing and performs no stack cleanup."
+      ],
+      "uncertain": [
+        "kb.json places 0x17ed70, 0x17edd0 and 0x17ef00 in rasterizer_sprites.obj with source rasterizer/rasterizer_sprites.c, but the single __FILE__ string \"c:\\halo\\SOURCE\\rasterizer\\rasterizer_frame_statistics.c\" at 0x2af728 is xref'd from 0x17eb53, 0x17ee17, 0x17ee40 and 0x17ff6e, bracketing all three; the true translation unit is rasterizer_frame_statistics.c, which may cap a future lift's VC71 score."
+      ]
     }
   }
 }

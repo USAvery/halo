@@ -30408,15 +30408,18 @@
     },
     {
      "addr": "0x17cd80",
-     "decl": "void FUN_0017cd80(void);"
+     "decl": "void FUN_0017cd80(void);",
+     "ported": true
     },
     {
      "addr": "0x17cd90",
-     "decl": "void FUN_0017cd90(void);"
+     "decl": "void FUN_0017cd90(void);",
+     "ported": true
     },
     {
      "addr": "0x17cda0",
-     "decl": "void FUN_0017cda0(void);"
+     "decl": "void FUN_0017cda0(void);",
+     "ported": true
     },
     {
      "addr": "0x17cdb0",
@@ -30430,11 +30433,13 @@
     },
     {
      "addr": "0x17cde0",
-     "decl": "void FUN_0017cde0(void);"
+     "decl": "void FUN_0017cde0(void);",
+     "ported": true
     },
     {
      "addr": "0x17cdf0",
-     "decl": "void FUN_0017cdf0(void);"
+     "decl": "void FUN_0017cdf0(void);",
+     "ported": true
     },
     {
      "addr": "0x17ce00",
@@ -30448,11 +30453,13 @@
     },
     {
      "addr": "0x17ce30",
-     "decl": "void FUN_0017ce30(void);"
+     "decl": "void FUN_0017ce30(void);",
+     "ported": true
     },
     {
      "addr": "0x17ce40",
-     "decl": "void FUN_0017ce40(void);"
+     "decl": "void FUN_0017ce40(void);",
+     "ported": true
     },
     {
      "addr": "0x17ce50",
@@ -30461,11 +30468,13 @@
     },
     {
      "addr": "0x17ce60",
-     "decl": "void FUN_0017ce60(void);"
+     "decl": "void FUN_0017ce60(void);",
+     "ported": true
     },
     {
      "addr": "0x17ce70",
-     "decl": "void FUN_0017ce70(void);"
+     "decl": "void FUN_0017ce70(void);",
+     "ported": true
     },
     {
      "addr": "0x17ce80",
@@ -30474,11 +30483,13 @@
     },
     {
      "addr": "0x17ce90",
-     "decl": "void FUN_0017ce90(void);"
+     "decl": "void FUN_0017ce90(void);",
+     "ported": true
     },
     {
      "addr": "0x17cea0",
-     "decl": "void FUN_0017cea0(void);"
+     "decl": "void FUN_0017cea0(void);",
+     "ported": true
     },
     {
      "addr": "0x17ceb0",
@@ -30487,11 +30498,13 @@
     },
     {
      "addr": "0x17cec0",
-     "decl": "void FUN_0017cec0(void);"
+     "decl": "void FUN_0017cec0(void);",
+     "ported": true
     },
     {
      "addr": "0x17ced0",
-     "decl": "void FUN_0017ced0(void);"
+     "decl": "void FUN_0017ced0(void);",
+     "ported": true
     },
     {
      "addr": "0x17cee0",
@@ -30500,7 +30513,8 @@
     },
     {
      "addr": "0x17cef0",
-     "decl": "void FUN_0017cef0(void);"
+     "decl": "void FUN_0017cef0(void);",
+     "ported": true
     },
     {
      "addr": "0x17cf00",
@@ -30519,15 +30533,18 @@
     },
     {
      "addr": "0x17cf30",
-     "decl": "void FUN_0017cf30(void);"
+     "decl": "void FUN_0017cf30(void);",
+     "ported": true
     },
     {
      "addr": "0x17cf40",
-     "decl": "void FUN_0017cf40(void);"
+     "decl": "void FUN_0017cf40(void);",
+     "ported": true
     },
     {
      "addr": "0x17cf50",
-     "decl": "void FUN_0017cf50(void);"
+     "decl": "void FUN_0017cf50(void);",
+     "ported": true
     },
     {
      "addr": "0x17cf60",
@@ -30591,7 +30608,8 @@
     },
     {
      "addr": "0x17d020",
-     "decl": "void FUN_0017d020(void);"
+     "decl": "void FUN_0017d020(void);",
+     "ported": true
     },
     {
      "addr": "0x17d030",
@@ -30605,7 +30623,8 @@
     },
     {
      "addr": "0x17d050",
-     "decl": "void FUN_0017d050(void);"
+     "decl": "void FUN_0017d050(void);",
+     "ported": true
     },
     {
      "addr": "0x17d060",
@@ -30619,7 +30638,8 @@
     },
     {
      "addr": "0x17d080",
-     "decl": "void FUN_0017d080(void);"
+     "decl": "void FUN_0017d080(float *point, float radius, float *color);",
+     "ported": true
     },
     {
      "addr": "0x17d150",
@@ -30633,7 +30653,8 @@
     },
     {
      "addr": "0x17d2b0",
-     "decl": "void rasterizer_debug_model_vertices(void);",
+     "decl": "void rasterizer_debug_model_vertices(int render_data, int *skinning, unsigned char *part);",
+     "ported": true,
      "comment": "[NAME: rasterizer_debug_model_vertices — name_source=cea-pdb method=line_containment tier=confirmed (T2), cea-apply-unified 2026-09-03]"
     },
     {
@@ -30653,11 +30674,13 @@
     },
     {
      "addr": "0x17d980",
-     "decl": "void FUN_0017d980(void);"
+     "decl": "void FUN_0017d980(void);",
+     "ported": true
     },
     {
      "addr": "0x17d990",
-     "decl": "void FUN_0017d990(void);"
+     "decl": "void FUN_0017d990(void);",
+     "ported": true
     },
     {
      "addr": "0x17d9a0",
@@ -30676,7 +30699,8 @@
     },
     {
      "addr": "0x17da40",
-     "decl": "void FUN_0017da40(int16_t param_1, uint16_t param_2, float param_3, float param_4, float param_5);"
+     "decl": "void FUN_0017da40(int16_t param_1, uint16_t param_2, float param_3, float param_4, float param_5);",
+     "ported": true
     },
     {
      "addr": "0x17dab0",
@@ -30730,7 +30754,8 @@
     },
     {
      "addr": "0x17e030",
-     "decl": "void FUN_0017e030(void);"
+     "decl": "void FUN_0017e030(void);",
+     "ported": true
     },
     {
      "addr": "0x17e040",
@@ -30749,11 +30774,13 @@
     },
     {
      "addr": "0x17e5b0",
-     "decl": "void FUN_0017e5b0(float *vert_ws, float *vert_offset, int transform_a, int transform_b);"
+     "decl": "void FUN_0017e5b0(float *p0, float *p1, float *color0, float *color1);",
+     "ported": true
     },
     {
      "addr": "0x17e800",
-     "decl": "void rasterizer_debug_triangle_shaded(float *point0, float *point1, float *point2, void *param_4, void *param_5, void *param_6);",
+     "decl": "void rasterizer_debug_triangle_shaded(float *p0, float *p1, float *p2, float *color0, float *color1, float *color2);",
+     "ported": true,
      "comment": "[NAME: rasterizer_debug_triangle_shaded — CEA PDB line-containment (probable), cea-deferred 2026-09-03]"
     },
     {
@@ -30788,7 +30815,7 @@
     },
     {
      "addr": "0x17ed70",
-     "decl": "void FUN_0017ed70(void);"
+     "decl": "char rasterizer_frame_statistics_sort_index_compare(uint16_t a, uint16_t b);"
     },
     {
      "addr": "0x17ed90",
@@ -30802,7 +30829,7 @@
     },
     {
      "addr": "0x17ef00",
-     "decl": "void FUN_0017ef00(void);"
+     "decl": "void rasterizer_frame_statistics_update(void);"
     }
    ],
    "name": "rasterizer_sprites.obj",

@@ -1122,7 +1122,7 @@ void FUN_00158f90(void)
 
   if (*(short *)0x5a5bc2 == -1) {
     FUN_0017ebb0((void *)0x5a5400);
-    FUN_0017ef00();
+    rasterizer_frame_statistics_update();
   }
 
   if (*(char *)0x476ab8 == 0) {

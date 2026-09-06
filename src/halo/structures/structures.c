@@ -7585,8 +7585,8 @@ void render_debug_fog_planes(void)
         vert_b[2] = fVar1 * *(float *)(iVar2 + 0xc) + pfVar5[2];
         FUN_0017eb10(pfVar4, pfVar5, *(int *)0x2ee6c4);
         FUN_0017eb10(vert_a, vert_b, *(int *)0x2ee6cc);
-        FUN_0017e5b0(pfVar4, vert_a, *(int *)0x2ee6c4, *(int *)0x2ee6cc);
-        FUN_0017e5b0(pfVar5, vert_b, *(int *)0x2ee6c4, *(int *)0x2ee6cc);
+        FUN_0017e5b0(pfVar4, vert_a, *(float **)0x2ee6c4, *(float **)0x2ee6cc);
+        FUN_0017e5b0(pfVar5, vert_b, *(float **)0x2ee6c4, *(float **)0x2ee6cc);
         local_c = *(int *)(iVar2 + 0x14);
         local_8 = local_8 + 1;
         iVar3 = (int)(short)local_8;

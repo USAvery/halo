@@ -19,6 +19,44 @@ void FUN_0017cd70(int arg1, int arg2, int arg3, int arg4, int arg5, int arg6)
   FUN_00163910((void *)arg1, arg2, arg3, arg4, arg5, (void *)arg6);
 }
 
+/* Forwarding thunks 0x17cd80..0x17d050.
+ *
+ * These sit in the 16-byte-spaced table that spans 0x17cd60..0x17d070.  Each
+ * slot in the table holds one of two shapes: the four-instruction
+ * PUSH EBP / MOV EBP,ESP / POP EBP / JMP form already lifted above (0x17cd60,
+ * 0x17cd70, 0x17cdb0, ...), or the bare one-instruction E9 form lifted here.
+ * Every thunk below is the bare form: a lone JMP rel32 occupying the first 5
+ * bytes of its slot, with the remaining 11 bytes NOP (0x90) padding.  There is
+ * no prologue and no frame, so the target runs directly on the caller's frame.
+ *
+ * All nineteen targets are void(void) -- verified by disassembling each target
+ * out of the raw XBE: none reads [EBP+8] or higher, and the lone [ESP+4] in
+ * 0x166400 is a local inside its own SUB ESP,8 frame.  With no arguments to
+ * forward, each lift is a plain call to the target and clang reproduces the
+ * reference's tail transfer rather than emitting CALL/RET.
+ *
+ * None of the thunks carries string or PDB evidence of its own name.  Naming a
+ * thunk after its target would leave two semantic names for one behaviour once
+ * the target itself is named, so the mechanical FUN_ names are kept. */
+
+/* 0x17cd80: bare JMP 0x160970.  Reached by a single CALL at 0x196004. */
+void FUN_0017cd80(void)
+{
+  _rasterizer_hud_end();
+}
+
+/* 0x17cd90: bare JMP 0x160980.  Reached by a single CALL at 0x13a72f. */
+void FUN_0017cd90(void)
+{
+  FUN_00160980();
+}
+
+/* 0x17cda0: bare JMP 0x163c40.  Reached by a single CALL at 0x195c6e. */
+void FUN_0017cda0(void)
+{
+  FUN_00163c40();
+}
+
 /* Forwarding wrapper (0x17cdb0).  The original is four instructions:
  * PUSH EBP / MOV EBP,ESP / POP EBP / JMP 0x163fe0 -- the frame is torn down
  * before the jump, so 0x163fe0 inherits this function's stack arguments and
@@ -40,6 +78,18 @@ void FUN_0017cdb0(void *param_1)
 void FUN_0017cdc0(int arg1, int arg2, int arg3, int arg4, int arg5, int arg6)
 {
   FUN_001640d0((void *)arg1, arg2, arg3, arg4, arg5, (void *)arg6);
+}
+
+/* 0x17cde0: bare JMP 0x1609a0.  Reached by a single CALL at 0x195ca1. */
+void FUN_0017cde0(void)
+{
+  _rasterizer_dynamic_lit_geometry_draw();
+}
+
+/* 0x17cdf0: bare JMP 0x1643e0.  Reached by a single CALL at 0x195cb9. */
+void FUN_0017cdf0(void)
+{
+  FUN_001643e0();
 }
 
 /* Forwarding wrapper (0x17ce00).  The original is four instructions:
@@ -66,6 +116,18 @@ void FUN_0017ce10(int arg1, int arg2, int arg3, int arg4, int arg5, int arg6)
   FUN_001609b0((void *)arg1, arg2, arg3, arg4, arg5, (void *)arg6);
 }
 
+/* 0x17ce30: bare JMP 0x160bc0.  Reached by a single tail JMP at 0x195cec. */
+void FUN_0017ce30(void)
+{
+  FUN_00160bc0();
+}
+
+/* 0x17ce40: bare JMP 0x160bd0.  Reached by a single CALL at 0x195d09. */
+void FUN_0017ce40(void)
+{
+  FUN_00160bd0();
+}
+
 /* Forwarding wrapper (0x17ce50).  The original is four instructions:
  * PUSH EBP / MOV EBP,ESP / POP EBP / JMP 0x164690 -- the frame is torn down
  * before the jump, so 0x164690 inherits this function's stack arguments and
@@ -77,6 +139,18 @@ void FUN_0017ce10(int arg1, int arg2, int arg3, int arg4, int arg5, int arg6)
 void FUN_0017ce50(int arg1, int arg2, int arg3, int arg4, int arg5, int arg6)
 {
   FUN_00164690((void *)arg1, arg2, arg3, arg4, arg5, (void *)arg6);
+}
+
+/* 0x17ce60: bare JMP 0x160be0.  Reached by a single tail JMP at 0x195d36. */
+void FUN_0017ce60(void)
+{
+  FUN_00160be0();
+}
+
+/* 0x17ce70: bare JMP 0x160bf0.  Reached by a single CALL at 0x195d68. */
+void FUN_0017ce70(void)
+{
+  FUN_00160bf0();
 }
 
 /* Forwarding wrapper (0x17ce80).  The original is four instructions:
@@ -95,6 +169,18 @@ void FUN_0017ce80(void *shader, int arg2, int arg3, int arg4, int arg5,
                   void *vertex_buffer)
 {
   FUN_00164cf0(shader, arg2, arg3, arg4, arg5, vertex_buffer);
+}
+
+/* 0x17ce90: bare JMP 0x160c00.  Reached by a single CALL at 0x195d95. */
+void FUN_0017ce90(void)
+{
+  FUN_00160c00();
+}
+
+/* 0x17cea0: bare JMP 0x160c10.  Reached by a single CALL at 0x195de8. */
+void FUN_0017cea0(void)
+{
+  FUN_00160c10();
 }
 
 /* Forwarding wrapper (0x17ceb0).  The original is four instructions:
@@ -119,6 +205,18 @@ void FUN_0017ceb0(void *arg1, int arg2, int arg3, int arg4, int arg5, int arg6,
                (uint32_t *)arg9, arg10, arg11, arg12);
 }
 
+/* 0x17cec0: bare JMP 0x160c20.  Reached by a single CALL at 0x195e15. */
+void FUN_0017cec0(void)
+{
+  FUN_00160c20();
+}
+
+/* 0x17ced0: bare JMP 0x166400.  Reached by a single CALL at 0x195e68. */
+void FUN_0017ced0(void)
+{
+  FUN_00166400();
+}
+
 /* Forwarding wrapper (0x17cee0).  The original is four instructions:
  * PUSH EBP / MOV EBP,ESP / POP EBP / JMP 0x165cb0 -- the frame is torn down
  * before the jump, so 0x165cb0 inherits this function's stack arguments.
@@ -138,6 +236,12 @@ void FUN_0017cee0(void *shader, int arg2, int arg3, int arg4, int arg5,
                   void *vertex_buffer)
 {
   FUN_00165cb0(shader, arg2, arg3, arg4, arg5, vertex_buffer);
+}
+
+/* 0x17cef0: bare JMP 0x165dd0.  Reached by a single CALL at 0x195e95. */
+void FUN_0017cef0(void)
+{
+  FUN_00165dd0();
 }
 
 /* Forwarding wrapper (0x17cf00).  The original is four instructions:
@@ -191,6 +295,24 @@ void FUN_0017cf20(void *shader, int arg2, int arg3, int arg4, int arg5,
                   void *arg6)
 {
   FUN_001677d0(shader, arg2, arg3, arg4, arg5, arg6);
+}
+
+/* 0x17cf30: bare JMP 0x167920.  Reached by a CALL at 0x195ef5 and a tail JMP at 0x195f29. */
+void FUN_0017cf30(void)
+{
+  FUN_00167920();
+}
+
+/* 0x17cf40: bare JMP 0x15f1f0.  Reached by a single CALL at 0xd1426. */
+void FUN_0017cf40(void)
+{
+  FUN_0015f1f0();
+}
+
+/* 0x17cf50: bare JMP 0x15f200.  Reached by a single CALL at 0xd151c. */
+void FUN_0017cf50(void)
+{
+  FUN_0015f200();
 }
 
 /* Forwarding wrapper (0x17cf60).  The original is four instructions:
@@ -458,6 +580,12 @@ void FUN_0017d010(float *position, float radius, float *scale2d, float angle,
   FUN_0017b7d0(position, radius, scale2d, angle, color);
 }
 
+/* 0x17d020: bare JMP 0x17ad90.  Reached by CALLs at 0x1351fd, 0x181bfd and 0x182428. */
+void FUN_0017d020(void)
+{
+  FUN_0017ad90();
+}
+
 /* Forwarding wrapper (0x17d030).  The original is four instructions:
  * PUSH EBP / MOV EBP,ESP / POP EBP / JMP 0x17ba10 -- the frame is torn down
  * before the jump, so 0x17ba10 inherits this function's stack arguments and
@@ -503,6 +631,12 @@ int FUN_0017d030(float *position, float radius, unsigned int index)
 int FUN_0017d040(int index)
 {
   return (int)rasterizer_widget_get_occlusion_test_result((unsigned int)index);
+}
+
+/* 0x17d050: bare JMP 0x16dee0.  Reached by a single tail JMP at 0xdb23e. */
+void FUN_0017d050(void)
+{
+  FUN_0016dee0();
 }
 
 /* Forwarding wrapper (0x17d060).  The original is four instructions:
@@ -560,6 +694,86 @@ void FUN_0017d060(void *param_1, int param_2, float param_3, int param_4,
 void FUN_0017d070(float *position, float param_2)
 {
   FUN_0016e2e0(position, param_2);
+}
+
+/* 0x17d080: draw a three-segment axis cross centred on `point`, each arm
+ * spanning `radius` along one world axis.
+ *
+ * Frame evidence (0x17d080..0x17d143): PUSH EBP / MOV EBP,ESP / SUB ESP,0x18
+ * with PUSH ESI / PUSH EDI after the frame, so the locals are exactly six
+ * floats.  They are addressed as two three-float arrays by the two LEAs that
+ * feed every call site: `LEA EDX,[EBP-0x18]` (segment start) and
+ * `LEA ECX,[EBP-0xc]` (segment end).  ESI holds `point` for the whole body
+ * and EDI holds `color`.
+ *
+ * The half-extent is folded into the incoming parameter slot rather than a
+ * new local: FLD [EBP+0xc] / FMUL [0x253398] / FSTP [EBP+0xc], where the
+ * constant at 0x253398 is 0x3f000000 = 0.5f.  Writing it back to [EBP+0xc]
+ * is why the frame is 0x18 and not 0x1c, so the parameter is mutated here
+ * instead of copied into a local.
+ *
+ * Per-axis store offsets, taken from the raw MOV/FSTP destinations (the
+ * decompiler's field labels are not used):
+ *   axis 0: [EBP-0x18]=FSTP(point[0]-r)  [EBP-0x14]=point[1]
+ * [EBP-0x10]=point[2] [EBP-0xc] =FSTP(r+point[0])  [EBP-0x8] =point[1]
+ * [EBP-0x4] =point[2] axis 1: [EBP-0x18]=point[0] [EBP-0x14]=FSTP(point[1]-r)
+ * [EBP-0x10]=point[2] [EBP-0xc] =point[0] [EBP-0x8] =FSTP(r+point[1]) [EBP-0x4]
+ * =point[2] axis 2: [EBP-0x18]=point[0] [EBP-0x14]=point[1]
+ * [EBP-0x10]=FSTP(point[2]-r) [EBP-0xc] =point[0] [EBP-0x8] =point[1] [EBP-0x4]
+ * =FSTP(r+point[2]) All six components are rewritten before each call even
+ * where the value is unchanged, so the source assigns all six each time.
+ *
+ * x87 operand order is per-site and preserved: the low endpoint is
+ * FLD [ESI+n] / FSUB [EBP+0xc] (point[i] - r) while the high endpoint is
+ * FLD [EBP+0xc] / FADD [ESI+n] (r + point[i]).
+ *
+ * Calls: PUSH EDI / PUSH EDI / PUSH ECX(&end) / PUSH EDX(&start) /
+ * CALL 0x15a7f0, three times, with one combined ADD ESP,0x30 (3*4 cdecl
+ * slots).  Last push is the first C argument, giving
+ * FUN_0015a7f0(start, end, color, color) against the callee decl
+ * `void FUN_0015a7f0(float*, float*, float*, float*)` -- the same
+ * single-colour line call the sibling at 0x17d150 makes.
+ *
+ * kb.json previously declared this `void FUN_0017d080(void)`; the arity and
+ * types above were corrected by an earlier naming-only pass.  The function
+ * has no callers and no code or data xrefs anywhere in the binary, so it is
+ * dead code and no call-site arity contract is disturbed; it also means no
+ * runtime or equivalence oracle is reachable for it.
+ * Names are behaviour-derived only (no string or PDB evidence) and therefore
+ * provisional; the mechanical function name is kept.
+ * Shape note: the reference interleaves the argument pushes and the copy MOVs
+ * into the FLD/FSTP chains.  There is no call between, so that is MSVC
+ * scheduling an x87 chain against the pushes, not a side-effect order. */
+void FUN_0017d080(float *point, float radius, float *color)
+{
+  float start[3];
+  float end[3];
+
+  radius = radius * 0.5f;
+
+  start[0] = point[0] - radius;
+  start[1] = point[1];
+  start[2] = point[2];
+  end[0] = radius + point[0];
+  end[1] = point[1];
+  end[2] = point[2];
+  FUN_0015a7f0(start, end, color, color);
+
+  start[0] = point[0];
+  start[1] = point[1] - radius;
+  start[2] = point[2];
+  end[0] = point[0];
+  end[1] = radius + point[1];
+  end[2] = point[2];
+  FUN_0015a7f0(start, end, color, color);
+
+  start[0] = point[0];
+  start[1] = point[1];
+  start[2] = point[2] - radius;
+  end[0] = point[0];
+  end[1] = point[1];
+  end[2] = radius + point[2];
+  FUN_0015a7f0(start, end, color, color);
 }
 
 /* 0x17d150: draw a debug line from `point` to `point + scale * direction`.
@@ -685,6 +899,296 @@ void FUN_0017d1a0(bool param_1)
   FUN_0016b180(param_1);
 }
 
+/* 0x17d2b0: dump the skinned vertices of one model part that lie under the
+ * screen-effect reference ray, then draw a debug point per unique position and
+ * a text label on the one nearest the camera.
+ *
+ * Prototype.  Ghidra recovered no signature (the body reads
+ * `in_stack_00000004/8/c`), and kb.json carried a placeholder
+ * `void rasterizer_debug_model_vertices(void)`.  The disassembly reads three
+ * stack dwords and never adjusts ESP on return, so it is a 3-argument cdecl:
+ *   [EBP+0x08] compared against the screen-effect reference handle at
+ *              0x47e4cc (which FUN_0017d1a0 latches from the collision
+ *              result's +0x38), so it is the render-data / geometry handle;
+ *   [EBP+0x0c] the skinning block -- [+0] is the node-matrix array base and
+ *              [+4] is an int16 count, named `skinning->node_matrix_count` by
+ *              the asserts at lines 0x36e/0x36f;
+ *   [EBP+0x10] `part`, named by the assert string at line 0x33e.
+ * The sole caller (units.c, inside FUN_00123560's opaque pass) already passed
+ * three arguments through a raw function-pointer cast; correcting the kb decl
+ * lets that cast go away.
+ *
+ * Frame.  MOV EAX,0x20280 / CALL 0x1d90e0 (_chkstk).  The 0x20280 bytes are
+ * exactly 0x80 of scalars + two 0x100 text buffers (EBP-0x180, EBP-0x280) +
+ * 0x20000 for a 0x800-entry record array at EBP-0x20280.  The array stride is
+ * proven twice: `ADD ECX,0x40` in the search loop and `ADD EBX,0x40` in the
+ * print loop, with `LEA ESI,[EBX-0x3c]` recovering the record base from the
+ * +0x3c cursor.
+ *
+ * Record layout, derived from the raw MOV destinations (the decompiler types
+ * the cursor `undefined2 *`, which halves every printed offset):
+ *   +0x00 float position[3]    MOV [EAX],EDX / [EAX+4] / [EAX+8]
+ *   +0x0c short index_list[12] MOV [ECX-0x18],AX  (cursor is base+0x24)
+ *   +0x24 short vertex_list[12] MOV [ECX],DX
+ *   +0x3c uchar index_count    MOV byte [ECX+0x18],1 / INC byte [ECX+0x3c]
+ *   +0x3d uchar vertex_count   MOV byte [ECX+0x19],1 / INC byte [ECX+0x3d]
+ * The 12-entry cap is the `CMP AL,0xc / JNC` guard on each count, and 12
+ * shorts is exactly the gap to the next field, so both arrays are [12].
+ *
+ * Element signedness is settled by the two membership tests, which differ:
+ *   index_list  MOV BX,[EBP-0x14] / CMP word [ECX+EAX*2+0xc],BX   16-bit
+ *   vertex_list MOVSX EBX,word [ECX+EAX*2+0x24] / MOVZX EAX,word [EBP-0x10]
+ * A 16-bit compare means both sides are `short`; the widened compare means the
+ * operands differ in signedness, so vertex_list is `short` while the loop's
+ * vertex index is `unsigned short` (it comes from MOVZX of the index buffer).
+ *
+ * Per-vertex decode (vertex stride 0x20 from SHL ESI,0x5):
+ *   +0x00 float position[3]  (passed straight to matrix_transform_point)
+ *   +0x0c uint32 packed normal, handed to FUN_0017ffc0
+ *   +0x1c int8  node index 0, +0x1d int8 node index 1 -- both MOVSX then
+ *         divided by 3 via the 0x55555556 magic multiply with the
+ *         SHR 0x1f / ADD sign fixup, i.e. a signed /3
+ *   +0x1e int16 node weight, FILD'd and scaled by the constant at 0x290dd8 =
+ *         0x38000100 = 1.0f/32767.0f
+ * FUN_0017ffc0 writes exactly three dwords through its first argument and
+ * returns that same pointer (MOV EAX,[EBP+8] / MOV ECX,EAX, EAX untouched
+ * afterwards), so the scratch buffer is a float[3] and the copy that follows
+ * reads back through the returned pointer.
+ *
+ * Constants: 0x2533c0 = 0.0f, 0x2533c8 = 1.0f, 0x255e94 = -1.0f,
+ * 0x2533d0 = the double 0x3f1a36e2e0000000, which is the double promotion of
+ * the float 1e-4f -- the FABS before it is why the compare is `double`
+ * (fabs() returns double, so both sides promote).
+ *
+ * Branch senses, from FNSTSW/TEST rather than the decompiler:
+ *   TEST AH,0x44 / JP   -> "not equal"  (C3|C2, even parity == neither set)
+ *   TEST AH,0x05 / JNP  -> "less"       (C0|C2, odd parity == C0 set)
+ *   TEST AH,0x41 / JNP  -> "less or equal" for the 0x370 assert's upper bound
+ * The best-candidate test at 0x17d73f..0x17d761 is therefore
+ *   (dot < 0.0f && best_distance < distance) || best_distance == -1.0f
+ * with the two arms falling into a shared update block.
+ *
+ * Uncertain / faithful oddity: [EBP-0x2c] (`best_distance`) is read at
+ * 0x17d746 and 0x17d753 but never initialised anywhere in the original --
+ * the only write is the update at 0x17d769.  The `== -1.0f` test reads like
+ * an intended "no candidate yet" sentinel that was never stored, so the
+ * original reads uninitialised stack on the first iteration.  That read is
+ * C UB and toolchain-dependent (cl.exe leaves stack garbage; this build's
+ * clang happens to zero it via FLDZ), so `best_distance` is explicitly
+ * initialised to 0.0f below rather than left to compiler whim -- the
+ * sentinel comparison and control flow are otherwise unchanged.
+ *
+ * x87 association is taken from the stack discipline, not rewritten into a
+ * "natural" x,y,z order: the delta is left in ST0..ST2 as (dz,dy,dx) after the
+ * three FSUBs, and every following sum consumes ST0 first, giving
+ * (dz*dz + dy*dy) + dx*dx for the magnitude and the same z,y,x order for both
+ * dot products.
+ *
+ * The ',' / ' ' separator is the branchless MSVC two-constant select
+ * SETNZ DL / DEC EDX / AND EDX,0xfffffff4 / ADD EDX,0x2c: 0x2c when the index
+ * is not the last, 0x20 when it is.
+ *
+ * Object-membership note: the assert __FILE__ here is
+ * c:\halo\SOURCE\rasterizer\rasterizer.c, not a sprites TU, so this function's
+ * kb object (rasterizer_sprites.obj) does not match its original translation
+ * unit.  Flagged only; not investigated. */
+typedef struct rasterizer_debug_vertex_record {
+  float position[3]; /* +0x00 */
+  short index_list[12]; /* +0x0c */
+  short vertex_list[12]; /* +0x24 */
+  unsigned char index_count; /* +0x3c */
+  unsigned char vertex_count; /* +0x3d */
+  char pad_3e[2]; /* +0x3e */
+} rasterizer_debug_vertex_record;
+
+void rasterizer_debug_model_vertices(int render_data, int *skinning,
+                                     unsigned char *part)
+{
+  float node_weight0;
+  float node_weight1;
+  int point_count;
+  unsigned short vertex_index;
+  float distance;
+  short strip_index;
+  float point[3];
+  int best_index;
+  float best_distance;
+  float point1[3];
+  float normal1[3];
+  float normal0[3];
+  float point0[3];
+  float normal[3];
+  float vertex_normal[3];
+  float decompressed[3];
+  char index_text[256];
+  char vertex_text[256];
+  rasterizer_debug_vertex_record points[0x800];
+  unsigned char *vertex;
+  float *unpacked;
+  short node_index0;
+  short node_index1;
+  short k;
+  int j;
+  float dx;
+  float dy;
+  float dz;
+  float magnitude;
+
+  assert_halt_msg_at("part", "c:\\halo\\SOURCE\\rasterizer\\rasterizer.c",
+                     0x33e, part != NULL);
+
+  if (*(char *)0x3256bf != 0 && render_data == *(int *)0x47e4cc) {
+    point_count = 0;
+    best_index = -1;
+    best_distance = 0.0f;
+    assert_halt_msg_at(
+      "part->triangle_buffer.type==_triangle_buffer_type_precompiled_strip",
+      "c:\\halo\\SOURCE\\rasterizer\\rasterizer.c", 0x359,
+      *(short *)(part + 0x44) == 1);
+
+    for (strip_index = 0; strip_index < *(int *)(part + 0x48) + 2;
+         strip_index++) {
+      vertex_index = ((unsigned short *)*(void **)(part + 0x3c))[strip_index];
+      vertex = *(unsigned char **)(part + 0x30) + vertex_index * 0x20;
+      node_index0 = (short)(*(signed char *)(vertex + 0x1c) / 3);
+      node_weight0 = *(short *)(vertex + 0x1e) * (1.0f / 32767.0f);
+      node_weight1 = 1.0f - node_weight0;
+      node_index1 = (short)(*(signed char *)(vertex + 0x1d) / 3);
+
+      point0[0] = 0.0f;
+      point0[1] = 0.0f;
+      point0[2] = 0.0f;
+      normal0[0] = 0.0f;
+      normal0[1] = 0.0f;
+      normal0[2] = 0.0f;
+      point1[0] = 0.0f;
+      point1[1] = 0.0f;
+      point1[2] = 0.0f;
+      normal1[0] = 0.0f;
+      normal1[1] = 0.0f;
+      normal1[2] = 0.0f;
+
+      unpacked = FUN_0017ffc0(decompressed, *(unsigned int *)(vertex + 0xc));
+      vertex_normal[0] = unpacked[0];
+      vertex_normal[1] = unpacked[1];
+      vertex_normal[2] = unpacked[2];
+
+      assert_halt_msg_at("node_index0<skinning->node_matrix_count",
+                         "c:\\halo\\SOURCE\\rasterizer\\rasterizer.c", 0x36e,
+                         node_index0 < *(short *)((char *)skinning + 4));
+      assert_halt_msg_at("node_index1<skinning->node_matrix_count",
+                         "c:\\halo\\SOURCE\\rasterizer\\rasterizer.c", 0x36f,
+                         node_index1 < *(short *)((char *)skinning + 4));
+      assert_halt_msg_at("node_weight0>=0.0f && node_weight0<=1.0f",
+                         "c:\\halo\\SOURCE\\rasterizer\\rasterizer.c", 0x370,
+                         node_weight0 >= 0.0f && node_weight0 <= 1.0f);
+
+      if (node_index0 >= 0) {
+        matrix_transform_point((float *)(*skinning + node_index0 * 0x34),
+                               (float *)vertex, point0);
+        matrix_scale_transform_vector((float *)(*skinning + node_index0 * 0x34),
+                                      vertex_normal, normal0);
+      }
+      if (node_index1 >= 0) {
+        matrix_transform_point((float *)(*skinning + node_index1 * 0x34),
+                               (float *)vertex, point1);
+        matrix_scale_transform_vector((float *)(*skinning + node_index1 * 0x34),
+                                      vertex_normal, normal1);
+      }
+
+      point[0] = point1[0] * node_weight1 + point0[0] * node_weight0;
+      point[1] = point1[1] * node_weight1 + point0[1] * node_weight0;
+      point[2] = point1[2] * node_weight1 + point0[2] * node_weight0;
+      normal[0] = normal1[0] * node_weight1 + normal0[0] * node_weight0;
+      normal[1] = normal1[1] * node_weight1 + normal0[1] * node_weight0;
+      normal[2] = normal1[2] * node_weight1 + normal0[2] * node_weight0;
+      normalize3d(normal);
+
+      for (j = 0; j < point_count; j++) {
+        if (point[0] == points[j].position[0] &&
+            point[1] == points[j].position[1] &&
+            point[2] == points[j].position[2]) {
+          if (points[j].index_count < 12) {
+            for (k = 0; k < points[j].index_count; k++) {
+              if (points[j].index_list[k] == strip_index) {
+                break;
+              }
+            }
+            if (k == points[j].index_count) {
+              points[j].index_list[points[j].index_count] = strip_index;
+              points[j].index_count++;
+            }
+          }
+          if (points[j].vertex_count < 12) {
+            for (k = 0; k < points[j].vertex_count; k++) {
+              if (points[j].vertex_list[k] == vertex_index) {
+                break;
+              }
+            }
+            if (k == points[j].vertex_count) {
+              points[j].vertex_list[points[j].vertex_count] =
+                (short)vertex_index;
+              points[j].vertex_count++;
+            }
+          }
+          break;
+        }
+      }
+
+      if (j == point_count && point_count < 0x800) {
+        dx = point[0] - *(float *)0x5a5bc8;
+        dy = point[1] - *(float *)0x5a5bcc;
+        dz = point[2] - *(float *)0x5a5bd0;
+        points[point_count].position[0] = point[0];
+        points[point_count].position[1] = point[1];
+        points[point_count].position[2] = point[2];
+        points[point_count].index_list[0] = strip_index;
+        points[point_count].vertex_list[0] = (short)vertex_index;
+        points[point_count].index_count = 1;
+        points[point_count].vertex_count = 1;
+        magnitude = sqrtf(dz * dz + dy * dy + dx * dx);
+        if (fabs(magnitude) >= 1e-4f) {
+          magnitude = 1.0f / magnitude;
+          dx = dx * magnitude;
+          dy = dy * magnitude;
+          dz = dz * magnitude;
+        }
+        distance = *(float *)0x5a5bdc * dz + *(float *)0x5a5bd8 * dy +
+                   *(float *)0x5a5bd4 * dx;
+        if ((normal[2] * dz + normal[1] * dy + normal[0] * dx < 0.0f &&
+             best_distance < distance) ||
+            best_distance == -1.0f) {
+          best_index = j;
+          best_distance = distance;
+        }
+        point_count++;
+      }
+    }
+
+    for (j = 0; j < point_count; j++) {
+      if (j == best_index) {
+        csstrcpy((char *)0x5ab100, "I=");
+        for (k = 0; k < points[j].index_count; k++) {
+          crt_sprintf(index_text, "%d%c", points[j].index_list[k],
+                      k != points[j].index_count - 1 ? ',' : ' ');
+          FUN_0008dc30((char *)0x5ab100, index_text);
+        }
+        FUN_0008dc30((char *)0x5ab100, "\nV=");
+        for (k = 0; k < points[j].vertex_count; k++) {
+          crt_sprintf(vertex_text, "%d%c", points[j].vertex_list[k],
+                      k != points[j].vertex_count - 1 ? ',' : ' ');
+          FUN_0008dc30((char *)0x5ab100, vertex_text);
+        }
+        FUN_00189150(0, points[j].position, 0.03125f, *(void **)0x2ee6d0);
+        FUN_00189cb0(0, points[j].position, (void *)0x5ab100, *(int *)0x2ee6e0);
+      } else {
+        FUN_00189150(0, points[j].position, 0.03125f, *(void **)0x2ee6c4);
+      }
+    }
+  }
+}
+
+
 /* 0x17d8f0.  Ghidra decompiles this as `void` and drops the result, but the
  * original never pops the x87 stack:
  *     0017d8f4: CALL 0x000b5aa0        ; game_time_get()
@@ -756,6 +1260,26 @@ void FUN_0017d950(void)
     *(float *)((char *)globals + 0x6c) = 1.0f;
     *(float *)((char *)globals + 0x70) = 1.0f;
   }
+}
+
+/* 0x17d980: the whole function body is a single RET -- byte C3 at
+ * 0x17d980, bounds 0x17d980..0x17d981, followed by 15 NOP bytes of padding to
+ * the next 16-byte slot.  No prologue, no frame, no callee: this is a
+ * genuinely empty function in the shipped debug build, not a placeholder
+ * for unrecovered logic.  Reached by a single CALL at 0x155070.  Nothing in the binary
+ * names it or shows what it did in a build where it was non-empty. */
+void FUN_0017d980(void)
+{
+}
+
+/* 0x17d990: the whole function body is a single RET -- byte C3 at
+ * 0x17d990, bounds 0x17d990..0x17d991, followed by 15 NOP bytes of padding to
+ * the next 16-byte slot.  No prologue, no frame, no callee: this is a
+ * genuinely empty function in the shipped debug build, not a placeholder
+ * for unrecovered logic.  Reached by a single CALL at 0x155bc2.  Nothing in the binary
+ * names it or shows what it did in a build where it was non-empty. */
+void FUN_0017d990(void)
+{
 }
 
 /* 0x17d9a0: store one float into the cinematic screen-effect globals' float
@@ -858,6 +1382,95 @@ void FUN_0017da00(char param_1)
       *(char *)((char *)globals + 0x39) = 1;
     }
     *(char *)((char *)globals + 0x38) = 1;
+  }
+}
+
+/* 0x17da40: arm a cinematic screen effect -- seed the record at
+ * cinematic_screen_effect_globals with its two ids, clear the running state,
+ * store two float parameters, and stamp the start/end times off the game
+ * clock.  Guarded on the globals pointer being non-null (MOV EAX,[0x47e4d4] /
+ * XOR ECX,ECX / CMP EAX,ECX / JE 0x17da9e, the shared epilogue).
+ *
+ * Signature is caller-confirmed, not just kb-declared.  The single call site
+ * at 0xc36de sets the arguments up as
+ *   SUB ESP,0xc / FLD [EAX+0x10] / FSTP [ESP+0x8]   -> param_5
+ *                 FLD [EAX+0xc]  / FSTP [ESP+0x4]   -> param_4
+ *                 FLD [EAX+0x8]  / FSTP [ESP]       -> param_3
+ *   XOR EDX,EDX / MOV DX,[EAX+0x4] / PUSH EDX       -> param_2 (zero-extended)
+ *   MOVSX EAX,WORD PTR [EAX]       / PUSH EAX       -> param_1 (sign-extended)
+ * so the three trailing slots are genuinely floats reserved by SUB ESP and
+ * filled by FSTP -- the values are FPU results, not the pushed dwords a
+ * decompiler would report.  param_1 is signed (MOVSX) and param_2 unsigned
+ * (XOR/MOV DX), which is what fixes the int16_t / uint16_t split.
+ *
+ * Store-offset table, taken from the raw MOV destinations rather than the
+ * decompiler, because MSVC interleaves them and the order below is the
+ * order the reference emits (it is NOT ascending):
+ *   +0x23  byte   0            (MOV [EAX+0x23],CL  with CL==0)
+ *   +0x24  word   0
+ *   +0x28  dword  0
+ *   +0x2c  dword  0
+ *   +0x30  dword  0
+ *   +0x34  dword  0
+ *   +0x00  word   param_1
+ *   +0x02  word   param_2
+ *   +0x3c  float  param_3
+ *   +0x40  float  param_4
+ *   +0x44  float  start
+ *   +0x48  float  start + param_5
+ * The +0x23 store is a byte and +0x24 a word -- widening either to a dword
+ * would clobber neighbouring state.
+ *
+ * The globals pointer is RELOADED from 0x47e4d4 after the call (MOV EAX,
+ * ds:0x47e4d4 at 0x17da88), not carried in a callee-saved register across it,
+ * so the second half re-reads the macro instead of reusing the local.
+ *
+ * The time stamp is FILD of game_time_get()'s int result spilled to [EBP-4],
+ * multiplied by the .rdata literal at 0x2546a4 = 0x3d088889 = 1/30, i.e. ticks
+ * converted to seconds at the Xbox 30Hz tick rate.  It must stay a multiply by
+ * the reciprocal: dividing by 30.0f would emit FDIV where the reference has
+ * FMUL.  This is a distinct .rdata literal from the TICKS_PER_SECOND global at
+ * 0x253394, so the macro in common.h is deliberately not used here.
+ * FLD ST(0) duplicates the product so +0x44 gets the start time and +0x48 the
+ * same value plus param_5 -- param_5 is therefore a duration in seconds and
+ * +0x48 an end time, though nothing in the binary names either field.
+ *
+ * Explicit unknowns: the meaning of the two id words at +0x00/+0x02, of the
+ * cleared state at +0x23..+0x37, and of the two floats at +0x3c/+0x40.  No
+ * string or PDB evidence names this function, so the FUN_ name is kept.
+ *
+ * Match ceiling: VC71 measures 95.4% (32/33 insns) and the whole gap is one
+ * x87 peephole clang picks differently.  Where the reference duplicates the
+ * product and pops it into the field (FLD ST(0) / FSTP [EAX+0x44]), clang
+ * emits the single store-and-keep FST [EAX+0x44].  Both leave the same
+ * un-narrowed 80-bit product in ST(0) for the following FADD, so the stored
+ * float and the +0x48 sum are bit-identical -- this is an instruction-count
+ * difference only, not a precision or ordering difference, and it is not
+ * worth chasing with the permuter. */
+void FUN_0017da40(int16_t param_1, uint16_t param_2, float param_3,
+                  float param_4, float param_5)
+{
+  void *globals;
+  int now;
+  float start;
+
+  globals = cinematic_screen_effect_globals;
+  if (globals != (void *)0) {
+    *(char *)((char *)globals + 0x23) = 0;
+    *(int16_t *)((char *)globals + 0x24) = 0;
+    *(int *)((char *)globals + 0x28) = 0;
+    *(int *)((char *)globals + 0x2c) = 0;
+    *(int *)((char *)globals + 0x30) = 0;
+    *(int *)((char *)globals + 0x34) = 0;
+    *(int16_t *)globals = param_1;
+    *(uint16_t *)((char *)globals + 0x2) = param_2;
+    *(float *)((char *)globals + 0x3c) = param_3;
+    *(float *)((char *)globals + 0x40) = param_4;
+    now = game_time_get();
+    globals = cinematic_screen_effect_globals;
+    start = (float)now * (1.0f / 30.0f);
+    *(float *)((char *)globals + 0x44) = start;
+    *(float *)((char *)globals + 0x48) = start + param_5;
   }
 }
 
@@ -1497,6 +2110,16 @@ void FUN_0017e010(void)
   *(int *)0x47e4f4 = 0;
 }
 
+/* 0x17e030: the whole function body is a single RET -- byte C3 at
+ * 0x17e030, bounds 0x17e030..0x17e031, followed by 15 NOP bytes of padding to
+ * the next 16-byte slot.  No prologue, no frame, no callee: this is a
+ * genuinely empty function in the shipped debug build, not a placeholder
+ * for unrecovered logic.  Reached by a single CALL at 0x159056.  Nothing in the binary
+ * names it or shows what it did in a build where it was non-empty. */
+void FUN_0017e030(void)
+{
+}
+
 /* Disposes the three debug-geometry buffers (0x17e040).  Guarded by the byte
  * flag at 0x47e4d8: when it is non-zero the three pointers are asserted
  * non-null, freed, and the flag is cleared.
@@ -1815,6 +2438,288 @@ finished:
   *(uint16_t *)0x325652 = 0;
 }
 
+/* 0x17e5b0: append one debug line to the debug-geometry record list.
+ *
+ * The four parameters are string-proven by the assert at line 0xab, whose
+ * .rdata text is "p0 && p1 && color0 && color1" and whose four TEST/JZ pairs
+ * (0017e5d9 EDI=[EBP+8], 0017e5dd EBX=[EBP+0xc], 0017e5e4 ESI=[EBP+0x10],
+ * 0017e5eb EAX=[EBP+0x14]) test the incoming slots in that order.  kb.json
+ * previously declared the trailing pair `int transform_a, int transform_b`;
+ * they are colour pointers, and the decl is corrected here.  The 0x17eb10
+ * wrapper below passes its single third dword to both of them, i.e. a
+ * single-colour line, matching the "colour pushed twice" shape of the other
+ * debug-line helpers in this TU.
+ *
+ * The __FILE__ at 0x2af4b8 is "c:\halo\SOURCE\rasterizer\rasterizer_debug.c"
+ * (lines 0xab..0xae) -- Bungie's TU was rasterizer_debug.c, but kb.json maps
+ * this address into rasterizer_sprites.obj, so the string is copied verbatim
+ * as binary data and the object mapping is left alone, exactly as for
+ * FUN_0017df80 / FUN_0017e040 / FUN_0017e190 above.
+ *
+ * Globals are the same debug_data set FUN_0017e190 documents: 0x47e4d8 the
+ * byte "buffers valid" flag, 0x3256dd the byte rendering-enabled flag,
+ * 0x47e4e4/0x47e4e8 the opaque_lines buffer and its count, 0x47e4ec/0x47e4f0
+ * the non_opaque_primitives buffer and its count.  0x5a5bc8/cc/d0 is the
+ * camera position and 0x5a5bd4/d8/dc the camera forward vector (the same two
+ * triples FUN_0017d1a0 uses).
+ *
+ * Two guards decide the destination list:
+ *   - FLD [colour] / FCOMP [0x2533c0] twice, where 0x2533c0 is 0x00000000 =
+ *     0.0f.  TEST AH,0x41 masks C3|C0, so the first JZ is taken for
+ *     color0[0] > 0 and the second JNZ exits for color1[0] <= 0: the body runs
+ *     when either leading component (the alpha) is positive.
+ *   - CMP dword ptr [ESI],0x3f800000 and the same on color1.  This is an
+ *     INTEGER compare of the float bit pattern for 1.0f, not an FPU compare,
+ *     so it is spelled as a dword compare here; writing `color0[0] == 1.0f`
+ *     emits FLD/FCOMP instead.  Both alphas at 1.0 select the opaque_lines
+ *     list, otherwise the non_opaque_primitives list.
+ *
+ * The record is 0x3c bytes (IMUL EAX,EAX,0x3c), matching the qsort element
+ * size and the ADD EDI,0x3c stride in FUN_0017e190.  Store offsets taken from
+ * the raw MOV/FSTP destinations:
+ *   +0x00/+0x04/+0x08  p0 xyz, copied as three dword MOVs (MSVC copies the
+ *                      12-byte point as integers, not FLD/FSTP)
+ *   +0x0c              FUN_000d1c90(color0) -- the packed colour returned in
+ *                      EAX and stored as a dword (MOV [ESI+0xc],EAX), so it
+ *                      is a uint32_t, not a float
+ *   +0x10/+0x14/+0x18  p1 xyz (written through LEA ECX,[ESI+0x10])
+ *   +0x1c              FUN_000d1c90(color1)
+ *   +0x20..+0x2f       never written here -- the third vertex slot, used only
+ *                      by the triangle entry point
+ *   +0x30              word 2, the int16 vertex count FUN_0017e130 sorts on
+ *                      and FUN_0017e190 MOVSXs (2 vertices = a line)
+ *   +0x34              float sort key
+ *   +0x38              byte flag, the opaque selector, the same byte
+ *                      FUN_0017e130 tests
+ *
+ * The sort key is the dot product of the camera forward vector with
+ * (camera_position - point) for each endpoint, the smaller of the two.  The
+ * reference keeps the first dot product in ST0 across the FCOM and only spills
+ * the second (FSTP [EBP-0x8]), so only one distance has a stack slot; the
+ * min is FCOM [EBP-0x8] / TEST AH,0x41 / FSTP ST0 / FLD [EBP-0x8], i.e.
+ * replace with the second only when the second is strictly smaller.
+ *
+ * Frame: SUB ESP,0x20 with delta1 at EBP-0x20..-0x18, delta0 at
+ * EBP-0x14..-0xc, the spilled second distance at EBP-0x8 and the opaque byte
+ * at EBP-0x1 (EBP-0x4..-0x2 unused).
+ *
+ * Call-site audit note: ADD ESP,0x8 at 0017e799 is the coalesced cleanup for
+ * the two 1-argument FUN_000d1c90 calls, the same artifact class already
+ * documented for FUN_0017e040. */
+void FUN_0017e5b0(float *p0, float *p1, float *color0, float *color1)
+{
+  float delta1[3];
+  float delta0[3];
+  float distance1;
+  char opaque;
+  char *buffer;
+  char *record;
+  int *count;
+  int index;
+  float distance0;
+
+  if (*(char *)0x47e4d8 != 0 && *(char *)0x3256dd != 0) {
+    assert_halt_msg_at("p0 && p1 && color0 && color1",
+                       "c:\\halo\\SOURCE\\rasterizer\\rasterizer_debug.c", 0xab,
+                       p0 != NULL && p1 != NULL && color0 != NULL &&
+                         color1 != NULL);
+    assert_halt_msg_at("debug_data.opaque_triangles",
+                       "c:\\halo\\SOURCE\\rasterizer\\rasterizer_debug.c", 0xac,
+                       *(void **)0x47e4dc != NULL);
+    assert_halt_msg_at("debug_data.opaque_lines",
+                       "c:\\halo\\SOURCE\\rasterizer\\rasterizer_debug.c", 0xad,
+                       *(void **)0x47e4e4 != NULL);
+    assert_halt_msg_at("debug_data.non_opaque_primitives",
+                       "c:\\halo\\SOURCE\\rasterizer\\rasterizer_debug.c", 0xae,
+                       *(void **)0x47e4ec != NULL);
+    if (color0[0] > 0.0f || color1[0] > 0.0f) {
+      if (*(uint32_t *)color0 == 0x3f800000 &&
+          *(uint32_t *)color1 == 0x3f800000) {
+        opaque = 1;
+        count = (int *)0x47e4e8;
+      } else {
+        opaque = 0;
+        count = (int *)0x47e4f0;
+      }
+      index = FUN_0017df10(count);
+      if (index != -1) {
+        buffer = *(char **)0x47e4e4;
+        if (opaque == 0) {
+          buffer = *(char **)0x47e4ec;
+        }
+        record = buffer + index * 0x3c;
+        delta0[0] = *(float *)0x5a5bc8 - p0[0];
+        delta0[1] = *(float *)0x5a5bcc - p0[1];
+        delta0[2] = *(float *)0x5a5bd0 - p0[2];
+        delta1[0] = *(float *)0x5a5bc8 - p1[0];
+        delta1[1] = *(float *)0x5a5bcc - p1[1];
+        delta1[2] = *(float *)0x5a5bd0 - p1[2];
+        *(uint16_t *)(record + 0x30) = 2;
+        *(uint32_t *)(record + 0x00) = ((uint32_t *)p0)[0];
+        *(uint32_t *)(record + 0x04) = ((uint32_t *)p0)[1];
+        *(uint32_t *)(record + 0x08) = ((uint32_t *)p0)[2];
+        *(uint32_t *)(record + 0x10) = ((uint32_t *)p1)[0];
+        *(uint32_t *)(record + 0x14) = ((uint32_t *)p1)[1];
+        *(uint32_t *)(record + 0x18) = ((uint32_t *)p1)[2];
+        *(uint32_t *)(record + 0x0c) = FUN_000d1c90(color0);
+        *(uint32_t *)(record + 0x1c) = FUN_000d1c90(color1);
+        distance0 = *(float *)0x5a5bdc * delta0[2] +
+                    *(float *)0x5a5bd8 * delta0[1] +
+                    *(float *)0x5a5bd4 * delta0[0];
+        distance1 = *(float *)0x5a5bdc * delta1[2] +
+                    *(float *)0x5a5bd8 * delta1[1] +
+                    *(float *)0x5a5bd4 * delta1[0];
+        if (distance1 < distance0) {
+          distance0 = distance1;
+        }
+        *(float *)(record + 0x34) = distance0;
+        *(char *)(record + 0x38) = opaque;
+      }
+    }
+  }
+}
+
+/* 0x17e800: append one debug triangle to the debug-geometry record list.  The
+ * triangle sibling of FUN_0017e5b0 above -- same globals, same 0x3c record,
+ * same guards, one more vertex.
+ *
+ * The six parameters are string-proven by the assert at rasterizer_debug.c
+ * line 0xe5, whose .rdata text is "p0 && p1 && p2 && color0 && color1 &&
+ * color2" and whose six TEST/JZ pairs (0017e829 EDI=[EBP+8], 0017e830
+ * [EBP+0xc], 0017e834 EBX=[EBP+0x10], 0017e83b ESI=[EBP+0x14], 0017e842
+ * [EBP+0x18], 0017e849 [EBP+0x1c]) test the incoming slots in that order.
+ * kb.json declared the trailing three as `void *param_4/5/6`; they are colour
+ * pointers, and the decl is corrected here.  The 0x17eb30 wrapper below passes
+ * one colour into all three, i.e. a flat-shaded triangle.
+ *
+ * Differences from the line variant, all binary-derived:
+ *   - the guard is a three-way `alpha > 0` disjunction (three FLD/FCOMP
+ *     against 0x2533c0 = 0.0f, the first two JZ into the body, the third JNZ
+ *     to the exit);
+ *   - the opaque test is three dword compares against 0x3f800000, again an
+ *     INTEGER compare of the 1.0f bit pattern, not an FPU compare;
+ *   - the opaque list is debug_data.opaque_triangles (buffer 0x47e4dc, count
+ *     0x47e4e0) instead of opaque_lines;
+ *   - the +0x30 vertex count is 3, and the third vertex occupies the
+ *     +0x20..+0x2f slot the line variant leaves untouched.
+ *
+ * Store offsets, from the raw MOV/FSTP destinations:
+ *   +0x00/+0x04/+0x08  p0 xyz (dword MOVs through ECX = ESI)
+ *   +0x0c              FUN_000d1c90(color0), a uint32_t packed colour in EAX
+ *   +0x10/+0x14/+0x18  p1 xyz (through LEA ECX,[ESI+0x10])
+ *   +0x1c              FUN_000d1c90(color1)
+ *   +0x20/+0x24/+0x28  p2 xyz (through LEA ECX,[ESI+0x20])
+ *   +0x2c              FUN_000d1c90(color2)
+ *   +0x30              word 3
+ *   +0x34              float sort key
+ *   +0x38              byte opaque flag
+ *
+ * The sort key is the smallest of the three per-vertex camera depths, and the
+ * reference proves it is written as a nested two-argument min MACRO, not a
+ * running minimum: the inner min(distance1, distance2) is evaluated TWICE.
+ * The first evaluation is FCOM [EBP-0x8] / JNZ / FLD ST0 vs FLD [EBP-0x8] at
+ * 0017ea94..0017eaa3, which leaves the selected value in ST0 while KEEPING
+ * distance1 in ST1; the second is the FCOM [EBP-0x8] at 0017ead2 that re-picks
+ * between that preserved distance1 and distance2 when distance0 lost the outer
+ * comparison.  A running `if (x < best) best = x;` chain would evaluate it
+ * once and would not need the ST1 copy, so the double-evaluated ternary below
+ * is the faithful spelling.
+ *
+ * Frame: SUB ESP,0x30 with delta0 at EBP-0x30..-0x28, delta2 at
+ * EBP-0x24..-0x1c, delta1 at EBP-0x18..-0x10, distance0 spilled with FST (not
+ * FSTP) at EBP-0xc, distance2 at EBP-0x8 and the opaque byte at EBP-0x1;
+ * distance1 never leaves the x87 stack.
+ *
+ * Call-site audit note: ADD ESP,0xc at 0017ea59 is the coalesced cleanup for
+ * the three 1-argument FUN_000d1c90 calls, the same artifact class documented
+ * for FUN_0017e040. */
+void rasterizer_debug_triangle_shaded(float *p0, float *p1, float *p2,
+                                      float *color0, float *color1,
+                                      float *color2)
+{
+  float delta0[3];
+  float delta2[3];
+  float delta1[3];
+  float distance0;
+  float distance1;
+  float distance2;
+  char opaque;
+  char *buffer;
+  char *record;
+  int *count;
+  int index;
+
+  if (*(char *)0x47e4d8 != 0 && *(char *)0x3256dd != 0) {
+    assert_halt_msg_at("p0 && p1 && p2 && color0 && color1 && color2",
+                       "c:\\halo\\SOURCE\\rasterizer\\rasterizer_debug.c", 0xe5,
+                       p0 != NULL && p1 != NULL && p2 != NULL &&
+                         color0 != NULL && color1 != NULL && color2 != NULL);
+    assert_halt_msg_at("debug_data.opaque_triangles",
+                       "c:\\halo\\SOURCE\\rasterizer\\rasterizer_debug.c", 0xe6,
+                       *(void **)0x47e4dc != NULL);
+    assert_halt_msg_at("debug_data.opaque_lines",
+                       "c:\\halo\\SOURCE\\rasterizer\\rasterizer_debug.c", 0xe7,
+                       *(void **)0x47e4e4 != NULL);
+    assert_halt_msg_at("debug_data.non_opaque_primitives",
+                       "c:\\halo\\SOURCE\\rasterizer\\rasterizer_debug.c", 0xe8,
+                       *(void **)0x47e4ec != NULL);
+    if (color0[0] > 0.0f || color1[0] > 0.0f || color2[0] > 0.0f) {
+      if (*(uint32_t *)color0 == 0x3f800000 &&
+          *(uint32_t *)color1 == 0x3f800000 &&
+          *(uint32_t *)color2 == 0x3f800000) {
+        opaque = 1;
+        count = (int *)0x47e4e0;
+      } else {
+        opaque = 0;
+        count = (int *)0x47e4f0;
+      }
+      index = FUN_0017df10(count);
+      if (index != -1) {
+        buffer = *(char **)0x47e4dc;
+        if (opaque == 0) {
+          buffer = *(char **)0x47e4ec;
+        }
+        record = buffer + index * 0x3c;
+        delta0[0] = *(float *)0x5a5bc8 - p0[0];
+        delta0[1] = *(float *)0x5a5bcc - p0[1];
+        delta0[2] = *(float *)0x5a5bd0 - p0[2];
+        delta1[0] = *(float *)0x5a5bc8 - p1[0];
+        delta1[1] = *(float *)0x5a5bcc - p1[1];
+        delta1[2] = *(float *)0x5a5bd0 - p1[2];
+        delta2[0] = *(float *)0x5a5bc8 - p2[0];
+        delta2[1] = *(float *)0x5a5bcc - p2[1];
+        delta2[2] = *(float *)0x5a5bd0 - p2[2];
+        *(uint16_t *)(record + 0x30) = 3;
+        *(uint32_t *)(record + 0x00) = ((uint32_t *)p0)[0];
+        *(uint32_t *)(record + 0x04) = ((uint32_t *)p0)[1];
+        *(uint32_t *)(record + 0x08) = ((uint32_t *)p0)[2];
+        *(uint32_t *)(record + 0x10) = ((uint32_t *)p1)[0];
+        *(uint32_t *)(record + 0x14) = ((uint32_t *)p1)[1];
+        *(uint32_t *)(record + 0x18) = ((uint32_t *)p1)[2];
+        *(uint32_t *)(record + 0x20) = ((uint32_t *)p2)[0];
+        *(uint32_t *)(record + 0x24) = ((uint32_t *)p2)[1];
+        *(uint32_t *)(record + 0x28) = ((uint32_t *)p2)[2];
+        *(uint32_t *)(record + 0x0c) = FUN_000d1c90(color0);
+        *(uint32_t *)(record + 0x1c) = FUN_000d1c90(color1);
+        *(uint32_t *)(record + 0x2c) = FUN_000d1c90(color2);
+        distance1 = *(float *)0x5a5bdc * delta1[2] +
+                    *(float *)0x5a5bd8 * delta1[1] +
+                    *(float *)0x5a5bd4 * delta1[0];
+        distance2 = *(float *)0x5a5bdc * delta2[2] +
+                    *(float *)0x5a5bd8 * delta2[1] +
+                    *(float *)0x5a5bd4 * delta2[0];
+        distance0 = *(float *)0x5a5bdc * delta0[2] +
+                    *(float *)0x5a5bd8 * delta0[1] +
+                    *(float *)0x5a5bd4 * delta0[0];
+        *(float *)(record + 0x34) =
+          distance0 < (distance1 < distance2 ? distance1 : distance2) ?
+            distance0 :
+            (distance1 < distance2 ? distance1 : distance2);
+        *(char *)(record + 0x38) = opaque;
+      }
+    }
+  }
+}
 /* Forwarding wrapper (0x17eb10).  A real frame -- PUSH EBP / MOV EBP,ESP ...
  * CALL 0x17e5b0 / ADD ESP,0x10 / POP EBP / RET -- not a tail call.  The third
  * incoming dword is loaded once (MOV EAX,[EBP+0x10] at 0017eb13) and pushed
@@ -1822,12 +2727,15 @@ finished:
  * [EBP+0x8], so 0x17e5b0 receives it as both of its trailing arguments.  The
  * duplicated argument is binary-proven, not a decompiler artifact.
  *
- * Explicit unknown: the meaning of the duplicated dword.  The callee decl
- * names its trailing pair transform_a/transform_b; nothing here proves what
- * they select. */
+ * The duplicated dword is a colour pointer: the callee's assert at
+ * rasterizer_debug.c line 0xab spells its four parameters
+ * "p0 && p1 && color0 && color1", and it dereferences both trailing slots as
+ * float pointers.  This wrapper's own slot stays `int` because its ten call
+ * sites in render_debug.c / hud.c already pass `(int)color`; the cast is done
+ * here rather than churning those TUs. */
 void FUN_0017eb10(float *vert_a, float *vert_b, int param_3)
 {
-  FUN_0017e5b0(vert_a, vert_b, param_3, param_3);
+  FUN_0017e5b0(vert_a, vert_b, (float *)param_3, (float *)param_3);
 }
 
 /* Forwarding wrapper (0x17eb30).  Full EBP frame, cdecl call, no tail call:
@@ -2129,7 +3037,8 @@ int rasterizer_frame_statistics_count_static_vertices(
       index_count = triangle_count * 3;
       csmemcpy(*(void **)0x47ec40, (void *)((char *)base + a2 * 6),
                triangle_count * 6);
-      FUN_00091da0(*(void **)0x47ec40, index_count, (void *)FUN_0017ed70);
+      FUN_00091da0(*(void **)0x47ec40, index_count,
+                   (void *)rasterizer_frame_statistics_sort_index_compare);
 
       previous = 0xffff;
       {
