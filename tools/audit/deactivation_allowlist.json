@@ -1601,5 +1601,12 @@
     "object": "ai_communication.obj",
     "reason": "pre-existing ported:false with no source_path; the only detected \"impl\" is the raw-address forwarding thunk added in src/halo/unported_thunks.c (build-fix), which behaves identically to the ported:false patch.py fallback (calls the original address either way) -- not a new/active bisection",
     "since": "2026-08-27"
+  },
+  {
+    "addr": "0x10a5e0",
+    "name": "FUN_0010a5e0",
+    "object": "real_math.obj",
+    "reason": "Real Xbox A/B: the ported function reproduces the transparent-geometry constant_color0.red assertion; routing this function to the original survives the same c40 scene.",
+    "since": "2026-09-06"
   }
 ]

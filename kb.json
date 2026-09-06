@@ -21934,7 +21934,7 @@
     {
      "addr": "0x10a5e0",
      "decl": "float FUN_0010a5e0(int16_t function_type, float input);",
-     "ported": true
+     "ported": false
     },
     {
      "addr": "0x10a710",
