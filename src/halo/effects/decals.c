@@ -2598,7 +2598,8 @@ void FUN_0017cc10(int param_1)
 void FUN_0017cc20(int param_1, int param_2, int param_3, int param_4,
                   int param_5, int param_6)
 {
-  FUN_00160f50(param_1, param_2, param_3, param_4, param_5, param_6);
+  FUN_00160f50((void *)param_1, param_2, param_3, param_4, param_5,
+               (void *)param_6);
 }
 
 /* Tail-call thunk to rasterizer_xbox_environment gel-light setup
@@ -2621,7 +2622,8 @@ void FUN_0017cc60(int light_index)
 void FUN_0017cc70(int param_1, int param_2, int param_3, int param_4,
                   int param_5, int param_6)
 {
-  FUN_00162560(param_1, param_2, param_3, param_4, param_5, param_6);
+  FUN_00162560((void *)param_1, param_2, param_3, param_4, param_5,
+               (void *)param_6);
 }
 
 /* Tail-call thunk to rasterizer shadow-pass begin (FUN_00172a30).

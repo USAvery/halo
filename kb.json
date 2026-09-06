@@ -23659,7 +23659,7 @@
     },
     {
      "addr": "0x190a90",
-     "decl": "void shader_environment_texture_animation_evaluate(void);"
+     "decl": "void shader_environment_texture_animation_evaluate(void *shader, void *a2, void *out_a, void *out_b);"
     },
     {
      "addr": "0x190be0",
@@ -45980,7 +45980,8 @@
    "functions": [
     {
      "addr": "0x1609b0",
-     "decl": "void FUN_001609b0(int arg1, int arg2, int arg3, int arg4, int arg5, int arg6);"
+     "decl": "void FUN_001609b0(void *shader, int a2, int vertices_per_primitive, int a4, int triangle_count, void *geometry);",
+     "ported": true
     },
     {
      "addr": "0x160bc0",
@@ -45996,35 +45997,43 @@
     },
     {
      "addr": "0x160bf0",
-     "decl": "void FUN_00160bf0(void);"
+     "decl": "void FUN_00160bf0(void);",
+     "ported": true
     },
     {
      "addr": "0x160c00",
-     "decl": "void FUN_00160c00(void);"
+     "decl": "void FUN_00160c00(void);",
+     "ported": true
     },
     {
      "addr": "0x160c10",
-     "decl": "void FUN_00160c10(void);"
+     "decl": "void FUN_00160c10(void);",
+     "ported": true
     },
     {
      "addr": "0x160c20",
-     "decl": "void FUN_00160c20(void);"
+     "decl": "void FUN_00160c20(void);",
+     "ported": true
     },
     {
      "addr": "0x160c30",
-     "decl": "void FUN_00160c30(void);"
+     "decl": "void FUN_00160c30(void);",
+     "ported": true
     },
     {
      "addr": "0x160dc0",
-     "decl": "void FUN_00160dc0(int param_1);"
+     "decl": "void FUN_00160dc0(int param_1);",
+     "ported": true
     },
     {
      "addr": "0x160f50",
-     "decl": "void FUN_00160f50(int param_1, int param_2, int param_3, int param_4, int param_5, int param_6);"
+     "decl": "void FUN_00160f50(void *shader, int frame_index, int vertices_per_primitive, int a4, int triangle_count, void *vertex_buffer);",
+     "ported": true
     },
     {
      "addr": "0x161f00",
-     "decl": "void FUN_00161f00(void);"
+     "decl": "void FUN_00161f00(void);",
+     "ported": true
     },
     {
      "addr": "0x1621c0",
@@ -46032,11 +46041,13 @@
     },
     {
      "addr": "0x162560",
-     "decl": "void FUN_00162560(int param_1, int param_2, int param_3, int param_4, int param_5, int param_6);"
+     "decl": "void FUN_00162560(void *shader, int frame_index, int vertices_per_primitive, int a4, int triangle_count, void *vertex_buffer);",
+     "ported": true
     },
     {
      "addr": "0x162790",
-     "decl": "void FUN_00162790(void);"
+     "decl": "void FUN_00162790(void);",
+     "ported": true
     },
     {
      "addr": "0x162920",
@@ -46044,51 +46055,62 @@
     },
     {
      "addr": "0x162f90",
-     "decl": "void FUN_00162f90(void);"
+     "decl": "void FUN_00162f90(void);",
+     "ported": true
     },
     {
      "addr": "0x1631d0",
-     "decl": "void FUN_001631d0(void);"
+     "decl": "void FUN_001631d0(int light_index@<eax>);"
     },
     {
      "addr": "0x163590",
-     "decl": "void FUN_00163590(int arg1);"
+     "decl": "void FUN_00163590(int light_index);",
+     "ported": true
     },
     {
      "addr": "0x163910",
-     "decl": "void FUN_00163910(int arg1, int arg2, int arg3, int arg4, int arg5, int arg6);"
+     "decl": "void FUN_00163910(void *shader, int frame_index, int vertices_per_primitive, int a4, int triangle_count, void *vertex_buffer);",
+     "ported": true
     },
     {
      "addr": "0x163c40",
-     "decl": "void FUN_00163c40(void);"
+     "decl": "void FUN_00163c40(void);",
+     "ported": true
     },
     {
      "addr": "0x163fe0",
-     "decl": "void FUN_00163fe0(void *param_1);"
+     "decl": "void FUN_00163fe0(void *bitmap_data);",
+     "ported": true
     },
     {
      "addr": "0x1640d0",
-     "decl": "void FUN_001640d0(int arg1, int arg2, int arg3, int arg4, int arg5, int arg6);"
+     "decl": "void FUN_001640d0(void *shader, int frame_index, int vertices_per_primitive, int a4, int triangle_count, void *geometry);",
+     "ported": true
     },
     {
      "addr": "0x1643e0",
-     "decl": "void FUN_001643e0(void);"
+     "decl": "void FUN_001643e0(void);",
+     "ported": true
     },
     {
      "addr": "0x164590",
-     "decl": "void FUN_00164590(int arg1);"
+     "decl": "void FUN_00164590(void *bitmap_data);",
+     "ported": true
     },
     {
      "addr": "0x164690",
-     "decl": "void FUN_00164690(int arg1, int arg2, int arg3, int arg4, int arg5, int arg6);"
+     "decl": "void FUN_00164690(void *shader, int frame_index, int vertices_per_primitive, int a4, int triangle_count, void *vertex_buffer);",
+     "ported": true
     },
     {
      "addr": "0x164cf0",
-     "decl": "void FUN_00164cf0(void *shader, int arg2, int arg3, int arg4, int arg5, void *vertex_buffer);"
+     "decl": "void FUN_00164cf0(void *shader, int frame_index, int vertices_per_primitive, int a4, int triangle_count, void *vertex_buffer);",
+     "ported": true
     },
     {
      "addr": "0x165420",
-     "decl": "void FUN_00165420(void *arg1, int arg2, int arg3, int arg4, int arg5, int arg6, int arg7, void *arg8, int arg9, int arg10, int arg11, int arg12);"
+     "decl": "void FUN_00165420(void *shader, int16_t a2, int a3, int vertices_per_primitive, int a5, int triangle_count, int a7, float *centroid, uint32_t *colors, int a10, int geometry_data, int geometry_flags);",
+     "ported": true
     }
    ]
   },

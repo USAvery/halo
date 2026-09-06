@@ -9065,8 +9065,7 @@
   "0x162790": "void FUN_00162790(void);",
   "0x162920": "void FUN_00162920(int param_1, int param_2, int param_3, int param_4, int param_5, int param_6);",
   "0x162f90": "void FUN_00162f90(void);",
-  "0x1631d0": "void FUN_001631d0(void);",
-  "0x163590": "void FUN_00163590(int arg1);",
+  "0x163590": "void FUN_00163590(int light_index);",
   "0x163910": "void FUN_00163910(void);",
   "0x163c40": "void FUN_00163c40(void);",
   "0x163fe0": "void FUN_00163fe0(void);",
@@ -9990,8 +9989,8 @@
     "0x002258a4": "int __stdcall send(void *xnet@<ecx>, unsigned int socket, const char *buf, int len, int flags);",
     "0x2f5f0": "bool FUN_0002f5f0(int actor_handle /*@<eax> */, int object_handle /*@<edi> */, float param_3, float param_4, char param_5, char param_6);",
     "0x30e60": "short FUN_00030e60(void *records /*@<eax> */, int key /*@<edi> */, int param_1, short *p_count, short max_count);",
-    "0x430d0": "short ai_communication_consider_speech(int *sound_definition_index_reference @<eax>, short *vocalization_type @<ecx>, short priority @<dx>, int unit_handle, short param_5, short param_6, char param_7, char param_8, float *weight, char *failure_reason);",
     "0x125ce0": "void FUN_00125ce0(void *message_packet@<edi>, void *param_1);",
-    "0x57330": "short FUN_00057330(int16_t scenario_index@<eax>, void *record@<esi>, int field_1a8_val, int child_handle, int reserved);"
+    "0x57330": "short FUN_00057330(int16_t scenario_index@<eax>, void *record@<esi>, int field_1a8_val, int child_handle, int reserved);",
+    "0x1631d0": "void FUN_001631d0(int light_index@<eax>);"
   }
 }
