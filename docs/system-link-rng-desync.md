@@ -1633,3 +1633,108 @@ rather than from a PE export:
 symbol names by the same amount, which is harmless for a baseline capture
 because almost every caller is in `xbe` space.  The host ring stays at
 0x7ff900 and needs only `--pe`.
+
+### The paired rate, which is the number that matters
+
+Per-unit tables understate this.  The right comparison is the non-1.0 cosine
+rate inside one game, client against host:
+
+    run                        client non-1.0        host non-1.0
+    ported   cos_c / cos_h     0/512    0.00%        162/748   21.66%
+    baseline ctrl_c / ctrl_h   30/2136  1.40%        54/3520    1.53%
+
+The baseline pair agrees to 0.13 percentage points.  The ported pair differs by
+21.7 points.  The absolute rate differs between the two games only because the
+players moved differently, so only the within-pair agreement is meaningful.
+
+Zero out of 512 against an expected 21.66% is not a sampling accident.  Our
+ported client does not produce a non-1.0 turn cosine in an MP client role.
+
+### Our build turns correctly in SOLO
+
+`solo_facing.json` carries kinds 28/29/30 from the ported build.  For four AI
+units, `unit+0x1b4` bit 0 is set on every sample and `unit+0x1d4` differs from
+`unit+0x24`:
+
+    0xe52c00ce  n=297  differ 295  equal 2   bit0=1 always
+    0xe52f00d1  n=297  differ 293  equal 4   bit0=1 always
+    0xe53200d4  n=297  differ 294  equal 3   bit0=1 always
+    0xe53500d7  n=297  differ 294  equal 3   bit0=1 always
+    0xe45c01ed  n=296  differ   0  equal 296 bit0=1 always
+    0xe45001e1  n=295  differ   0  equal 295 bit0=1 always
+
+So the static arm is not firing, and our facing pipeline works outside a network
+client role.  The defect is specific to the MP client path.
+
+### `unit_update`'s two arms are a faithful lift, so they are not the defect
+
+Disassembly of 0x1b3690, against `units.c` `FUN_001b3690`:
+
+    1b3741  mov  eax, [ebx+0x1b4]
+    1b3747  test eax, 0x2000000      -> running-blind arm  (matches our C)
+    1b374c  je   0x1b37b1
+    1b37b1  test al, 1               -> static arm when bit 0 is CLEAR
+    1b37b3  jne  0x1b3820
+    1b37ea  lea  ecx, [ebx+0x1d4]    -> writes desired facing from +0x24
+
+Our `else if ((unit[0x6d] & 1) == 0)` reproduces `test al,1 / jne`.  Combined
+with the solo measurement (bit 0 set on every sample), the static arm is not the
+writer that pins the cosine.
+
+Remaining writer of `unit+0x1d4` on a client: `unit_set_control`, which copies
+control data `cd+0x1c` into the unit.  That is the next target.
+
+## The divergence is ONE unit, and three units match bit-for-bit
+
+Raw cosine bits from the paired capture, same map instance:
+
+    unit         cos_h (pristine host)          cos_c (our client)
+    0xe2710002   0x3f7fffff x212                0x3f7fffff x128
+    0xe2740005   0x3f800000 x212                0x3f800000 x128
+    0xe27a000b   0x3f800000 x162                0x3f800000 x128
+    0xe2770008   0x3f6ca109 x144 + 17 others    0x3f800000 x128
+
+Three units agree to the bit, including the one-ULP value 0x3f7fffff.  Our
+cosine arithmetic is therefore exact.  Only `0xe2770008` diverges: the host
+holds 0.924332, a steady 22.4 degree offset between desired facing and body
+forward, while our client holds exactly 1.0.
+
+The earlier "our client pins every cosine at 1.0" framing was too broad.  Three
+of the four units are at 1.0 on BOTH machines because those bipeds are not
+turning.  The finding is one unit, not four.
+
+### Restricting the host to the client's tick window confirms it
+
+Both segments belong to one map instance, so ticks are comparable.  Host ticks
+0..129 against the client's full 130 ticks, `probe:anim_update_in` state[0]:
+
+    unit         host ticks 0..129        client ticks 0..129
+    0xe2710002   0xa8 x128, 0xaa x1       0xa8 x128, 0xaa x1
+    0xe2740005   0xa8 x128, 0xaa x1       0xa8 x128, 0xaa x1
+    0xe27a000b   0xa8 x128, 0xaa x1       0xa8 x128, 0xaa x1
+    0xe2770008   0xa8 x113, 0xbd x15,     0xa8 x128, 0xaa x1
+                 0xaa x1
+
+Same tick range, same unit, same three controls.  The host plays animation 0xbd
+on unit 8 for 15 ticks.  Our client never leaves 0xa8.
+
+The fork gates are identical on both machines for all four units (`+0x42a` mode
+0, `+0x257` = 2, bits 16 and 17 clear), so the fork takes the same path.  The
+difference enters upstream: on our client `unit+0x1d4` never differs from
+`unit+0x24` for unit 8, so no turn is requested and animation 0xbd never starts.
+
+### Leading hypothesis
+
+During that window the player at unit 8 was turning.  The four handles are
+object indices 2, 5, 8 and 11.  If that player sat at the host console, then our
+client is failing to apply a REMOTE player's facing.  That points at the code
+that fills `action_buf` for remote players in `players_update_before_game`
+(`player_control_get_current_actions`, then `player_build_action_update`), not
+at `unit_set_control`, which copies `cd+0x1c` into `unit+0x1d4` faithfully.
+
+`unit_set_actively_controlled` (0x1adf10) was checked against disassembly and is
+a faithful lift, so it is not the source of a cleared bit 0.
+
+Next measurement: a `--rng-trace` build with the existing kind 28/29/30 probes
+at the fork call site in `units.c`, which report `unit+0x1d4`, `unit+0x24` and
+`unit+0x1b4` directly for every unit each tick.
