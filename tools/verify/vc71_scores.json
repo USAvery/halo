@@ -70183,6 +70183,21 @@
       "score": 90.2,
       "source": "src/halo/networking/network_client_manager.c"
     },
+    "network_game_client_add_player": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 86.1,
+      "addr": "0x1258a0",
+      "end": "0x125a74",
+      "kind": "auto",
+      "n_r": 173,
+      "opnd_percent": 76.9,
+      "raw_mnemonic_pct": 86.1,
+      "ref": "synth",
+      "ref_sha": "c690a9b70cdbf9d4",
+      "score": 86.1,
+      "source": "src/halo/networking/network_client_manager.c"
+    },
     "network_game_client_add_player_to_game": {
       "abi_model": "raw",
       "abi_model_items": 0,
@@ -70528,6 +70543,21 @@
       "score": 100.0,
       "source": "src/halo/networking/network_client_manager.c"
     },
+    "network_game_client_leave_game": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 94.0,
+      "addr": "0x126140",
+      "end": "0x126387",
+      "kind": "auto",
+      "n_r": 175,
+      "opnd_percent": 78.6,
+      "raw_mnemonic_pct": 94.0,
+      "ref": "synth",
+      "ref_sha": "e9debe8e2befa0bc",
+      "score": 94.0,
+      "source": "src/halo/networking/network_client_manager.c"
+    },
     "network_game_client_local_player_quit": {
       "abi_model": "raw",
       "abi_model_items": 0,
@@ -70591,17 +70621,17 @@
     "network_game_client_request_remove_player": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 4.3,
+      "abi_modeled_mnemonic_pct": 91.4,
       "addr": "0x1263a0",
       "end": "0x126574",
       "kind": "auto",
       "n_r": 181,
-      "opnd_percent": 3.2,
-      "raw_mnemonic_pct": 4.3,
+      "opnd_percent": 85.9,
+      "raw_mnemonic_pct": 91.4,
       "ref": "synth",
       "ref_sha": "3147fbd7da9be799",
-      "score": 4.3,
-      "source": "src/halo/unported_thunks.c"
+      "score": 91.4,
+      "source": "src/halo/networking/network_client_manager.c"
     },
     "network_game_client_request_start_time_change": {
       "abi_model": "raw",

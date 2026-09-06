@@ -1782,6 +1782,274 @@ char network_game_client_request_remove_player(void *client, void *record)
                                   (unsigned short)(*packet >> 4), 0, true);
 }
 
+/* network_game_client_leave_game (0x126140)
+ *
+ * Tears the local client out of whatever network game it is in and returns
+ * whether the connection teardown succeeded.
+ *
+ * Asserts "client && client->connection" (line 0x179), logs "leaving network
+ * game", then dispatches on the unsigned int16 client state at +0xca6
+ * (MOVZX EAX,word[ESI+0xca6] / CMP EAX,4 / JA default / JMP [EAX*4+0x126388]):
+ *   0 (none)     - asserts the connection is NOT connected (line 0x180).
+ *   1 (joining)  - terminates the pending transport server handle at +0x830
+ *                  (and clears it), then disconnects.
+ *   2 (pregame)  - sends a message_client_graceful_game_exit_pregame
+ *                  (message type 0x12), then disconnects.
+ *   3 (ingame)   - disconnects.
+ *   4 (postgame) - sends a message_client_graceful_game_exit_postgame
+ *                  (message type 0x22), then disconnects.
+ *   default      - logs "client is in an unknown state".
+ * Every path converges on network_game_invalidate(client+0x85c) and resets the
+ * state field at +0xca6 to 0.
+ *
+ * Evidence / decompiler corrections (0x126140-0x126386):
+ *  - Ghidra types this `void __cdecl FUN_00126140(void)` with an
+ *    `in_stack_00000004`. The frame really does take one stack parameter
+ *    (MOV ESI,[EBP+8] at 0x126145) and really does return a value
+ *    (MOV AL,BL at 0x126382), so the signature is
+ *    `bool network_game_client_leave_game(void *client)`. BL is preloaded
+ *    with 1 at 0x1214d and is only overwritten by the disconnect result
+ *    (MOV BL,AL after each 0x129980 call), so every early exit — case 0, the
+ *    not-connected exits, and the unknown-state default — returns true.
+ *  - The parameter slot [EBP+8] is REUSED as the 4-byte message payload for
+ *    the two graceful-exit messages (MOV [EBP+8],EDI zeroes it at 0x126233 /
+ *    0x1262f0, then LEA ECX,[EBP+8] passes its address). The real client
+ *    pointer lives in ESI for the whole function, which is why the code below
+ *    saves it into client_ptr before clobbering the parameter.
+ *  - The message length argument is computed in 16 bits (XOR ECX,ECX /
+ *    MOV CX,word[EAX] / SHR CX,4), i.e. an unsigned 16-bit header field
+ *    shifted right by 4, not a 32-bit shift.
+ *  - The pregame case tail-merges its two failure logs into one call site
+ *    (LAB_00126287); the postgame case does not. Both are written here as
+ *    plain calls — same calls, same order, same strings.
+ *  - No struct is recovered for the client record, so the accesses at +0x82c
+ *    (connection handle), +0x830 (transport server handle), +0x85c (embedded
+ *    network game) and +0xca6 (state) stay raw offset casts. */
+bool network_game_client_leave_game(void *client)
+{
+  void *client_ptr;
+  unsigned short *message;
+  bool disconnected;
+  const char *failure_message;
+
+  disconnected = true;
+  client_ptr = client;
+  if (client_ptr == NULL || *(int *)((char *)client_ptr + 0x82c) == 0) {
+    display_assert("client && client->connection",
+                   "c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+                   0x179, true);
+    system_exit(-1);
+  }
+  network_game_log("leaving network game");
+  switch (*(uint16_t *)((char *)client_ptr + 0xca6)) {
+  case 0:
+    if (network_connection_connected(*(int *)((char *)client_ptr + 0x82c))) {
+      display_assert("!network_connection_connected(client->connection)",
+                     "c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+                     0x180, true);
+      system_exit(-1);
+    }
+    goto invalidate;
+
+  case 1:
+    if (*(int **)((char *)client_ptr + 0x830) != NULL) {
+      transport_server_terminate(*(int **)((char *)client_ptr + 0x830));
+      *(int *)((char *)client_ptr + 0x830) = 0;
+    }
+    if (!network_connection_connected(*(int *)((char *)client_ptr + 0x82c))) {
+      goto invalidate;
+    }
+    disconnected = FUN_00129980(*(int *)((char *)client_ptr + 0x82c));
+    if (disconnected) {
+      goto invalidate;
+    }
+    failure_message = "network_connection_disconnect() failed "
+                      "_network_game_client_state_joining";
+    break;
+
+  case 2:
+    client = NULL;
+    if (!network_connection_connected(*(int *)((char *)client_ptr + 0x82c))) {
+      goto invalidate;
+    }
+    message = (unsigned short *)encode_network_game_message(0x12, &client, 4);
+    if (message == NULL) {
+      network_game_log(
+        "failed to create a message_client_graceful_game_exit_pregame message");
+    } else if (!network_connection_write(
+                 *(void **)((char *)client_ptr + 0x82c), message,
+                 (unsigned short)(*message >> 4), 0, true)) {
+      network_game_log("network_game_client_write() failed while sending a "
+                       "message_client_graceful_game_exit_pregame message");
+    }
+    disconnected = FUN_00129980(*(int *)((char *)client_ptr + 0x82c));
+    if (disconnected) {
+      goto invalidate;
+    }
+    failure_message = "network_connection_disconnect() failed "
+                      "_network_game_client_state_pregame";
+    break;
+
+  case 3:
+    if (!network_connection_connected(*(int *)((char *)client_ptr + 0x82c))) {
+      goto invalidate;
+    }
+    disconnected = FUN_00129980(*(int *)((char *)client_ptr + 0x82c));
+    if (disconnected) {
+      goto invalidate;
+    }
+    failure_message = "network_connection_disconnect() failed "
+                      "_network_game_client_state_ingame";
+    break;
+
+  case 4:
+    client = NULL;
+    if (!network_connection_connected(*(int *)((char *)client_ptr + 0x82c))) {
+      goto invalidate;
+    }
+    message = (unsigned short *)encode_network_game_message(0x22, &client, 4);
+    if (message != NULL && !network_connection_write(
+                             *(void **)((char *)client_ptr + 0x82c), message,
+                             (unsigned short)(*message >> 4), 0, true)) {
+      network_game_log("network_game_client_write() failed while sending a "
+                       "message_client_graceful_game_exit_postgame message");
+    }
+    disconnected = FUN_00129980(*(int *)((char *)client_ptr + 0x82c));
+    if (disconnected) {
+      goto invalidate;
+    }
+    failure_message = "network_connection_disconnect() failed "
+                      "_network_game_client_state_postgame";
+    break;
+
+  default:
+    failure_message = "client is in an unknown state";
+    break;
+  }
+  network_game_log(failure_message);
+
+invalidate:
+  network_game_invalidate((char *)client_ptr + 0x85c);
+  *(int16_t *)((char *)client_ptr + 0xca6) = 0;
+  return disconnected;
+}
+
+/* network_game_client_request_remove_player (0x1263a0)
+ *
+ * Asks the server to remove one of this machine's local players. Asserts
+ * "client && network_player_is_valid(player)" (line 0x208), then asserts that
+ * the record's machine index byte at +0x1c equals this client's own machine
+ * index (line 0x209) — the byte at client + client->local_machine_index * 0x44
+ * + 0x9b0 (MOVZX EAX,word[ESI] / IMUL EAX,EAX,0x44 / MOV CL,[EAX+ESI+0x9b0]).
+ * Logs the request, then dispatches on the unsigned int16 client state at
+ * +0xca6 (MOVZX EAX,word[ESI+0xca6] / CMP EAX,4 / JA default /
+ * JMP [EAX*4+0x126574]):
+ *   0,1 (none/joining) - logs and returns false.
+ *   2 (pregame)        - message type 0x0e.
+ *   3 (ingame)         - message type 0x1b.
+ *   4 (postgame)       - message type 0x20, with its own write-failure log.
+ *   default            - logs "client is in an unknown state", returns true.
+ *
+ * Evidence / decompiler corrections (0x1263a0-0x126573):
+ *  - BL is preloaded with 1 at 0x1263b1 and the epilogues return AL from BL,
+ *    so the unknown-state default returns true while the two "can't remove"
+ *    early exits XOR BL,BL and return false.
+ *  - Each case copies the 0x20-byte record into a stack buffer
+ *    (LEA EAX,[EBP-0x20]; PUSH EDI; PUSH EAX; CALL csmemcpy) before encoding;
+ *    encode_network_game_message takes (type, buffer, 0x20). The ADD ESP,0x18
+ *    after each encode folds both calls' cleanup, which is why the call-site
+ *    audit reports cleanup=6 for a 3-argument callee.
+ *  - The message length argument is computed in 16 bits (XOR ECX,ECX /
+ *    MOV CX,word[EAX] / SHR CX,4).
+ *  - Cases 2 and 3 tail-merge onto the shared write at 0x1264ad and return
+ *    the write result directly; case 4 has its own write at 0x126522 followed
+ *    by a failure log, so it is written out separately here.
+ *  - No struct is recovered for the client record, so +0x82c (connection),
+ *    +0x9b0 (machine index table) and +0xca6 (state) stay raw offset casts. */
+char network_game_client_request_remove_player(void *client, void *record)
+{
+  unsigned short *message;
+  unsigned short postgame_length;
+  char result;
+  unsigned char buffer[0x20];
+
+  result = 1;
+  if (client == NULL || !network_player_is_valid(record)) {
+    display_assert("client && network_player_is_valid(player)",
+                   "c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+                   0x208, true);
+    system_exit(-1);
+  }
+  if (*(char *)((char *)client + (unsigned int)*(uint16_t *)client * 0x44 +
+                0x9b0) != *(char *)((char *)record + 0x1c)) {
+    display_assert("client's can only remove players from their own machines",
+                   "c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+                   0x209, true);
+    system_exit(-1);
+  }
+  network_game_log("requesting a player removal (controller index #%d)",
+                   (int)*(char *)((char *)record + 0x1d));
+  switch (*(uint16_t *)((char *)client + 0xca6)) {
+  case 0:
+  case 1:
+    result = 0;
+    network_game_log(
+      "can't remove players from a game until after a game is joined");
+    goto done;
+
+  case 2:
+    csmemcpy(buffer, record, 0x20);
+    message = (unsigned short *)encode_network_game_message(0xe, buffer, 0x20);
+    if (message == NULL) {
+      result = 0;
+      network_game_log("failed to create a "
+                       "message_client_remove_player_request_pregame mesage");
+      goto done;
+    }
+    break;
+
+  case 3:
+    csmemcpy(buffer, record, 0x20);
+    message = (unsigned short *)encode_network_game_message(0x1b, buffer, 0x20);
+    if (message != NULL) {
+      break;
+    }
+    result = 0;
+    network_game_log("failed to create a "
+                     "message_client_remove_player_request_ingame message");
+    goto done;
+
+  case 4:
+    csmemcpy(buffer, record, 0x20);
+    message = (unsigned short *)encode_network_game_message(0x20, buffer, 0x20);
+    if (message == NULL) {
+      result = 0;
+      network_game_log("failed to create a "
+                       "message_client_remove_player_request_postgame message");
+      goto done;
+    }
+    result = (char)network_connection_write(
+      *(void **)((char *)client + 0x82c), message,
+      (unsigned short)(postgame_length = (unsigned short)(*message >> 4)), 0,
+      true);
+    if (!result) {
+      network_game_log("network_game_client_write() failed while sending a "
+                       "message_client_remove_player_request_postgame message");
+    }
+    goto done;
+
+  default:
+    network_game_log("client is in an unknown state");
+    goto done;
+  }
+  result = (char)network_connection_write(*(void **)((char *)client + 0x82c),
+                                          message,
+                                          (unsigned short)(*message >> 4), 0,
+                                          true);
+done:
+  return result;
+}
+
 /* network_game_client_remove_player (0x126590)
  *
  * Removes the player identified by a remove-player message from the client's
