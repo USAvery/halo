@@ -7760,6 +7760,37 @@ AUTOLIFT_REVIEW: NEEDS_RUNTIME |
 | FUN_00057380 | 0x57380 | encounters.obj | 81.8 | parked | escalation_exhausted [cohort=retrieval] |
 | FUN_0005c680 | 0x5c680 | encounters.obj | 82.5 | parked | escalation_exhausted [cohort=retrieval] |
 
+## Goal-lift run — 9/12 committed (queue_exhausted) — 2026-09-03
+
+| function | addr | obj | vc71 | action | reason |
+|---|---|---|---|---|---|
+| FUN_0017eb50 | 0x17eb50 | rasterizer_sprites.obj | 89.5 | committed | pass1+permute [cohort=control] |
+| FUN_0017cfb0 | 0x17cfb0 | rasterizer_sprites.obj | 100 | committed | mechanical gate: 100% clean (pass1) [cohort=control] |
+| FUN_0017d010 | 0x17d010 | rasterizer_sprites.obj | 100 | committed | mechanical gate: 100% clean (pass1) [cohort=control] |
+| FUN_0017eb30 | 0x17eb30 | rasterizer_sprites.obj | 100 | committed | mechanical gate: 100% clean (pass1) [cohort=control] |
+| FUN_0017ebb0 | 0x17ebb0 | rasterizer_sprites.obj | 63.93 | parked | below_65pct [cohort=control] |
+| FUN_0017d150 | 0x17d150 | rasterizer_sprites.obj | 100 | committed | mechanical gate: 100% clean (pass1) [cohort=retrieval] |
+| rasterizer_screen_effect_get_cinematic_parameters | 0x17dc70 | rasterizer_sprites.obj | 90.1 | committed | pass1 [cohort=retrieval] |
+| FUN_0017dee0 | 0x17dee0 | rasterizer_sprites.obj | 100 | committed | mechanical gate: 100% clean (pass1) [cohort=retrieval] |
+| FUN_0017e190 | 0x17e190 | rasterizer_sprites.obj | 92.6 | committed | escalated+optimize [cohort=control] |
+| FUN_0017ed70 | 0x17ed70 | rasterizer_sprites.obj | 80 | parked | escalation_exhausted [cohort=control] |
+| FUN_0017ef00 | 0x17ef00 | rasterizer_sprites.obj | 85.8 | parked | structured_output_null:review (structured_output_null:review) [cohort=control] |
+| FUN_0017dab0 | 0x17dab0 | rasterizer_sprites.obj | 85.7 | committed | pass1+permute [cohort=retrieval] |
+
+**Summary:** 9/12 committed (queue_exhausted); 3 parked (63.93%, 80%, 85.8% scores).
+
+## Goal-lift run — 0/12 committed (queue_exhausted)
+
+| function | addr | obj | vc71 | action | reason |
+|---|---|---|---|---|---|
+| FUN_0017ebb0 | 0x17ebb0 | rasterizer_sprites.obj | - | infra_blocked | agent_null [cohort=control] |
+| FUN_0017ed70 | 0x17ed70 | rasterizer_sprites.obj | - | parked | verify_skipped_no_ref (infrastructure — VC71 never measured; do not treat as below_65pct) [cohort=control] |
+| FUN_0017ef00 | 0x17ef00 | rasterizer_sprites.obj | 0 | build_failed | No source or kb.json mutation was made. The fingerprinted artifact contains the target decompilation, audited call sites, and no register-argument callees, but the target is a 0x3158-byte, large-frame diagnostics/logging routine with decompiler call-site omissions that required further bounded disassembly mapping. Existing unrelated worktree modifications were present in README.md, artifacts/auto_lift/goal_progress.md, kb_meta.json, and tools/equivalence/leaf_cache.json. Build and VC71 were not run because no implementation was safely completed. [cohort=none] |
+
+Then regenerate the actionable-unblock queue from this run's park/skip reasons
+(dedupes callee-ABI blockers and untried score levers across all runs):
+rtk python3 tools/lift/park.py followups --write --limit 50
+Report its "wrote N follow-up(s)" line.
 ## Goal-lift run — 10/12 committed (queue_exhausted) — 2026-09-06
 
 | function | addr | obj | vc71 | action | reason |

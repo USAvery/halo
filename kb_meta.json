@@ -14861,6 +14861,10 @@
       "kind": "function",
       "status": "ported"
     },
+    "0x17dc70": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0x17edd0": {
       "kind": "function",
       "status": "ported"
