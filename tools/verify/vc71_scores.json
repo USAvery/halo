@@ -36946,17 +36946,17 @@
     "FUN_0016b1c0": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 5.9,
+      "abi_modeled_mnemonic_pct": 96.9,
       "addr": "0x16b1c0",
       "end": "0x16b231",
       "kind": "auto",
       "n_r": 32,
-      "opnd_percent": 0.0,
-      "raw_mnemonic_pct": 5.9,
+      "opnd_percent": 93.8,
+      "raw_mnemonic_pct": 96.9,
       "ref": "synth",
       "ref_sha": "4bdf148f484ca69a",
-      "score": 5.9,
-      "source": "src/halo/unported_thunks.c"
+      "score": 96.9,
+      "source": "src/halo/rasterizer/xbox/rasterizer_xbox_models.c"
     },
     "FUN_0016b240": {
       "abi_model": "raw",

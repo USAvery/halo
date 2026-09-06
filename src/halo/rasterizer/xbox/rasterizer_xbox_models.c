@@ -223,6 +223,40 @@ void FUN_0016b180(bool flag)
   }
 }
 
+/* 0x16b1c0 - end of the model local-parameters block; the counterpart of
+ * FUN_0016bed0 (0x16bed0), which stashes the parameter block pointer in
+ * DAT_0047dff8 and its second argument's low byte in DAT_0047e005.
+ * Guarded by the profile-collection master switch (DAT_003256c4). Asserts
+ * that a parameter block is currently open ("local_parameters", line 0x5d3),
+ * flushes the pending sub-pass when DAT_0047e004 is set (FUN_00165fc0), then
+ * - only when the block's first byte is negative and DAT_0047e005 is clear,
+ * mirroring the open path's entry condition - restores the default projection
+ * with FUN_00158ae0(2) and rasterizer_set_frustum_z(0.0f, 0.0f). Finally
+ * clears DAT_0047dff8 to mark the block closed. */
+void FUN_0016b1c0(void)
+{
+  if (*(char *)0x3256c4 != 0) {
+    if (*(void **)0x47dff8 == NULL) {
+      display_assert(
+        "local_parameters",
+        "c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c", 0x5d3,
+        true);
+      system_exit(-1);
+    }
+
+    if (*(char *)0x47e004 != 0) {
+      FUN_00165fc0();
+    }
+
+    if (*(signed char *)*(void **)0x47dff8 < 0 && *(char *)0x47e005 == 0) {
+      FUN_00158ae0(2);
+      rasterizer_set_frustum_z(0.0f, 0.0f);
+    }
+
+    *(void **)0x47dff8 = NULL;
+  }
+}
+
 /* 0x16b240 — model-rendering profile close; the counterpart of FUN_0016b180.
  * Guarded by the same profile-collection master switch (DAT_003256c4); reads
  * back the sub-state latched by FUN_0016b180 (DAT_0047e002) and closes the
@@ -265,11 +299,11 @@ void FUN_0016b270(int param_1, float param_2, float param_3, float param_4)
   if (global_rasterizer_model_ambient_reflection_tint != NULL) {
     *(int *)global_rasterizer_model_ambient_reflection_tint = param_1;
     *(float *)((char *)global_rasterizer_model_ambient_reflection_tint + 4) =
-        param_2;
+      param_2;
     *(float *)((char *)global_rasterizer_model_ambient_reflection_tint + 8) =
-        param_3;
+      param_3;
     *(float *)((char *)global_rasterizer_model_ambient_reflection_tint + 0xc) =
-        param_4;
+      param_4;
   }
 }
 
@@ -469,172 +503,176 @@ void *FUN_0016c090(void *shader, short param_2, int param_3, int param_4,
   }
 
   if (!is_decal) {
-
-  if (shader == NULL) {
-    display_assert("shader",
-                   "c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
-                   0x515, true);
-    system_exit(-1);
-  }
-
-  if (shader_type_is_valid_for_model(*(uint16_t *)((char *)shader + 0x24)) ==
-      0) {
-    display_assert("shader_type_is_valid_for_model(shader->base.type)",
-                   "c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
-                   0x516, true);
-    system_exit(-1);
-  }
-
-  if (centroid == NULL) {
-    display_assert("centroid",
-                   "c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
-                   0x517, true);
-    system_exit(-1);
-  }
-
-  if (*(void **)0x47dff8 == NULL) {
-    display_assert("local_parameters",
-                   "c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
-                   0x518, true);
-    system_exit(-1);
-  }
-
-  flags = **(uint32_t **)0x47dff8;
-  if (use_pool) {
-    if (shader_is_decal(shader) != 0) {
-      flags = flags | 3;
+    if (shader == NULL) {
+      display_assert(
+        "shader",
+        "c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c", 0x515,
+        true);
+      system_exit(-1);
     }
-    if ((flags & 2) != 0) {
-      group = (char *)0x47df58;
-      *(uint32_t *)0x47dfe8 = 0xffffffff;
-      goto have_group;
+
+    if (shader_type_is_valid_for_model(*(uint16_t *)((char *)shader + 0x24)) ==
+        0) {
+      display_assert(
+        "shader_type_is_valid_for_model(shader->base.type)",
+        "c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c", 0x516,
+        true);
+      system_exit(-1);
     }
-  }
 
-  if (*(short *)0x47e000 == 1 && *(short *)((char *)shader + 0x24) != 4) {
-    group = (char *)rasterizer_secondary_geometry_group_new();
-  } else {
-    group = (char *)rasterizer_transparent_geometry_group_new();
-    result = group;
-  }
+    if (centroid == NULL) {
+      display_assert(
+        "centroid",
+        "c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c", 0x517,
+        true);
+      system_exit(-1);
+    }
 
-  if (out != NULL) {
-    *(short *)((char *)out + 8) =
+    if (*(void **)0x47dff8 == NULL) {
+      display_assert(
+        "local_parameters",
+        "c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c", 0x518,
+        true);
+      system_exit(-1);
+    }
+
+    flags = **(uint32_t **)0x47dff8;
+    if (use_pool) {
+      if (shader_is_decal(shader) != 0) {
+        flags = flags | 3;
+      }
+      if ((flags & 2) != 0) {
+        group = (char *)0x47df58;
+        *(uint32_t *)0x47dfe8 = 0xffffffff;
+        goto have_group;
+      }
+    }
+
+    if (*(short *)0x47e000 == 1 && *(short *)((char *)shader + 0x24) != 4) {
+      group = (char *)rasterizer_secondary_geometry_group_new();
+    } else {
+      group = (char *)rasterizer_transparent_geometry_group_new();
+      result = group;
+    }
+
+    if (out != NULL) {
+      *(short *)((char *)out + 8) =
         rasterizer_transparent_geometry_group_to_presorted_index(
-            (unsigned int)group);
-    *(void **)out = group + 0x94;
-    *(void **)((char *)out + 4) = group + 0x96;
-  }
-
-  if (group != NULL) {
-
-have_group:
-  *(uint32_t *)group = flags;
-  *(uint32_t *)(group + 4) = *(uint32_t *)(*(char **)0x47dff8 + 4);
-  zero.d[0] = 0;
-  zero.d[3] = (zero.d[2] = (zero.d[1] = 0));
-
-  group_centroid = (float *)(group + 0x74);
-  if (*(short *)((*(char **)0x47dff8) + 0x8c) == 0) {
-    *(uint32_t *)(group + 8) = 0;
-    *(rasterizer_model_block12_t *)group_centroid =
-        *(rasterizer_model_block12_t *)centroid;
-  } else {
-    if (*(uint32_t *)((*(char **)0x47dff8) + 0x98) == 0) {
-      display_assert("local_parameters->effect.source_object_index!=0",
-                     "c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
-                     0x54c, true);
-      system_exit(-1);
+          (unsigned int)group);
+      *(void **)out = group + 0x94;
+      *(void **)((char *)out + 4) = group + 0x96;
     }
-    *(uint32_t *)(group + 8) = *(uint32_t *)((*(char **)0x47dff8) + 0x98);
-    *(rasterizer_model_block12_t *)group_centroid =
-        *(rasterizer_model_block12_t *)((*(char **)0x47dff8) + 0x9c);
-  }
 
-  *(short *)(group + 0x10) = param_2;
-  *(void **)(group + 0xc) = shader;
-  *(rasterizer_model_block40_t *)(group + 0x14) =
-      *(rasterizer_model_block40_t *)((*(char **)0x47dff8) + 0x8c);
-  *(int *)(group + 0x44) = param_4;
-  *(int *)(group + 0x48) = param_3;
-  *(int *)(group + 0x50) = param_5;
-  *(int *)(group + 0x54) = param_7;
-  *(int *)(group + 0x58) = param_6;
-  *(int *)(group + 0x4c) = 0;
-  *(int *)(group + 0x5c) = 0;
+    if (group != NULL) {
+    have_group:
+      *(uint32_t *)group = flags;
+      *(uint32_t *)(group + 4) = *(uint32_t *)(*(char **)0x47dff8 + 4);
+      zero.d[0] = 0;
+      zero.d[3] = (zero.d[2] = (zero.d[1] = 0));
 
-  dx = group_centroid[0] - *(float *)0x5a5bc8;
-  dy = group_centroid[1] - *(float *)0x5a5bcc;
-  dz = group_centroid[2] - *(float *)0x5a5bd0;
-  *(rasterizer_model_block16_t *)(group + 0x80) = zero;
-  *(float *)(group + 0x70) = -(*(float *)0x5a5bdc * dz +
-                               *(float *)0x5a5bd8 * dy +
-                               *(float *)0x5a5bd4 * dx);
+      group_centroid = (float *)(group + 0x74);
+      if (*(short *)((*(char **)0x47dff8) + 0x8c) == 0) {
+        *(uint32_t *)(group + 8) = 0;
+        *(rasterizer_model_block12_t *)group_centroid =
+          *(rasterizer_model_block12_t *)centroid;
+      } else {
+        if (*(uint32_t *)((*(char **)0x47dff8) + 0x98) == 0) {
+          display_assert(
+            "local_parameters->effect.source_object_index!=0",
+            "c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
+            0x54c, true);
+          system_exit(-1);
+        }
+        *(uint32_t *)(group + 8) = *(uint32_t *)((*(char **)0x47dff8) + 0x98);
+        *(rasterizer_model_block12_t *)group_centroid =
+          *(rasterizer_model_block12_t *)((*(char **)0x47dff8) + 0x9c);
+      }
 
-  *(uint32_t *)(group + 0x3c) = *(uint32_t *)((*(char **)0x47dff8) + 0xc4);
-  *(uint32_t *)(group + 0x40) = *(uint32_t *)((*(char **)0x47dff8) + 0xc8);
-  *(short *)(group + 0x94) = -1;
-  *(short *)(group + 0x96) = -1;
+      *(short *)(group + 0x10) = param_2;
+      *(void **)(group + 0xc) = shader;
+      *(rasterizer_model_block40_t *)(group + 0x14) =
+        *(rasterizer_model_block40_t *)((*(char **)0x47dff8) + 0x8c);
+      *(int *)(group + 0x44) = param_4;
+      *(int *)(group + 0x48) = param_3;
+      *(int *)(group + 0x50) = param_5;
+      *(int *)(group + 0x54) = param_7;
+      *(int *)(group + 0x58) = param_6;
+      *(int *)(group + 0x4c) = 0;
+      *(int *)(group + 0x5c) = 0;
 
-  if (*(short *)0x47e000 == 1 && *(short *)((char *)shader + 0x24) != 4) {
-    *(uint32_t *)(group + 0x98) = *(uint32_t *)((*(char **)0x47dff8) + 0x98);
-    if (*(uint32_t *)(group + 0x98) == 0) {
-      display_assert("group->active_camouflage_transparent_source_object_index",
-                     "c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
-                     0x56d, true);
-      system_exit(-1);
+      dx = group_centroid[0] - *(float *)0x5a5bc8;
+      dy = group_centroid[1] - *(float *)0x5a5bcc;
+      dz = group_centroid[2] - *(float *)0x5a5bd0;
+      *(rasterizer_model_block16_t *)(group + 0x80) = zero;
+      *(float *)(group + 0x70) =
+        -(*(float *)0x5a5bdc * dz + *(float *)0x5a5bd8 * dy +
+          *(float *)0x5a5bd4 * dx);
+
+      *(uint32_t *)(group + 0x3c) = *(uint32_t *)((*(char **)0x47dff8) + 0xc4);
+      *(uint32_t *)(group + 0x40) = *(uint32_t *)((*(char **)0x47dff8) + 0xc8);
+      *(short *)(group + 0x94) = -1;
+      *(short *)(group + 0x96) = -1;
+
+      if (*(short *)0x47e000 == 1 && *(short *)((char *)shader + 0x24) != 4) {
+        *(uint32_t *)(group + 0x98) =
+          *(uint32_t *)((*(char **)0x47dff8) + 0x98);
+        if (*(uint32_t *)(group + 0x98) == 0) {
+          display_assert(
+            "group->active_camouflage_transparent_source_object_index",
+            "c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
+            0x56d, true);
+          system_exit(-1);
+        }
+      } else {
+        *(uint32_t *)(group + 0x98) = 0;
+      }
+
+      *(char *)(group + 0x9d) = *(char *)0x5a5570;
+
+      if ((flags & 2) != 0) {
+        {
+          char *lp = *(char **)0x47dff8;
+          *(uint32_t *)(group + 0x60) = *(uint32_t *)(lp + 8);
+          *(short *)(group + 0x64) = *(short *)(lp + 0xc);
+          *(char **)(group + 0x68) = lp + 0x10;
+          *(char **)(group + 0x6c) = lp + 0x84;
+        }
+        FUN_00174ce0();
+        rasterizer_transparent_geometry_group_draw(group, 0);
+        FUN_001749b0();
+        *(char *)0x325173 = 1;
+      } else {
+        if (*(char *)0x47dffc == 0) {
+          char *lp = *(char **)0x47dff8;
+          *(int *)0x47df54 = rasterizer_memory_pool_copy(
+            *(int *)(lp + 8), *(short *)(lp + 0xc) * 0x34);
+          *(short *)0x47df50 = *(short *)(lp + 0xc);
+          *(int *)0x47df4c =
+            rasterizer_memory_pool_copy((int)(lp + 0x10), 0x74);
+          *(int *)0x47df48 = rasterizer_memory_pool_copy((int)(lp + 0x84), 8);
+          *(char *)0x47dffc = 1;
+        }
+        *(uint32_t *)(group + 0x60) = *(uint32_t *)0x47df54;
+        *(short *)(group + 0x64) = *(short *)0x47df50;
+        *(uint32_t *)(group + 0x68) = *(uint32_t *)0x47df4c;
+        *(uint32_t *)(group + 0x6c) = *(uint32_t *)0x47df48;
+      }
+
+      if (*(short *)0x3256ba == 2) {
+        *(int *)0x5a54f0 = *(int *)0x5a54f0 + 1;
+        total_ptr = (int *)0x5a54e8;
+        *total_ptr = *total_ptr + param_5;
+        if (param_5 > *(int *)0x5a54ec) {
+          *(int *)0x5a54ec = param_5;
+        }
+        *(int *)0x5a54e4 =
+          *(int *)0x5a54e4 + FUN_0017ed90((void *)param_3, (void *)param_6);
+      }
+
+    } else if (*(char *)0x47e006 == 0) {
+      error(2, "### ERROR too many transparent geometry groups");
+      *(char *)0x47e006 = 1;
     }
-  } else {
-    *(uint32_t *)(group + 0x98) = 0;
-  }
-
-  *(char *)(group + 0x9d) = *(char *)0x5a5570;
-
-  if ((flags & 2) != 0) {
-    {
-      char *lp = *(char **)0x47dff8;
-      *(uint32_t *)(group + 0x60) = *(uint32_t *)(lp + 8);
-      *(short *)(group + 0x64) = *(short *)(lp + 0xc);
-      *(char **)(group + 0x68) = lp + 0x10;
-      *(char **)(group + 0x6c) = lp + 0x84;
-    }
-    FUN_00174ce0();
-    rasterizer_transparent_geometry_group_draw(group, 0);
-    FUN_001749b0();
-    *(char *)0x325173 = 1;
-  } else {
-    if (*(char *)0x47dffc == 0) {
-      char *lp = *(char **)0x47dff8;
-      *(int *)0x47df54 =
-          rasterizer_memory_pool_copy(*(int *)(lp + 8),
-                                      *(short *)(lp + 0xc) * 0x34);
-      *(short *)0x47df50 = *(short *)(lp + 0xc);
-      *(int *)0x47df4c = rasterizer_memory_pool_copy((int)(lp + 0x10), 0x74);
-      *(int *)0x47df48 = rasterizer_memory_pool_copy((int)(lp + 0x84), 8);
-      *(char *)0x47dffc = 1;
-    }
-    *(uint32_t *)(group + 0x60) = *(uint32_t *)0x47df54;
-    *(short *)(group + 0x64) = *(short *)0x47df50;
-    *(uint32_t *)(group + 0x68) = *(uint32_t *)0x47df4c;
-    *(uint32_t *)(group + 0x6c) = *(uint32_t *)0x47df48;
-  }
-
-  if (*(short *)0x3256ba == 2) {
-    *(int *)0x5a54f0 = *(int *)0x5a54f0 + 1;
-    total_ptr = (int *)0x5a54e8;
-    *total_ptr = *total_ptr + param_5;
-    if (param_5 > *(int *)0x5a54ec) {
-      *(int *)0x5a54ec = param_5;
-    }
-    *(int *)0x5a54e4 =
-        *(int *)0x5a54e4 +
-        FUN_0017ed90((void *)param_3, (void *)param_6);
-  }
-
-  } else if (*(char *)0x47e006 == 0) {
-    error(2, "### ERROR too many transparent geometry groups");
-    *(char *)0x47e006 = 1;
-  }
 
   } else if (out != NULL) {
     *(short *)((char *)out + 8) = (short)0xffff;
