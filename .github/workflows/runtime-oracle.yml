@@ -23,9 +23,45 @@ env:
   VENV_PYTHON: /mnt/g/dev/halo/.venv/bin/python3
 
 jobs:
+  # GitHub dispatches scheduled runs on a best-effort basis and has been
+  # consistently ~4h late for this workflow (cron 04:00 UTC, observed starts
+  # 07:59-08:28 UTC over 2026-09-02..06), which lands it in the middle of the
+  # working day. This workflow builds AND deploys to the shared dev Xbox, so a
+  # daytime run steals the machine and overwrites whatever XBE a human is
+  # testing with -- the same "rogue runner deploys harness builds" incident the
+  # missing `push:` trigger above was meant to prevent. Gate on the wall clock
+  # at run time rather than trusting the dispatch time. A manual
+  # workflow_dispatch is always allowed: that is someone asking for it on
+  # purpose.
+  night-window:
+    name: Night window gate
+    runs-on: self-hosted
+    outputs:
+      proceed: ${{ steps.window.outputs.proceed }}
+    steps:
+      - name: Check local hour
+        id: window
+        run: |
+          HOUR=$(date +%H)
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Manual dispatch -- running regardless of the hour."
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+          elif [ "$HOUR" -ge 1 ] && [ "$HOUR" -lt 6 ]; then
+            echo "Local hour $HOUR is inside the 01:00-06:00 night window."
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Local hour $HOUR is OUTSIDE the 01:00-06:00 night window."
+            echo "Skipping: this workflow deploys to the shared Xbox and must"
+            echo "not contend with interactive work. It will run tonight, or"
+            echo "force it now with a manual workflow_dispatch."
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+          fi
+
   runtime-oracle:
     name: Nightly runtime oracle
     runs-on: self-hosted
+    needs: night-window
+    if: needs.night-window.outputs.proceed == 'true'
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4

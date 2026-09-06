@@ -460,3 +460,199 @@ both seeds; correlate its tick with the trace records.
 - Sub-90% VC71 on the path: `unit_animation_set_state` 87.3 after the audit above,
   `FUN_000f7e60` 72.2, `FUN_000f9c40` 89.1, `FUN_001a6350` 89.9,
   `FUN_001a6280` 86.4.
+
+## Paired capture 2026-09-06 (shoot-only): divergence localized
+
+First paired capture with animation probes live on BOTH sides. Client
+`10.0.0.21` ran the traced build (rev `25e26a513`, `RNGT` ring present); host
+`10.0.0.24` ran `rng_probe.xbe` (SHA `fa079c60...`, detours re-verified in live
+memory after a CI incident). Artifacts:
+`artifacts/rng_trace/shoot_only_20260906{,_host}.json`,
+`shoot_only_20260906_host.bin` (raw ring), and
+`debug_{client,host}_shoot_only.txt`.
+
+Desync reported by the client at update #1121
+(`#5e9321ab`/`#8719cf51`); the host declared client machine #1 out of sync at
+game tick #1249.
+
+### Alignment
+
+Both sides reseed to `000040b2` at the match start (host ring index 119496,
+client 119262). Frame numbering is IDENTICAL on the two sides -- an assumed
+one-tick offset scores 41.9% agreement on `anim_update_in` values versus 87.3%
+at offset 0, so offset 0 is the alignment. Do not assume a tick skew.
+
+### First divergence
+
+1217 consecutive seed-consuming draws match exactly. Draw ordinal 1218, with
+seed `cc6b2274` still identical on both sides:
+
+    HOST    tick 996  random_direction3d   caller 0x1aba66
+    CLIENT  tick 995  random_math_real     caller model_animation_choose_random+78
+
+The client consumes a draw the original never consumes. Its cause is one frame
+earlier, on unit handle `0xe3170037`, at the state-request site
+(`unit_update_animation+862`, original `0x1b1215`, which IS instrumented on both
+sides):
+
+    frame 993   anim_state=0x15 old=0xff    host YES   client YES
+    frame 994   anim_state=0x00 old=0x15    host YES   client YES
+    frame 995   anim_state=0x03 old=0x00    host NO    client YES  <-- extra
+
+The extra transition calls `unit_animation_set_state+779`, which calls
+`model_animation_choose_random`, which draws. From frame 996 the unit's state
+byte is `0xbd` on the client versus `0xa8` on the host and never reconverges.
+
+### What is NOT the cause
+
+- **Not an extra animation-update call.** Site-matched (client `+484` only,
+  the site corresponding to the host's sole `anim_update_in` probe at
+  `0x1b0f58`), call counts are (1,1) on all 7757 comparable frames.
+  An earlier "client calls 2-3x, host never double-calls" reading was an
+  INSTRUMENTATION ARTIFACT: `unit_update_animation` has FOUR call sites to
+  `FUN_001ab870` (+413, +456, +997, +1071) and only +456 carries a host probe,
+  while our build probes four sites (+436, +484, +682, +765). Any future
+  cross-side count comparison must filter to the site the host actually probes.
+- **Not `state[1]`.** The second half of the pair is a frame counter that
+  increments in lockstep on both sides.
+
+### The remaining question
+
+At `0x1b11f9` the original loads the CURRENT state into CX and takes either of
+two skips before transitioning:
+
+    001b1201  cmp   dx, cx
+    001b1204  je    0x1b121f        ; skip 1: desired == current
+    001b120c  call  0x1a86b0        ; gate; preserves EDX
+    001b1211  test  al, al
+    001b1213  je    0x1b121f        ; skip 2: gate returned 0
+    001b1215  push  edx             ; EDX reused WITHOUT reload
+    001b1217  call  0x1ad260        ; unit_animation_set_state
+
+Current state was `0x00` and our desired state was `0x03`, so skip 1 cannot
+have fired for us. Either the original's desired state (EDX) was `0x00` at that
+moment and it took skip 1, or its gate `FUN_001a86b0` returned 0 and it took
+skip 2. Distinguishing these two is the next step, and it decides the fix:
+
+- If EDX differed, the bug is UPSTREAM in whatever computes the desired state.
+- If the gate differed, the bug is in `FUN_001a86b0` -- note its AL return was
+  previously verified identical across all 11264 (old_state, requested_state)
+  machine-code cases, but it takes a POINTER (`lea ecx,[edi+0x248]`) and reads
+  `[ecx+0xb]`, so its result depends on struct contents that sweep did not vary.
+
+A third probe recording EDX and the gate's AL at `0x1b1211` on both sides would
+settle it in one capture.
+
+## Static resolution of the frame-995 fork (2026-09-06, no new capture)
+
+The previous section ended by proposing a third probe on EDX and the gate's AL
+at `0x1b1211`. That capture is NOT needed: both branches of the fork resolve
+statically, and one of them also closes an instrumentation gap that would have
+invalidated the whole section.
+
+### Instrumentation gap check (this had to pass first)
+
+The `FUN_001ab870` episode taught that a single host probe on a multi-site
+callee manufactures fake findings. So before trusting "host took no transition
+at frame 995", count the call sites to the transition callee:
+
+    call 0x1ad260 (unit_animation_set_state) inside unit_update_animation
+      0x1b1217  (+1159)   <-- the probed site (host patch at 0x1b1215)
+      TOTAL: 1 site
+
+One site, and it is the probed one. The claim holds: the host really did not
+transition at frame 995.
+
+### The gate `FUN_001a86b0` is exonerated analytically
+
+Its entire input domain is two values -- `byte [ecx+0xb]` and DX:
+
+    001a86b0  movsx ecx, byte ptr [ecx + 0xb]
+    001a86b4  add   ecx, -2
+    001a86b7  cmp   ecx, 0x27
+    001a86ba  mov   al, 1
+    001a86bc  ja    0x1a86ec          ; -> ret with AL=1
+    001a86be  movzx ecx, byte ptr [ecx + 0x1a8704]
+    001a86c5  jmp   dword ptr [ecx*4 + 0x1a86f0]
+
+All five jump-table arms (`0x1a86cc/d5/e5/ea/ec`) read only DX. Nothing else is
+loaded, so the earlier 11264-case (old_state, requested_state) sweep WAS
+exhaustive -- the doc's earlier note that "struct contents the sweep did not
+vary" could matter is wrong, and is corrected here.
+
+Stronger still, for this exact frame: the caller does
+`lea ecx,[edi+0x248]`, so `[ecx+0xb]` is `[edi+0x253]` -- the *same* current-state
+byte the caller loads into CX. Current state was 0x00, so `ecx = 0 - 2 =
+0xFFFFFFFE`, which is `ja 0x27`, so the gate returns **AL=1 unconditionally**.
+Skip 2 cannot have fired on either side.
+
+### There is a THIRD path to the call, not two
+
+    001b11ee  mov   al, byte ptr [ebp - 1]
+    001b11f1  test  al, al
+    001b11f3  mov   edx, dword ptr [ebp - 0xc]
+    001b11f7  jne   0x1b1215            ; force: bypasses BOTH skips
+    001b11f9  movsx cx, byte ptr [edi + 0x253]
+    001b1201  cmp   dx, cx
+    001b1204  je    0x1b121f            ; skip 1
+    001b1206  lea   ecx, [edi + 0x248]
+    001b120c  call  0x1a86b0
+    001b1211  test  al, al
+    001b1213  je    0x1b121f            ; skip 2 (proven inert here)
+    001b1215  push  edx
+    001b1216  push  esi
+    001b1217  call  0x1ad260
+
+`[ebp-1]` is a force flag, set at `0x1b115a` when `FUN_001a8790` returns 0.
+With skip 2 inert, the host not transitioning means the host had force==0 AND
+desired state == current state == 0. Ours pushed 3.
+
+### The desired state is an input PARAMETER, so the bug is in the caller
+
+`[ebp-0xc]` has exactly two writes in the whole function:
+
+    001b0dcd (+61)   mov dword ptr [ebp - 0xc], eax    ; eax = movsx ax, byte [ebp+0xc]
+    001b0fe3 (+595)  mov dword ptr [ebp - 0xc], 0x28
+
+`[ebp+0xc]` is param_2. So `unit_update_animation(unit_handle, char *anim_state)`
+does not compute the desired state -- it receives it, and 0x28 != 3, so ours came
+straight from `*param_2`. Nothing inside this function is at fault.
+
+(Note for whoever edits this: at `0x1b0db8` the load is `movsx ax, ...`, a 16-bit
+movsx that writes only AX, so the dword stored at `[ebp-0xc]` carries a stale
+upper half from the preceding `tag_get` return. Harmless here because every
+consumer uses DX, but do not "clean it up" into a 32-bit movsx.)
+
+### Caller narrowed to three ported functions
+
+`unit_update_animation` has no direct `call` site in the image; ours is
+`src/halo/units/units.c:1186`, passing `state_pair`, initialized to 0 and then
+filled by five callees (`units.c:1119-1138`):
+
+    FUN_001a4c50   ported: null   <- runs ORIGINAL code, cannot diverge
+    FUN_001a5300   ported: null   <- runs ORIGINAL code, cannot diverge
+    FUN_001a2900   ported: true       writes 0x28 / 0x14
+    FUN_001a2a60   ported: true       writes 0x15 / 0x16
+    FUN_001a6280   ported: true       writes 0x18 / 0x19
+
+No ported code anywhere in `src/` writes 3 into that byte (`rg '\*state(_out)? = 3'`
+is empty; the only state writes in bipeds.c/units.c are the six values above).
+
+So the value 3 is written by original code, and our divergence is that original
+code *chose* to write it -- i.e. some input it reads differed, or a ported callee
+it dispatches to returned differently. `FUN_001a5300` and `FUN_001a4c50` are
+step dispatchers that call ported step functions (`FUN_001a2b90`'s header
+comment names `FUN_001a5300` as its dispatcher), so a ported step corrupting
+biped state upstream is the live hypothesis.
+
+Next step is therefore NOT another probe on `0x1b1211` -- it is to find which
+store in `FUN_001a4c50` / `FUN_001a5300` writes 3, and which ported callee feeds
+its predicate.
+
+### Negative result worth recording
+
+The captured client build INCLUDED the `FUN_0010a5e0` x87-narrowing fix, and the
+desync still reproduced with the same `model_animation_choose_random` signature.
+That closes the x87-narrowing lane as a cause of this desync. The fix remains a
+genuine correctness fix (see docs/lift-learnings.md and
+tools/audit/check_x87_narrowing.py); it is simply not this bug.

@@ -25,10 +25,22 @@ ROOT_DIR = os.path.abspath(
 BUILD_DIR = os.path.join(ROOT_DIR, "build")
 
 
+def _build_jobs() -> int:
+    """Recipes to run concurrently. Override with HALO_BUILD_JOBS."""
+    override = os.environ.get("HALO_BUILD_JOBS")
+    if override:
+        try:
+            return max(1, int(override))
+        except ValueError:
+            pass
+    return os.cpu_count() or 1
+
+
 def _run_cmake_build(target: str = "", quiet: bool = False) -> int:
     command = ["cmake", "--build", BUILD_DIR]
     if target:
         command += ["--target", target]
+    command += ["--parallel", str(_build_jobs())]
     if quiet:
         command += ["--", "--quiet"]
 
