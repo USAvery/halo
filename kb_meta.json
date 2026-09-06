@@ -14551,6 +14551,25 @@
       "kind": "function",
       "status": "ported"
     },
+    "0x169200": {
+      "kind": "function",
+      "status": "unknown",
+      "inferred": [
+        "FUN_00169200 is the shape twin of the already-ported FUN_0017a8a0 (rasterizer.c): it takes point, radius and out_extent on the stack and out_screen in EBX (LEA EBX,[EBP-0x10] at 0x16a1c2, first written by FSTP [EBX] at 0x16933d) and returns bool in AL."
+      ]
+    },
+    "0x169fd0": {
+      "kind": "function",
+      "status": "unknown",
+      "inferred": [
+        "The original Bungie name is rasterizer_sun_glow_draw, from the tail failure string at 0x2a30d4 and the per-call debug strings that name locals bounds.x0/x1/y0/y1, r, pass and brightness; the symbol is deliberately left as FUN_00169fd0 to match sibling FUN_00169a50.",
+        "The sun entry (0x28-stride array at 0x4c6480) is read here only at +0x00 (definition pointer), +0x04/+0x08/+0x0c (float position) and +0x10 (packed direction passed to FUN_0017ffc0); the definition is read only at +0x10 (float glow radius, used both as the FMUL scale at 0x16a1b0 and as the raw radius dword pushed at 0x16a1e1)."
+      ],
+      "uncertain": [
+        "The lift splits three MSVC-coalesced stack regions ([EBP-0x34] FUN_0017ffc0 output, [EBP-0x30] FUN_00169200 out_extent, and screen_bounds[1..3]) into separate C locals, so our frame is larger than the original 0x98; this is a deliberate correctness-over-frame-size choice and is the most likely source of any VC71 frame_mismatch.",
+        "cone is declared double because the original never spills the FCOS result to memory (it lives in ST1 across FXCH/FSUB/FSUB at 0x16a05e-0x16a06a); a float declaration would introduce a narrowing the binary does not perform, but a double still narrows 80-bit to 64-bit."
+      ]
+    },
     "0x16f500": {
       "kind": "function",
       "status": "unknown",

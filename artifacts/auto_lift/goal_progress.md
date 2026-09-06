@@ -7779,3 +7779,22 @@ AUTOLIFT_REVIEW: NEEDS_RUNTIME |
 | FUN_00162f90 | 0x162f90 | rasterizer_xbox_environment.obj | 100 | committed | mechanical gate: 100% clean (pass1) [cohort=retrieval] |
 
 **Summary:** 11/12 committed (queue_exhausted).
+
+## Goal-lift run — 2/12 committed (queue_exhausted)
+
+| function | addr | obj | vc71 | action | reason |
+|---|---|---|---|---|---|
+| FUN_00169650 | 0x169650 | rasterizer_xbox_lights.obj | 100 | committed | mechanical gate: 100% clean (pass1) [cohort=control] |
+| FUN_00169670 | 0x169670 | rasterizer_xbox_lights.obj | 100 | committed | mechanical gate: 100% clean (pass1) [cohort=retrieval] |
+| FUN_001696d0 | 0x1696d0 | rasterizer_xbox_lights.obj | - | infra_blocked | agent_null [cohort=none] |
+| FUN_00169a50 | 0x169a50 | rasterizer_xbox_lights.obj | - | parked | verify_skipped_no_ref (infrastructure — VC71 never measured; do not treat as below_65pct) [cohort=retrieval] |
+
+
+## Goal-lift run — 2/12 committed (queue_exhausted)
+
+| function | addr | obj | vc71 | action | reason |
+|---|---|---|---|---|---|
+| FUN_001696d0 | 0x1696d0 | rasterizer_xbox_lights.obj | 98.8 | committed | mechanical gate: 98.8% clean (pass1) [cohort=retrieval] |
+| FUN_00169a50 | 0x169a50 | rasterizer_xbox_lights.obj | 85.6 | committed | pass1+permute [cohort=retrieval] |
+
+**Summary:** 2/12 committed (queue_exhausted).

@@ -46297,7 +46297,7 @@
     },
     {
      "addr": "0x169200",
-     "decl": "void FUN_00169200(void);"
+     "decl": "bool FUN_00169200(float *point, float radius, float *out_extent, float *out_screen @<ebx>);"
     }
    ]
   },
@@ -46307,23 +46307,30 @@
    "functions": [
     {
      "addr": "0x169650",
-     "decl": "void FUN_00169650(void);"
+     "decl": "int __stdcall FUN_00169650(void *device, uint32_t reg@<edx>, float a, float b);",
+     "ported": true,
+     "source_path": "src/halo/rasterizer/xbox/rasterizer_xbox_lights.c"
     },
     {
      "addr": "0x169670",
-     "decl": "void FUN_00169670(void);"
+     "decl": "int __stdcall FUN_00169670(void *device, uint32_t reg, float a, float b, float c, float d);",
+     "ported": true,
+     "source_path": "src/halo/rasterizer/xbox/rasterizer_xbox_lights.c"
     },
     {
      "addr": "0x1696d0",
-     "decl": "void FUN_001696d0(void);"
+     "decl": "void FUN_001696d0(int param_1, float *bounds@<esi>);",
+     "ported": true
     },
     {
      "addr": "0x169a50",
-     "decl": "void FUN_00169a50(void);"
+     "decl": "int FUN_00169a50(int primary_target, int secondary_target, short iterations);",
+     "ported": true
     },
     {
      "addr": "0x169fd0",
-     "decl": "void FUN_00169fd0(int *param_1);"
+     "decl": "void FUN_00169fd0(int *sun_entry);",
+     "ported": true
     }
    ]
   },
