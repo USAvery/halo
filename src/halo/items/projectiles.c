@@ -203,6 +203,9 @@ void projectile_export_function_values(int projectile_handle)
 float FUN_000f7fa0(void *tag, float range_begin, float range_end)
 {
   range_end -= range_begin;
+  /* 0xf7fa9: FSTP dword [ebp+0xc] -- the width is narrowed to float32
+   * before the zero test and the 2*width divisor. */
+  HALO_FLT_ROUNDTRIP(range_end);
   if (*(float *)((char *)tag + 0x1e4) == *(float *)((char *)tag + 0x1e8) || range_end == *(float *)0x2533c0)
     return *(float *)0x2533c0;
   return (*(float *)((char *)tag + 0x1e4) * *(float *)((char *)tag + 0x1e4) -
@@ -1300,13 +1303,24 @@ void projectile_accelerate(int projectile_handle, float *acceleration)
 
     /* Compute squared magnitude, then scale = sqrt(sq_mag) * rand * PI/2. */
     magnitude = acceleration[0] * acceleration[0] + acceleration[1] * acceleration[1] + acceleration[2] * acceleration[2];
+    /* 0xf9001: FSTP dword [ebp-4] -- the squared magnitude is narrowed to
+     * float32 before the FSQRT (0xf9018).  The sqrt itself is FST (kept
+     * wide on the stack) and scale is never stored, so only this copy
+     * rounds.  Without it the grenade scatter velocity differs in the low
+     * bits and a thrown grenade lands one tick late (system-link run 3,
+     * tick 1009 vs 1010). */
+    HALO_FLT_ROUNDTRIP(magnitude);
 
     scale = random_math_real((unsigned int *)get_global_random_seed_address()) * sqrtf(magnitude) * *(float *)0x2568bc;
 
-    dir[0] *= scale;
+    /* 0xf9028..0xf9054: dir[0]*scale stays on the x87 stack and is added
+     * wide into +0x3c; dir[1]*scale and dir[2]*scale go through FSTP
+     * dword [ebp-0xc] / [ebp-8] (narrowed) before the adds. */
     dir[1] *= scale;
+    HALO_FLT_ROUNDTRIP(dir[1]);
     dir[2] *= scale;
-    *(float *)(proj + 0x3c) += dir[0];
+    HALO_FLT_ROUNDTRIP(dir[2]);
+    *(float *)(proj + 0x3c) += dir[0] * scale;
     *(float *)(proj + 0x40) += dir[1];
     *(float *)(proj + 0x44) += dir[2];
 
