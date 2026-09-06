@@ -101,6 +101,7 @@ KINDS = {
     28: ("probe:desired_x", "info"),
     29: ("probe:current_x", "info"),
     30: ("probe:unit_flags", "info"),
+    31: ("probe:damage_target", "info"),
 }
 
 

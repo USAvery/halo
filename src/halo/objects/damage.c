@@ -1064,6 +1064,11 @@ void object_cause_damage(void *damage_params, int object_handle,
   int obj_tag;
   int coll_ref;
 
+#ifdef HALO_RNG_TRACE
+  RNG_TRACE_EX(RNG_TRACE_KIND_DAMAGE_TARGET, *(unsigned int *)damage_params,
+               object_handle);
+#endif
+#line 1067
   dp = (unsigned int *)damage_params;
 
   /* Get damage effect tag data */

@@ -91,6 +91,11 @@
 #define RNG_TRACE_KIND_DESIRED_X     28u /* raw bits of unit+0x1d4  info */
 #define RNG_TRACE_KIND_CURRENT_X     29u /* raw bits of unit+0x24   info */
 #define RNG_TRACE_KIND_UNIT_FLAGS    30u /* full dword unit+0x1b4   info */
+/* object_cause_damage entry on BOTH builds: value = damage effect tag index
+ * (damage_params[0]), caller2 = object handle.  Host mirror is a binary
+ * detour at 0x137d20 (build_original_probes.py).  Names every object the
+ * damage pass touches, so a differing candidate set is visible. */
+#define RNG_TRACE_KIND_DAMAGE_TARGET 31u /* value=jpt! tag, caller2=object handle  info */
 
 /* 16 bytes. */
 typedef struct {

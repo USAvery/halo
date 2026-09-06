@@ -1849,3 +1849,36 @@ Not yet confirmed at runtime. Repro needs two xemu instances in a lobby:
     rtk ./tools/xbox/build_deploy_run.sh --xemu-bridged --xbox 10.0.0.21 -- -q --rng-trace
 
 then re-capture ds_h.json / ds_c.json and run `tools/xbox/rng_first_divergence.py`.
+
+## RUN 2 2026-09-07 (after the spawn-rating fix): tick 2 is clean, next divergence at tick 315
+
+Captures: `artifacts/rng_trace/ds2_h.json` (host 10.0.0.24, `host_rng_probe.xbe`,
+ring 0x7ff900) and `ds2_c.json` (client 10.0.0.21, commit 49bce6e75 `--rng-trace`);
+`debug_ds2_21.txt` / `debug_ds2_24.txt`.  `rng_first_divergence.py ds2_h ds2_c`:
+
+- Ticks 0..314 identical, every draw and every unit_state / anim_update probe.
+  The spawn desync at tick 2 is gone.  (The client shows extra `anim_update_in`
+  records from a second call site in `unit_update_animation`, 0x6ecd7a; the
+  host detour only covers the 0x1b0f57 site.  Probe coverage, not a divergence.)
+- Tick 315: `FUN_0009cb90` (effect event) -> `effect_update` -> `object_cause_damage`
+  on both.  Then the HOST damages three more objects, one of them a projectile
+  (`projectile_accelerate` via the damage.c type switch case 5, two draws), the
+  CLIENT damages one more object and stops.  Client damage probes at 315 name
+  only units 0xe2770008 and 0xe2740005, both with damage_scale 0.
+- After 315 the seed streams are the same sequence offset by those four draws
+  until tick 328, where the client's shot kills a unit (`unit_detach_weapon`,
+  `FUN_000460e0`) and the host's does not.  So the whole desync is "an area
+  damage effect at tick 315 found 4 candidate objects on the host and 2 on the
+  client".  Positions or the candidate query differ silently; nothing in the
+  ring shows which objects the host touched.
+
+New probe, kind 31 `probe:damage_target` (value = damage effect tag index
+`damage_params[0]`, caller2 = object handle) at `object_cause_damage` entry on
+both builds: client `src/halo/objects/damage.c` under `HALO_RNG_TRACE`, host
+binary detour at 0x137d20 built by `artifacts/rng_trace/build_original_probes_v2.py`
+on top of the v1 image (`host_rng_probe_v1.xbe`, sha eac7fbae...; the v1 input
+`host_rng_baseline.xbe` was rebuilt for the control run and no longer matches
+sha a2a004b6...).  Unicorn check: registers, flags and every byte at or above
+ESP identical to the original prologue path; record = kind 31, tick, jpt tag,
+handle.  Host image sha 3a838b03..., deployed with `host_diagnostic.py probes`.
+Next capture will list the candidate set on both sides.
