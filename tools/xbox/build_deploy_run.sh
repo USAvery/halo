@@ -3,6 +3,7 @@ set -euo pipefail
 
 xbox_host="${XBOX_HOST:-127.0.0.1}"
 build_args=()
+native_xbdm="${HALO_NATIVE_XBDM:-0}"
 
 log() {
   printf '[build_deploy_run][%s] %s\n' "$(date '+%H:%M:%S')" "$*"
@@ -23,6 +24,10 @@ while (($#)); do
       xbox_host="$2"
       shift 2
       ;;
+    --xemu-bridged|--native-xbdm)
+      native_xbdm=1
+      shift
+      ;;
     --)
       shift
       build_args+=("$@")
@@ -38,6 +43,14 @@ done
 log "starting (xbox host: ${xbox_host})"
 reset_terminal_input_modes
 log "terminal mouse-tracking modes disabled"
+if [[ "$native_xbdm" == "1" ]]; then
+  # A bridged xemu guest is reachable directly from WSL.  Keep every RDCP
+  # subprocess native so it neither re-execs through Windows nor falls back to
+  # XBCP, whose Windows network path may not reach the bridged adapter.
+  export HALO_NATIVE_XBDM=1
+  export HALO_WINDOWS_REEXEC=1
+  log "using native XBDM transport (bridged xemu)"
+fi
 if ((${#build_args[@]})); then
   log "build args: ${build_args[*]}"
 else
