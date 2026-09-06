@@ -7828,7 +7828,6 @@ Report its "wrote N follow-up(s)" line.
 | FUN_001696d0 | 0x1696d0 | rasterizer_xbox_lights.obj | 98.8 | committed | mechanical gate: 98.8% clean (pass1) [cohort=retrieval] |
 | FUN_00169a50 | 0x169a50 | rasterizer_xbox_lights.obj | 85.6 | committed | pass1+permute [cohort=retrieval] |
 
-**Summary:** 2/12 committed (queue_exhausted).
 
 ## Goal-lift run — 2/12 committed (queue_exhausted) — 2026-09-07
 
