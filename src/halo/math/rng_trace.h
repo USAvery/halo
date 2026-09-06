@@ -46,6 +46,27 @@
 #define RNG_TRACE_KIND_UNIT_STATE    16u /* unit_animation_set_state entry: value=(anim_state<<8)|old_state, caller=its caller, caller2=unit handle  info */
 #define RNG_TRACE_KIND_ANIM_UPDATE_IN 17u /* FUN_001ab870 before original updater: value=state[1]<<16|state[0], caller=unit_update_animation site, caller2=unit handle  info */
 #define RNG_TRACE_KIND_ANIM_UPDATE_OUT 18u /* FUN_001ab870 after original updater: value=state[0]<<16|result, caller=unit_update_animation site, caller2=unit handle  info */
+/* Turn-in-place fork gates in FUN_001a4c50, which is unported on BOTH builds.
+ * Sampled in its ported caller (FUN_001a6350) rather than inside the fork: the
+ * fork performs no write to any of these four fields before the gate chain at
+ * 0x1a5109, so the caller's read is the same value the gates see.  The pristine
+ * host gets the identical record from a binary probe at 0x1a5109
+ * (artifacts/rng_trace/build_original_probes.py).
+ *   bits 0-7   +0x42a  animation mode  (gates at 0x1a5109 / 0x1a5120)
+ *   bits 8-15  +0x257  (drives [ebp-2] and the early exit at 0x1a4f65)
+ *   bit  16    +0x1b4 & 0x4000         (gate at 0x1a513c)
+ *   bit  17    +0x1b8 & 0x100          (gate at 0x1a514b) */
+#define RNG_TRACE_KIND_TURN_GATES    19u /* value=packed gates, caller2=unit handle  info */
+#define RNG_TRACE_KIND_TURN_COSINE   20u /* raw float bits of the fcomp operand at 0x1a5169  info */
+/* Client-side reconstruction of the fork's compared value, from the ported
+ * caller.  FUN_001a4c50 computes, at 0x1a5061..0x1a50cd:
+ *     d = (+0x1d4, +0x1d8, 0), normalized
+ *     cos = d.x * f.x + d.y * f.y     with f = +0x24, used RAW
+ * f is neither flattened nor renormalized, so a non-zero f.z lowers cos even
+ * when the two vectors point the same way in the XY plane.  Kind 22 carries
+ * f.z for that reason. */
+#define RNG_TRACE_KIND_TURN_COS_C    21u /* raw float bits of the reconstructed cosine  info */
+#define RNG_TRACE_KIND_TURN_FWD_Z    22u /* raw float bits of the current facing z (+0x2c)  info */
 
 /* 16 bytes. */
 typedef struct {

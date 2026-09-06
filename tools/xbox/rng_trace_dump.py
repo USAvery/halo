@@ -82,6 +82,17 @@ KINDS = {
     # the unit_update_animation slot, caller2 is the unit handle.
     17: ("probe:anim_update_in", "info"),
     18: ("probe:anim_update_out", "info"),
+    # Turn-in-place fork gates in FUN_001a4c50 (unported on both builds).
+    # 19 = gate snapshot at the top of the chain, caller2 = unit handle:
+    #   bits 0-7 +0x42a, bits 8-15 +0x257, bit 16 +0x1b4&0x4000,
+    #   bit 17 +0x1b8&0x100.
+    # 20 = raw float bits of the facing cosine [ebp-0xc] at the fcomp.
+    19: ("probe:turn_gates", "info"),
+    20: ("probe:turn_cosine", "info"),
+    # Client-side reconstruction of the fork's compared value and of the
+    # current-facing z that lowers it.  seed_before carries raw float bits.
+    21: ("probe:turn_cos_c", "info"),
+    22: ("probe:turn_fwd_z", "info"),
 }
 
 
