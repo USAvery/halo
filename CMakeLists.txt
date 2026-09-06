@@ -12,6 +12,12 @@ option(HALO_RETAIL64 "Build experimental 64MB retail-compatible runtime profile"
 
 find_package(Python3 COMPONENTS Interpreter)
 
+find_program(CCACHE_EXECUTABLE ccache)
+if(CCACHE_EXECUTABLE)
+	set(CMAKE_C_COMPILER_LAUNCHER "${CCACHE_EXECUTABLE}")
+	set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_EXECUTABLE}")
+endif()
+
 set(gen_dir "${PROJECT_BINARY_DIR}/generated")
 add_custom_target(create_gen_dir ALL
 	COMMAND ${CMAKE_COMMAND} -E make_directory ${gen_dir})
@@ -22,6 +28,8 @@ add_custom_command(
 		--gen-header "${gen_dir}/decl.h"
 		--gen-def "${gen_dir}/halo.xbe.def"
 		--gen-thunks "${gen_dir}/thunks.c"
+	COMMAND "${CMAKE_COMMAND}" -E touch_nocreate
+		"${gen_dir}/decl.h" "${gen_dir}/halo.xbe.def" "${gen_dir}/thunks.c"
 	DEPENDS "${CMAKE_CURRENT_LIST_DIR}/tools/analysis/knowledge.py" "${CMAKE_CURRENT_LIST_DIR}/kb.json" create_gen_dir
 	VERBATIM
 )

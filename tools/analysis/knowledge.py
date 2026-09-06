@@ -162,6 +162,7 @@ class KnowledgeBase:
 		self.name_to_addr: Mapping[str, int] = {}
 		self.expected_md5: Optional[str] = None
 		self.addr_to_symbols = {}
+		self._cursor_translation_units = []
 
 	def add_symbols(self, symbols: Sequence[Symbol]):
 		self.symbols.extend(symbols)
@@ -204,6 +205,30 @@ class KnowledgeBase:
 					  'si': 'esi', 'di': 'edi', 'bp': 'ebp'}[reg]
 			return f'popl %%{parent}'
 		return f'popl %%{reg}'
+
+	def prepare_cursors(self, symbols: Sequence[Function]):
+		"""Parse declarations for several symbols in one clang translation unit."""
+		pending = [s for s in symbols if s._parsed is None]
+		if not pending:
+			return
+
+		source = _get_types_file() + '\n' + '\n'.join(
+			filter_reg_assignments(s.decl) for s in pending)
+		index = clang.Index.create()
+		tu = index.parse('tmp.h', args=['-target', 'i386-pc-win32'],
+			unsaved_files=[('tmp.h', source)])
+		wanted_names = {s.name for s in pending}
+		cursors = {
+			cursor.spelling: cursor
+			for cursor in tu.cursor.get_children()
+			if cursor.spelling in wanted_names
+		}
+		missing = sorted(wanted_names - cursors.keys())
+		if missing:
+			raise ValueError(f'Could not parse declarations for: {", ".join(missing)}')
+		for s in pending:
+			s._parsed = cursors[s.name]
+		self._cursor_translation_units.append(tu)
 
 	def gen_thunk(self, s: Function):
 		match = reg_filter_re.search(s.decl)
@@ -615,6 +640,16 @@ def main():
 
 	if args.gen_header:
 		kb.build_header(args.gen_header)
+
+	cursor_symbols = [
+		s for s in kb.symbols
+		if isinstance(s, Function) and (
+			(args.gen_thunks and s.requires_reg_thunk) or
+			(args.gen_def and not s.requires_reg_thunk and
+			 ('__stdcall' in s.decl or '__fastcall' in s.decl))
+		)
+	]
+	kb.prepare_cursors(cursor_symbols)
 
 	if args.gen_thunks:
 		kb.build_thunks(args.gen_thunks)
