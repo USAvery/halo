@@ -29,10 +29,6 @@
       "kind": "function",
       "status": "ported"
     },
-    "0x12660": {
-      "kind": "function",
-      "status": "ported"
-    },
     "0x128c0": {
       "kind": "function",
       "status": "ported"
@@ -799,10 +795,6 @@
       ]
     },
     "0x302b0": {
-      "kind": "function",
-      "status": "ported"
-    },
-    "0x355f0": {
       "kind": "function",
       "status": "ported"
     },
@@ -2337,15 +2329,7 @@
       "kind": "function",
       "status": "ported"
     },
-    "0x5e150": {
-      "kind": "function",
-      "status": "ported"
-    },
     "0x5e560": {
-      "kind": "function",
-      "status": "ported"
-    },
-    "0x5e680": {
       "kind": "function",
       "status": "ported"
     },
@@ -8625,10 +8609,6 @@
       "kind": "function",
       "status": "ported"
     },
-    "0xcab80": {
-      "kind": "function",
-      "status": "ported"
-    },
     "0xcaba0": {
       "kind": "function",
       "status": "ported"
@@ -8881,10 +8861,6 @@
       "status": "ported"
     },
     "0xce840": {
-      "kind": "function",
-      "status": "ported"
-    },
-    "0xce8c0": {
       "kind": "function",
       "status": "ported"
     },
@@ -10114,10 +10090,6 @@
       "status": "ported"
     },
     "0xece10": {
-      "kind": "function",
-      "status": "ported"
-    },
-    "0xeea10": {
       "kind": "function",
       "status": "ported"
     },
@@ -14843,10 +14815,6 @@
       "kind": "function",
       "status": "ported"
     },
-    "0x17d910": {
-      "kind": "function",
-      "status": "ported"
-    },
     "0x17da40": {
       "kind": "function",
       "status": "unknown",
@@ -14856,22 +14824,6 @@
       "uncertain": [
         "The semantic meanings of FUN_0017da40's five parameters and the 0x47e4d4 target structure remain unidentified."
       ]
-    },
-    "0x17db40": {
-      "kind": "function",
-      "status": "ported"
-    },
-    "0x17dc70": {
-      "kind": "function",
-      "status": "ported"
-    },
-    "0x17edd0": {
-      "kind": "function",
-      "status": "ported"
-    },
-    "0x180050": {
-      "kind": "function",
-      "status": "ported"
     },
     "0x180820": {
       "kind": "function",
@@ -14979,10 +14931,6 @@
       "uncertain": [
         "Ghidra dropped every swizzler argument and the width/height/depth results; the argument lists here are reconstructed from the original push order (2D: dst=temp, src=mip_addr, width in ESI, height in EBX; 3D adds depth from [EBP-0xc]; cubemap walks one source pointer by mip_size/6 and derives dst as src plus a once-computed temp-minus-mip_addr delta). Verified against the disassembly but not against runtime behavior."
       ]
-    },
-    "0x183390": {
-      "kind": "function",
-      "status": "ported"
     },
     "0x183650": {
       "kind": "function",
@@ -15175,15 +15123,7 @@
       "kind": "function",
       "status": "ported"
     },
-    "0x18ca40": {
-      "kind": "function",
-      "status": "ported"
-    },
     "0x18d0b0": {
-      "kind": "function",
-      "status": "ported"
-    },
-    "0x18d2c0": {
       "kind": "function",
       "status": "ported"
     },
@@ -17233,10 +17173,6 @@
       "kind": "function",
       "status": "ported"
     },
-    "0x1b5680": {
-      "kind": "function",
-      "status": "ported"
-    },
     "0x1b5770": {
       "kind": "function",
       "status": "ported"
@@ -17752,22 +17688,6 @@
       "kind": "function",
       "status": "ported"
     },
-    "0x1c0450": {
-      "kind": "function",
-      "status": "ported"
-    },
-    "0x1c0570": {
-      "kind": "function",
-      "status": "ported"
-    },
-    "0x1c0600": {
-      "kind": "function",
-      "status": "ported"
-    },
-    "0x1c0680": {
-      "kind": "function",
-      "status": "ported"
-    },
     "0x1c0910": {
       "kind": "function",
       "status": "ported"
@@ -17777,18 +17697,6 @@
       "status": "ported"
     },
     "0x1c0da0": {
-      "kind": "function",
-      "status": "ported"
-    },
-    "0x1c1290": {
-      "kind": "function",
-      "status": "ported"
-    },
-    "0x1c1340": {
-      "kind": "function",
-      "status": "ported"
-    },
-    "0x1c18f0": {
       "kind": "function",
       "status": "ported"
     },
@@ -18071,10 +17979,6 @@
       "status": "ported"
     },
     "0x1c7e70": {
-      "kind": "function",
-      "status": "ported"
-    },
-    "0x1c7f80": {
       "kind": "function",
       "status": "ported"
     },
@@ -18784,11 +18688,131 @@
       "kind": "data",
       "status": "ported"
     },
+    "0x12660": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x5e150": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x5e680": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0xcab80": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0xce8c0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0xeea10": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x1b5680": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x1c0450": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x1c0570": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x1c0600": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x1c0680": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x1c1290": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x1c1340": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x1c18f0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x1c7f80": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x180050": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x183390": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x18ca40": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x18d2c0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x355f0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x308e0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x31440": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x32ac0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x32b50": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x32bb0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x32c10": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x33330": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x425c0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x430d0": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0x43870": {
       "kind": "function",
       "status": "ported"
     },
-    "0x46b60": {
+    "0x43f20": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x458f0": {
       "kind": "function",
       "status": "ported"
     },
@@ -18796,7 +18820,15 @@
       "kind": "function",
       "status": "ported"
     },
-    "0x32b50": {
+    "0x46b60": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0xda980": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x126590": {
       "kind": "function",
       "status": "ported"
     },
@@ -18806,26 +18838,6 @@
       "inferred": [
         "FUN_00169200 is the shape twin of the already-ported FUN_0017a8a0 (rasterizer.c): it takes point, radius and out_extent on the stack and out_screen in EBX (LEA EBX,[EBP-0x10] at 0x16a1c2, first written by FSTP [EBX] at 0x16933d) and returns bool in AL."
       ]
-    },
-    "0x430d0": {
-      "kind": "function",
-      "status": "ported"
-    },
-    "0x32ac0": {
-      "kind": "function",
-      "status": "ported"
-    },
-    "0x458f0": {
-      "kind": "function",
-      "status": "ported"
-    },
-    "0x32c10": {
-      "kind": "function",
-      "status": "ported"
-    },
-    "0x425c0": {
-      "kind": "function",
-      "status": "ported"
     },
     "0x169fd0": {
       "kind": "function",
@@ -18839,23 +18851,15 @@
         "cone is declared double because the original never spills the FCOS result to memory (it lives in ST1 across FXCH/FSUB/FSUB at 0x16a05e-0x16a06a); a float declaration would introduce a narrowing the binary does not perform, but a double still narrows 80-bit to 64-bit."
       ]
     },
+    "0x17d910": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x17db40": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0x19c5d0": {
-      "kind": "function",
-      "status": "ported"
-    },
-    "0x33330": {
-      "kind": "function",
-      "status": "ported"
-    },
-    "0x32bb0": {
-      "kind": "function",
-      "status": "ported"
-    },
-    "0x308e0": {
-      "kind": "function",
-      "status": "ported"
-    },
-    "0xda980": {
       "kind": "function",
       "status": "ported"
     },
@@ -18867,19 +18871,15 @@
       "kind": "function",
       "status": "ported"
     },
-    "0x126590": {
-      "kind": "function",
-      "status": "ported"
-    },
-    "0x31440": {
-      "kind": "function",
-      "status": "ported"
-    },
     "0x1c7230": {
       "kind": "function",
       "status": "ported"
     },
-    "0x43f20": {
+    "0x17dc70": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x17edd0": {
       "kind": "function",
       "status": "ported"
     }
