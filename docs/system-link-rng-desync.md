@@ -1738,3 +1738,64 @@ a faithful lift, so it is not the source of a cleared bit 0.
 Next measurement: a `--rng-trace` build with the existing kind 28/29/30 probes
 at the fork call site in `units.c`, which report `unit+0x1d4`, `unit+0x24` and
 `unit+0x1b4` directly for every unit each tick.
+
+## ROOT CAUSE LOCATED 2026-09-06: unit 0xe2740005 turns one tick late, into the wrong state
+
+Capture: `artifacts/rng_trace/ds_c.json` (our full ported build, `--rng-trace`,
+fork probes) against `artifacts/rng_trace/ds_h.json` (original code, binary
+probes).  Tool: `tools/xbox/rng_first_divergence.py`, which segments both rings
+by map instance before comparing.  `rng_trace_dump.py --diff` cannot do this: it
+aligns at record 0 and reports a false divergence when the rings hold different
+numbers of map instances.
+
+    first diverging tick: 2
+      tick 2
+           unit 0xe2710002  A state 0x0300   B state 0x0300
+        !! unit 0xe2740005  A state -        B state 0x0300
+           unit 0xe27a000b  A state 0x0300   B state 0x0300
+           draw  random_math_real model_animation_choose_random 0x53a5f8a3 | same
+           draw  random_math_real model_animation_choose_random 0xe4d885a6 | same
+        !! draw  -                            | random_math_real ... 0x2de3e0cd
+      tick 3
+        !! unit 0xe2740005  A state 0x0200   B state -
+        !! draw  random_math_real ... 0x2de3e0cd | -
+
+The seed VALUES are identical.  0x53a5f8a3, 0xe4d885a6 and 0x2de3e0cd appear on
+both machines in that order.  The LCG is not the problem.  The draw happens on
+the WRONG TICK, which is enough to fail the per-tick lockstep seed check.
+
+Two of the four units, 0xe2710002 and 0xe27a000b, take state 3 at tick 2 on both
+machines.  Only 0xe2740005 differs, and it differs twice over:
+
+    host    tick 2  animation state 3, animation 0xbd
+    client  tick 3  animation state 2, animation 0xbc
+
+State 2 against state 3 is the turn-in-place direction that `FUN_001a4c50`
+selects.  So the unit turns the other way, one tick late.
+
+### Why: the desired facing arrives one tick late for that unit
+
+Kinds 28/29 read `unit+0x1d4` and `unit+0x24` in the fork's caller:
+
+    client tick 2  0xe2740005  desired 0x3f800000  current 0x3f800000  equal
+    client tick 3  0xe2740005  desired 0x3b6ef322  current 0x3f800000  differ
+
+At tick 2 our client still holds the old desired facing, so no turn is
+requested.  The value arrives at tick 3, by which time the true turn delta has
+changed sign and the fork picks state 2 instead of 3.
+
+The other two turning units get their desired facing on time, so the control
+path works in general.  `unit+0x1b4` is 0x41 for every unit on every sample, so
+bit 0 is set and `unit_update`'s static arm is not involved.  That kills the
+static-arm hypothesis from the previous section for good.
+
+### What this retires
+
+The turn cosine was a symptom, not the defect.  Chasing the cosine writer was
+looking one step downstream of the real event, which is the tick on which
+`unit_set_control` receives the new facing for one specific unit.
+
+The next question is why unit 0xe2740005 alone is late.  The four handles are
+object indices 2, 5, 8 and 11.  Whether index 5 is the client's own local player
+or a remote one decides between a local-prediction ordering bug and a network
+decode ordering bug.
