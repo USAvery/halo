@@ -111,7 +111,13 @@ def main():
         if n:
             by_name[n] = (int(addr, 16), int(ent["end"], 16))
 
-    objs = sorted(OBJ_ROOT.rglob("*.obj"))
+    # unported_thunks.c holds JMP-only thunks for functions we have NOT
+    # lifted.  They contain no FPU code at all, so every one scores "ours 0"
+    # against a real XBE function and lands at the top of the report.  That
+    # is not a lost narrowing, it is an unported function -- 63 of 207
+    # findings before this filter.
+    objs = [o for o in sorted(OBJ_ROOT.rglob("*.obj"))
+            if o.name != "unported_thunks.c.obj"]
     if args.paths:
         want = {Path(p).name + ".obj" for p in args.paths}
         objs = [o for o in objs if o.name in want]

@@ -656,3 +656,433 @@ desync still reproduced with the same `model_animation_choose_random` signature.
 That closes the x87-narrowing lane as a cause of this desync. The fix remains a
 genuine correctness fix (see docs/lift-learnings.md and
 tools/audit/check_x87_narrowing.py); it is simply not this bug.
+
+## The fork is a float comparison (2026-09-06, same session)
+
+The section above ended by saying the next step was to find which store in
+`FUN_001a4c50` / `FUN_001a5300` writes state 3. It is `FUN_001a4c50` at
+`0x1a5183`, and the answer changes the shape of the investigation.
+
+### The writer
+
+Neither dispatcher stores a literal 3; both write the state byte through a
+register. In `FUN_001a4c50`:
+
+    001a5160  fld   dword ptr [eax + 0x4c8]   ; per-tag threshold
+    001a5166  fld   dword ptr [ebp - 0xc]     ; computed value
+    001a5169  fcomp st(1)
+    001a516b  fnstsw ax
+    001a516f  test  ah, 5
+    001a5172  jp    0x1a5193                  ; skip the write entirely
+    ...
+    001a5183  mov   cl, byte ptr [ebp - 1]
+    001a5186  mov   eax, dword ptr [ebp + 0xc]
+    001a5189  test  cl, cl
+    001a518b  setne dl
+    001a518e  add   dl, 2                     ; dl = 2 or 3
+    001a5191  mov   byte ptr [eax], dl        ; <-- the desired state
+
+So the state is 2 or 3 depending on the `[ebp-1]` flag, and it is written at
+all only on one side of an x87 compare. `2` and `3` are the two turn-in-place
+directions.
+
+### What the compared value is
+
+From the aligned disassembly at `0x1a5061` (a jump target, so a safe boundary
+-- disassembling from an arbitrary address here decodes garbage and invents
+operands, which cost one wrong reading before this):
+
+    001a5061  lea   eax, [esi + 0x1d4]        ; desired facing
+    ...       copy to [ebp-0x20..], force z = 0
+    001a5083  call  0x12f10                   ; magnitude
+    001a5088  fcomp dword ptr [0x2533c0]      ; degenerate? then fall back to
+    001a5098  lea   edx, [esi + 0x24]         ;   the current facing
+    ...
+    001a50ac  fld   dword ptr [ebp - 0x20]    ; cross_z = a.x*b.y - a.y*b.x
+    001a50b2  fmul  dword ptr [edi + 4]       ;   -> sign selects [ebp-1],
+    001a50ba  fsubp st(1)                     ;      i.e. which way to turn
+    001a50bc  fld   dword ptr [ebp - 0x1c]    ; dot = a.x*b.x + a.y*b.y
+    001a50cb  faddp st(1)
+    001a50cd  fstp  dword ptr [ebp - 0xc]     ; <-- the compared value
+
+`[ebp-0xc]` is the **cosine of the angle between the biped's desired facing
+(`+0x1d4`) and its current facing (`+0x24`)**, and `[ebp-1]` is the sign of
+their cross product. The fork at `0x1a5172` is therefore "is the biped turned
+far enough from where it wants to face to play a turn-in-place animation", and
+our biped answered yes where the original answered no.
+
+**Struck 2026-09-06.** This paragraph previously claimed the same signature as
+"the open a10 report of a biped that rotates without translating". That report
+is not open -- it was fixed long ago -- so the cross-reference was wrong and
+carried no evidence either way. Nothing else in this document depends on it.
+
+### This REOPENS the float-precision lane
+
+The previous section recorded, correctly, that the captured build already had
+the `FUN_0010a5e0` x87-narrowing fix and still desynced. That remains true, but
+the conclusion drawn from it -- "closes the x87-narrowing lane as a cause" -- was
+too strong and is **withdrawn here**. It only rules out that one function. The
+fork is decided by a single `fcomp` of a computed cosine against a threshold, so
+a sub-ULP difference in the facing vectors flips it. Float precision upstream is
+now the PRIME suspect, not a closed lane.
+
+### Where it is not
+
+Checked and clean (not flagged by tools/audit/check_x87_narrowing.py):
+`normalize3d`, `magnitude3d`, the dot/cross helpers, and `FUN_001b0630` (the
+ported aiming-vector update called from inside `FUN_001a4c50` itself). Our
+ported normalization of `+0x1d4` (`src/halo/units/units.c:1058-1065`) is a
+faithful in-place normalize with the z component zeroed and a world-forward
+fallback.
+
+### Where to look next
+
+The full detector run is 5891 functions compared, 207 flagged (the earlier
+"397 compared, 29 flagged" figure was a partial run; use the 207). Ranked
+candidates that feed biped facing, worst first:
+
+    FUN_0002bd80            src/halo/ai/actor_moving.c   ours 4,  xbe 15  (-11)
+    FUN_001a2f40            src/halo/units/bipeds.c      ours 14, xbe 21  (-7)
+    actor_destination_update src/halo/ai/actor_moving.c  ours 0,  xbe 4   (-4)
+    FUN_0002b020            src/halo/ai/actor_moving.c   ours 0,  xbe 4   (-4)
+    FUN_001a2160            src/halo/units/bipeds.c      ours 1,  xbe 3   (-2)
+    FUN_001a1a10            src/halo/units/bipeds.c      ours 1,  xbe 3   (-2)
+    actor_move_update       src/halo/ai/actor_moving.c   ours 3,  xbe 4   (-1)
+
+`FUN_001a2f40` is notable because the unported dispatcher `FUN_001a5300` calls
+it directly on the same tick, and it is the worst offender in the units/bipeds
+group.
+
+Note the whole chain runs through UNPORTED code (`FUN_001a4c50`,
+`FUN_001a5300`), so the bug cannot be in the decision logic itself -- only in
+the float inputs that ported code hands it. That is what makes the narrowing
+detector the right instrument here rather than another capture.
+
+## Candidate list corrected by intersection with the fork's inputs (2026-09-06)
+
+The previous section ranked x87-narrowing candidates by raw delta. That was the
+wrong instrument: a narrowing delta only matters if the function touches one of
+the two vectors the `fcomp` at `0x1a5183` actually compares — the biped's
+desired facing (`+0x1d4`) and its current facing (`+0x24`). Intersecting the
+flagged set with the writers and readers of those two vectors reorders it and
+drops one entry entirely.
+
+| function | delta | touches the fork's inputs? | verdict |
+|---|---|---|---|
+| `FUN_0002bd80` (`actor_moving.c`) | -11 | reads `obj+0x24`, and its callers at `actor_moving.c:3717` take its `slerp`/`weight` outputs into the desired-facing path | **top candidate** |
+| `FUN_001a2160` (`bipeds.c`) | -2 | it *is* the per-tick writer of current facing `+0x24` | second, but see below |
+| `FUN_001a2f40` (`bipeds.c`) | -7 | 956 lines, no access to `+0x1d4`, `+0x24`, `+0x28`, `+0x2c` or `+0x30` anywhere in its body | **drop — noise for this bug** |
+
+### `FUN_001a2160` site-level result
+
+Per-site comparison (not just counts) narrows what its -2 means. The XBE
+narrows three cross-product temporaries at `ebp-0x20/-0x1c/-0x18`
+(`fstp dword` then `fld dword`, `0x1a21ef`..`0x1a2236`); our build keeps two of
+the three live in ST at 64-bit. Those temporaries feed **only the up vector**
+(`unit+0x30`). They reach the forward vector — the one the fork compares —
+through exactly one edge: the degenerate test at `0x1a2248`,
+
+    call 0x13010            ; normalize3d(up_ptr)
+    fcomp dword ptr [0x2533c0]
+    test  ah, 0x44
+    jp    0x1a2283          ; skip the reset
+    ...                     ; else fwd(+0x24) = global forward, up = global up
+
+so a precision difference here only propagates when the rebuilt up vector is
+near-degenerate. Real coupling, narrow band.
+
+`cos_a`/`sin_a` are **not** a divergence here even though clang stores them as
+`fstp tbyte [ebp-0x24]` / `[ebp-0x3c]`. Both are reloaded and narrowed with
+`fstp dword ptr [esp+0xc]` / `[esp+0x8]` at the call boundary, so each value is
+rounded to float32 exactly once, the same as the XBE's `fstp dword [ebp-8]`
+straight after `fcos`. An 80-bit spill is only a finding when nothing narrows
+the value before it is consumed.
+
+### Two checks that must come before any more candidate grinding
+
+The "it is an `fcomp`, therefore precision" step skips two questions, and two of
+the three possible answers make the narrowing list the wrong tool entirely:
+
+1. **Did the original even reach `0x1a5160`?** `FUN_001a4c50` has earlier
+   integer exits — `je 0x1a52f9` at `0x1a4f65` when `[esi+0x257] == 0`, and the
+   `and eax,0x40 / je 0x1a5061` split at `0x1a4f73`. If the host bailed before
+   the compare, the divergence is in an integer or flag upstream and no float
+   work touches it.
+2. **How far apart were the cosine and the threshold?** A sub-ULP difference
+   flips a compare *only when the operands are within an ULP of each other*.
+   If `|cos - threshold|` is appreciable, the desired-facing vector is
+   substantively wrong and this is a logic bug, not a precision one.
+
+One probe at `0x1a5169` recording (reached-flag, ST0, ST1, unit handle)
+discriminates all three outcomes in a single capture. Census its call sites
+first, the same way `0x1ad260` was censused above.
+
+Because of this, the earlier sentence "a sub-ULP difference in either facing
+vector flips it" should be read as **only when the two operands are near-equal**.
+
+### Tooling note
+
+Do not name a scratch analysis script `/tmp/dis.py`. Python's `inspect` imports
+the stdlib `dis` module, so a shadowing script in the CWD produces a confusing
+circular-import traceback (and breaks `apport`'s excepthook) even though the
+script's own output is correct.
+
+## Paired capture 2026-09-06 (repro B): the divergence is TWO records
+
+Second reproduction, both guests instrumented (client `10.0.0.21` trace build,
+host `10.0.0.24` running `host_rng_probe.xbe`, ring at `0x7ff900` — dump it
+with `--pe artifacts/rng_trace/session_symbols.pe`, the default cachebeta
+symbol lookup finds the wrong VA and reports a magic mismatch).
+
+Client ticks 0..6763, host 425..6847, first `out of sync` at tick **6635**.
+Diffing every `probe:unit_state` record by (tick, unit, state) over the whole
+overlap gives exactly two client-only records and **zero** host-only:
+
+    t=6627  handle=0xe3c20037  new=3  old=0
+    t=6633  handle=0xe3c20037  new=0  old=3
+
+Everything else in ~6,800 ticks matches. The unit enters animation state 3 on
+our build, sits there six ticks, and leaves; the original never enters it. The
+exit at 6633 draws from the global seed via `model_animation_choose_random`
+(three draws at t=6633/6634), and the seeds mismatch two ticks later. That
+closes the mechanism: **an animation transition is a seed draw, so one extra
+transition is one extra draw.**
+
+### The recorded state value was always in the capture
+
+`probe:unit_state` has no `value` field; the packed `(new<<8)|old` state is
+carried in **`seed_before`**. Reading `r.get("value", 0)` yields a histogram of
+all zeros and looks like "the probe records no state". It does. This also
+retroactively confirms the earlier *inference* that the spurious state is 3 —
+it is now measured, not deduced from `setne dl; add dl,2`.
+
+### Corrections to the previous section
+
+- Ranking client-only transitions without the paired host capture suggested a
+  burst at 6625/6626/6627 and therefore a gross, repeating error. Wrong: 6625
+  and 6626 occur on **both** sides. Only 6627 and 6633 are ours alone.
+- One transient excursion in 6,800 ticks that self-corrects after six ticks is
+  the knife-edge signature, not the gross-error one. The precision hypothesis
+  is back in first place, and `FUN_0002bd80` / `FUN_001a2160` are live again.
+
+### The fork has three gates, only one of which is float
+
+    0x1a5142  eax = [esi+0x1b8]
+    0x1a5148  test ah,1   / jne 0x1a52f9        ; gate 1 — integer flag, exits
+    0x1a5151  test al,0x20 / je  0x1a515d       ; threshold select
+    0x1a5155    fld dword [0x28ace8]            ;   A: constant
+    0x1a515d    fld dword [eax+0x4c8]           ;   B: from tag data
+    0x1a5166  fld dword [ebp-0xc]               ; the facing cosine
+    0x1a5169  fcomp st(1)                       ; gate 2 — FLOAT
+    0x1a516f  test ah,5   / jp  0x1a5193        ;   skip if not below
+    0x1a5177  test [ecx+0x17c], 0x100000
+    0x1a5181  jne 0x1a5193                      ; gate 3 — integer flag
+    0x1a5183  setne dl; add dl,2 -> state 2 or 3
+
+`setne`/`add dl,2` can only produce 2 or 3, never 0. The host wrote no
+transition at all, so the original did not reach `0x1a5183` — it failed gate 1,
+2 or 3. Gates 1 and 3 are integer flag tests; a wrong flag bit would normally
+diverge persistently rather than for six ticks, which is why gate 2 (the
+`fcomp`) remains the leading candidate. But gates 1 and 3 are now explicit
+alternatives that must be ruled out rather than assumed away.
+
+Next probe, if one is needed, should record at `0x1a5169`: the two `fcomp`
+operands, plus `[esi+0x1b8]` and `[ecx+0x17c]`, which distinguishes all three
+gates in one capture. Note the host probe framework already supports a value
+payload — `log(at, kind, value_code, caller)` in
+`artifacts/rng_trace/build_original_probes.py`.
+
+## Causality proven: the seed streams are one stream, shifted two draws (2026-09-06)
+
+The previous section established a *temporal* correlation -- two client-only
+animation transitions at ticks 6627 and 6633, first `out of sync` at 6635 --
+and inferred causality from the mechanism (a transition calls
+`model_animation_choose_random`, which draws). That inference is now a
+measurement.
+
+Diffing the seed-consuming draws in the paired repro-B capture, keyed by tick:
+
+    385 of 385 shared draw ticks (591..6633) agree on seed_before exactly
+    first divergent seed value:  tick 6634
+    client-only draw ticks:      6627, 6633, 6751
+    host-only draw ticks:        6685
+
+The raw sequence around the excursion shows what actually happened. These are
+the same seed values on both sides, consumed at different ticks:
+
+    tick   CLIENT                          HOST
+    6626   2615001737                      2615001737
+    6627   2174052948   <- extra draw      (no draw)
+    6633   3147223459   <- extra draw      (no draw)
+    6634   1401522854                      2174052948
+    6634   3521061325                      3147223459
+    6642    423647432                      1401522854
+
+Both machines walk the identical LCG sequence. The client simply reaches each
+value two draws earlier, because it burned two extra draws -- one entering the
+animation state at 6627, one leaving it at 6633 -- and those are exactly the two
+client-only `probe:unit_state` records. This is not "a different random
+stream"; it is the same stream, phase-shifted by two.
+
+It also answers a loose end: the state *entry* at 6627 does consume a draw
+immediately. The mismatch is not logged until 6635 only because the next draw
+the host performs after 6626 is at 6634.
+
+`seed_before` carrying the packed state is likewise no longer an inference:
+`tools/xbox/rng_trace_dump.py` documents kind 16 as
+`seed_before = (anim_state << 8) | old_state`.
+
+### Gate 3 and the threshold are read-only tag data -- eliminated
+
+`FUN_001a4c50`'s prologue resolves what `[ebp-8]` is:
+
+    0x1a4c69  push 0x62697064        ; 'bipd'
+    0x1a4c6e  call 0x1ba140          ; tag_get(group, index)
+    0x1a4c73  mov  edx, eax
+    0x1a4c81  mov  dword ptr [ebp-8], edx
+
+`[ebp-8]` is the **biped tag definition pointer** -- map content, byte-identical
+on both machines, written once at once at load. There is exactly one write to
+the slot in the whole function. Therefore:
+
+- Gate 3, `test dword ptr [ecx+0x17c], 0x100000` with `ecx = [ebp-8]`, **cannot
+  differ between the two machines. Eliminated.**
+- The gate-2 threshold, `fld dword ptr [eax+0x4c8]` with `eax = [ebp-8]`, is
+  also identical. So is the alternative `fld dword ptr [0x28ace8]`, a constant.
+  Only the *other* `fcomp` operand -- the facing cosine at `[ebp-0xc]`, which
+  ported code computes -- can differ.
+- `test bl,1` at `0x1a5117` reads `[edx+0x2f4]`, tag flags from the same
+  pointer. Also identical, also eliminated.
+
+### The gate list was incomplete -- corrected from a clean boundary
+
+Disassembling from the jump target `0x1a5061` (starting at `0x1a5130` decoded
+mid-instruction and invented operands -- the same trap recorded earlier in this
+document) shows more runtime gates than previously published:
+
+    0x1a5109  al = [esi+0x42a];  cmp al,1;  je  0x1a51aa      RUNTIME
+    0x1a5117  test bl,1          -> 0x1a51aa                  tag, eliminated
+    0x1a5120  test al,al         -> exit 0x1a52f9             RUNTIME (+0x42a)
+    0x1a5128  al = [ebp-2];      test al,al -> exit           RUNTIME (local)
+    0x1a5133  eax = [esi+0x1b4]; test ah,0x40 -> exit         RUNTIME
+    0x1a5142  eax = [esi+0x1b8]; test ah,1    -> exit         RUNTIME
+    0x1a5151  test al,0x20       threshold select             (both operands tag)
+    0x1a5169  fcomp st(1)  + test ah,5 + jp                   FLOAT
+    0x1a5177  test [ecx+0x17c],0x100000                       tag, eliminated
+    0x1a5183  setne dl; add dl,2 -> writes state 2 or 3
+
+`esi` is the unit object. The surviving runtime integer gates are `+0x42a`,
+`+0x1b4` bit 0x4000, `+0x1b8` bit 0x100, and the local `[ebp-2]`.
+
+### The immediate caller is ported and writes one of the gates
+
+`FUN_001a6350` (`src/halo/units/units.c`) is the per-tick biped dispatcher and
+the direct caller of `FUN_001a4c50`. It is ported, and in the same block it
+
+- normalizes the desired-facing vector at `+0x1d4` (`units.c:1053-1063`) -- one
+  of the two vectors whose cosine gate 2 compares, and
+- writes `+0x42a` from the animation state at `+0x253` (`units.c:1068-1083`) --
+  a surviving runtime gate.
+
+The x87-narrowing detector does **not** flag `FUN_001a6350`, nor `normalize3d`.
+Of the fork's upstream chain only two functions are flagged:
+
+    FUN_0002bd80  src/halo/ai/actor_moving.c   ours  4, xbe 15  (-11)
+    FUN_001a2160  src/halo/units/bipeds.c      ours  1, xbe  3   (-2)
+
+which is the ranking already recorded above, now with the caller ruled out.
+
+### Detector fix: unported thunks were 30% of the findings
+
+`check_x87_narrowing.py` was comparing `unported_thunks.c` entries -- JMP-only
+stubs containing no FPU code at all -- against real XBE functions, so every
+unported function scored "ours 0" and sorted to the top. 63 of the 207 reported
+findings were this artifact. With `unported_thunks.c.obj` skipped the run is
+**5375 compared, 144 MISSING-NARROWING**. Quote 144, not 207.
+
+### The `+0x42a` gates are eliminated too -- by measurement plus a table check
+
+`+0x42a` is written *only* by the ported `FUN_001a6350` switch, as a pure
+function of the animation state at `+0x253`. Two independent facts close it.
+
+**The switch is correct.** The XBE compiles it as a jump table:
+
+    0x1a64b8  movsx eax, byte ptr [esi+0x253]
+    0x1a64bf  cmp   eax, 7
+    0x1a64c2  ja    0x1a64e4                 ; unsigned -- negatives take default
+    0x1a64c4  movzx ecx, byte ptr [eax + 0x1a67a4]
+    0x1a64cb  jmp   dword ptr [ecx*4 + 0x1a6798]
+
+    index table @0x1a67a4 : [0, 2, 0, 0, 1, 1, 1, 1]
+    jump targets @0x1a6798: 0x1a64db -> +0x42a = 0
+                            0x1a64d2 -> +0x42a = 1
+                            0x1a64e4 -> +0x42a = 2  (also the `ja` default)
+
+So the original maps `0,2,3 -> 0`, `4..7 -> 1`, `1 and everything else -> 2`.
+Our C (`units.c:1068-1083`) is `case 0,2,3 -> 0`, `case 4,5,6,7 -> 1`,
+`default -> 2`, with `anim_state` declared `signed char`. State 1 falls to our
+`default` and to their index-2 arm, both giving 2. **Identical, including the
+negative-state case.** No bug here.
+
+**`+0x253` was identical at 6627.** The kind-16 probe payload decodes as
+
+    0f b7 c2                movzx eax, dx                 ; new state
+    c1 e0 08                shl   eax, 8
+    0f b6 8f 53 02 00 00    movzx ecx, byte ptr [edi+0x253]   ; OLD state
+    09 c8                   or    eax, ecx
+
+so the low byte of `seed_before` is `+0x253` read live at each call. Comparing
+the full `(tick, unit, new, old)` tuple across the paired capture: 171 client
+records, 169 host, **zero host-only**, and the two client-only records are the
+excursion itself. For the excursion unit `0xe3c20037`:
+
+    CLIENT  (6625, 21<-255)  (6626, 0<-21)  (6627, 3<-0)  (6633, 0<-3)
+    HOST    (6625, 21<-255)  (6626, 0<-21)
+
+Both machines set `+0x253 = 0` at tick 6626 and neither writes it again before
+6627. State 0 maps to `+0x42a = 0` on both. Therefore at the fork:
+
+    0x1a5109  cmp al,1   -> not taken on either machine
+    0x1a5120  test al,al -> not taken on either machine
+
+**Both `+0x42a` gates passed identically. Eliminated.**
+
+### `[ebp-2]` traced
+
+    0x1a4f59  al = [esi+0x257]
+    0x1a4f5f  test al,al
+    0x1a4f61  [ebp-2] = 0
+    0x1a4f65  je 0x1a52f9        ; +0x257 == 0 -> exit
+    0x1a4f6b  cmp al,5
+    0x1a4f6f  [ebp-2] = 1        ; only when +0x257 == 5
+
+`[ebp-2]` is not independent state: it is `(+0x257 == 5)`.
+
+### Where that leaves the fork
+
+Eliminated: gate 3, the gate-2 threshold, `test bl,1` (all tag data); both
+`+0x42a` gates (measured identical). Still unaccounted for, all runtime unit
+fields nobody has captured:
+
+    +0x257                (via [ebp-2], and the 0x1a4f65 early exit)
+    +0x1b4 bit 0x4000
+    +0x1b8 bit 0x100
+    the fcomp at 0x1a5169 -- facing cosine vs tag threshold
+
+The float gate is now the *largest* surviving candidate rather than the only
+one, and it is the only one whose input ported code computes through the FPU.
+
+**Probe placement, corrected:** a probe at `0x1a5169` only fires if the original
+reaches it, so on the host it would record nothing and name no gate. Probe the
+top of the chain at `0x1a5109` instead, logging `+0x42a`, `+0x257`, `+0x1b4`,
+`+0x1b8` in one payload -- it fires unconditionally on both machines and the
+diff names the gate directly. A second probe at `0x1a5169` then supplies the
+two `fcomp` operands when the chain is reached.
+
+### Scope of the seed-stream proof
+
+The wide tick-keyed comparison was `385 / 397` agreeing, where the 12
+disagreements are all at ticks >= 6634 and the comparison used only the *first*
+draw of each tick. The one-for-one value alignment above comes from the
+6600-6645 zoom, which covers the high-volume ticks in full. The whole proof is
+scoped to ticks >= 591 because the 65536-record ring had wrapped on both sides.
