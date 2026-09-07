@@ -33678,7 +33678,8 @@
     },
     {
      "addr": "0x32ac0",
-     "decl": "void actor_perception_unreachable(int actor_handle, int leader_handle, char flag);"
+     "decl": "void actor_perception_unreachable(int actor_handle, int leader_handle, char flag);",
+     "ported": true
     },
     {
      "addr": "0x32b50",
@@ -33687,7 +33688,8 @@
     },
     {
      "addr": "0x32bb0",
-     "decl": "void actor_perception_tried_to_search(int actor_handle, int prop_handle);"
+     "decl": "void actor_perception_tried_to_search(int actor_handle, int prop_handle);",
+     "ported": true
     },
     {
      "addr": "0x32c10",

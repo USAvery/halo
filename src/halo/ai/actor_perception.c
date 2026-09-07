@@ -624,38 +624,6 @@ done_vision:
          local_c;
 }
 
-/* actor_perception_tried_to_uncover: mark a prop as having been uncovered.
- *
- * Early-out when prop_handle == -1 (CMP ESI,-1 / JZ epilogue).
- * Fetches the actor record (datum_get(actor_data, actor_handle), EDI) and the
- * prop record (datum_get(prop_data, prop_handle), EAX), sets the prop's
- * +0xb9 byte flag to 1, then — if the prop is the actor's current target
- * (actor_t.target_target_prop_index, +0x270) — refreshes target and combat
- * status.
- *
- * Confirmed: both cdecl cleanups are coalesced (ADD ESP,0x10 for the two
- * 2-arg datum_get calls; ADD ESP,0x8 for the two 1-arg situation calls), so
- * the ARG_COUNT audit hazards are cdecl mis-grouping, not extra arguments.
- *
- * No __FILE__ string. */
-void actor_perception_tried_to_uncover(int actor_handle, int prop_handle)
-{
-  char *actor;
-  char *prop;
-
-  if (prop_handle == -1)
-    return;
-
-  actor = (char *)datum_get(actor_data, actor_handle);
-  prop = (char *)datum_get(prop_data, prop_handle);
-  *(char *)(prop + 0xb9) = 1;
-
-  if (prop_handle == ((actor_t *)actor)->target_target_prop_index) {
-    actor_situation_update_target_status(actor_handle);
-    actor_situation_combat_status_update(actor_handle);
-  }
-}
-
 /* actor_situation_try_new_target (0x308e0)
  * Score prop `target` for `actor_handle` and adopt it as the actor's combat
  * target when it beats the currently-held target.
@@ -772,6 +740,106 @@ short FUN_00030e60(void *records /* @<eax> */, int key /* @<edi> */,
   return index;
 }
 
+/* actor_perception_unreachable (0x32ac0): mark a prop as reachable or not.
+ *
+ * The first datum_get(actor_data, actor_handle) result is discarded by the
+ * original (EAX is immediately overwritten by the second call); the call is
+ * kept for side-effect/order fidelity.  flag == 0 clears the unreachable
+ * state (+0x9c word = 0, +0xa0 timestamp = NONE); otherwise the state is
+ * raised to 1 only when currently 0, and the timestamp is refreshed from
+ * game_time_get().  Both the knowledge byte (+0xa4) and the target weight
+ * (+0x50) are then recomputed, in that order. */
+void actor_perception_unreachable(int actor_handle, int leader_handle,
+                                  char flag)
+{
+  char *prop;
+
+  (void)datum_get(actor_data, actor_handle);
+  prop = (char *)datum_get(*(data_t **)0x5ab23c, leader_handle);
+
+  if (flag == 0) {
+    *(uint16_t *)(prop + 0x9c) = 0;
+    *(int *)(prop + 0xa0) = -1;
+  } else {
+    if (*(int16_t *)(prop + 0x9c) == 0)
+      *(uint16_t *)(prop + 0x9c) = 1;
+    *(int *)(prop + 0xa0) = game_time_get();
+  }
+
+  *(char *)(prop + 0xa4) =
+    (char)actor_get_perception_knowledge(actor_handle, leader_handle);
+  *(float *)(prop + 0x50) =
+    actor_compute_prop_target_weight(actor_handle, leader_handle);
+}
+
+/* actor_perception_tried_to_uncover: mark a prop as having been uncovered.
+ *
+ * Early-out when prop_handle == -1 (CMP ESI,-1 / JZ epilogue).
+ * Fetches the actor record (datum_get(actor_data, actor_handle), EDI) and the
+ * prop record (datum_get(prop_data, prop_handle), EAX), sets the prop's
+ * +0xb9 byte flag to 1, then — if the prop is the actor's current target
+ * (actor_t.target_target_prop_index, +0x270) — refreshes target and combat
+ * status.
+ *
+ * Confirmed: both cdecl cleanups are coalesced (ADD ESP,0x10 for the two
+ * 2-arg datum_get calls; ADD ESP,0x8 for the two 1-arg situation calls), so
+ * the ARG_COUNT audit hazards are cdecl mis-grouping, not extra arguments.
+ *
+ * No __FILE__ string. */
+void actor_perception_tried_to_uncover(int actor_handle, int prop_handle)
+{
+  char *actor;
+  char *prop;
+
+  if (prop_handle == -1)
+    return;
+
+  actor = (char *)datum_get(actor_data, actor_handle);
+  prop = (char *)datum_get(prop_data, prop_handle);
+  *(char *)(prop + 0xb9) = 1;
+
+  if (prop_handle == ((actor_t *)actor)->target_target_prop_index) {
+    actor_situation_update_target_status(actor_handle);
+    actor_situation_combat_status_update(actor_handle);
+  }
+}
+
+/* actor_perception_tried_to_search (0x32bb0): mark a prop as having been
+ * searched for.
+ *
+ * Same shape as actor_perception_tried_to_uncover, one offset apart.
+ * Early-out when prop_handle == -1 (CMP ESI,-1 / JZ epilogue at 0x32bba).
+ * Fetches the actor record (datum_get(actor_data, actor_handle) -> EDI at
+ * 0x32bc8) and the prop record (datum_get(prop_data, prop_handle) -> EAX at
+ * 0x32bd7), sets the prop's +0xba byte flag to 1 (MOV byte ptr [EAX+0xba],1
+ * at 0x32bdc), then - only when the prop is the actor's current target
+ * (actor_t.target_target_prop_index, +0x270; CMP ESI,EAX at 0x32bec) -
+ * refreshes target and combat status.
+ *
+ * Confirmed: both cdecl cleanups are coalesced (ADD ESP,0x10 at 0x32be9 for
+ * the two 2-arg datum_get calls; ADD ESP,0x8 at 0x32bfc for the two 1-arg
+ * situation calls), so the ARG_COUNT audit hazards are cdecl mis-grouping,
+ * not extra arguments.
+ *
+ * No __FILE__ string. */
+void actor_perception_tried_to_search(int actor_handle, int prop_handle)
+{
+  char *actor;
+  char *prop;
+
+  if (prop_handle == -1)
+    return;
+
+  actor = (char *)datum_get(actor_data, actor_handle);
+  prop = (char *)datum_get(prop_data, prop_handle);
+  *(char *)(prop + 0xba) = 1;
+
+  if (prop_handle == ((actor_t *)actor)->target_target_prop_index) {
+    actor_situation_update_target_status(actor_handle);
+    actor_situation_combat_status_update(actor_handle);
+  }
+}
+
 /* actor_perception_abandoned_search (0x32c10): the actor gives up on a search.
  *
  * prop_handle == -1 is the "no prop" path: clear the actor's search
@@ -816,6 +884,7 @@ void actor_perception_abandoned_search(int actor_handle, int prop_handle)
     actor_situation_combat_status_update(actor_handle);
   }
 }
+
 /* actor_perception_become_acknowledged (0x33330): promote a prop to the
  * "acknowledged" state (prop+0x24 == 3).
  *
