@@ -24757,7 +24757,8 @@
     },
     {
      "addr": "0x1cd540",
-     "decl": "void sound_stop_all(void);"
+     "decl": "void sound_stop_all(void);",
+     "ported": true
     },
     {
      "addr": "0x1cd690",

@@ -1705,6 +1705,31 @@ void sound_stop_impulse(int sound_index)
     sound_start_fade(0, 0.3f, -1, sound_index);
 }
 
+/* sound_stop_all (0x1cd540)
+ *
+ * Stop every active sound channel and reset the fade deadline.
+ *
+ * If the sound system is initialized (0x4eaf40), walk the sounds table
+ * (0x4fdba4) with data_next_index and stop each entry via
+ * sound_stop_channel (@<ebx>), then re-validate the looping-sounds table
+ * (0x4fdba0) and call the hardware backend's +0x2c vtable entry
+ * (0x4eaf48). The fade deadline (0x4eaf44) is cleared unconditionally,
+ * even when the sound system is not initialized. */
+void sound_stop_all(void)
+{
+  int sound_index;
+  if (*(uint8_t *)0x4eaf40 != 0) {
+    for (sound_index = data_next_index(*(data_t **)0x4fdba4, -1);
+         sound_index != -1;
+         sound_index = data_next_index(*(data_t **)0x4fdba4, sound_index)) {
+      sound_stop_channel(sound_index);
+    }
+    data_make_valid(*(data_t **)0x4fdba0);
+    (*(void (**)(void))((*(uint8_t **)0x4eaf48) + 0x2c))();
+  }
+  *(int *)0x4eaf44 = 0;
+}
+
 /* Allocate a sound channel for a source based on its spatialization mode.
  *
  * source is passed in EAX (register argument); priority is on the stack.
