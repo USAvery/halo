@@ -1882,3 +1882,31 @@ sha a2a004b6...).  Unicorn check: registers, flags and every byte at or above
 ESP identical to the original prologue path; record = kind 31, tick, jpt tag,
 handle.  Host image sha 3a838b03..., deployed with `host_diagnostic.py probes`.
 Next capture will list the candidate set on both sides.
+
+## RUN 3 2026-09-07: grenade lands one tick late -- lost float32 narrowing in projectiles.c
+
+Captures `ds3_h.json` / `ds3_c.json` (both builds carry the kind-31 damage probe).
+Identical through tick 1008.  Tick 996: grenade throw (`projectile_accelerate`
+from units.c, same two scatter draws on both).  Host: impact handler
+`FUN_000f90d0` draws at tick 1009; client: the same two draws (same seeds) at
+tick 1010.  The grenade flew a slightly different path.
+
+`check_x87_narrowing.py src/halo/items/projectiles.c` flagged
+`projectile_accelerate` (ours 0 narrowed slots, xbe 3): the original FSTPs the
+squared scatter magnitude before the FSQRT (0xf9001) and the dir[1]/dir[2]
+scatter components (0xf9032/0xf903a) while dir[0]*scale is added wide.  Fixed
+in 0b211d249 together with `FUN_000f7fa0`.  The remaining three flagged
+functions (`FUN_000f9c40` projectile update, `FUN_000f90d0` impact handler,
+`projectile_aim_ballistic`) were aligned site by site in 9e0ddb9cb; the TU now
+reports 0 MISSING-NARROWING and no VC71 score moved.
+
+Checker gap found on the way: `narrowing_slots()` only recognises a reload as
+`fld dword [slot]`; a slot consumed by `fsub/fdiv/fmul/fcomp dword [slot]` is
+invisible, so the reported deltas understate the real gap (four such slots in
+`projectile_aim_ballistic` alone: t_min, two_a, b, V).  Follow-up: extend the
+checker, then re-run it over every TU that touches simulation state.
+
+Run 2's tick-315 case (area damage candidate set 4 vs 2) is most likely the
+same class -- an explosion position that differs in the low bits -- and has
+not been reproduced since the kind-31 probe went in; the next capture that
+shows it will name the objects on both sides.
