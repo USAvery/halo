@@ -16,6 +16,20 @@
 #define HALO_FLT_ROUNDTRIP(lv) __asm__ __volatile__("" : "+m"(lv))
 #endif
 
+/* Register-width scalar intermediate.  MSVC 7.1 keeps a temporary such as a
+ * dot product in ST(i) at 64-bit significand and never narrows it; clang
+ * -mno-sse spills a float-typed SSA value as a dword under register pressure,
+ * rounding it to 24 bits where the original binary does not.  Typing the
+ * temporary (and promoting the products feeding it) as double makes clang
+ * spill it as a qword instead: 53 bits, the closest this target offers
+ * (`long double` is 64-bit on i386-pc-win32).  The VC71 lane keeps `float` so
+ * cl.exe emits the register-resident code the reference has. */
+#if defined(_MSC_VER) && !defined(__clang__)
+typedef float x87_wide_t;
+#else
+typedef double x87_wide_t;
+#endif
+
 #if defined(_MSC_VER) && !defined(__clang__)
 /* VC71 verify lane only (the shipping clang build takes the asm-volatile
  * branches below; clang defines _MSC_VER under -target i386-pc-win32, hence

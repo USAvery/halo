@@ -1,3 +1,4 @@
+#include "x87_math.h"
 #ifdef HALO_RNG_TRACE
 #include "halo/math/rng_trace.h"
 #endif
@@ -1548,10 +1549,16 @@ check_result:
 void collision_log_end_time(float *target, float *origin, float *output,
                             float *dir)
 {
-  float t =
-    ((target[0] - origin[0]) * dir[0] + (target[1] - origin[1]) * dir[1] +
-     (target[2] - origin[2]) * dir[2]) /
-    (dir[0] * dir[0] + dir[1] * dir[1] + dir[2] * dir[2]);
+  /* The original keeps both dot products in ST(i) and narrows only the
+   * quotient (FSTP dword [ebp+8] at 0x14eefb).  When clang inlines this into
+   * FUN_0014f2c0 it narrowed the numerator instead and kept t wide; both
+   * differences moved a grenade's rest position (system-link run 9). */
+  float t = (float)((((x87_wide_t)target[0] - origin[0]) * dir[0] +
+                     ((x87_wide_t)target[1] - origin[1]) * dir[1] +
+                     ((x87_wide_t)target[2] - origin[2]) * dir[2]) /
+                    ((x87_wide_t)dir[0] * dir[0] + (x87_wide_t)dir[1] * dir[1] +
+                     (x87_wide_t)dir[2] * dir[2]));
+  HALO_FLT_ROUNDTRIP(t);
   output[0] = t * dir[0] + origin[0];
   output[1] = t * dir[1] + origin[1];
   output[2] = t * dir[2] + origin[2];
@@ -1780,8 +1787,8 @@ short FUN_0014f2c0(float *old_pos, float *old_vel, short *features,
 
   short clip_count;
   short new_clip_count;
-  float scale;
-  float dot, dot2, factor, pos_dot, len_sq;
+  x87_wide_t scale;
+  x87_wide_t dot, dot2, factor, pos_dot, len_sq;
   float *collision_record;
   float *plane_ptr;
   float *prev_plane_ptr;
@@ -1871,11 +1878,17 @@ short FUN_0014f2c0(float *old_pos, float *old_vel, short *features,
       break;
     }
 
-    scale = *(float *)0x2533c8 - collision_record[0];
+    scale = (x87_wide_t)*(float *)0x2533c8 - collision_record[0];
 
     old_vel_copy[0] = old_vel_copy[0] * scale;
     old_vel_copy[1] = old_vel_copy[1] * scale;
     old_vel_copy[2] = old_vel_copy[2] * scale;
+    /* MSVC narrows each scaled component to float (FSTP dword [ebp-0x34..-0x2c]
+     * at 0x14f60a..0x14f633); clang kept them as 64-bit doubles across the
+     * clip loop.  Lockstep-relevant: run 9 grenade trajectory drift. */
+    HALO_FLT_ROUNDTRIP(old_vel_copy[0]);
+    HALO_FLT_ROUNDTRIP(old_vel_copy[1]);
+    HALO_FLT_ROUNDTRIP(old_vel_copy[2]);
 
     collision_count++;
 
@@ -1887,10 +1900,11 @@ short FUN_0014f2c0(float *old_pos, float *old_vel, short *features,
     CHECK_FINITE3_VEC(old_vel_copy, "&velocity", 0x3cd);
 
     plane_ptr = (float *)((char *)collision_record + 0x10);
-    dot = plane_ptr[0] * plane_ptr[0] + plane_ptr[1] * plane_ptr[1] +
-          plane_ptr[2] * plane_ptr[2];
+    dot = (x87_wide_t)plane_ptr[0] * plane_ptr[0] +
+          (x87_wide_t)plane_ptr[1] * plane_ptr[1] +
+          (x87_wide_t)plane_ptr[2] * plane_ptr[2];
 
-    dot_check = dot - *(float *)0x2533c8;
+    dot_check = (float)(dot - *(float *)0x2533c8);
     if ((*(uint32_t *)&dot_check & 0x7f800000) == 0x7f800000 ||
         !(fabs((double)dot_check) < *(double *)0x2549d8) ||
         ((*(uint32_t *)&plane_ptr[3] & 0x7f800000) == 0x7f800000)) {
@@ -1918,45 +1932,57 @@ short FUN_0014f2c0(float *old_pos, float *old_vel, short *features,
 
     new_clip_count = 1;
 
-    dot = collision_plane[0] * old_vel_copy[0] +
-          collision_plane[1] * old_vel_copy[1] +
-          collision_plane[2] * old_vel_copy[2];
+    dot = (x87_wide_t)collision_plane[0] * old_vel_copy[0] +
+          (x87_wide_t)collision_plane[1] * old_vel_copy[1] +
+          (x87_wide_t)collision_plane[2] * old_vel_copy[2];
     factor = -dot;
 
     velocity[0] = factor * collision_plane[0] + old_vel_copy[0];
     velocity[1] = factor * collision_plane[1] + old_vel_copy[1];
     velocity[2] = factor * collision_plane[2] + old_vel_copy[2];
+    HALO_FLT_ROUNDTRIP(velocity[0]);
+    HALO_FLT_ROUNDTRIP(velocity[1]);
+    HALO_FLT_ROUNDTRIP(velocity[2]);
 
-    pos_dot = collision_plane[0] * collision_position[0] +
-              collision_plane[1] * collision_position[1] +
-              collision_plane[2] * collision_position[2] - collision_plane[3];
+    pos_dot = (x87_wide_t)collision_plane[0] * collision_position[0] +
+              (x87_wide_t)collision_plane[1] * collision_position[1] +
+              (x87_wide_t)collision_plane[2] * collision_position[2] -
+              collision_plane[3];
     factor = -pos_dot;
 
     position[0] = factor * collision_plane[0] + collision_position[0];
     position[1] = factor * collision_plane[1] + collision_position[1];
     position[2] = factor * collision_plane[2] + collision_position[2];
+    HALO_FLT_ROUNDTRIP(position[0]);
+    HALO_FLT_ROUNDTRIP(position[1]);
+    HALO_FLT_ROUNDTRIP(position[2]);
 
     if (clip_count > 0) {
       prev_plane_ptr = (float *)((char *)collisions +
                                  (int)(short)clip_indices[0] * 0x2c + 0x10);
-      dot = (prev_plane_ptr[2] * velocity[2] + prev_plane_ptr[1] * velocity[1]) +
-            prev_plane_ptr[0] * velocity[0];
+      dot = ((x87_wide_t)prev_plane_ptr[2] * velocity[2] +
+             (x87_wide_t)prev_plane_ptr[1] * velocity[1]) +
+            (x87_wide_t)prev_plane_ptr[0] * velocity[0];
 
       if (dot < *(float *)0x26a810 &&
           line_from_planes3d(plane_ptr, prev_plane_ptr, clip_result, clip_line)) {
         CHECK_FINITE3_POINT(clip_result, "&clip_line_point", 0x3e1);
         CHECK_FINITE3_VEC(clip_line, "&clip_line_vector", 0x3e2);
 
-        len_sq = clip_line[0] * clip_line[0] + clip_line[1] * clip_line[1] +
-                 clip_line[2] * clip_line[2];
-        dot2 =
-          (clip_line[0] * old_vel_copy[0] + clip_line[1] * old_vel_copy[1] +
-           clip_line[2] * old_vel_copy[2]) /
-          len_sq;
+        len_sq = (x87_wide_t)clip_line[0] * clip_line[0] +
+                 (x87_wide_t)clip_line[1] * clip_line[1] +
+                 (x87_wide_t)clip_line[2] * clip_line[2];
+        dot2 = ((x87_wide_t)clip_line[0] * old_vel_copy[0] +
+                (x87_wide_t)clip_line[1] * old_vel_copy[1] +
+                (x87_wide_t)clip_line[2] * old_vel_copy[2]) /
+               len_sq;
 
         velocity[0] = dot2 * clip_line[0];
         velocity[1] = dot2 * clip_line[1];
         velocity[2] = dot2 * clip_line[2];
+        HALO_FLT_ROUNDTRIP(velocity[0]);
+        HALO_FLT_ROUNDTRIP(velocity[1]);
+        HALO_FLT_ROUNDTRIP(velocity[2]);
 
         collision_log_end_time(collision_position, clip_result, position,
                                clip_line);
@@ -1968,9 +1994,9 @@ short FUN_0014f2c0(float *old_pos, float *old_vel, short *features,
           prev_plane_ptr =
             (float *)((char *)collisions +
                       (int)(short)clip_indices[1] * 0x2c + 0x10);
-          dot = (prev_plane_ptr[2] * velocity[2] +
-                 prev_plane_ptr[1] * velocity[1]) +
-                prev_plane_ptr[0] * velocity[0];
+          dot = ((x87_wide_t)prev_plane_ptr[2] * velocity[2] +
+                 (x87_wide_t)prev_plane_ptr[1] * velocity[1]) +
+                (x87_wide_t)prev_plane_ptr[0] * velocity[0];
 
           if (dot < *(float *)0x26a810 &&
               point_from_planes3d(
@@ -2003,9 +2029,9 @@ short FUN_0014f2c0(float *old_pos, float *old_vel, short *features,
       } else if (clip_count > 1) {
         prev_plane_ptr = (float *)((char *)collisions +
                                    (int)(short)clip_indices[1] * 0x2c + 0x10);
-        dot = (prev_plane_ptr[2] * velocity[2] +
-               prev_plane_ptr[1] * velocity[1]) +
-              prev_plane_ptr[0] * velocity[0];
+        dot = ((x87_wide_t)prev_plane_ptr[2] * velocity[2] +
+               (x87_wide_t)prev_plane_ptr[1] * velocity[1]) +
+              (x87_wide_t)prev_plane_ptr[0] * velocity[0];
 
         if (dot < *(float *)0x26a810 &&
             line_from_planes3d(
@@ -2033,16 +2059,20 @@ short FUN_0014f2c0(float *old_pos, float *old_vel, short *features,
             system_exit(-1);
           }
 
-          len_sq = clip_line[0] * clip_line[0] + clip_line[1] * clip_line[1] +
-                   clip_line[2] * clip_line[2];
-          dot2 = (clip_line[0] * old_vel_copy[0] +
-                  clip_line[1] * old_vel_copy[1] +
-                  clip_line[2] * old_vel_copy[2]) /
+          len_sq = (x87_wide_t)clip_line[0] * clip_line[0] +
+                   (x87_wide_t)clip_line[1] * clip_line[1] +
+                   (x87_wide_t)clip_line[2] * clip_line[2];
+          dot2 = ((x87_wide_t)clip_line[0] * old_vel_copy[0] +
+                  (x87_wide_t)clip_line[1] * old_vel_copy[1] +
+                  (x87_wide_t)clip_line[2] * old_vel_copy[2]) /
                  len_sq;
 
           velocity[0] = dot2 * clip_line[0];
           velocity[1] = dot2 * clip_line[1];
           velocity[2] = dot2 * clip_line[2];
+          HALO_FLT_ROUNDTRIP(velocity[0]);
+          HALO_FLT_ROUNDTRIP(velocity[1]);
+          HALO_FLT_ROUNDTRIP(velocity[2]);
 
           collision_log_end_time(collision_position, clip_result, position,
                                  clip_line);
@@ -2081,7 +2111,8 @@ short FUN_0014f2c0(float *old_pos, float *old_vel, short *features,
         "c:\\\\halo\\\\SOURCE\\\\physics\\\\collisions.c", 0x428, 1);
       system_exit(-1);
     }
-    dot = (collision_plane[0] * old_vel[0] + collision_plane[1] * old_vel[1]) +
+    dot = ((x87_wide_t)collision_plane[0] * old_vel[0] +
+           (x87_wide_t)collision_plane[1] * old_vel[1]) +
           collision_plane[2] * old_vel[2];
     factor = -dot;
     new_vel[0] = factor * collision_plane[0] + old_vel[0];

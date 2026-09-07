@@ -1962,3 +1962,69 @@ land inside the stolen range before installing a detour.
 
 Run 6 host data was lost (host rebooted by a redeploy before the dump).
 Host image sha256 ca16e603…, 8 patches. Client commits 12990c7d1, 2e7d0e1fb.
+
+## RUN 7 / RUN 8 (2026-09-07) — LOS reject flips both ways; origin identical
+
+Run 7 (tick 966) and run 8 (tick 751) are the same event with opposite outcomes:
+the LOS test for one projectile candidate (`0xe2ae0039` / `0xe2bb0039`) returns
+"hit at t=0, structure BSP" on one box and "miss" on the other. Run 7: host miss,
+client hit. Run 8: host hit, client miss. The kind-34 `damage_origin` probe shows
+the explosion origin (x, y) bit-identical on both sides in run 8, and the
+`radius_hit` candidate sets and order are identical.
+
+Everything downstream of the origin is either original code on both boxes
+(`FUN_00138900`, the bsp3d traversal `FUN_00148eb0`) or a ported leaf verified
+against the binary and against our clang codegen: `collision_bsp_test_vector`
+(same data struct init and t clamp), `FUN_00148780` (point = t*dir+origin
+narrowed to float exactly like the original), `FUN_00146d40` (2D BSP point test,
+no spills on either side), `FUN_00061df0` (dword copies). So with an identical
+origin the remaining input is the ray direction = target position - origin. A
+start point lying on a floor plane makes the "t=0 hit" decision depend on the
+sign of dot(direction, normal), which flips with a one-ulp change in the target's
+position. The target is a projectile, so the suspect is the projectile/object
+physics position update on the client (`FUN_0014f2c0` in collision_usage.c is
+flagged by the narrowing checker with two missing float32 stores).
+
+Probe change: `radius_hit` now logs the accepted object's position z bits
+(obj+0x58) instead of found_count (host detour 6 reads [ESI+0x58]). Next run
+compares the z of the rejected projectile on both sides.
+
+## RUN 9 (2026-09-07) — grenade position drift; FUN_0014f2c0 narrowing fixed
+
+Tick 261, same class: the LOS test for grenade `0xe29b002c` returned hit-at-t=0
+on the host (reject) and miss on the client (damage, projectile_accelerate draws).
+This time the kind-34 origin differed too (host x/y `c103f26e/40c8735a`, client
+`c103d821/40c9c2fd`, about 0.04 world units) and the new radius_hit z showed the
+grenade itself at `bed53017` vs `becf0592`. Walking back through the ring, the
+same grenade was already 0.009 off in z at tick 187 when an earlier explosion
+kicked it (identical RNG draws on both sides). The drift is in the projectile's
+flight/bounce physics, not in any RNG-consuming code.
+
+Static walk of the physics step (`FUN_0014f2c0`, collision_usage.c) against
+the XBE showed three narrowing mismatches, all invisible to VC71 (cl.exe narrows
+by itself):
+
+1. `old_vel_copy[i] *= (1 - t)` — the original stores each product to a float
+   slot every clip iteration (FSTP dword [ebp-0x34..-0x2c] at 0x14f60a..33);
+   clang kept the three components as 64-bit doubles (`fst qword [ebp-0x80..-0x70]`)
+   for the whole loop. Fixed with `HALO_FLT_ROUNDTRIP` after the scaling, and
+   also after every velocity/position projection store.
+2. Under register pressure clang spilled the *partial* dot product
+   `plane[0]*v[0] + plane[1]*v[1]` as a dword (`fstp dword [ebp-0x58]`) — a
+   24-bit rounding the original never does (it keeps `dot`, `factor`,
+   `pos_dot`, `len_sq`, `dot2`, `scale` in ST(i)). Fixed by typing those
+   temporaries `x87_wide_t` (double under clang, float on the VC71 lane) and
+   promoting the products that feed them; clang now spills them as qwords.
+3. `collision_log_end_time` inlined into the loop: the original narrows only the
+   quotient `t` (FSTP dword [ebp+8] at 0x14eefb); inlined clang narrowed the
+   numerator and kept `t` wide. Fixed the same way plus `HALO_FLT_ROUNDTRIP(t)`.
+
+`check_x87_narrowing.py` now reports 0 MISSING for collision_usage.c; VC71
+unchanged (FUN_0014f2c0 88.9%, collision_log_end_time 69.6%). Note the checker's
+count is a net: an extra clang narrowing can hide behind a missing one (the
+pre-fix count was 7 vs 9 while ours had one *extra* rounding), so a "0 MISSING"
+result does not prove parity — inspect the computed dword stores directly.
+
+None of the 22 other functions the checker flags in real_math.c / collision_bsp.c
+/ objects.c are in the static callee closure of `FUN_0014f2c0` (183 functions).
+Run 10 pending.

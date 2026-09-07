@@ -20,8 +20,13 @@ narrowing our shipped clang build omits, so the score stays 100%.
 
 Metric: per function, count dword-width x87 stores to frame-relative slots that
 are later reloaded by an x87 dword load from the same slot.  Report functions
-where ours is lower than the original's.  A lower count means we skipped a
-narrowing; a higher count is only extra spilling and is numerically harmless.
+where ours is lower than the original's (MISSING) and, separately, where ours is
+higher (EXTRA): clang spills a float-typed *computed* value as a dword under
+register pressure -- e.g. the partial dot product in FUN_0014f2c0 -- which is a
+24-bit rounding the original never performs.  Fix an EXTRA by typing the
+temporary `x87_wide_t` (src/x87_math.h) and promoting the products feeding it.
+The count is a net: an extra can hide a missing one, so a clean report is not
+proof of parity -- inspect the computed dword stores when a divergence persists.
 
 Fix template: `HALO_FLT_ROUNDTRIP(lv)` in `src/halo/math/real_math.c` -- a
 guarded empty `asm volatile ("" : "+m"(lv))` that forces the store/reload at
@@ -87,6 +92,8 @@ def narrowing_slots(insns):
                     stored.add(slot)
                 computed = ins.mnemonic == "fst"
             continue
+        if ins.mnemonic in ("fxch", "fchs", "fabs"):
+            continue  # exchange/sign ops carry the wide value through unchanged
         computed = ins.mnemonic.startswith(ARITH)
     return roundtripped
 
@@ -125,7 +132,7 @@ def main():
         print("no clang objects under %s -- build first" % OBJ_ROOT, file=sys.stderr)
         return 2
 
-    findings, checked = [], 0
+    findings, extras, checked = [], [], 0
     for obj in objs:
         for name, insns in objdump_functions(obj).items():
             if args.function and name not in args.function:
@@ -139,13 +146,19 @@ def main():
             delta = len(theirs) - len(ours)
             if delta >= args.min_delta:
                 findings.append((delta, name, obj, len(ours), len(theirs)))
+            elif delta < 0:
+                extras.append((-delta, name, obj, len(ours), len(theirs)))
 
     for delta, name, obj, no, nt in sorted(findings, reverse=True):
         print("[X87-NARROW] %s (%s): ours %d, xbe %d (-%d)"
               % (name, obj.relative_to(OBJ_ROOT), no, nt, delta))
+    for delta, name, obj, no, nt in sorted(extras, reverse=True):
+        print("[X87-EXTRA-NARROW] %s (%s): ours %d, xbe %d (+%d)"
+              % (name, obj.relative_to(OBJ_ROOT), no, nt, delta))
 
-    print("\n%d compared, %d MISSING-NARROWING" % (checked, len(findings)))
-    return 1 if findings else 0
+    print("\n%d compared, %d MISSING-NARROWING, %d EXTRA-NARROWING"
+          % (checked, len(findings), len(extras)))
+    return 1 if findings or extras else 0
 
 
 if __name__ == "__main__":
