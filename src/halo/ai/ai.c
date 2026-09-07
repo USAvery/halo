@@ -209,6 +209,49 @@ void ai_get_major_upgrade_chance(int16_t param_1, char *force_major,
   }
 }
 
+/* 0x3f900 — ai_adjust_damage: scale incoming damage by per-actor AI modifiers.
+ *
+ * If actor_handle is a valid datum handle into the actor pool ([0x6325a4]):
+ *   - when damage_params+0x4 has bit 3 (0x8) set AND actor->field_69c > 0.0f,
+ *     multiplies *scale by actor->field_69c (an AI-specific damage multiplier);
+ *   - when actor->field_1ca is non-zero, multiplies *scale by the global float
+ *     at 0x2533e4 and returns 1 unconditionally.
+ * Returns whether any scaling was applied.
+ *
+ * Confirmed: PUSH EAX(actor_handle); PUSH [0x6325a4]; CALL datum_get; ADD ESP,8
+ *   at 0x3f915 — 2 cdecl args, pool is actor_data (same global as actors.c).
+ * Confirmed: MOV AL,byte[ECX+0x4]; TEST AL,0x8 at 0x3f91f/0x3f928 —
+ * damage_params flag byte at +0x4, bit 0x8. Confirmed: FLD [EDX+0x69c]; FCOMP
+ * [0x2533c0]; FNSTSW; TEST AH,0x41; JNZ skip at 0x3f92c — proceeds only when
+ * field_69c > *(float*)0x2533c0 (0.0f). Confirmed: FLD [EDX+0x69c]; FMUL [ECX];
+ * FSTP [ECX] at 0x3f93f — multiplicand order is field_69c * (*scale).
+ * Confirmed: MOV BL,0x1 at 0x3f945 sits between the FLD and the FMUL — the flag
+ *   is assigned before the multiply.
+ * Confirmed: FLD [ECX]; FMUL [0x2533e4]; FSTP [ECX] at 0x3f955 — (*scale) *
+ * const. Confirmed: return value is byte-sized in AL — MOV AL,0x1 at 0x3f957 on
+ * the field_1ca path, MOV AL,BL at 0x3f964 on every other exit (BL zeroed by
+ *   XOR BL,BL at 0x3f907). */
+bool ai_adjust_damage(int actor_handle, void *damage_params, float *scale)
+{
+  actor_t *actor;
+  bool adjusted;
+
+  adjusted = 0;
+  if (actor_handle != -1) {
+    actor = (actor_t *)datum_get(*(void **)0x6325a4, actor_handle);
+    if (((*((unsigned char *)damage_params + 4) & 8) != 0) &&
+        (actor->field_69c > *(float *)0x2533c0)) {
+      adjusted = 1;
+      *scale = actor->field_69c * *scale;
+    }
+    if (actor->field_1ca != '\0') {
+      *scale = *scale * *(float *)0x2533e4;
+      return 1;
+    }
+  }
+  return adjusted;
+}
+
 /* ai_erase: erase AI actors matching an encounter/squad/squad-group filter.
  * Guards on AI globals active flag (*(char*)(ai_globals+1) != 0).
  * If param_1 == -1 (all encounters): iterates all actors via
@@ -267,10 +310,9 @@ void ai_erase(int param_1, int param_2, int param_3, int param_4)
 /* ai_release_inactive_swarms: count and erase swarm units, format a result
  * description.
  *
- * Iterates all AI actors via encounter_iterator_next (flag=0) + actor_iterator_next.
- * For each actor record where:
- *   record[6] != 0  (actor is active/alive)
- *   record[8] == 0  (not in some suppressed state)
+ * Iterates all AI actors via encounter_iterator_next (flag=0) +
+ * actor_iterator_next. For each actor record where: record[6] != 0  (actor is
+ * active/alive) record[8] == 0  (not in some suppressed state)
  *   *(int*)(record+0xc) != -1  (has a valid reference)
  * accumulates *(short*)(record+0x1e) into swarm_count, then erases the actor
  * via actor_erase(handle, 1).
@@ -280,8 +322,9 @@ void ai_erase(int param_1, int param_2, int param_3, int param_4)
  *
  * Stack layout (SUB ESP,0x20):
  *   [EBP-0x20..EBP-0xd]: iter[0x14] (encounter iterator, 20-byte body)
- *   [EBP-0xc]:           iter+0x14  (actor handle stored by actor_iterator_next)
- *   [EBP-0x4]:           local_8    (initialized to 0; base for swarm_count/SI)
+ *   [EBP-0xc]:           iter+0x14  (actor handle stored by
+ * actor_iterator_next) [EBP-0x4]:           local_8    (initialized to 0; base
+ * for swarm_count/SI)
  *
  * Confirmed: assert string "result_description && more_to_release", line
  * 0x1f7=503. Confirmed: encounter_iterator_next flag=0 (PUSH 0x0 at 0x3fa81).
@@ -336,6 +379,221 @@ int FUN_0003fb00(unsigned char *param_1, unsigned char *param_2)
     return 0xffffffff;
   }
   return (*param_1 < *param_2);
+}
+
+
+/* ai_find_inactive_encounters (0x3fb40): build the "potentially releasable
+ * storage" list — every clump actor and every encounter that is currently
+ * inactive — into the caller's working memory, then sort it.
+ *
+ * Confirmed (XBE 0x3fb40): PUSH EBP / MOV EBP,ESP / SUB ESP,0x18.  Two stack
+ *   parameters: [EBP+8] is the storage pointer (ESI, a 16-bit-indexed base)
+ *   and [EBP+0xc] is read as a 16-bit unsigned size (CMP word ptr [EBP+0xc],
+ *   0xc04 / JNC), so the declaration carries a 2-byte size, not an int.
+ *   0xc04 == 4 + 256*12 == sizeof(struct potentially_releasable_storage):
+ *   an int16 count at +0, two pad bytes at +2, then up to 0x100 records of
+ *   12 bytes at +4 (byte kind at +0, dword at +4, dword handle at +8).
+ * Confirmed: the 24 bytes of frame are two 3-dword iterators, not scalars —
+ *   [EBP-0xc] is the actor iterator handed to encounter_actor_iterator_new/
+ *   _next, so Ghidra's "local_c" ([EBP-0x8]) is actor_iter[1], the iterator's
+ *   own current-handle field, and [EBP-0x18] is the encounter iterator.
+ *   actor_iter[1] is read in BOTH loops (0x3fbc4 and 0x3fc3e); in the second
+ *   loop it is the stale value left by the last actor step, and that is
+ *   reproduced here deliberately.
+ * Confirmed: EDI holds -1 for the whole body — it is system_exit's argument,
+ *   encounter_actor_iterator_new's clump argument, and the sentinel compared
+ *   against actor+0xc and encounter+0x10.
+ * Confirmed: the count is re-read from memory (MOVSX ECX,word ptr [ESI]) before
+ *   each of the three record stores, so it is indexed through the storage
+ *   pointer each time rather than cached in a local.
+ * Confirmed: the count guard is a signed 16-bit compare against 0x100
+ *   (MOV CX,word ptr [ESI] / CMP CX,0x100 / JGE) evaluated after the iterator
+ *   step, i.e. the loop tests "more elements AND room left".
+ *
+ * Call-site verification (cdecl, first PUSH is the last argument):
+ *   0x3fb64  PUSH 1 / PUSH 0x22e / PUSH 0x2575c0 / PUSH 0x257648
+ *            -> display_assert("working_memory_size >= sizeof(struct "
+ *               "potentially_releasable_storage)",
+ * "c:\\halo\\SOURCE\\ai\\ai.c", 0x22e, 1) [match] 0x3fb6a  PUSH EDI(-1) ->
+ * system_exit(-1)                           [match] 0x3fb85  PUSH EDI(-1) /
+ * PUSH EAX(LEA [EBP-0xc])
+ *            -> encounter_actor_iterator_new(actor_iter, -1)           [match]
+ *   0x3fb8e / 0x3fbe2  PUSH LEA [EBP-0xc]
+ *            -> encounter_actor_iterator_next(actor_iter).  ADD ESP,0xc at
+ *            0x3fb93 folds this call's 1 dword with iterator_new's 2 — the
+ *            ARG_COUNT hazard on that site is a folded-cleanup false positive.
+ *   0x3fbf4  PUSH 0 / PUSH ECX(LEA [EBP-0x18])
+ *            -> encounter_iterator_new((int)encounter_iter, 0)         [match]
+ *   0x3fbfd / 0x3fc59  PUSH LEA [EBP-0x18] ->
+ * FUN_000599c0((int)encounter_iter). ADD ESP,0xc at 0x3fc02 again folds the
+ * preceding new(2)+next(1). 0x3fc7c  PUSH 0x3fb00 / PUSH 0xc / PUSH MOVSX
+ * EDX,AX(count) / PUSH ESI+4 -> qsort(records, count, 12, FUN_0003fb00) [match]
+ *
+ * Uncertain: actor+8, actor+0xc, encounter+0xd, encounter+0x2a and
+ * encounter+0x10 are left as raw offsets — only their widths and the sense of
+ * each test are proven here. */
+void ai_find_inactive_encounters(void *working_memory,
+                                 unsigned short working_memory_size)
+{
+  int actor_iter[3];
+  int encounter_iter[3];
+  short *storage;
+  int actor;
+  void *encounter;
+
+  if (working_memory_size < 0xc04) {
+    display_assert(
+      "working_memory_size >= sizeof(struct potentially_releasable_storage)",
+      "c:\\halo\\SOURCE\\ai\\ai.c", 0x22e, 1);
+    system_exit(-1);
+  }
+
+  storage = (short *)working_memory;
+  storage[0] = 0;
+  storage[1] = 0;
+
+  encounter_actor_iterator_new(actor_iter, -1);
+  actor = encounter_actor_iterator_next(actor_iter);
+  while ((actor != 0) && (storage[0] < 0x100)) {
+    if ((*(char *)(actor + 8) == '\0') && (*(int *)(actor + 0xc) != -1)) {
+      *(char *)(storage + storage[0] * 6 + 2) = 1;
+      *(int *)(storage + storage[0] * 6 + 4) = actor_iter[1];
+      *(int *)(storage + (storage[0] + 1) * 6) = *(int *)(actor + 0xc);
+      storage[0] = (short)(storage[0] + 1);
+    }
+    actor = encounter_actor_iterator_next(actor_iter);
+  }
+
+  encounter_iterator_new((int)encounter_iter, 0);
+  encounter = FUN_000599c0((int)encounter_iter);
+  while ((encounter != (void *)0x0) && (storage[0] < 0x100)) {
+    if ((*((char *)encounter + 0xd) == '\0') &&
+        (*(short *)((char *)encounter + 0x2a) > 0) &&
+        (*(int *)((char *)encounter + 0x10) != -1)) {
+      *(char *)(storage + storage[0] * 6 + 2) = 0;
+      *(int *)(storage + storage[0] * 6 + 4) = actor_iter[1];
+      *(int *)(storage + (storage[0] + 1) * 6) =
+        *(int *)((char *)encounter + 0x10);
+      storage[0] = (short)(storage[0] + 1);
+    }
+    encounter = FUN_000599c0((int)encounter_iter);
+  }
+
+  if (storage[0] > 0) {
+    qsort(storage + 2, (size_t)(int)storage[0], 0xc,
+          (qsort_compar_proc)FUN_0003fb00);
+  }
+}
+/* ai_release_inactive_encounters (0x3fc90): release ONE entry from the
+ * "potentially releasable storage" list built by ai_find_inactive_encounters,
+ * describe it into result_description, and report whether more entries remain.
+ *
+ * Confirmed (XBE 0x3fc90): PUSH EBP / MOV EBP,ESP, no SUB ESP — four stack
+ *   parameters and no locals.  [EBP+8] result_description, [EBP+0xc]
+ *   more_to_release (byte store MOV byte ptr [EDX],CL at 0x3fdb8), [EBP+0x10]
+ *   the storage pointer (EDI), and [EBP+0x14] read as a 16-bit UNSIGNED size
+ *   (CMP word ptr [EBP+0x14],0xc04 / JNC), so the declaration carries a 2-byte
+ *   size, not an int.  Returns a bool in AL (XOR BL,BL at entry, MOV BL,0x1
+ *   only on the release path, MOV AL,BL at 0x3fdb6) — the kb decl's
+ *   "void (void)" was Ghidra's undetected-parameter default, not the ABI.
+ * Confirmed storage layout (same as ai_find_inactive_encounters): int16 count
+ *   at +0, int16 cursor at +2, then 12-byte records at +4 (byte kind at +0,
+ *   dword handle at +4, dword sort key at +8).  0x3fcfd MOVSX EAX,AX /
+ *   LEA EAX,[EAX+EAX*2] / LEA ESI,[EDI+EAX*4+4] == storage + cursor*12 + 4.
+ * Confirmed the guard is a SIGNED 16-bit compare of cursor against count
+ *   (CMP AX,word ptr [EDI] / JGE at 0x3fcf7, and SETL CL at 0x3fdb2), and the
+ *   count/cursor pair is RE-READ from memory at 0x3fda8 after the increment.
+ * Confirmed kind sense: CMP byte ptr [ESI],0x0 / JZ 0x3fd4b — the fall-through
+ *   (nonzero kind) is the actor case, matching ai_find_inactive_encounters,
+ *   which stores kind 1 for clump actors and kind 0 for encounters.
+ *
+ * Call-site verification (cdecl, first PUSH is the last argument):
+ *   0x3fcb6  PUSH 1 / PUSH 0x270 / PUSH 0x2575c0 / PUSH 0x257620
+ *            -> display_assert("result_description && more_to_release",
+ *               "c:\\halo\\SOURCE\\ai\\ai.c", 0x270, 1)                [match]
+ *   0x3fcde  PUSH 1 / PUSH 0x271 / PUSH 0x2575c0 / PUSH 0x257648      [match]
+ *   0x3fcbd / 0x3fce5  PUSH -1 -> system_exit(-1)                     [match]
+ *   0x3fd18  PUSH ECX([ESI+4]) / PUSH EDX([0x6325a4])
+ *            -> datum_get(actor pool, record handle)                  [match]
+ *   0x3fd21  PUSH EAX([datum+0x5c]) -> tag_get_name(tag index)        [match]
+ *   0x3fd36  PUSH EAX(stripped name) / PUSH 0x2576a8 / PUSH [EBP+8]
+ *            -> crt_sprintf(result_description, "encounterless-actor %s", ...)
+ *   0x3fd41  PUSH 1 / PUSH EDX([ESI+4]) -> actor_erase(handle, 1).  ADD ESP,
+ *            0x24 at 0x3fd46 folds datum_get(2)+tag_get_name(1)+
+ *            tag_name_strip_path(1)+crt_sprintf(3)+actor_erase(2) = 9 dwords,
+ *            so the ARG_COUNT hazard on that site is a folded-cleanup false
+ *            positive.
+ *   0x3fd59  PUSH 0xb0 / PUSH EAX(handle & 0xffff), then CALL
+ *            global_scenario_get and PUSH EAX+0x42c at 0x3fd63
+ *            -> tag_block_get_element(scenario+0x42c, index, 0xb0)    [match]
+ *            The element pointer is parked in EBX across the following
+ *            datum_get, so the two lookups are sequenced here with temporaries
+ *            rather than nested in the crt_sprintf argument list.
+ *   0x3fd76  PUSH ECX([ESI+4]) / PUSH EDX([0x5ab270])
+ *            -> datum_get(encounter pool, record handle); MOVSX from +0x2a is
+ *            the encounter's live-unit count printed as %d.            [match]
+ *   0x3fd99  PUSH 1 / PUSH -1 / PUSH -1 / PUSH EDX([ESI+4])
+ *            -> ai_erase(handle, -1, -1, 1).  ADD ESP,0x34 at 0x3fd9e folds
+ *            global_scenario_get's 2 + tag_block_get_element(1) +
+ *            datum_get(2) + crt_sprintf(4) + ai_erase(4) = 13 dwords.
+ *
+ * Uncertain: the encounter record's +0x2a short and the actor record's +0x5c
+ * dword are left as raw offsets — only their widths and their roles as a unit
+ * count and a tag index are proven here.  The scenario block at +0x42c has a
+ * 0xb0-byte element stride whose fields are not needed by this function. */
+bool ai_release_inactive_encounters(char *result_description,
+                                    bool *more_to_release, void *working_memory,
+                                    unsigned short working_memory_size)
+{
+  short *storage;
+  short *record;
+  void *encounter_name;
+  short unit_count;
+  const char *actor_tag_name;
+  bool released;
+
+  released = 0;
+
+  if ((result_description == (char *)0x0) || (more_to_release == (bool *)0x0)) {
+    display_assert("result_description && more_to_release",
+                   "c:\\halo\\SOURCE\\ai\\ai.c", 0x270, 1);
+    system_exit(-1);
+  }
+
+  if (working_memory_size < 0xc04) {
+    display_assert(
+      "working_memory_size >= sizeof(struct potentially_releasable_storage)",
+      "c:\\halo\\SOURCE\\ai\\ai.c", 0x271, 1);
+    system_exit(-1);
+  }
+
+  storage = (short *)working_memory;
+  if (storage[1] < storage[0]) {
+    record = storage + storage[1] * 6 + 2;
+    if (*(char *)record != '\0') {
+      actor_tag_name = tag_get_name(
+        *(int *)((char *)datum_get(*(data_t **)0x6325a4, *(int *)(record + 2)) +
+                 0x5c));
+      crt_sprintf(result_description, "encounterless-actor %s",
+                  tag_name_strip_path(actor_tag_name));
+      actor_erase(*(int *)(record + 2), 1);
+    } else {
+      encounter_name = tag_block_get_element(
+        (char *)global_scenario_get() + 0x42c,
+        (int)(*(unsigned int *)(record + 2) & 0xffff), 0xb0);
+      unit_count = *(
+        short *)((char *)datum_get(*(data_t **)0x5ab270, *(int *)(record + 2)) +
+                 0x2a);
+      crt_sprintf(result_description, "encounter %s (%d units)", encounter_name,
+                  (int)unit_count);
+      ai_erase(*(int *)(record + 2), -1, -1, 1);
+    }
+    storage[1] = (short)(storage[1] + 1);
+    released = 1;
+  }
+
+  *more_to_release = storage[1] < storage[0];
+  return released;
 }
 
 /* ai_handle_unit_approach: test whether a unit is approaching a valid
@@ -442,13 +700,15 @@ check_debug:
  * param_1 (unit_handle): the unit that just exited.
  * param_2: passed to ai_get_responsible_unit as unit_handle for
  * vehicle-occupant resolution. param_3: vehicle/context handle; used to control
- * prefer_passenger (word !=9) and forwarded as param5 of ai_communication_event.
+ * prefer_passenger (word !=9) and forwarded as param5 of
+ * ai_communication_event.
  *
  * Resolves the occupant from param_2 via ai_get_responsible_unit, determines a
  * relationship code (0=same unit, 2=enemy, 3=friendly, or 0xffffffff if no
- * valid occupant), then notifies the AI communication system (ai_communication_event),
- * clears encounter references (ai_conversation_unit_died), and updates
- * encounter kill counts (encounters_unit_died).
+ * valid occupant), then notifies the AI communication system
+ * (ai_communication_event), clears encounter references
+ * (ai_conversation_unit_died), and updates encounter kill counts
+ * (encounters_unit_died).
  *
  * Confirmed: [EBP+8]=unit_handle (int), [EBP+C]=param_2 (int),
  *            [EBP+10]=param_3 compared as word ptr. */
@@ -471,7 +731,8 @@ void ai_handle_death(int unit_handle, int param_2, short param_3)
                   *(short *)((char *)obj_resolved + 0x68)) != 0) +
                2;
   }
-  ai_communication_event(0, unit_handle, resolved, relation, (int)param_3, -1, 0);
+  ai_communication_event(0, unit_handle, resolved, relation, (int)param_3, -1,
+                         0);
   ai_conversation_unit_died(unit_handle, '\0');
   encounters_unit_died(unit_handle);
 }
@@ -483,8 +744,8 @@ void ai_handle_death(int unit_handle, int param_2, short param_3)
  * meets the threshold to trigger a killing-spree AI communication event.
  * Threshold is 3 if the unit has no rider (unit+0x1c8 == 0xffffffff), or
  * 5 if it does. When the debug flag at 0x5aca60 is set, logs the spree count
- * to the console. If the threshold is met, fires ai_communication_event with type=1
- * and returns 1; otherwise returns 0.
+ * to the console. If the threshold is met, fires ai_communication_event with
+ * type=1 and returns 1; otherwise returns 0.
  *
  * Confirmed: [EBP+8]=unit_handle (int), [EBP+C]=killing_spree_count (short),
  *            threshold = (uVar1 != 0xffffffff)*2 + 3 = 3 (no rider) or 5
@@ -521,9 +782,10 @@ char ai_handle_killing_spree(int unit_handle, short killing_spree_count)
 /* game_allegiance_apply_change: apply an allegiance change between two
  * teams, updating all matching actor records in the AI actor iterator.
  * Iterates over all active player-actors via
- * encounter_iterator_next/actor_iterator_next; for each actor whose team matches
- * team_a or team_b, walks the actor's clump items via FUN_00064540/FUN_00064570
- * and applies the friendship and force flags. Confirmed: 4 args via PUSH count
+ * encounter_iterator_next/actor_iterator_next; for each actor whose team
+ * matches team_a or team_b, walks the actor's clump items via
+ * FUN_00064540/FUN_00064570 and applies the friendship and force flags.
+ * Confirmed: 4 args via PUSH count
  * + ADD ESP,0x18 cleanup at 0x40068. Operand sizes confirmed: team_a/team_b as
  * int16_t (MOVSX + CMP AX,DI); friendship/force as char (MOV byte ptr).
  *
@@ -592,6 +854,99 @@ void game_allegiance_apply_change(int16_t team_a, int16_t team_b,
   next_actor:
     actor = actor_iterator_next(iter);
   }
+}
+
+/* 0x40150 — ai_handle_allegiance_broken_notification.
+ * Propagate an allegiance break/reform between two teams to every active AI
+ * actor that belongs to one of the two teams, then notify the game layer.
+ *
+ * Params (cdecl, stack): [EBP+0x8] team_a (int16_t, MOVSX at the name-table
+ * index and CMP AX,DI), [EBP+0xc] team_b (int16_t), [EBP+0x10] broken (char,
+ * MOV AL,byte ptr).
+ *
+ * Debug print (only when *(char *)0x5aca55): the message string is selected
+ * before the table loads — EAX = 0x257718 "broken" by default, replaced with
+ * 0x25770c "reformed" when the broken byte is zero.  cdecl push order at
+ * 0x40190 is PUSH EAX(state) / PUSH ECX(team_b name) / PUSH EAX(team_a name) /
+ * PUSH fmt / PUSH 0, i.e. console_printf(0, fmt, names[team_a], names[team_b],
+ * state); ADD ESP,0x14 confirms 5 stack args.
+ *
+ * Stack layout (EBP-based, SUB ESP,0x24) — same shape as
+ * game_allegiance_apply_change at 0x40010:
+ *   [EBP-0x24..EBP-0x09]: ai_actor_iter (0x1c bytes extended iterator)
+ *   [EBP-0x08]:           clump_iter[0] (current clump-item handle)
+ *   [EBP-0x04]:           clump_iter[1] (next clump-item handle)
+ * [EBP-0x10] is ai_actor_iter+0x14 (current actor handle), which the
+ * decompiler names 'local_14' because it overlaps the iterator buffer.
+ *
+ * Matched-team selection (0x401c0): EDI is preloaded with team_a; when the
+ * actor's field_03e equals team_a the code reloads EDI with team_b, otherwise
+ * it compares against team_b and keeps team_a.  So matched_team is always the
+ * *other* team, and -1 skips the actor.
+ *
+ * Inner stores (0x40206): +0x61 = 1, +0x62 = 0 (BL, the zero register),
+ * +0x60 = broken, +0xa4 = actor_get_perception_knowledge (byte from AL),
+ * +0x50 = actor_compute_prop_target_weight (FSTP float).  Both calls take
+ * (actor handle from iter+0x14, clump_iter[0]) — PUSH ECX([EBP-0x8]) then
+ * PUSH EDX([EBP-0x10]), so the handle is the first argument.
+ *
+ * Tail call at 0x40269: PUSH [EBP+0xc] then PUSH [EBP+0x8] →
+ * game_allegiance_notify_change(team_a, team_b). */
+void ai_handle_allegiance_broken_notification(int16_t team_a, int16_t team_b,
+                                              char broken)
+{
+  char iter[0x1c]; /* extended AI actor iterator; see encounter_iterator_next */
+  int clump_iter[2]; /* clump-item walk: [0]=current handle, [1]=next */
+  int16_t matched_team;
+  int actor;
+  int clump_item;
+
+  /* optional debug console print */
+  if (*(char *)0x5aca55) {
+    const char *state = broken ? "broken" : "reformed";
+    console_printf(0, "allegiance between teams %s and %s communicated as %s",
+                   ((const char **)0x2efdf8)[team_a],
+                   ((const char **)0x2efdf8)[team_b], state);
+  }
+
+  /* initialise iterator over all active player-actors (flag=1) */
+  encounter_iterator_next(iter, 1);
+  actor = actor_iterator_next(iter);
+  while (actor != 0) {
+    /* matched_team is the opposite team of the one this actor belongs to */
+    matched_team = team_b;
+    if (((actor_t *)actor)->field_03e == team_a) {
+      matched_team = team_b;
+    } else if (((actor_t *)actor)->field_03e == team_b) {
+      matched_team = team_a;
+    } else {
+      goto next_actor;
+    }
+    if (matched_team == -1) {
+      goto next_actor;
+    }
+
+    /* walk this actor's clump items, using actor handle from iter.field_0x14 */
+    FUN_00064540(clump_iter, *(int *)(iter + 0x14));
+    clump_item = FUN_00064570(clump_iter);
+    while (clump_item != 0) {
+      if (*(int16_t *)(clump_item + 0x12) == matched_team) {
+        *(char *)(clump_item + 0x61) = 1;
+        *(char *)(clump_item + 0x62) = 0;
+        *(char *)(clump_item + 0x60) = broken;
+        *(char *)(clump_item + 0xa4) =
+          actor_get_perception_knowledge(*(int *)(iter + 0x14), clump_iter[0]);
+        *(float *)(clump_item + 0x50) = actor_compute_prop_target_weight(
+          *(int *)(iter + 0x14), clump_iter[0]);
+      }
+      clump_item = FUN_00064570(clump_iter);
+    }
+
+  next_actor:
+    actor = actor_iterator_next(iter);
+  }
+
+  game_allegiance_notify_change(team_a, team_b);
 }
 
 /* 0x40280 — Update clump-item perception fields for all active AI actors.
@@ -707,6 +1062,75 @@ void ai_handle_bump(int param_1, int param_2, float *velocity_ptr)
   }
 }
 
+/* ai_handle_damage: notify the AI systems that a unit took damage.
+ *
+ * unit_handle ([EBP+8]): the damaged unit. param_2 ([EBP+C]): the damaging
+ * unit/vehicle handle, resolved to a responsible occupant via
+ * ai_get_responsible_unit. param_3 ([EBP+10]): damage-source category,
+ * compared as int16_t (CMP BX,9 / CMP BX,1) and forwarded as param5 of
+ * ai_communication_event. damage ([EBP+14]): damage amount (float; FLD
+ * [EBP+0x14] / FCOMP [0x2533e4] and forwarded as actor_handle_damage param_3).
+ * param_5 ([EBP+18]): forwarded to actor_handle_damage param_4.
+ * param_6 ([EBP+1C]): char flag; when non-zero suppresses both the actor
+ * damage notification and the "betrayal" (type 3) communication event.
+ *
+ * Relationship code: 1 = damaged itself, 2/3 from
+ * game_allegiance_get_team_is_friendly (2 = enemy, 3 = friendly), 0 when the
+ * responsible unit could not be resolved.
+ *
+ * Confirmed: 6 stack params, ADD ESP cleanups 0x10/0x8/0x10/0x8/0x1c/0x8.
+ * Confirmed: object_get_and_verify_type(handle, 3); actor handle at obj+0x1a4;
+ *   team at obj+0x68 (int16_t).
+ * Confirmed: friendly-check arg order PUSH EAX(resolved team) then
+ *   PUSH EDX(unit team) => (unit_team, resolved_team); provoke pushes are
+ *   reversed => (resolved_team, unit_team).
+ * Confirmed: FCOMP + TEST AH,1 + JNZ skip => call when damage >= threshold. */
+void ai_handle_damage(int unit_handle, int param_2, int param_3, float damage,
+                      int param_5, char param_6)
+{
+  void *unit_obj;
+  void *resolved_obj;
+  int resolved;
+  int actor_handle;
+  int relation;
+
+  unit_obj = object_get_and_verify_type(unit_handle, 3);
+  resolved = ai_get_responsible_unit(param_2, (char)((short)param_3 != 9));
+  if (resolved == -1) {
+    resolved_obj = (void *)0;
+  } else {
+    resolved_obj = object_get_and_verify_type(resolved, 3);
+  }
+
+  if (param_6 == '\0' && (short)param_3 != 1) {
+    actor_handle = *(int *)((char *)unit_obj + 0x1a4);
+    if (actor_handle != -1) {
+      actor_handle_damage(actor_handle, resolved, damage, param_5);
+    }
+  }
+
+  relation = 0;
+  if (unit_handle == resolved) {
+    relation = 1;
+  } else if (resolved_obj != (void *)0) {
+    relation = (game_allegiance_get_team_is_friendly(
+                  *(short *)((char *)unit_obj + 0x68),
+                  *(short *)((char *)resolved_obj + 0x68)) != 0) +
+               2;
+  }
+
+  if (param_6 == '\0' && (short)relation == 2) {
+    ai_communication_event(3, unit_handle, resolved, 2, param_3, -1, 0);
+  } else if (damage >= *(float *)0x2533e4) {
+    ai_communication_event(2, unit_handle, resolved, relation, param_3, -1, 0);
+  }
+
+  if (resolved_obj != (void *)0) {
+    game_allegiance_provoke(*(short *)((char *)resolved_obj + 0x68),
+                            *(short *)((char *)unit_obj + 0x68));
+  }
+}
+
 /* FUN_00040570: spawn AI actors into vehicle seats from pending vehicle list.
  * Called each tick from ai_update. Iterates the vehicle spawn queue stored
  * in the AI globals block: a count at offset +0x8b8 (int16_t) and an array
@@ -815,7 +1239,8 @@ void ai_create_mounted_weapons_for_unit(int param_1)
  * command via ai_communication_event with command type 0x24.
  * The vehicle_handle parameter is accepted but unused in this function body.
  * Confirmed: 1 stack param used ([EBP+8]), second param ([EBP+0xc]) untouched.
- * Confirmed: PUSH order for ai_communication_event — 7 args, cdecl (ADD ESP,0x1c). */
+ * Confirmed: PUSH order for ai_communication_event — 7 args, cdecl (ADD
+ * ESP,0x1c). */
 void unit_vehicle_board_notify(int unit_handle, int vehicle_handle)
 {
   void *unit_obj = object_get_and_verify_type(unit_handle, 3);
@@ -828,16 +1253,16 @@ void unit_vehicle_board_notify(int unit_handle, int vehicle_handle)
  * vehicle. Looks up the unit object (type_mask=3), checks whether the unit has
  * a valid AI actor handle at offset +0x1a4. If the actor exists, retrieves the
  * actor record from actor_data and checks the byte flag at actor+0x38c. If
- * the flag is clear, dispatches AI command 0x25 via ai_communication_event to notify
- * the subsystem of the vehicle-exit event. The flag at actor+0x38c is then
- * cleared unconditionally (whether or not the command was dispatched).
+ * the flag is clear, dispatches AI command 0x25 via ai_communication_event to
+ * notify the subsystem of the vehicle-exit event. The flag at actor+0x38c is
+ * then cleared unconditionally (whether or not the command was dispatched).
  *
  * Confirmed: 1 stack param [EBP+8] (unit handle). No return value.
  * Confirmed: object_get_and_verify_type(param_1, 3); EAX+0x1a4 = actor handle.
  * Confirmed: datum_get([0x6325a4], actor_handle); result in ESI.
  * Confirmed: TEST AL,AL on [ESI+0x38c]; JNZ skips ai_communication_event call.
- * Confirmed: ai_communication_event(0x25, param_1, -1, -1, -1, -1, 0), 7 args cdecl
- *   (ADD ESP,0x1c). MOV byte [ESI+0x38c],0 always executes. */
+ * Confirmed: ai_communication_event(0x25, param_1, -1, -1, -1, -1, 0), 7 args
+ * cdecl (ADD ESP,0x1c). MOV byte [ESI+0x38c],0 always executes. */
 void ai_handle_exit_vehicle(int param_1)
 {
   char *unit_obj;
@@ -1482,9 +1907,9 @@ void ai_enemies_attacking_player(void)
   ai_clump(1);
 }
 
-/* ai_handle_spatial_effect: ai_sound_spatial_effect_submit — submit a spatial sound effect
- * into the AI's ring buffer of recent spatial events. If AI subsystem is
- * inactive (g+1 == 0), returns immediately.
+/* ai_handle_spatial_effect: ai_sound_spatial_effect_submit — submit a spatial
+ * sound effect into the AI's ring buffer of recent spatial events. If AI
+ * subsystem is inactive (g+1 == 0), returns immediately.
  *
  * The ring buffer lives at g+0x130 (head/tail uint16_t pair) and holds up to
  * 32 entries of 0x14 bytes each starting at g+0x134.  Each entry:
@@ -1510,8 +1935,8 @@ void ai_enemies_attacking_player(void)
  * Asserts: count > 0, 0 <= volume < 5, 0 <= effect_type < 3.
  * Confirmed: c:\halo\SOURCE\ai\ai.c line 0x80e/0x80f/0x810/0x847/0x871.
  */
-void ai_handle_spatial_effect(int object_handle, float *position, short effect_type,
-                  short volume, short count)
+void ai_handle_spatial_effect(int object_handle, float *position,
+                              short effect_type, short volume, short count)
 {
   int *g;
   int current_time;

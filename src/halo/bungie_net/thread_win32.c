@@ -3,6 +3,8 @@
  * XBE source: c:\halo\SOURCE\bungie_net\common\thread_win32.c
  *
  * Re-implemented functions (by XBE address, ascending):
+ *   0x81170  FUN_00081170 (from public_key_crypt.c — same COFF object)
+ *   0x81250  FUN_00081250 (from public_key_crypt.c — same COFF object)
  *   0x81630  thread_new
  *   0x81720  thread_is_done
  *   0x81770  thread_close
@@ -33,6 +35,93 @@ typedef struct {
 } thread_slot_t;
 
 #define g_thread_slots ((thread_slot_t *)0x334990)
+
+/*
+ * FUN_00081170 — generate the 2-dword modulus/base/generator triple.
+ *
+ * TU: c:\halo\SOURCE\bungie_net\common\public_key_crypt.c (confirmed by the
+ * __FILE__ string at 0x265da0 pushed by both asserts below); it links into
+ * the same COFF object as the thread_win32 routines.
+ *
+ * For each of the two dwords: draw p[i] = rand(0xffff) * rand(0xffff) + 2
+ * until it is >= 0xffffff, then draw x[i] in [0xff, p[i]-2] and
+ * g[i] in [0xff, p[i]-1].
+ *
+ * Confirmed: assert "x->dwords[i] < (p->dwords[i] - 2)" at line 0xa2,
+ * assert "g->dwords[i] < (p->dwords[i] - 1)" at line 0xa3.
+ * Confirmed: FUN_00080eb0 called twice with 0xffff; FUN_00081410 called as
+ * (0xff, p[i]-2) then (0xff, p[i]-1) — first PUSH is the last argument.
+ * Confirmed: the retry compare is JC (unsigned) against 0xffffff.
+ * Unknown: the semantic names of the function and of FUN_00080eb0 /
+ * FUN_00081410 (no string or symbol evidence); parameter names p/x/g come
+ * from the assert strings.
+ */
+void FUN_00081170(unsigned int *p, unsigned int *x, unsigned int *g)
+{
+  int i;
+
+  for (i = 0; i < 2; i++) {
+    do {
+      p[i] = FUN_00080eb0(0xffff) * FUN_00080eb0(0xffff) + 2;
+    } while (p[i] < 0xffffff);
+
+    x[i] = (unsigned int)FUN_00081410(0xff, (int)(p[i] - 2));
+    g[i] = (unsigned int)FUN_00081410(0xff, (int)(p[i] - 1));
+
+    if (x[i] >= p[i] - 2) {
+      display_assert("x->dwords[i] < (p->dwords[i] - 2)",
+                     "c:\\halo\\SOURCE\\bungie_net\\common\\public_key_crypt.c",
+                     0xa2, 1);
+      system_exit(-1);
+    }
+    if (g[i] >= p[i] - 1) {
+      display_assert("g->dwords[i] < (p->dwords[i] - 1)",
+                     "c:\\halo\\SOURCE\\bungie_net\\common\\public_key_crypt.c",
+                     0xa3, 1);
+      system_exit(-1);
+    }
+  }
+}
+
+/*
+ * 0x81250 - compute a Diffie-Hellman public key from (p, x, g) and dump all
+ * four 64-bit values through error() at severity 2.
+ *
+ * From public_key_crypt.c (same COFF object as FUN_00081170 above), cdecl
+ * with four stack params: p@[EBP+8], x@[EBP+0xc], g@[EBP+0x10],
+ * public_key@[EBP+0x14].
+ *
+ * Confirmed: the loop runs exactly 2 iterations ([EBP-8] initialised to 2,
+ * DEC/JNZ). The original walks x with a single cursor and reaches the other
+ * three arrays through precomputed byte deltas (p-x, g-x, public_key-x)
+ * folded into MOV [EDX+ECX*1]; that is a strength-reduction of the plain
+ * per-array index used here.
+ * Confirmed by register order at 0x81290-0x81298: EDI = g[i], EBX = x[i],
+ * ESI = p[i], matching FUN_00081090's declared p@esi / x@ebx / g@edi.
+ * Confirmed: EAX from that call is stored to public_key[i] (MOV
+ * [EDX+ECX*1],EAX at 0x812a3) -- FUN_00081090 tail-calls FUN_00080fc0,
+ * which returns the low dword of its accumulator in EAX.
+ * Confirmed: the error() varargs are pushed high-to-low as public_key[1],
+ * public_key[0], g[1], g[0], x[1], x[0], p[1], p[0], format, 2 -- first
+ * PUSH is the last argument, so the printed order matches the format
+ * string at 0x265e2c (read verbatim from the pristine XBE .rdata).
+ * Unknown: the semantic name of this function and of FUN_00081090 (no
+ * string or symbol evidence); parameter names come from the format string.
+ */
+void FUN_00081250(unsigned int *p, unsigned int *x, unsigned int *g,
+                  unsigned int *public_key)
+{
+  int i;
+  unsigned int result[2];
+
+  for (i = 0; i < 2; i++) {
+    result[i] = FUN_00081090(p[i], x[i], g[i]);
+    public_key[i] = result[i];
+  }
+
+  error(2, "p= %8lX%8lX\nx= %8lX%8lX\ng= %8lX%8lX\npublic key= %8lX%8lX\n\n",
+        p[0], p[1], x[0], x[1], g[0], g[1], public_key[0], public_key[1]);
+}
 
 /*
  * thread_new — allocate a thread slot and create an Xbox thread.

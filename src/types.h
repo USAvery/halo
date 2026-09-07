@@ -1528,7 +1528,7 @@ typedef struct {
   char pad_688[0x4];
   float control_burst_aim_vector[3];                  /* +0x68c  LEA EDI,[EBX+0x68c] @0x23d1a */
   float field_698;                                   /* +0x698  accessed 2x, meaning unproven */
-  char pad_69c[0x4];
+  float field_69c;                                   /* +0x69c  FLD [EDX+0x69c] @0x3f92c/0x3f93f, meaning unproven */
   char field_6a0;                                    /* +0x6a0  accessed 1x, meaning unproven */
   uint8_t field_6a1;                                 /* +0x6a1  accessed 1x, meaning unproven */
   char pad_6a2[0x2];

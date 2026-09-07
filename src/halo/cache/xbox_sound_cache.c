@@ -229,7 +229,7 @@ bool sound_cache_request_sound(void *sound_ptr, bool block, bool load,
   }
 
   if (sound->field_2c == NONE && load) {
-    FUN_001be2b0();
+    FUN_001be2b0((char *)sound);
   }
 
   if (sound->field_2c != NONE) {

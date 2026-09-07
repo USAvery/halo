@@ -4092,7 +4092,8 @@
     },
     {
      "addr": "0x3f900",
-     "decl": "void ai_adjust_damage(int player_index, void *damage_params, float *scale);"
+     "decl": "bool ai_adjust_damage(int actor_handle, void *damage_params, float *scale);",
+     "ported": true
     },
     {
      "addr": "0x3f350",
@@ -4135,11 +4136,13 @@
     },
     {
      "addr": "0x3fb40",
-     "decl": "void ai_find_inactive_encounters(void);"
+     "decl": "void ai_find_inactive_encounters(void *working_memory, unsigned short working_memory_size);",
+     "ported": true
     },
     {
      "addr": "0x3fc90",
-     "decl": "void ai_release_inactive_encounters(void);"
+     "decl": "bool ai_release_inactive_encounters(char *result_description, bool *more_to_release, void *working_memory, unsigned short working_memory_size);",
+     "ported": true
     },
     {
      "addr": "0x3fe30",
@@ -4158,7 +4161,8 @@
     },
     {
      "addr": "0x40150",
-     "decl": "void ai_handle_allegiance_broken_notification(void);"
+     "decl": "void ai_handle_allegiance_broken_notification(int16_t team_a, int16_t team_b, char broken);",
+     "ported": true
     },
     {
      "addr": "0x40360",
@@ -4167,7 +4171,8 @@
     },
     {
      "addr": "0x40460",
-     "decl": "void ai_handle_damage(void);"
+     "decl": "void ai_handle_damage(int unit_handle, int param_2, int param_3, float damage, int param_5, char param_6);",
+     "ported": true
     },
     {
      "addr": "0x40690",
@@ -26265,7 +26270,8 @@
     },
     {
      "addr": "0x81170",
-     "decl": "void FUN_00081170(void);"
+     "decl": "void FUN_00081170(unsigned int *p, unsigned int *x, unsigned int *g);",
+     "ported": true
     },
     {
      "addr": "0x81250",

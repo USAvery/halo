@@ -658,7 +658,7 @@ void FUN_00080f00(uint16_t *result)
  *  - display_assert args at 0x8106a: __FILE__ 0x265da0 =
  *    "c:\halo\SOURCE\bungie_net\common\public_key_crypt.c", line 0x5f.
  */
-void FUN_00080fc0(uint32_t exponent /* @<eax> */, uint32_t base /* @<ecx> */,
+uint32_t FUN_00080fc0(uint32_t exponent /* @<eax> */, uint32_t base /* @<ecx> */,
                   uint32_t modulus /* @<edx> */)
 {
   math64_qword_t s;
@@ -683,6 +683,7 @@ void FUN_00080fc0(uint32_t exponent /* @<eax> */, uint32_t base /* @<ecx> */,
 
   assert_halt_at("c:\\halo\\SOURCE\\bungie_net\\common\\public_key_crypt.c",
                  0x5f, s.qword <= 0xFFFFFFFF);
+  return (uint32_t)s.qword;
 }
 
 /* 0x81090 - validate Diffie-Hellman parameters then compute modexp.
@@ -696,7 +697,7 @@ void FUN_00080fc0(uint32_t exponent /* @<eax> */, uint32_t base /* @<ecx> */,
  * (exponent@eax, base@ecx, modulus@edx) -- confirmed by the MOV EDX,ESI /
  * MOV EAX,EBX / MOV ECX,EDI register shuffle immediately before the
  * original JMP 0x80fc0 tail call. */
-void FUN_00081090(uint32_t p /* @<esi> */, uint32_t x /* @<ebx> */,
+uint32_t FUN_00081090(uint32_t p /* @<esi> */, uint32_t x /* @<ebx> */,
                   uint32_t g /* @<edi> */)
 {
   assert_halt_msg_at("p>2",
@@ -709,7 +710,7 @@ void FUN_00081090(uint32_t p /* @<esi> */, uint32_t x /* @<ebx> */,
                      "c:\\halo\\SOURCE\\bungie_net\\common\\public_key_crypt.c",
                      0x72, g < p);
 
-  FUN_00080fc0(x, g, p);
+  return FUN_00080fc0(x, g, p);
 }
 
 /* 0x81110 - Validate Diffie-Hellman exponent/modulus then compute modexp.
