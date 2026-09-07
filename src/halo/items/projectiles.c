@@ -1,4 +1,21 @@
 #include "x87_math.h"
+#ifdef HALO_RNG_TRACE
+#include "halo/math/rng_trace.h"
+/* Mirrors the host LOS-exit detour for calls returning into FUN_000f8720:
+ * kind 33 with value bit 31 set (host sets it when the return address is
+ * below 0x138900). */
+static bool sweep_los_trace(bool result, int16_t *collision_result)
+{
+  RNG_TRACE_EX(RNG_TRACE_KIND_LOS_RESULT,
+               0x80000000u | ((unsigned int)(unsigned char)result << 16) |
+                 (unsigned short)collision_result[0],
+               *(unsigned int *)((char *)collision_result + 0x14));
+  return result;
+}
+#define SWEEP_LOS(call) sweep_los_trace((call), collision_result)
+#else
+#define SWEEP_LOS(call) (call)
+#endif
 
 /* Clear bit 1 of projectile flags at offset 0x1dc. */
 void projectile_kill_tracer(int projectile_handle)
@@ -838,6 +855,10 @@ bool FUN_000f8720(int projectile_handle, float *new_pos,
   /* negative-side endpoint: new_pos - radius * cross */
   float pt_b2[3];
 
+#ifdef HALO_RNG_TRACE
+  RNG_TRACE_EX(RNG_TRACE_KIND_SWEEP_POS, RNG_TRACE_BITS(new_pos[0]),
+               RNG_TRACE_BITS(new_pos[2]));
+#endif
   proj = (char *)object_get_and_verify_type(projectile_handle, 0x20);
   tag_def = tag_get(0x70726f6a, *(int *)proj);
   proj_pos = (float *)(proj + 0xc);
@@ -850,8 +871,8 @@ bool FUN_000f8720(int projectile_handle, float *new_pos,
   origin1[0] = HALO_NARROW(dx);
   origin1[1] = HALO_NARROW(dy);
   origin1[2] = HALO_NARROW(dz);
-  if (FUN_0014df70(0x1000e9, proj_pos, origin1, *(int *)(proj + 0x1e4),
-                   collision_result)) {
+  if (SWEEP_LOS(FUN_0014df70(0x1000e9, proj_pos, origin1, *(int *)(proj + 0x1e4),
+                   collision_result))) {
     return 1;
   }
 
@@ -908,8 +929,8 @@ bool FUN_000f8720(int projectile_handle, float *new_pos,
   dir1[2] = pt_b1z - origin1[2];
 
   /* 2. Positive-side lateral collision test (flags 0x89). */
-  if (FUN_0014df70(0x89, origin1, dir1, *(int *)(proj + 0x1e4),
-                   collision_result)) {
+  if (SWEEP_LOS(FUN_0014df70(0x89, origin1, dir1, *(int *)(proj + 0x1e4),
+                   collision_result))) {
     return 1;
   }
 

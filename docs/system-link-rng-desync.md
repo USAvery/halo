@@ -2170,3 +2170,48 @@ Fallback if the bisect is inconclusive: capture a client state snapshot with a
 grenade in flight and run `unicorn_diff.py --state-snapshot` on
 `FUN_000f9c40` original vs ours with a memory trace, which pinpoints the first
 differing store without further static guessing.
+
+## RUN 12 — toggle bisect: the projectile and biped bodies are excluded (2026-09-07)
+
+Run 12 used the bisect client (`FUN_000f9c40` and `FUN_001a2f40` running as
+original code, every callee still ours). Rings: `artifacts/rng_trace/ds12_h.json`
+/ `ds12_c.json`.
+
+- The bounce is still one tick late: host draws at tick 612, client at 613.
+- Detonation origins still differ: host tick 627 `c11a2aa9`/`409a6958`,
+  client tick 628 `c11a4032`/`409a3cce`.
+- Grounded bipeds still show 1-ulp z differences (`e2770008` from tick 273,
+  `e2750006` from tick 609).
+
+So the remaining mismatch is not in either body. What is left for the
+projectile is the sweep `FUN_000f8720` and its collision test `FUN_0014df70`
+(plus the `collision_bsp` leaves), or the throw setup (initial velocity and
+marker position: `object_compute_node_matrices` and the unit/weapon code that
+seeds the projectile). For bipeds it is `FUN_0014f2c0` or the same
+collision leaves.
+
+### Run 13 setup: per-tick position probes
+
+Rather than audit those by hand, the next run logs the grenade position every
+tick on both sides:
+
+- **kind 36 `sweep_pos`**: `FUN_000f8720` entry, value = `new_pos.x` bits,
+  caller2 = `new_pos.z` bits. Host detour at `0xf8720` (6-byte prologue
+  replayed, cave `impl+0x10` = 0x6eca00, inside the deactivated
+  `unit_update_animation` body); client `RNG_TRACE_EX` at the top of our
+  `FUN_000f8720`.
+- **kind 33 widened**: the LOS-exit detour now also logs calls returning into
+  `0xf8720..0xf8920`, with value bit 31 set to separate them from the
+  area-damage callers. The cave at `impl+0x268` was rewritten in place
+  (147 bytes, still below `impl+0x300`). Client mirror: `SWEEP_LOS()` in
+  `projectiles.c` wraps both `FUN_0014df70` calls and logs kind 33 with bit 31.
+
+Host image v3 (`build_original_probes_v3.py`, sha `ad146cd8...`, 10 patches)
+deployed to 10.0.0.24 after the run-12 ring was dumped. The client keeps the
+two `ported=false` toggles (still uncommitted) so any position difference is
+attributable to the sweep, the collision test, or the throw setup.
+
+Reading run 13: the first tick where `sweep_pos` differs is where the input
+to the sweep first differs (throw setup or the previous tick's integration);
+a tick where `sweep_pos` matches but the flagged kind-33 result or `t` differs
+puts the mismatch inside `FUN_000f8720` / `FUN_0014df70`.
