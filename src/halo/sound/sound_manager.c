@@ -191,6 +191,75 @@ void sound_object_apply_pitch_delta(int object_handle, float pitch)
   *stored_pitch += delta;
 }
 
+/* unit_find_weapon_to_ready (0x1ac350)
+ *
+ * Scans the unit's four weapon-handle slots at +0x2a8 (0x2a8 + index*4) and
+ * returns the index of the first slot whose weapon reports that it must be
+ * readied.  Slots holding NONE (-1) are skipped.  Returns -1 when no weapon
+ * needs readying (reference materializes -1 in EBX before the loop and moves
+ * BX into AX on the fallthrough exit; the found exit moves SI into AX).
+ *
+ * Loop is a do/while in the reference (JMP into the head at 0x1ac36b, JL back
+ * at 0x1ac391).  Index is a signed 16-bit counter: MOVSX ECX,SI at 0x1ac370
+ * and CMP SI,0x4 at 0x1ac38d. */
+int16_t unit_find_weapon_to_ready(int unit_handle)
+{
+  char *unit;
+  int weapon_handle;
+  short index;
+
+  unit = (char *)object_get_and_verify_type(unit_handle, 3);
+
+  index = 0;
+  do {
+    weapon_handle = *(int *)(unit + index * 4 + 0x2a8);
+    if (weapon_handle != -1) {
+      /* TEST AL,AL at 0x1ac388 tests only the low byte of the return. */
+      if ((char)weapon_must_be_readied(weapon_handle) != 0) {
+        return index;
+      }
+    }
+    index++;
+  } while (index < 4);
+
+  return -1;
+}
+
+/* FUN_001ac3b0 (0x1ac3b0)
+ *
+ * Returns non-zero when the given weapon handle occupies one of the unit's
+ * four weapon-handle slots at +0x2a8 (0x2a8 + index*4).
+ *
+ * Reference verifies the object as type 3 (unit) via
+ * object_get_and_verify_type(handle, 3) at 0x1ac3ba, then walks EDX from
+ * EAX+0x2a8 comparing dword [EDX] against the second argument (EBP+0xc).
+ * Loop is a do/while: CMP at 0x1ac3d0, INC/ADD 4, CMP ECX,4 / JL back.
+ * Found exit is MOV AL,1; the fallthrough exit moves BL (zeroed by
+ * XOR BL,BL at 0x1ac3c2) into AL, i.e. returns 0. */
+char FUN_001ac3b0(volatile int unit_handle, int weapon_handle)
+{
+  char *unit;
+  int *slot;
+  int index;
+  char result;
+
+  unit = (char *)object_get_and_verify_type(unit_handle, 3);
+
+  result = 0;
+  slot = (int *)(unit + 0x2a8);
+  index = 0;
+  do {
+    if (*slot == weapon_handle) {
+      result = 1;
+      break;
+    }
+    index++;
+    slot++;
+  } while (index < 4);
+
+  return result;
+}
+
 /* sound_cache_sound_finished (0x1be090)
  *
  * Decrements the software_reference_count on a cache-sound entry when a
@@ -225,6 +294,187 @@ void sound_cache_sound_finished(int permutation_ptr)
   *(uint8_t *)(cache_sound + 4) -= 1;
 }
 
+/* FUN_001be100 (0x1be100)
+ *
+ * Hardware-reference counterpart of sound_cache_sound_finished: bumps the
+ * hardware_reference_count on the cache-sound datum a permutation plays out
+ * of. Takes the permutation tag pointer, reads the cache handle from +0x2c
+ * and looks the datum up in the sound cache table at 0x4e9368 (same lookup
+ * shape as 0x1be090).
+ *
+ * The count is a single byte (MOV CL,byte ptr [EAX + 0x5]) and the compare is
+ * unsigned (CMP CL,0xff / JNC 0x1be128), so the increment saturates: while the
+ * datum's own count is below 0xff it is incremented in place, otherwise the
+ * 16-bit global at 0x5054ea is incremented instead (INC word ptr [0x5054ea];
+ * xbox_sound_cache.c names that global the hardware sound reference count).
+ * Whether 0xff is a saturation limit or a NONE marker is unproven -- 0xff is
+ * the only byte value the unsigned compare admits either way. */
+void FUN_001be100(int permutation_ptr)
+{
+  char *cache_sound;
+  int cache_handle;
+
+  cache_handle = *(int *)(permutation_ptr + 0x2c);
+  cache_sound = (char *)datum_get(*(data_t **)0x4e9368, cache_handle);
+
+  if (*(uint8_t *)(cache_sound + 5) < 0xff) {
+    *(uint8_t *)(cache_sound + 5) += 1;
+  } else {
+    *(int16_t *)0x5054ea += 1;
+  }
+}
+/* FUN_001be140 (0x1be140)
+ *
+ * Release counterpart of FUN_001be100: drops the hardware reference the
+ * permutation holds on its cache-sound datum. Takes the permutation tag
+ * pointer, reads the cache handle from +0x2c and looks the datum up in the
+ * sound cache table at 0x4e9368 (same lookup shape as 0x1be090/0x1be100).
+ *
+ * The count is a single byte (MOV CL,byte ptr [EAX + 0x5]) and the test is
+ * TEST CL,CL / JZ, so when the datum's own count is non-zero it is
+ * decremented in place; when it is already zero the 16-bit global at
+ * 0x5054ea is incremented instead (INC word ptr [0x5054ea]) -- the same
+ * global FUN_001be100 bumps on saturation. The meaning of that global
+ * counter is unproven beyond the name xbox_sound_cache.c gives it.
+ *
+ * No assert on underflow here (unlike the software path at 0x1be090). */
+void FUN_001be140(int permutation_ptr)
+{
+  char *cache_sound;
+  int cache_handle;
+
+  cache_handle = *(int *)(permutation_ptr + 0x2c);
+  cache_sound = (char *)datum_get(*(data_t **)0x4e9368, cache_handle);
+
+  if (*(uint8_t *)(cache_sound + 5) != 0) {
+    *(uint8_t *)(cache_sound + 5) -= 1;
+  } else {
+    *(int16_t *)0x5054ea += 1;
+  }
+}
+/* FUN_001be170 (0x1be170)
+ *
+ * LRU-V block-query callback for the Xbox sound cache: sound_cache_new hands
+ * this function to lruv_new as the second callback (see
+ * cache/xbox_sound_cache.c:0x49), so the argument is a cache block index,
+ * which in this cache is also the cache-sound datum index (FUN_001be2b0
+ * asserts new_cache_sound_index==cache_block_index).
+ *
+ * Looks the datum up in the sound cache table at 0x4e9368 (same lookup shape
+ * as 0x1be090/0x1be100/0x1be140) and returns 0 only when +0x02 is non-zero
+ * and both reference counts are zero -- +0x04 is the software reference count
+ * and +0x05 the hardware reference count (named in xbox_sound_cache.c), and
+ * +0x02 is the byte FUN_001be2b0 hands to cache_file_read as the read
+ * completion flag. Every other state returns 1.
+ *
+ * Which polarity the caller wants (0 = "may evict" vs 1 = "may evict") is not
+ * proven from this function alone; lruv's use of the callback is unlifted.
+ * The three byte loads are TEST CL,CL on byte ptr operands, and the returns
+ * are a full-dword XOR EAX,EAX / MOV EAX,1, so the result is an int, not a
+ * bool in AL. */
+int FUN_001be170(int cache_block_index)
+{
+  char *cache_sound;
+
+  cache_sound = (char *)datum_get(*(data_t **)0x4e9368, cache_block_index);
+
+  if (*(uint8_t *)(cache_sound + 2) != 0 &&
+      *(uint8_t *)(cache_sound + 4) == 0 &&
+      *(uint8_t *)(cache_sound + 5) == 0) {
+    return 0;
+  }
+
+  return 1;
+}
+/* FUN_001be1b0 (0x1be1b0)
+ *
+ * LRU-V block-delete callback for the Xbox sound cache: sound_cache_new hands
+ * this function to lruv_new as the first callback (cast at
+ * cache/xbox_sound_cache.c:122), so the stack argument is a cache block index
+ * -- which in this cache is also the cache-sound datum index (FUN_001be2b0
+ * asserts new_cache_sound_index==cache_block_index).  The kb decl was
+ * void(void); the reference reads MOV EDI,dword ptr [EBP+0x8] at 0x1be1ba and
+ * cleanup is caller-side (plain RET), so it is a single cdecl int parameter.
+ *
+ * Refuses to evict a block that is still referenced: +0x04 is the software
+ * reference count and +0x05 the hardware reference count (same fields
+ * FUN_001be170 tests), and a non-zero count reports
+ * "tried to delete sound %s(%s) from the cache while it was playing."
+ * (xbox_sound_cache.c line 0x141) and halts.
+ *
+ * Otherwise it asserts cache_sound->sound->cache_block_index==block_index
+ * (line 0x144), clears the owning record's cache-block index (+0x2c = -1) and
+ * cache page address (+0x30 = 0), then frees the datum.  +0x08 is the owning
+ * sound-permutation record FUN_001be2b0 stored there, and +0x3c on that record
+ * is the tag index handed to tag_get_name.
+ *
+ * The reference re-loads [ESI+0x8] before each of the three uses
+ * (0x1be216 / 0x1be23e / 0x1be248), so the loads are left uncached here.
+ *
+ * The second %s consumes the record pointer itself (PUSH EAX at 0x1be1e9,
+ * offset 0), so offset 0 of that record is most likely an embedded name
+ * string -- UNPROVEN from this function, hence the raw pointer. */
+void FUN_001be1b0(int block_index)
+{
+  char *cache_sound;
+
+  cache_sound = (char *)datum_get(*(data_t **)0x4e9368, block_index);
+
+  if (*(uint8_t *)(cache_sound + 4) != 0 ||
+      *(uint8_t *)(cache_sound + 5) != 0) {
+    display_assert(
+      csprintf((char *)0x5ab100,
+               "tried to delete sound %s(%s) from the cache while it was "
+               "playing.",
+               tag_get_name(*(int *)(*(char **)(cache_sound + 8) + 0x3c)),
+               *(char **)(cache_sound + 8)),
+      "c:\\halo\\SOURCE\\cache\\xbox_sound_cache.c", 0x141, 1);
+    system_exit(-1);
+  }
+
+  if (*(int *)(*(char **)(cache_sound + 8) + 0x2c) != block_index) {
+    display_assert("cache_sound->sound->cache_block_index==block_index",
+                   "c:\\halo\\SOURCE\\cache\\xbox_sound_cache.c", 0x144, 1);
+    system_exit(-1);
+  }
+
+  *(int *)(*(char **)(cache_sound + 8) + 0x2c) = -1;
+  *(int *)(*(char **)(cache_sound + 8) + 0x30) = 0;
+  datum_delete(*(data_t **)0x4e9368, block_index);
+}
+/* FUN_001be270 (0x1be270)
+ *
+ * Name-formatting callback for the Xbox sound cache LRU dump: FUN_001be2b0
+ * hands this function's address to FUN_0011db90 as the last argument
+ * (PUSH 0x1be270 in the "SOUND CACHE BLOWN" cold path), so the single cdecl
+ * stack argument (MOV EAX,dword ptr [EBP+0x8] at 0x1be273) is a cache block
+ * index -- which in this cache is also the cache-sound datum index.
+ *
+ * The kb decl was void(void); the reference both reads [EBP+0x8] and ends
+ * with MOV EAX,0x4e9268 / POP EBP / RET, so it takes one int and returns the
+ * static formatting buffer at 0x4e9268.
+ *
+ * Same record fields the sibling callbacks use: +0x08 on the cache-sound
+ * datum is the owning sound-permutation record, and +0x3c on that record is
+ * the tag index handed to tag_get_name.  The second %s consumes the record
+ * pointer itself (the PUSH EAX at 0x1be28c survives the ADD ESP,0x4 after
+ * tag_get_name and is sprintf's last vararg), so offset 0 of that record is
+ * most likely an embedded name string -- UNPROVEN, hence the raw pointer,
+ * exactly as in FUN_001be1b0.
+ *
+ * [EAX+0x8] is loaded once and reused for both the +0x3c load and the vararg
+ * push (0x1be283 / 0x1be286 / 0x1be28c), so the load is cached in a local. */
+char *FUN_001be270(int cache_block_index)
+{
+  char *cache_sound;
+  char *sound;
+
+  cache_sound = (char *)datum_get(*(data_t **)0x4e9368, cache_block_index);
+  sound = *(char **)(cache_sound + 8);
+  crt_sprintf((char *)0x4e9268, "%s (%s)", tag_get_name(*(int *)(sound + 0x3c)),
+              sound);
+  return (char *)0x4e9268;
+}
 /* FUN_001be2b0 (0x1be2b0)
  *
  * Sound-cache counterpart of xbox_texture_cache_request: reserves an LRU
@@ -319,6 +569,63 @@ __declspec(noinline) void sound_pitch_push_sample(int object_handle,
   }
 }
 
+/* FUN_001c7b40 (0x1c7b40)
+ *
+ * Rebuilds the global per-cluster audibility bitfield at 0x5054a0 for the
+ * current frame.  The table is first cleared to
+ * ((clusters.count + 0x1f) >> 5) * 4 bytes (one bit per cluster, rounded up
+ * to whole dwords).  Then, for each of the four local players that has a
+ * player index (local_player_get_player_index != NONE) and whose observer
+ * camera has a valid cluster (camera +0x10 != NONE), every cluster of the
+ * structure BSP is tested: structure_bsp_cluster_sound_encoding returns a
+ * packed byte whose low 7 bits scale by 0x256148 into a distance which is
+ * compared against the cutoff at 0x2642a0.  Clusters under the cutoff get
+ * their bit set, so the bit is the union over all local cameras.
+ *
+ * Consumed by sound_cluster_is_audible (game_sound.c) which reads the same
+ * table at 0x5054a0.
+ *
+ * Call-site evidence (0x1c7bb9): PUSH ECX (camera cluster, +0x10), PUSH EDI
+ * (loop cluster index), PUSH EBX (bsp) -> (bsp, from_cluster = loop index,
+ * to_cluster = camera cluster).  scenario_get() is called once outside both
+ * loops and reused (EBX). */
+void FUN_001c7b40(void)
+{
+  void *bsp;
+  void *camera;
+  int16_t local_player_index;
+  int16_t cluster_index;
+  int cluster;
+  uint8_t encoding;
+
+  bsp = scenario_get();
+  csmemset((void *)0x5054a0, 0,
+           (size_t)(((*(int *)((char *)bsp + 0x134) + 0x1f) >> 5) << 2));
+
+  local_player_index = 0;
+  do {
+    if (local_player_get_player_index(local_player_index) != -1) {
+      camera = observer_get_camera((unsigned short)local_player_index);
+      if (*(int16_t *)((char *)camera + 0x10) != -1) {
+        cluster_index = 0;
+        cluster = 0;
+        while (cluster < *(int *)((char *)bsp + 0x134)) {
+          encoding = structure_bsp_cluster_sound_encoding(
+            bsp, cluster_index, *(int16_t *)((char *)camera + 0x10));
+          if ((float)(int)(encoding & 0x7f) * *(float *)0x256148 <
+              *(float *)0x2642a0) {
+            ((uint32_t *)0x5054a0)[cluster >> 5] |=
+              1u << ((uint8_t)cluster & 0x1f);
+          }
+          cluster_index = (int16_t)(cluster_index + 1);
+          cluster = (int)cluster_index;
+        }
+      }
+    }
+    local_player_index = (int16_t)(local_player_index + 1);
+  } while (local_player_index < 4);
+}
+
 /* Return a pointer to the sound class definition at class_index.
  * The definitions live in a static table at 0x32ed08 with a stride of 0x2c.
  * Originally inlined from sound_classes.h; compiled into sound_manager.obj.
@@ -340,7 +647,10 @@ void *sound_class_get_definition(short class_index)
 /* Return the default priority for a sound tag (0x1c8d10).
  * Reads the priority field at tag offset 0xc. If zero, falls back to
  * the sound class definition's default priority at offset 0x1c. */
-float sound_get_default_priority(int sound_tag_index)
+/* noinline (VC71 verification only): the original build emits this out of
+ * line -- callers such as FUN_001cc4f0 (0x1cc4f0) CALL 0x1c8d10/0x1c8d50
+ * rather than carrying an inlined copy of the fallback path. */
+__declspec(noinline) float sound_get_default_priority(int sound_tag_index)
 {
   void *sound_tag = tag_get(0x736e6421, sound_tag_index);
   float priority = *(float *)((char *)sound_tag + 0xc);
@@ -359,7 +669,10 @@ float sound_get_default_priority(int sound_tag_index)
  * If it is zero, falls back to the min_distance field (offset 0x18)
  * of the sound class definition looked up via the tag's class_index
  * at offset 0x4. */
-float sound_class_get_min_distance(int sound_tag_index)
+/* noinline (VC71 verification only): the original build emits this out of
+ * line -- callers such as FUN_001cc4f0 (0x1cc4f0) CALL 0x1c8d10/0x1c8d50
+ * rather than carrying an inlined copy of the fallback path. */
+__declspec(noinline) float sound_class_get_min_distance(int sound_tag_index)
 {
   void *sound_tag = tag_get(0x736e6421, sound_tag_index);
   float min_distance = *(float *)((char *)sound_tag + 0x8);
@@ -1157,6 +1470,32 @@ float sound_update_channel_attenuation(int sound_handle)
          *(float *)(sound_entry + 0x9c);
 }
 
+/* FUN_001cc440 (0x1cc440)
+ *
+ * The single argument arrives in EDI (the caller at 0x1ce5c5 in
+ * FUN_001ce550 sets it up); the disassembly compares EDI at 0x1cc46b
+ * without ever initialising it in this function.
+ *
+ * Walks the looping-sounds table (0x4fdba0) with data_next_index and
+ * returns the index of the first entry whose field_08 equals the
+ * argument, or -1 when no entry matches.  The meaning of field_08 is
+ * unknown from this function alone. */
+int FUN_001cc440(int value /* @<edi> */)
+{
+  int index;
+  char *entry;
+
+  index = data_next_index(*(data_t **)0x4fdba0, -1);
+  while (index != -1) {
+    entry = (char *)datum_get(*(data_t **)0x4fdba0, index);
+    if (*(int *)(entry + 8) == value) {
+      return index;
+    }
+    index = data_next_index(*(data_t **)0x4fdba0, index);
+  }
+  return -1;
+}
+
 /* sound_volume_crossfade (0x1cc490)
  *
  * Step a volume level toward a target value using a multiplicative rate.
@@ -1184,6 +1523,46 @@ float sound_volume_crossfade(float current, float target, float rate)
     if (current > result)
       return current;
     return result;
+  }
+}
+
+/* FUN_001cc4f0 (0x1cc4f0)
+ *
+ * Debug overlay for one active sound.  Gated on the debug byte at 0x4fc382
+ * (MOV AL,[0x4fc382]; TEST AL,AL; JZ epilogue), it resolves the handle in the
+ * sounds table (0x4fdba4), touches the sound's 'snd!' tag (the tag_get result
+ * is discarded — the call is kept for its side effects/asserts), then draws:
+ *   - a sphere at the sound position (entry + 0x20) with the tag's default
+ *     priority as radius, colour [0x2ee6e0];
+ *   - a sphere at the same position with the sound class minimum distance as
+ *     radius, colour [0x2ee6d0];
+ *   - a text label "<tag name>|n<f> <f>" from the floats at entry + 0x4c and
+ *     entry + 0x50, colour [0x2ee6c4].
+ * Both radii arrive via FSTP [ESP] over the pushed slot (0x1cc53d / 0x1cc55b),
+ * and the two label floats are widened to double for the sprintf varargs
+ * (FSTP double ptr [ESP] / [ESP+8] at 0x1cc56c / 0x1cc573, so entry + 0x4c is
+ * the first %f and entry + 0x50 the second).  Local buffer is 512 bytes
+ * (SUB ESP,0x200; LEA EDX,[EBP-0x200]). */
+void FUN_001cc4f0(int sound_handle)
+{
+  char *sound_entry;
+  void *position;
+  char text[512];
+
+  if (*(char *)0x4fc382 != '\0') {
+    sound_entry = (char *)datum_get(*(data_t **)0x4fdba4, sound_handle);
+    tag_get(0x736e6421, *(int *)(sound_entry + 8));
+    position = (void *)(sound_entry + 0x20);
+    FUN_00189540('\0', position,
+                 sound_get_default_priority(*(int *)(sound_entry + 8)),
+                 *(void **)0x2ee6e0);
+    FUN_00189540('\0', position,
+                 sound_class_get_min_distance(*(int *)(sound_entry + 8)),
+                 *(void **)0x2ee6d0);
+    crt_sprintf(text, "%s|n%f %f", tag_get_name(*(int *)(sound_entry + 8)),
+                (double)*(float *)(sound_entry + 0x4c),
+                (double)*(float *)(sound_entry + 0x50));
+    FUN_00189cb0('\0', position, text, (int)*(void **)0x2ee6c4);
   }
 }
 
@@ -1464,6 +1843,79 @@ short sound_find_oldest_channel(int sound_handle, short *channels, short count)
   return -1;
 }
 
+/* sound_update_time (0x1cce80)
+ *
+ * Priority comparison between two active sounds ("challenger" vs
+ * "champion" per the assert string at 0x1cced8/0x1ccee2).  Returns
+ * true when the challenger should win the contest.
+ *
+ * Register ABI (disassembly 0x1cce89/0x1cce8b): ECX and EAX carry the two
+ * sound handles, the float arrives on the stack at [EBP+8] (FCOMP float ptr
+ * [EBP+8] at 0x1ccf54), and the result is returned in EAX (XOR EAX,EAX /
+ * MOV EAX,1 at 0x1ccf60 / 0x1ccf69 -- a full-EAX boolean, so the return
+ * type is int, not the 1-byte bool typedef).  Which handle is the challenger
+ * and which the champion is INFERRED from the return sense (return true when
+ * the ECX-derived class ranks higher), not proven by the binary.
+ *
+ * Sequence:
+ *   1. Resolve both sound datums and their snd! tags.
+ *   2. assert(challenger != champion) at line 0x763.
+ *   3. Compare the two sound classes' field_0a (rank/priority, meaning
+ * unproven; signed 16-bit, CMP/JG at 0x1ccf18): challenger higher -> true.
+ *   4. If the priorities differ at all (JNZ at 0x1ccf46) -> false.
+ *   5. Tie-break: recompute the champion's listener distance via
+ *      FUN_001ccbe0 (@<eax> = sound_entry+0x6, @<edi> = sound_entry+0x14)
+ *      and return true when it exceeds the caller-supplied threshold. */
+int sound_update_time(int challenger_sound_index, int champion_sound_index,
+                      float threshold)
+{
+  char *challenger_entry;
+  char *champion_entry;
+  char *volatile challenger_tag;
+  char *volatile champion_tag;
+  void *volatile challenger_class;
+  void *volatile champion_class;
+
+  challenger_entry =
+    (char *)datum_get(*(data_t **)0x4fdba4, challenger_sound_index);
+  challenger_tag =
+    (char *)tag_get(0x736e6421, *(int *)(challenger_entry + 0x8));
+  champion_entry =
+    (char *)datum_get(*(data_t **)0x4fdba4, champion_sound_index);
+  champion_tag = (char *)tag_get(0x736e6421, *(int *)(champion_entry + 0x8));
+
+  if (challenger_sound_index == champion_sound_index) {
+    display_assert("challenger_sound_index!=champion_sound_index",
+                   "c:\\halo\\SOURCE\\sound\\sound_manager.c", 0x763, 1);
+    system_exit(-1);
+  }
+
+  /* Higher class priority wins outright. */
+  challenger_class =
+    sound_class_get_definition(*(unsigned short *)(challenger_tag + 0x4));
+  champion_class =
+    sound_class_get_definition(*(unsigned short *)(champion_tag + 0x4));
+  if (*(short *)((char *)challenger_class + 0xa) >
+      *(short *)((char *)champion_class + 0xa))
+    return 1;
+
+  /* Different (lower) priority loses outright.  The original reloads both
+   * class definitions here rather than reusing the values above. */
+  challenger_class =
+    sound_class_get_definition(*(unsigned short *)(challenger_tag + 0x4));
+  champion_class =
+    sound_class_get_definition(*(unsigned short *)(champion_tag + 0x4));
+  if (*(short *)((char *)challenger_class + 0xa) !=
+      *(short *)((char *)champion_class + 0xa))
+    return 0;
+
+  /* Equal priority: the champion's listener distance decides. */
+  if (!(FUN_001ccbe0(*(short *)(champion_entry + 0x6),
+                     (void *)(champion_entry + 0x14)) > threshold))
+    return 0;
+  return 1;
+}
+
 /* sound_update_channel (0x1ccf80)
  *
  * Apply volume/pan/pitch updates for a non-music sound channel.
@@ -1703,6 +2155,41 @@ void sound_stop_impulse(int sound_index)
   sound = datum_get(*(data_t **)0x4fdba4, sound_index);
   if (*(short *)((char *)sound + 2) == 0)
     sound_start_fade(0, 0.3f, -1, sound_index);
+}
+
+/* sound_stop_impulse_by_source_and_definition (0x1cd4d0)
+ *
+ * Walk the sounds table (0x4fdba4) with data_next_index and stop the first
+ * impulse sound whose source and definition both match the arguments.
+ *
+ * The reference declares no parameters in kb.json but reads two stack dwords:
+ * [EBP+8] is compared against entry+0xc and [EBP+0xc] against entry+0x8.
+ * entry+0x8 is the 'snd!' definition tag index (it is the tag_get argument in
+ * sound_update at 0x1cc0e0); entry+0xc is the source handle (assigned from an
+ * object handle at 0x1ccf50), so the parameter order matches the symbol name:
+ * source first, definition second.
+ *
+ * entry+0x2 is the sound type; 0 means impulse (from the
+ * "sound_get(sound_index)->type==_sound_impulse" assert in
+ * sound_stop_impulse). Only the FIRST match is stopped -- the reference
+ * returns immediately after the sound_stop_impulse call. */
+void sound_stop_impulse_by_source_and_definition(int source_handle,
+                                                 int definition_index)
+{
+  int sound_index;
+  char *sound_entry;
+
+  for (sound_index = data_next_index(*(data_t **)0x4fdba4, -1);
+       sound_index != -1;
+       sound_index = data_next_index(*(data_t **)0x4fdba4, sound_index)) {
+    sound_entry = (char *)datum_get(*(data_t **)0x4fdba4, sound_index);
+    if (*(short *)(sound_entry + 2) == 0 &&
+        *(int *)(sound_entry + 0xc) == source_handle &&
+        *(int *)(sound_entry + 8) == definition_index) {
+      sound_stop_impulse(sound_index);
+      return;
+    }
+  }
 }
 
 /* sound_stop_all (0x1cd540)
@@ -2764,4 +3251,24 @@ void sound_render(void)
   /* Profiling: exit "sound_render" section. */
   if (*(uint8_t *)0x449ef1 != 0 && *(uint8_t *)0x32f6f0 != 0)
     profile_exit_private((void *)0x32f6e8);
+}
+
+/* FUN_001cf820 @ 0x1cf820 -- store a fixed data-block address through an
+ * out-pointer.
+ *
+ * Reference (0x1cf820..0x1cf82e, 6 instructions):
+ *   PUSH EBP / MOV EBP,ESP
+ *   MOV EAX,[EBP+0x8]          ; first (and only) cdecl argument
+ *   MOV dword ptr [EAX],0x32fce4
+ *   POP EBP / RET              ; plain RET => cdecl, caller cleans up
+ *
+ * The function has no callees and no call sites recorded in the fingerprinted
+ * evidence bundle, so the meaning of both the out-pointer and the target
+ * address 0x32fce4 is UNKNOWN. It is written as an opaque data address rather
+ * than named: 0x32fce4 sits just below the int16 table at 0x32fcf8 used by
+ * sound_dsound_xbox.c, but nothing in the bundle proves a relationship.
+ * Kept as a raw absolute address, matching the existing sound/ idiom. */
+void FUN_001cf820(void **out_data)
+{
+  *out_data = (void *)0x32fce4;
 }
