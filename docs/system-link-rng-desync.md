@@ -1938,3 +1938,27 @@ unicorn-verified register/flag/stack-preserving). Record: value = `found_count`,
 caller2 = accepted object handle. Comparing the kind-32 sets at the divergent tick
 decides between (1) and (2). Host image sha256 73efbe99…, 6 patches. Client commit
 adcc6dc30.
+
+## RUN 5 (2026-09-07) — tick 1099, radius query is NOT the cause
+
+Kind-32 `radius_hit` sets at tick 1099 are identical on both sides (29 objects,
+same order except a 4-entry cluster-list permutation at slots 0xd..0x10). The
+grenade `0xe2cf0004` is in both lists, yet only the host applies damage to it
+(both effects). So the reject happens inside the unported applier `FUN_00138900`:
+for a projectile (not biped/vehicle) the only reject before `object_cause_damage`
+is the LOS test `FUN_0014df70` (ported, VC71 84.9%) returning "hit". Static review
+of `FUN_0014dce0` and `object_get_root_parent` matched the binary; the candidate
+set inside the LOS chain (BSP test, `FUN_0014cb00`, sphere test, zone tracking) is
+too large to read, so both sides got a kind-33 `los_result` probe at the LOS exit:
+value = `(result<<16) | collision_result.type`, caller2 = hit-t float bits,
+guarded to calls returning into `FUN_00138900` (the render path calls the LOS test
+thousands of times per frame and flooded the ring in run 6).
+
+Host detour lessons: the second epilogue is entered mid-way by three `JE 0x14e62b`
+branches, so a 6-byte detour at 0x14e628 crashed the host (EIP 0x14e62c, landed
+inside the JMP). Fix: redirect the first epilogue into the second and detour once
+at 0x14e62b (stolen POP EDI/ESI/EBX; MOV ESP,EBP). Always scan for branches that
+land inside the stolen range before installing a detour.
+
+Run 6 host data was lost (host rebooted by a redeploy before the dump).
+Host image sha256 ca16e603…, 8 patches. Client commits 12990c7d1, 2e7d0e1fb.
