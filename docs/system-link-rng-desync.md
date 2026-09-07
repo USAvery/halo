@@ -2078,3 +2078,66 @@ these functions are mostly qword (53-bit) spills of the promoted temporaries
 and exact float copies, not 24-bit roundings.
 
 Client redeployed with all of the above; host image unchanged. Run 10/11 pending.
+
+## RUN 10 (2026-09-07) — per-tick drift in the free-flight integration
+
+Tick 1184, the LOS-flip class again: projectile `e2b80007` got hit-at-t=0 on
+the host and miss on the client, its radius_hit z already 0.018 apart
+(`404bf27e` vs `404d1060`). Walking the whole ring instead of the divergent
+tick showed the real picture:
+
+- **Every** grenade detonation origin (kind 34) differed between host and
+  client from the earliest surviving explosion at tick 810: 4-11 ulp in x/y
+  for grenades that never bounced, thousands of ulp after a bounce.
+- An **airborne biped** (`e2780009`, a jumping player, ticks 992-1003) was
+  ~2e-5 off in z with the gap growing slowly per tick, while every grounded
+  biped stayed bit-identical.
+
+So this is not a collision-branch flip but a rounding mismatch inside the
+per-tick flight integration itself, shared by projectiles and airborne units.
+Two instruction-level audits (projectile update `FUN_000f9c40`, biped physics
+step `FUN_001a2f40`) plus a callgraph check found:
+
+1. **`FUN_000f9c40` air-drag arm** (projectiles.c ~2544): the original does
+   `FSTP dword` on each scaled velocity component (0xfa270/78/7e) and reloads
+   the narrowed slot for `avg_vel` (0xfa281/8f/9e). clang emitted `FST`
+   (no-pop) and averaged the 80-bit product. `avg_vel` feeds `new_pos`
+   directly, so the position accumulated a sub-ulp error every tick — the
+   observed ramp. Same shape in the split-tick arm (0xfa1fa..0xfa24a) and on
+   the bounce path (`time_remaining`, `vel[2]` at 0xfa589/0xfa595). Fixed with
+   `HALO_FLT_ROUNDTRIP`.
+2. **`FUN_000f9c40` split-tick arm used the wrong variable**: the lift reused
+   `decel_frac` for both the "fraction of the tick before the speed floor"
+   (0xfa1bb, live in ST(2) through 0xfa210) and `dist_at_hit/speed_prev`,
+   so `avg_vel` was scaled by the wrong ratio on the tick a grenade reached
+   terminal speed. Now a separate `split_frac`.
+3. **`FUN_001a2f40` airborne branch** (bipeds.c ~2996): the original narrows
+   `damp*c0` (0x1a31c5 FSTP, 0x1a31ce reload) but keeps `damp*c1` wide; we
+   kept both wide. `raw0` feeds the new x velocity, hence position, hence the
+   next tick's collision query. Fixed with a narrowed `dc0` temporary (a
+   named temporary is right here because cl.exe spills it exactly as the
+   reference does). Three addend orders in the same function corrected.
+4. **SSE1 inlined in the reference**: `FUN_00147ed0` (collision_bsp.c, the
+   leaf of the biped sphere walk) computes the vertex distance with
+   `subps/mulps/addss`, i.e. every operation rounded to float32 and summed
+   x, y, z. Our port called the x87 `distance_squared3d` (64-bit accumulate,
+   wide compare). Rewritten with per-op round trips. A scan of every ported
+   function's reference body finds only one other SSE user (0x109850,
+   already handled with an asm block), so this class is closed. The x87
+   narrowing checker is blind to it by construction.
+
+Checker change: `check_x87_narrowing.py` now counts reloads through
+`fadd/fsub/fsubr/fmul/fdiv/fdivr/fcom/fcomp dword [slot]`, not only `fld`.
+That was the blind spot that hid `t_min/V/b` in `projectile_aim_ballistic`
+earlier; it exposes 26 more MISSING functions in units/bipeds/real_math/
+objects, none on the free-flight path (callgraph-checked). Counts remain a
+NET, so a "0 MISSING" on a large function still needs a slot-level pass.
+
+VC71: FUN_000f9c40 89.0 -> 89.2, FUN_001a2f40 77.0 -> 77.2, FUN_00147ed0
+91.1 -> 89.0 (cl.exe cannot emit the SSE sequence; accepted).
+
+Next suspect if the airborne drift survives run 11: `FUN_0014f2c0`
+(collision_usage.c) slot-by-slot with the `HALO_FLT_ROUNDTRIP` barriers
+excluded from the metric — its net +21 EXTRA masks whatever is left.
+
+Client redeployed; host image unchanged. Run 11 pending.

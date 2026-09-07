@@ -2219,6 +2219,9 @@ bool FUN_000f9c40(int projectile_handle)
   float gravity; /* local_8 — gravity deceleration magnitude          */
   float decel_frac; /* fVar2 — generic float scratch                     */
   float tmp_frac; /* fVar5/fVar6 — secondary scratch                   */
+  float split_frac; /* fraction of the tick before the speed floor; the
+                     * original keeps it live in ST(2) across the whole
+                     * split-tick arm (0xfa1bb..0xfa24a) */
 
   /* Steering helpers. */
   float target_dist; /* distance to guidance target (local_8 scratch)     */
@@ -2362,9 +2365,10 @@ bool FUN_000f9c40(int projectile_handle)
     saved_target = *(int *)(proj + 0x1e4);
     hit_flag = '\0';
 
-    speed = sqrtf(*(float *)(proj + 0x20) * *(float *)(proj + 0x20) +
+    /* 0xf9e07-0xf9e37: (x*x + y*y) + z*z */
+    speed = sqrtf(*pfVel * *pfVel +
                   *(float *)(proj + 0x1c) * *(float *)(proj + 0x1c) +
-                  *pfVel * *pfVel);
+                  *(float *)(proj + 0x20) * *(float *)(proj + 0x20));
     /* 0xf9e4c: FST dword [ebp-0x1c] -- the FSQRT result is narrowed before it
      * is copied on to [ebp-0x2c] (dist_at_hit) and [ebp-0x38] (dist_post) at
      * 0xf9e55/0xf9e58, so all four locals hold the same float32. */
@@ -2511,15 +2515,15 @@ bool FUN_000f9c40(int projectile_handle)
         dist_at_hit = speed_prev - decel_frac;
         if (dist_at_hit <= *(float *)(proj_tag + 0x1e8)) {
           /* Speed will cross min: split tick. */
-          decel_frac = (speed_prev - *(float *)(proj_tag + 0x1e8)) / decel_frac;
+          split_frac = (speed_prev - *(float *)(proj_tag + 0x1e8)) / decel_frac;
           dist_at_hit = *(float *)(proj_tag + 0x1e8) * *(float *)0x28ace8;
           /* 0xfa1c9: FSTP dword [ebp-0x2c] -- narrowed before the reload at
            * 0xfa1d4. */
           HALO_FLT_ROUNDTRIP(dist_at_hit);
-          tmp_frac = 1.0f - decel_frac;
+          tmp_frac = 1.0f - split_frac;
           dist_post =
             tmp_frac * *(float *)(proj_tag + 0x1e8) +
-            (dist_at_hit + speed_prev) * decel_frac * *(float *)0x253398;
+            (dist_at_hit + speed_prev) * split_frac * *(float *)0x253398;
           /* 0xfa1ec: FSTP dword [ebp-0x38] -- narrowed before the reloads at
            * 0xfa413 / 0xfa42c. */
           HALO_FLT_ROUNDTRIP(dist_post);
@@ -2527,12 +2531,20 @@ bool FUN_000f9c40(int projectile_handle)
           vel[0] *= decel_frac;
           vel[1] *= decel_frac;
           vel[2] *= decel_frac;
+          /* 0xfa1fa/0xfa202/0xfa208: FSTP dword narrows each scaled component;
+           * 0xfa20b/0xfa21a (and y/z) reload the narrowed slots for both
+           * terms of the average. */
+          HALO_FLT_ROUNDTRIP(vel[0]);
+          HALO_FLT_ROUNDTRIP(vel[1]);
+          HALO_FLT_ROUNDTRIP(vel[2]);
+          /* 0xfa210: FMUL ST(2) is split_frac (live since 0xfa1bb), not the
+           * dist_at_hit/speed_prev ratio that ST(0) holds. */
           avg_vel[0] = tmp_frac * vel[0] +
-                       (vel[0] + *pfVel) * decel_frac * *(float *)0x253398;
+                       (vel[0] + *pfVel) * split_frac * *(float *)0x253398;
           avg_vel[1] = tmp_frac * vel[1] + (vel[1] + *(float *)(proj + 0x1c)) *
-                                             decel_frac * *(float *)0x253398;
+                                             split_frac * *(float *)0x253398;
           avg_vel[2] = tmp_frac * vel[2] + (vel[2] + *(float *)(proj + 0x20)) *
-                                             decel_frac * *(float *)0x253398;
+                                             split_frac * *(float *)0x253398;
         } else {
           /* Speed stays above min: normal decel. */
           dist_post = speed_prev - decel_frac * *(float *)0x253398;
@@ -2544,6 +2556,13 @@ bool FUN_000f9c40(int projectile_handle)
           vel[0] *= decel_frac;
           vel[1] *= decel_frac;
           vel[2] *= decel_frac;
+          /* 0xfa270/0xfa278/0xfa27e: FSTP dword [ebp-0x10]/[ebp-0xc]/[ebp-8]
+           * narrow each scaled component; 0xfa281/0xfa28f/0xfa29e reload the
+           * narrowed slots for the average.  clang otherwise keeps the
+           * product in ST(i) (FST no-pop) and averages the wide value. */
+          HALO_FLT_ROUNDTRIP(vel[0]);
+          HALO_FLT_ROUNDTRIP(vel[1]);
+          HALO_FLT_ROUNDTRIP(vel[2]);
           avg_vel[0] = (vel[0] + *pfVel) * *(float *)0x253398;
           avg_vel[1] = (vel[1] + *(float *)(proj + 0x1c)) * *(float *)0x253398;
           avg_vel[2] = (vel[2] + *(float *)(proj + 0x20)) * *(float *)0x253398;
@@ -2651,7 +2670,13 @@ bool FUN_000f9c40(int projectile_handle)
         /* After hit: adjust time and post-decel velocity. */
         time_remaining =
           1.0f - *(float *)((char *)collision_result + 0x14);
+        /* 0xfa589: FSTP dword [ebp-0x18] -- narrowed before the reloads at
+         * 0xfa58f and 0xfa5a8. */
+        HALO_FLT_ROUNDTRIP(time_remaining);
         vel[2] += gravity * time_remaining;
+        /* 0xfa595: FSTP dword [ebp-8] -- narrowed before the reload at
+         * 0xfa5d6. */
+        HALO_FLT_ROUNDTRIP(vel[2]);
         if (dist_at_hit != 0.0f) {
           decel_frac = time_remaining * *(float *)(proj + 0x20c) + dist_at_hit;
           if (decel_frac > speed_prev) {

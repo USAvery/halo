@@ -731,6 +731,7 @@ void FUN_00147ed0(void *state, int surface_index)
   unsigned char hit;
   float radius2;
   float dist2;
+  float sq;
   float delta[3];
   float pa[2];
   float pb[2];
@@ -758,7 +759,27 @@ void FUN_00147ed0(void *state, int surface_index)
       vertex = (float *)tag_block_get_element((void *)(*(int *)state + 0x54),
                                               vertex_index, 0x10);
       point = *(float **)((char *)state + 0xc);
-      dist2 = distance_squared3d(vertex, point);
+      /* 0x147f82-0x147faf: the original inlines the distance with SSE1
+       * (movss/movhps, subps, mulps, addss): every operation rounds to
+       * float32 and the squares are summed x, y, z.  The x87 helper
+       * distance_squared3d accumulates at 64-bit significand and compares
+       * wide, which flips the boundary test; round after each op instead. */
+      delta[0] = vertex[0] - point[0];
+      HALO_FLT_ROUNDTRIP(delta[0]);
+      delta[1] = vertex[1] - point[1];
+      HALO_FLT_ROUNDTRIP(delta[1]);
+      delta[2] = vertex[2] - point[2];
+      HALO_FLT_ROUNDTRIP(delta[2]);
+      dist2 = delta[0] * delta[0];
+      HALO_FLT_ROUNDTRIP(dist2);
+      sq = delta[1] * delta[1];
+      HALO_FLT_ROUNDTRIP(sq);
+      dist2 = dist2 + sq;
+      HALO_FLT_ROUNDTRIP(dist2);
+      sq = delta[2] * delta[2];
+      HALO_FLT_ROUNDTRIP(sq);
+      dist2 = dist2 + sq;
+      HALO_FLT_ROUNDTRIP(dist2);
       if (dist2 <= radius2) {
         results = *(int **)((char *)state + 0x14);
         for (i = 0; i < results[0x202]; i++) {

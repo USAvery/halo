@@ -26476,16 +26476,16 @@
     "FUN_000f9c40": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 89.1,
+      "abi_modeled_mnemonic_pct": 89.2,
       "addr": "0xf9c40",
       "end": "0xfac17",
       "kind": "auto",
       "n_r": 1158,
-      "opnd_percent": 65.1,
-      "raw_mnemonic_pct": 89.1,
+      "opnd_percent": 65.5,
+      "raw_mnemonic_pct": 89.2,
       "ref": "synth",
       "ref_sha": "65fdc375a0a0f3d2",
-      "score": 89.1,
+      "score": 89.2,
       "source": "src/halo/items/projectiles.c"
     },
     "FUN_000fac20": {
@@ -33946,16 +33946,16 @@
     "FUN_00147ed0": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 91.1,
+      "abi_modeled_mnemonic_pct": 89.0,
       "addr": "0x147ed0",
       "end": "0x14823b",
       "kind": "auto",
       "n_r": 302,
-      "opnd_percent": 73.5,
-      "raw_mnemonic_pct": 91.1,
+      "opnd_percent": 71.9,
+      "raw_mnemonic_pct": 89.0,
       "ref": "synth",
       "ref_sha": "509d7a8fee343749",
-      "score": 91.1,
+      "score": 89.0,
       "source": "src/halo/physics/collision_bsp.c"
     },
     "FUN_00148240": {
@@ -43141,16 +43141,16 @@
     "FUN_001a2f40": {
       "abi_model": "regparam_stripped_saves",
       "abi_model_items": 3,
-      "abi_modeled_mnemonic_pct": 77.0,
+      "abi_modeled_mnemonic_pct": 77.2,
       "addr": "0x1a2f40",
       "end": "0x1a4436",
       "kind": "auto",
       "n_r": 1613,
       "opnd_percent": 58.6,
-      "raw_mnemonic_pct": 77.0,
+      "raw_mnemonic_pct": 77.1,
       "ref": "synth",
       "ref_sha": "243964b11509607c",
-      "score": 77.0,
+      "score": 77.2,
       "source": "src/halo/units/bipeds.c"
     },
     "FUN_001a4440": {

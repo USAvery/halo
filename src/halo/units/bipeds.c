@@ -2988,12 +2988,17 @@ void FUN_001a2f40(void *physics_arg /* @esi */)
     float tang[3];
     float c0, c1;
     float raw0, raw1;
+    float dc0; /* damp*c0: 0x1a31c5 FSTP dword [ebp-0x44] narrows it and
+                * 0x1a31ce reloads it; damp*c1 (0x1a31c8..0x1a31e2) stays
+                * in ST(0). */
 
     c0 = physics[0xf] * physics[5] - physics[6] * physics[0x10];
     c1 = physics[0xf] * physics[6] + physics[0x10] * physics[5];
     damp = *(float *)0x2533c8 - physics[0x12];
 
-    raw0 = damp * c0 - velocity[0];
+    dc0 = damp * c0;
+    HALO_FLT_ROUNDTRIP(dc0);
+    raw0 = dc0 - velocity[0];
     raw1 = damp * c1 - physics[0xc];
     tang[0] = raw0;
     tang[1] = raw1;
@@ -3574,8 +3579,9 @@ LAB_001a36a4:
     }
     e = &results[(short)best_index];
     /* selected entry: compute the result normal dot (local_3c) */
-    best_t = -(e->normal[0] * new_pos[0] + e->normal[2] * new_pos[2] +
-               e->normal[1] * new_pos[1]);
+    /* 0x1a3ef6-0x1a3f24: (n1*p1 + n2*p2) + n0*p0 */
+    best_t = -(e->normal[1] * new_pos[1] + e->normal[2] * new_pos[2] +
+               e->normal[0] * new_pos[0]);
     if (loop_flag9 == 0 && loop_flag1 == 0) {
       /* 0x1a3ff8: flds -0x48(%ebp) = loop_best (the selected entry's normal[2],
        * Z/up), compared against physics[0x19] (stand-on-slope threshold). */
@@ -3626,9 +3632,10 @@ LAB_001a36a4:
        * physics[0x20+i] (i.e. +0x80+4i). The prior lift swapped x/y
        * (new_pos[0]*[0x21] + new_pos[1]*[0x20]), corrupting the +0xc4 signed
        * plane distance used by downstream positioning. */
+      /* 0x1a3ff6-0x1a4012: (p1*n1 + p2*n2) + p0*n0 */
       physics[0x31] =
-        -(new_pos[0] * physics[0x20] + new_pos[1] * physics[0x21] +
-          new_pos[2] * physics[0x22]);
+        -(new_pos[1] * physics[0x21] + new_pos[2] * physics[0x22] +
+          new_pos[0] * physics[0x20]);
       goto LAB_001a4062;
     }
   }
@@ -3741,7 +3748,8 @@ LAB_001a4062_done:
     *(int *)&physics[0x2e] = *(int *)&los_dir[0]; /* +0xb8 new_velocity */
     *(int *)&physics[0x2f] = *(int *)&los_dir[1];
     *(int *)&physics[0x30] = *(int *)&los_dir[2];
-    physics[0x32] = sqrtf(d0 * d0 + d1 * d1 + d2 * d2); /* +0xc8 step */
+    /* 0x1a4194-0x1a41bf: (d2*d2 + d1*d1) + d0*d0 */
+    physics[0x32] = sqrtf(d2 * d2 + d1 * d1 + d0 * d0); /* +0xc8 step */
   }
   physics[0x30] = physics[0x30] - physics[0xe];
 

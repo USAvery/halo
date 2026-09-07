@@ -2896,3 +2896,36 @@ across 16 functions**, including `distance_squared3d`,
 `real_matrix4x3_transform_point`, `real_matrix3x3_transform_vector`,
 `triple_product3d`, `midpoint3d` and `real_rgb_color_brightness`.
 Report: `artifacts/fpu_assoc/sweep_20260905.txt`.
+
+## 58. The Reference Inlines SSE1 Vector Math in a Few Leaves — Per-Op float32 Rounding the x87 Checker Cannot See
+
+**Symptom.** System-link run 10: an airborne biped drifted ~2e-5 per tick
+from the pristine host while grounded bipeds stayed bit-identical, and a
+callgraph walk from the biped physics step reached `FUN_00147ed0` (the leaf of
+the bsp3d sphere walk), which `check_x87_narrowing.py` flagged as ours 1 vs
+xbe 3 round trips.
+
+**Cause.** MSVC 7.1 inlined `distance_squared3d` there as SSE1
+(`movss/movhps`, `subps`, `mulps`, `addss`, `addss` at 0x147f82..0x147faf):
+every operation is rounded to float32 and the squares are summed x, y, z.
+Our port, built with `-mno-sse`, called the x87 helper, which accumulates the
+sum at 64-bit significand and compares it wide against `radius^2`. Same
+inputs, different rounding model, occasional flipped boundary test.
+
+**Fix.** Reproduce the per-op rounding in C: compute each difference, square
+and partial sum into a `float` and `HALO_FLT_ROUNDTRIP` after every op (float
+ops on float32 operands rounded to nearest are bit-identical to `subps`/
+`mulps`/`addss`). An asm block is the alternative used for the large SSE
+matrix routine at 0x109850 (real_math.c).
+
+**Cost.** VC71 91.1 -> 89.0: cl.exe cannot emit the SSE sequence, so the
+reference bytes are unreachable either way; correctness wins.
+
+**Automation:** `tools/audit/check_sse_in_reference.py` lists every ported
+function whose reference body contains SSE instructions (2 today: 0x109850
+and 0x147ed0). Run it after lifting anything in real_math/collision; a new
+`[SSE-REF]` line means the x87 narrowing checker is blind to that function.
+
+Related: §57 (association divergence). The x87 narrowing checker now also
+counts reloads through `fadd/fsub/fmul/fdiv/fcom dword [slot]`, closing the
+blind spot that hid `t_min/V/b` in `projectile_aim_ballistic`.

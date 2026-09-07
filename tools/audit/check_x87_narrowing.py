@@ -60,6 +60,7 @@ def _slot(op_str):
 # Ops that can leave ST(0) with more than 24 significant bits.  Sign/exchange
 # ops are excluded: they cannot widen a value, so a round trip after one of them
 # re-rounds nothing.
+RELOAD_OPS = ("fadd", "fsub", "fsubr", "fmul", "fdiv", "fdivr", "fcom", "fcomp")
 ARITH = ("fadd", "fsub", "fmul", "fdiv", "fsqrt", "fprem", "fscale", "frndint",
          "fsin", "fcos", "fptan", "fpatan", "fyl2x", "f2xm1", "fidiv", "fimul",
          "fiadd", "fisub")
@@ -94,6 +95,14 @@ def narrowing_slots(insns):
             continue
         if ins.mnemonic in ("fxch", "fchs", "fabs"):
             continue  # exchange/sign ops carry the wide value through unchanged
+        # MSVC also reloads a narrowed slot straight into an arithmetic op or a
+        # compare (`fmul dword ptr [ebp-8]`, `fcomp dword ptr [ebp-0xc]`); those
+        # are round trips just like an explicit fld and were the checker's
+        # blind spot (t_min/V/b in projectile_aim_ballistic).
+        if ins.mnemonic in RELOAD_OPS:
+            slot = _slot(ins.op_str)
+            if slot is not None and slot in stored:
+                roundtripped.add(slot)
         computed = ins.mnemonic.startswith(ARITH)
     return roundtripped
 
