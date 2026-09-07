@@ -375,6 +375,20 @@ fail:
   ((void (*)(int, const char *, ...))0xff4d0)(0, "couldn't open '%s'", name);
 }
 
+/* 0x1c0070 / game_state.obj
+ * Create the Xbox LRU/vertex-cache-backed game state: reset the tag CRC
+ * accumulator, commit the fixed game-state buffer at 0x80061000
+ * (cpu 0x305000 + gpu 0x40000), open/create the game-state file, then
+ * allocate the 0x14c-byte save header block.
+ */
+void game_state_lruv_cache_new(void)
+{
+  crc_new((uint32_t *)0x4ea9a0);
+  *(void **)0x4ea994 = FUN_001c00c0((void *)0x80061000, 0x305000, 0x40000);
+  game_state_create_or_open_file();
+  *(void **)0x4ea9ac = game_state_malloc("header", (const char *)0, 0x14c);
+}
+
 /* 0x1c00c0
  * Commit the Xbox game-state buffer. Validates that no buffer is currently
  * allocated, that the caller-supplied address is non-NULL, that both region
@@ -386,6 +400,9 @@ fail:
  * (0x4ea9b8) = cpu_size + gpu_size, buffer_allocated (0x4ea9b0) = 1,
  * buffer (0x4ea9b4) = address.
  */
+/* noinline (VC71 verification only): the original build emits this out of
+ * line; game_state_lruv_cache_new calls it via CALL 0x001c00c0. */
+__declspec(noinline)
 void *FUN_001c00c0(void *address, uint32_t cpu_size, uint32_t gpu_size)
 {
   int result;

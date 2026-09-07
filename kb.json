@@ -9882,7 +9882,9 @@
     },
     {
      "addr": "0x1c0070",
-     "decl": "void game_state_lruv_cache_new(void);"
+     "decl": "void game_state_lruv_cache_new(void);",
+     "ported": true,
+     "src": "src/halo/saved_games/game_state.c"
     },
     {
      "addr": "0x1c00c0",
