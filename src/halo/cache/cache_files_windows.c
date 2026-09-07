@@ -385,9 +385,18 @@ void FUN_001bc280(void)
   *(void **)(*(unsigned char **)0x32ea98 + 0x958) =
     CreateEventA(NULL, 1, 0, NULL);
 
-  *(void (**)(void))(*(unsigned char **)0x32ea98 + 0x928) =
+  /* zlib alloc_func slot: cache_copy_compressed_alloc's frame proves the
+   * (opaque, items, size) -> void * signature, so the stored pointer is
+   * typed here rather than as void (*)(void). Store shape is unchanged
+   * (a single MOV imm32). */
+  *(void *(**)(void *, int, int))(*(unsigned char **)0x32ea98 + 0x928) =
     cache_copy_compressed_alloc;
-  *(void (**)(void))(*(unsigned char **)0x32ea98 + 0x92c) = FUN_001ba6c0;
+  /* zlib free_func slot: cache_copy_compressed_free's frame proves the
+   * (opaque, address) signature (it reads only [EBP+0xc]), so the stored
+   * pointer is typed here rather than as void (*)(void). Store shape is
+   * unchanged (a single MOV imm32). */
+  *(void (**)(void *, void *))(*(unsigned char **)0x32ea98 + 0x92c) =
+    cache_copy_compressed_free;
 
   *(void **)(*(unsigned char **)0x32ea98 + 0x95c) =
     CreateThread(NULL, 0x4000, simple_cache_copy_thread, NULL, 0, NULL);

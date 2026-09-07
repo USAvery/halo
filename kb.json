@@ -24948,7 +24948,8 @@
     },
     {
      "addr": "0x1b9fa0",
-     "decl": "void FUN_001b9fa0(void);"
+     "decl": "bool FUN_001b9fa0(void *element);",
+     "ported": true
     },
     {
      "addr": "0x1ba0c0",
@@ -24972,11 +24973,13 @@
     },
     {
      "addr": "0x1ba250",
-     "decl": "void FUN_001ba250(void);"
+     "decl": "void *FUN_001ba250(char raise_priority);",
+     "ported": true
     },
     {
      "addr": "0x1ba290",
-     "decl": "void FUN_001ba290(void);"
+     "decl": "void FUN_001ba290(char raise_priority);",
+     "ported": true
     },
     {
      "addr": "0x1ba2f0",
@@ -24989,11 +24992,13 @@
     },
     {
      "addr": "0x1ba660",
-     "decl": "void cache_copy_compressed_alloc(void);"
+     "decl": "void *cache_copy_compressed_alloc(void *opaque, int items, int size);",
+     "ported": true
     },
     {
      "addr": "0x1ba6c0",
-     "decl": "void FUN_001ba6c0(void);"
+     "decl": "void cache_copy_compressed_free(void *opaque, void *address);",
+     "ported": true
     },
     {
      "addr": "0x1ba710",
@@ -25001,7 +25006,8 @@
     },
     {
      "addr": "0x1ba7c0",
-     "decl": "void cache_copy_initialize_and_fill_with_garbage(void);"
+     "decl": "void cache_copy_initialize_and_fill_with_garbage(char *self@<esi>);",
+     "ported": true
     },
     {
      "addr": "0x1ba8b0",
@@ -25015,7 +25021,8 @@
     },
     {
      "addr": "0x1ba9d0",
-     "decl": "void FUN_001ba9d0(void);"
+     "decl": "short *FUN_001ba9d0(char *self, short key);",
+     "ported": true
     },
     {
      "addr": "0x1baa50",
@@ -25023,20 +25030,24 @@
     },
     {
      "addr": "0x1bab60",
-     "decl": "void get_write_buffer_size(void);",
+     "decl": "void get_write_buffer_size(char *self@<eax>);",
+     "ported": true,
      "comment": "[NAME: get_write_buffer_size — CEA PDB line-containment (probable), cea-deferred 2026-09-03]"
     },
     {
      "addr": "0x1bac00",
-     "decl": "void FUN_001bac00(void);"
+     "decl": "void FUN_001bac00(unsigned char bit_index);",
+     "ported": true
     },
     {
      "addr": "0x1bac70",
-     "decl": "void FUN_001bac70(void);"
+     "decl": "void FUN_001bac70(int timer_index@<esi>);",
+     "ported": true
     },
     {
      "addr": "0x1baca0",
-     "decl": "void FUN_001baca0(void);"
+     "decl": "void FUN_001baca0(void);",
+     "ported": true
     },
     {
      "addr": "0x1badc0",
@@ -25044,7 +25055,8 @@
     },
     {
      "addr": "0x1baf50",
-     "decl": "void FUN_001baf50(void);"
+     "decl": "void FUN_001baf50(void);",
+     "ported": true
     },
     {
      "addr": "0x1bafa0",
