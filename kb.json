@@ -19418,7 +19418,8 @@
     },
     {
      "addr": "0x1508b0",
-     "decl": "void FUN_001508b0(int *state);"
+     "decl": "void FUN_001508b0(int *state);",
+     "ported": true
     },
     {
      "addr": "0x1509c0",
@@ -19430,7 +19431,8 @@
     },
     {
      "addr": "0x150c80",
-     "decl": "void compute_ground_plane(void);"
+     "decl": "void compute_ground_plane(int ignore_object_handle, void *point_definition, void *mass_point@<ecx>);",
+     "ported": true
     },
     {
      "addr": "0x150dd0",
@@ -19442,15 +19444,16 @@
     },
     {
      "addr": "0x151a50",
-     "decl": "void physics_compute_biped_collision(void);"
+     "decl": "void physics_compute_biped_collision(int *collision_context, int object_index);"
     },
     {
      "addr": "0x151ec0",
-     "decl": "void FUN_00151ec0(void);"
+     "decl": "void FUN_00151ec0(int *state_self, int *state_other);"
     },
     {
      "addr": "0x152350",
-     "decl": "void physics_compute_unit_collisions(void);"
+     "decl": "void physics_compute_unit_collisions(int unit_index@<ebx>);",
+     "ported": true
     },
     {
      "addr": "0x1524d0",
@@ -19494,7 +19497,8 @@
     },
     {
      "addr": "0x154750",
-     "decl": "void FUN_00154750(void);"
+     "decl": "char FUN_00154750(float *out_pos, void *point_phys, float dt, float target_pos, float scale);",
+     "ported": true
     },
     {
      "addr": "0x1547d0",

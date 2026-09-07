@@ -34711,17 +34711,17 @@
     "FUN_001508b0": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 7.4,
+      "abi_modeled_mnemonic_pct": 100.0,
       "addr": "0x1508b0",
       "end": "0x1509b6",
       "kind": "auto",
       "n_r": 103,
-      "opnd_percent": 5.6,
-      "raw_mnemonic_pct": 7.4,
+      "opnd_percent": 99.0,
+      "raw_mnemonic_pct": 100.0,
       "ref": "synth",
       "ref_sha": "cff735466272842e",
-      "score": 7.4,
-      "source": "src/halo/unported_thunks.c"
+      "score": 100.0,
+      "source": "src/halo/physics/point_physics.c"
     },
     "FUN_001509c0": {
       "abi_model": "raw",
@@ -34811,6 +34811,21 @@
       "ref": "synth",
       "ref_sha": "5bc0d84a033e4774",
       "score": 100.0,
+      "source": "src/halo/physics/point_physics.c"
+    },
+    "FUN_00154750": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 89.1,
+      "addr": "0x154750",
+      "end": "0x1547c7",
+      "kind": "auto",
+      "n_r": 58,
+      "opnd_percent": 84.0,
+      "raw_mnemonic_pct": 89.1,
+      "ref": "synth",
+      "ref_sha": "44f725c799bac29a",
+      "score": 89.1,
       "source": "src/halo/physics/point_physics.c"
     },
     "FUN_001547d0": {
@@ -55963,6 +55978,21 @@
       "score": 94.1,
       "source": "src/halo/rasterizer/rasterizer_text.c"
     },
+    "compute_ground_plane": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 88.7,
+      "addr": "0x150c80",
+      "end": "0x150dce",
+      "kind": "auto",
+      "n_r": 114,
+      "opnd_percent": 59.1,
+      "raw_mnemonic_pct": 88.7,
+      "ref": "synth",
+      "ref_sha": "abbd5297b21171d9",
+      "score": 88.7,
+      "source": "src/halo/physics/point_physics.c"
+    },
     "compute_packet_field_sizes": {
       "abi_model": "raw",
       "abi_model_items": 0,
@@ -74802,6 +74832,21 @@
       "ref_sha": "deebea6745dd14e4",
       "score": 22.2,
       "source": "src/halo/unported_thunks.c"
+    },
+    "physics_compute_unit_collisions": {
+      "abi_model": "regparam_stripped_saves",
+      "abi_model_items": 3,
+      "abi_modeled_mnemonic_pct": 99.2,
+      "addr": "0x152350",
+      "end": "0x1524c3",
+      "kind": "auto",
+      "n_r": 124,
+      "opnd_percent": 93.6,
+      "raw_mnemonic_pct": 98.0,
+      "ref": "synth",
+      "ref_sha": "5d935e7e58144f3c",
+      "score": 99.2,
+      "source": "src/halo/physics/point_physics.c"
     },
     "pill_intersects_rectangle2d": {
       "abi_model": "raw",
