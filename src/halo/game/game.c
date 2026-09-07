@@ -1009,6 +1009,215 @@ wchar_t *FUN_000b4df0(int index, wchar_t *dst)
   return dst;
 }
 
+/* 0xb4e20 — find_next_target
+ *
+ * Slayer/oddball "next target" selection: counts the eligible players
+ * (not us, not our previous target, different team, alive), picks a random
+ * one of them with random_range(seed, 0, count), then walks the player data
+ * again to find that Nth eligible player and reports it.
+ *
+ * Register arg: @EDI = player datum handle (read uninitialized at 0xb4e2b
+ * PUSH EDI, never written inside the function).
+ *
+ * Source file: c:\halo\SOURCE\game\game_engine_slayer.c, assert line 0xc2.
+ *
+ * Confirmed 0xb4e7b: PUSH EDI / PUSH g_players_data / CALL datum_get -> EBX
+ *   (self), then PUSH ESI(iterator handle) / PUSH g_players_data ->
+ *   EAX (other); the +0x20 team compare is other vs self, and the +0x34
+ *   != -1 aliveness test is on `other`.
+ * Confirmed 0xb4ec8: PUSH EAX(count) / PUSH 0x0 / CALL
+ *   get_global_random_seed_address / PUSH EAX -> random_range(seed, 0, count).
+ * Confirmed 0xb4f56: on count exhaustion the chosen handle is re-read from
+ *   the iterator ([EBP-0x18] == data_iter_t.datum_handle) and the assert
+ *   fires when it is NONE.
+ */
+void find_next_target(int player_index)
+{
+  data_iter_t iterator;
+  void *player;
+  void *self;
+  void *other;
+  int last_target;
+  int next_target;
+  int count;
+  unsigned int handle;
+
+  player = datum_get(player_data, player_index);
+  last_target = *(int *)((char *)player + 0x88);
+  next_target = -1;
+  count = 0;
+  data_iterator_new(&iterator, player_data);
+  if (data_iterator_next(&iterator) != 0) {
+    do {
+      handle = iterator.datum_handle;
+      self = datum_get(player_data, player_index);
+      other = datum_get(player_data, (int)handle);
+      if (handle != (unsigned int)player_index &&
+          handle != (unsigned int)last_target &&
+          *(int *)((char *)other + 0x20) != *(int *)((char *)self + 0x20) &&
+          *(int *)((char *)other + 0x34) != -1) {
+        count = count + 1;
+      }
+    } while (data_iterator_next(&iterator) != 0);
+    if (count > 0) {
+      count = random_range((unsigned int *)get_global_random_seed_address(), 0,
+                           (int16_t)count);
+      data_iterator_new(&iterator, player_data);
+      while (data_iterator_next(&iterator) != 0) {
+        handle = iterator.datum_handle;
+        self = datum_get(player_data, player_index);
+        other = datum_get(player_data, (int)handle);
+        if (handle != (unsigned int)player_index &&
+            handle != (unsigned int)last_target &&
+            *(int *)((char *)other + 0x20) != *(int *)((char *)self + 0x20) &&
+            *(int *)((char *)other + 0x34) != -1) {
+          if (count == 0) {
+            next_target = (int)iterator.datum_handle;
+            if (next_target != -1)
+              goto have_target;
+            break;
+          }
+          count = count - 1;
+        }
+      }
+      display_assert("next_target != NONE",
+                     "c:\\halo\\SOURCE\\game\\game_engine_slayer.c", 0xc2, 1);
+      system_exit(-1);
+    }
+  }
+have_target:
+  *(int *)((char *)player + 0x88) = next_target;
+  if (next_target != -1) {
+    game_engine_player_event(player_index, 0x1e, next_target);
+  }
+}
+
+/* 0xb5040 — FUN_000b5040 — player-event message formatter
+ *
+ * Formats the
+ * HUD/status message for a player event.  Referenced only as
+ * data from the
+ * handler table at 0x2f015c (no code callers), so the cdecl
+ * signature comes
+ * from the frame: [EBP+0x8] player handle, [EBP+0xc] event
+ * type, [EBP+0x10]
+ * target player handle, [EBP+0x14] destination buffer,
+ * [EBP+0x18] buffer
+ * size (wchar count).  Returns AL (MOV BL,1 at 0xb5056,
+ * MOV AL,BL on every
+ * formatted exit; XOR AL,AL on the unhandled-event exit).
+ *
+ * Confirmed
+ * 0xb5049/0xb5058: MOV EAX,[0x5aa6d4] / PUSH ESI / PUSH EAX /
+ *   CALL
+ * 0x119320 — datum_get(player_data, player_handle), result discarded.
+ *
+ * Confirmed 0xb5065: CMP ECX,0x1e / JNZ 0xb512e, then 0xb512e CMP ECX,0x16 /
+ *
+ * JZ, CMP ECX,0x1e / JZ (the second 0x1e compare is unreachable), else
+ *   XOR
+ * AL,AL / RET.
+ * Confirmed 0xb506e/0xb5073: CALL 0xa9350
+ * (game_engine_get_variant) /
+ *   MOV CL,[EAX+0x1c] selects the team-scoring
+ * spelling.
+ * Confirmed 0xb508f: MOV EDI,[EDX*4+0x456fe0] with EDX =
+ * player+0x20 (team),
+ *   and 0xb50a4: MOV ECX,[ESI*4+0x457020] with ESI =
+ * handle & 0xffff — the
+ *   same two score tables FUN_000b4da0 / FUN_000b4df0
+ * read.
+ * Confirmed 0xb50bd: PUSH EDI / PUSH ECX / PUSH 0x26dd64 / PUSH 0x80
+ * /
+ *   PUSH EDX(local buffer) / CALL 0x19e9f0, ADD ESP,0x24; the 128-wchar
+ *
+ * local (SUB ESP,0x100) is formatted but never read afterwards — kept
+ *
+ * because the call order and side effects must be preserved.
+ * Confirmed
+ * 0xb50f1: the variant+0x1c == 0 arm uses the shared format at
+ *   0x26c118
+ * with only the 0x457020 score.
+ * Confirmed 0xb5104/0xb511d:
+ * datum_get(player_data, target_handle), then
+ *   PUSH EAX+4 / PUSH 0x26dd48 /
+ * PUSH size / PUSH buffer — the target name
+ *   lives at +4 in the player
+ * datum.
+ * Confirmed 0xb5150/0xb5156: PUSH 0x1 / PUSH ESI / CALL 0xa9e20
+ *
+ * (game_engine_get_place(handle, 1)) then CALL 0xa9af0
+ *
+ * (game_engine_place_to_string).
+ * Confirmed 0xb51ad: PUSH EDX(variant+0x40) /
+ * PUSH EAX(0x456fe0 team score) /
+ *   PUSH ESI(0x457020 player score) / PUSH
+ * EDI(place string) / PUSH 0x26dd14 /
+ *   PUSH size / PUSH buffer, ADD
+ * ESP,0x38.
+ * Confirmed 0xb51f9: the non-team arm pushes variant+0x40, the
+ * 0x456fe0 team
+ *   score and the place string with the format at 0x26dcf0,
+ * ADD ESP,0x2c.
+ */
+bool FUN_000b5040(unsigned int player_handle, int event_type, int target_handle,
+                  wchar_t *buffer, int buffer_size)
+{
+  wchar_t local_buffer[128];
+  void *variant;
+  void *player;
+  void *target;
+  wchar_t *place_string;
+  int table_score;
+  int player_score;
+
+  datum_get(player_data, player_handle);
+  if (event_type == 0x1e) {
+    variant = game_engine_get_variant();
+    if (*((char *)variant + 0x1c) != 0) {
+      player = datum_get(player_data, player_handle);
+      table_score = *(int *)(0x456fe0 + *(int *)((char *)player + 0x20) * 4);
+      datum_get(player_data, player_handle);
+      unicode_sprintf(local_buffer, 0x80, L"%d team %d",
+                      *(int *)(0x457020 + (player_handle & 0xffff) * 4),
+                      table_score);
+    } else {
+      datum_get(player_data, player_handle);
+      unicode_sprintf(local_buffer, 0x80, (const wchar_t *)0x26c118,
+                      *(int *)(0x457020 + (player_handle & 0xffff) * 4));
+    }
+    target = datum_get(player_data, target_handle);
+    unicode_sprintf(buffer, buffer_size, L"New Target %s",
+                    (wchar_t *)((char *)target + 4));
+    return true;
+  }
+  if (event_type == 0x16) {
+    variant = game_engine_get_variant();
+    if (*((char *)variant + 0x1c) != 0) {
+      place_string =
+        game_engine_place_to_string(game_engine_get_place(player_handle, 1));
+      player = datum_get(player_data, player_handle);
+      table_score = *(int *)(0x456fe0 + *(int *)((char *)player + 0x20) * 4);
+      datum_get(player_data, player_handle);
+      player_score = *(int *)(0x457020 + (player_handle & 0xffff) * 4);
+      variant = game_engine_get_variant();
+      unicode_sprintf(buffer, buffer_size, L"%s kills %d team %d of %d",
+                      place_string, player_score, table_score,
+                      *(int *)((char *)variant + 0x40));
+      return true;
+    }
+    place_string =
+      game_engine_place_to_string(game_engine_get_place(player_handle, 1));
+    player = datum_get(player_data, player_handle);
+    table_score = *(int *)(0x456fe0 + *(int *)((char *)player + 0x20) * 4);
+    variant = game_engine_get_variant();
+    unicode_sprintf(buffer, buffer_size, L"%s kills %d of %d", place_string,
+                    table_score, *(int *)((char *)variant + 0x40));
+    return true;
+  }
+  return false;
+}
+
 /* 0xb5490 — FUN_000b5490
  *
  * Returns the name string for a given material type index.

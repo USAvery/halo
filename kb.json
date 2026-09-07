@@ -8137,7 +8137,10 @@
     },
     {
      "addr": "0xb4e20",
-     "decl": "void find_next_target(void);"
+     "decl": "void find_next_target(int player_index@<edi>);",
+     "name": "find_next_target",
+     "src": "src/halo/game/game.c",
+     "ported": true
     },
     {
      "addr": "0xb4fb0",
@@ -8145,7 +8148,8 @@
     },
     {
      "addr": "0xb5040",
-     "decl": "void FUN_000b5040(void);"
+     "decl": "bool FUN_000b5040(unsigned int player_handle, int event_type, int target_handle, wchar_t *buffer, int buffer_size);",
+     "ported": true
     },
     {
      "addr": "0xb5210",
@@ -38447,13 +38451,13 @@
     },
     {
      "addr": "0x80fc0",
-     "decl": "void FUN_00080fc0(uint32_t exponent /* @<eax> */, uint32_t base /* @<ecx> */, uint32_t modulus /* @<edx> */);",
+     "decl": "uint32_t FUN_00080fc0(uint32_t exponent /* @<eax> */, uint32_t base /* @<ecx> */, uint32_t modulus /* @<edx> */);",
      "ported": true,
      "source_path": "src/halo/networking/message_header.c"
     },
     {
      "addr": "0x81090",
-     "decl": "void FUN_00081090(uint32_t p /* @<esi> */, uint32_t x /* @<ebx> */, uint32_t g /* @<edi> */);",
+     "decl": "uint32_t FUN_00081090(uint32_t p /* @<esi> */, uint32_t x /* @<ebx> */, uint32_t g /* @<edi> */);",
      "ported": true,
      "source_path": "src/halo/networking/message_header.c"
     },
