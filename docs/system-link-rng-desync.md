@@ -1910,3 +1910,31 @@ Run 2's tick-315 case (area damage candidate set 4 vs 2) is most likely the
 same class -- an explosion position that differs in the low bits -- and has
 not been reproduced since the kind-31 probe went in; the next capture that
 shows it will name the objects on both sides.
+
+## RUN 4 (2026-09-07) — first divergence tick 330, area-damage candidate set again
+
+Same class as run 2, now named by the kind-31 `damage_target` probe. A grenade thrown
+at tick 319 detonated at 330. Per damage effect, the set of objects that reached
+`object_cause_damage`:
+
+| effect       | host (pristine)                              | client (ours) |
+|--------------|----------------------------------------------|---------------|
+| `0xe3780204` | `..05`, `..02`, `0xe29c002c` (the projectile) | `..05`        |
+| `0xe37a0206` | `..2b`, `0xe29c002c`                          | `..2b`        |
+
+Missing on the client: `0xe2710002` and `0xe29c002c`. Two candidate causes, both
+inside the ported `FUN_00138e30` area-damage path:
+
+1. the ported radius query (`object_find_in_radius` → `structure_find_in_cluster` /
+   `object_find_in_cluster`) returned fewer candidates (x87 narrowing checks on those
+   are clean, so if it is this, it is something else);
+2. the unported applier `FUN_00138900` rejected the candidates, most likely via the
+   ported LOS test `FUN_0014df70`.
+
+**Instrumentation added (both sides):** kind 32 `radius_hit`, recorded at the accept
+branch of `object_find_in_radius` (client: `objects.c` before
+`out_handles[found_count] = handle`; host: detour 6 at 0x141793, cave impl+0x460,
+unicorn-verified register/flag/stack-preserving). Record: value = `found_count`,
+caller2 = accepted object handle. Comparing the kind-32 sets at the divergent tick
+decides between (1) and (2). Host image sha256 73efbe99…, 6 patches. Client commit
+adcc6dc30.
