@@ -11178,7 +11178,7 @@ int16_t object_find_in_radius(int flags, unsigned int type_mask,
 
       if (dx * dx + dz * dz + dy * dy <= effective_radius * effective_radius) {
 #ifdef HALO_RNG_TRACE
-        RNG_TRACE_EX(RNG_TRACE_KIND_RADIUS_HIT, found_count, handle);
+        RNG_TRACE_EX(RNG_TRACE_KIND_RADIUS_HIT, *(unsigned int *)&obj->unk_88, handle);
 #endif
 #line 11177
         out_handles[found_count] = handle;
