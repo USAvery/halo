@@ -101,7 +101,7 @@
  * binary detour at 0x141793.  Separates "the radius query returned a
  * different candidate set" from "the unported applier rejected it". */
 #define RNG_TRACE_KIND_RADIUS_HIT    32u /* value=found_count, caller2=object handle  info */
-#define RNG_TRACE_KIND_LOS_RESULT    33u /* FUN_0014df70 exit: value=(result<<16)|(uint16)collision_result[0], caller2=hit-t float bits  info */
+#define RNG_TRACE_KIND_LOS_RESULT    33u /* FUN_0014df70 exit, only when returning into FUN_00138900: value=(result<<16)|(uint16)collision_result[0], caller2=hit-t float bits  info */
 
 /* 16 bytes. */
 typedef struct {

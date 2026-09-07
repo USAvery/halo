@@ -1053,9 +1053,13 @@ bool FUN_0014df70(uint32_t collision_flags, float *origin, float *direction,
     scenario_location_from_point((char *)collision_result + 0xc,
                                  (char *)collision_result + 0x18);
 #ifdef HALO_RNG_TRACE
-  RNG_TRACE_EX(RNG_TRACE_KIND_LOS_RESULT,
-               ((unsigned int)(unsigned char)result << 16) | (unsigned short)collision_result[0],
-               *(unsigned int *)((char *)collision_result + 0x14));
+  /* Only calls returning into the area-damage applier FUN_00138900
+   * (0x138900..0x138e30); the render path calls this thousands of times per
+   * frame and would flood the ring.  Same guard as the host detour. */
+  if ((unsigned int)__builtin_return_address(0) - 0x138900u < 0x530u)
+    RNG_TRACE_EX(RNG_TRACE_KIND_LOS_RESULT,
+                 ((unsigned int)(unsigned char)result << 16) | (unsigned short)collision_result[0],
+                 *(unsigned int *)((char *)collision_result + 0x14));
 #endif
 #line 1051
     return result;
@@ -1422,9 +1426,13 @@ bool FUN_0014df70(uint32_t collision_flags, float *origin, float *direction,
   }
 
 #ifdef HALO_RNG_TRACE
-  RNG_TRACE_EX(RNG_TRACE_KIND_LOS_RESULT,
-               ((unsigned int)(unsigned char)result << 16) | (unsigned short)collision_result[0],
-               *(unsigned int *)((char *)collision_result + 0x14));
+  /* Only calls returning into the area-damage applier FUN_00138900
+   * (0x138900..0x138e30); the render path calls this thousands of times per
+   * frame and would flood the ring.  Same guard as the host detour. */
+  if ((unsigned int)__builtin_return_address(0) - 0x138900u < 0x530u)
+    RNG_TRACE_EX(RNG_TRACE_KIND_LOS_RESULT,
+                 ((unsigned int)(unsigned char)result << 16) | (unsigned short)collision_result[0],
+                 *(unsigned int *)((char *)collision_result + 0x14));
 #endif
 #line 1414
   return result;
