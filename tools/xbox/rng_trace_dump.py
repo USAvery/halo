@@ -103,6 +103,7 @@ KINDS = {
     30: ("probe:unit_flags", "info"),
     31: ("probe:damage_target", "info"),
     32: ("probe:radius_hit", "info"),
+    33: ("probe:los_result", "info"),
 }
 
 

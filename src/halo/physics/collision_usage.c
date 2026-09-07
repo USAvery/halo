@@ -1,3 +1,7 @@
+#ifdef HALO_RNG_TRACE
+#include "halo/math/rng_trace.h"
+#endif
+#line 1
 /* Build collision prism feature list from a collision prism descriptor.
  * FPU-WARN reviewed: ECX/EDX register assignment for origin y-component;
  * semantic value is correct (origin_y) in both paths — false positive.
@@ -1048,6 +1052,12 @@ bool FUN_0014df70(uint32_t collision_flags, float *origin, float *direction,
     ((float *)((char *)collision_result + 0x18))[2] = origin[2] + direction[2];
     scenario_location_from_point((char *)collision_result + 0xc,
                                  (char *)collision_result + 0x18);
+#ifdef HALO_RNG_TRACE
+  RNG_TRACE_EX(RNG_TRACE_KIND_LOS_RESULT,
+               ((unsigned int)(unsigned char)result << 16) | (unsigned short)collision_result[0],
+               *(unsigned int *)((char *)collision_result + 0x14));
+#endif
+#line 1051
     return result;
   }
 
@@ -1411,6 +1421,12 @@ bool FUN_0014df70(uint32_t collision_flags, float *origin, float *direction,
     }
   }
 
+#ifdef HALO_RNG_TRACE
+  RNG_TRACE_EX(RNG_TRACE_KIND_LOS_RESULT,
+               ((unsigned int)(unsigned char)result << 16) | (unsigned short)collision_result[0],
+               *(unsigned int *)((char *)collision_result + 0x14));
+#endif
+#line 1414
   return result;
 }
 
