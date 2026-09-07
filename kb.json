@@ -24630,7 +24630,8 @@
     },
     {
      "addr": "0x1be2b0",
-     "decl": "void FUN_001be2b0(void);"
+     "decl": "void FUN_001be2b0(char *request@<esi>);",
+     "ported": true
     },
     {
      "addr": "0x1c7b40",

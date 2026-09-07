@@ -4888,7 +4888,7 @@
   "0x1be170": "void FUN_001be170(void);",
   "0x1be1b0": "void FUN_001be1b0(void);",
   "0x1be270": "void FUN_001be270(void);",
-  "0x1be2b0": "void FUN_001be2b0(void);",
+  "0x1be2b0": "void FUN_001be2b0(char *request@<esi>);",
   "0x1c7b40": "void FUN_001c7b40(void);",
   "0x1c8700": "void FUN_001c8700(void);",
   "0x1c88a0": "void sound_is_active(void);",

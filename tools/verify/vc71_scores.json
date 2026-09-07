@@ -45149,19 +45149,19 @@
       "source": "src/halo/unported_thunks.c"
     },
     "FUN_001be2b0": {
-      "abi_model": "raw",
-      "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 2.1,
+      "abi_model": "regparam_stripped_saves",
+      "abi_model_items": 4,
+      "abi_modeled_mnemonic_pct": 97.9,
       "addr": "0x1be2b0",
       "end": "0x1be3d2",
       "kind": "auto",
       "n_r": 94,
-      "opnd_percent": 0.0,
-      "raw_mnemonic_pct": 2.1,
+      "opnd_percent": 90.5,
+      "raw_mnemonic_pct": 95.9,
       "ref": "synth",
       "ref_sha": "299547a2de55d05d",
-      "score": 2.1,
-      "source": "src/halo/unported_thunks.c"
+      "score": 97.9,
+      "source": "src/halo/sound/sound_manager.c"
     },
     "FUN_001be7b0": {
       "abi_model": "raw",

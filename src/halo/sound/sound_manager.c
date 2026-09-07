@@ -225,6 +225,79 @@ void sound_cache_sound_finished(int permutation_ptr)
   *(uint8_t *)(cache_sound + 4) -= 1;
 }
 
+/* FUN_001be2b0 (0x1be2b0)
+ *
+ * Sound-cache counterpart of xbox_texture_cache_request: reserves an LRU
+ * cache block for a pending sound-permutation request (record passed in ESI)
+ * and starts the asynchronous read into that block.
+ *
+ * Request record offsets (confirmed from the disassembly at 0x1be2b6 ff.):
+ *   +0x2c  cache block index   (written on success)
+ *   +0x30  cache page address  (written on success)
+ *   +0x34  cache file index    -> cache_file_read param_1
+ *   +0x40  requested size      -> lruv allocation size and read size
+ *   +0x48  file offset         -> cache_file_read offset
+ *
+ * On allocation failure it reports "SOUND CACHE BLOWN" and dumps the LRU
+ * state to d:\stabbed.txt, at most once per 10 seconds (last-report
+ * timestamp at 0x4e9374); the cache-sound datum is left untouched.
+ *
+ * Asserts new_cache_sound_index==cache_block_index
+ * (c:\halo\SOURCE\cache\xbox_sound_cache.c line 0x170).
+ *
+ * The cache_file_read return value is genuinely discarded here (unlike the
+ * texture path, which stores it at entry+2); entry+2 is instead handed to
+ * cache_file_read as the completion flag. */
+void FUN_001be2b0(char *request /* @<esi> */)
+{
+  int cache_block_index;
+  int cache_page_index;
+  int new_cache_sound_index;
+  char *cache_sound;
+
+  cache_block_index =
+    FUN_0011de10(*(void **)0x4e9370, *(unsigned int *)(request + 0x40));
+  if (cache_block_index != -1) {
+    cache_page_index =
+      lruv_block_get_address(*(void **)0x4e9370, cache_block_index) +
+      *(int *)0x4e936c;
+    new_cache_sound_index =
+      data_new_datum(*(data_t **)0x4e9368, cache_block_index);
+    cache_sound = (char *)datum_get(*(data_t **)0x4e9368, cache_block_index);
+
+    if (new_cache_sound_index != cache_block_index) {
+      display_assert("new_cache_sound_index==cache_block_index",
+                     "c:\\halo\\SOURCE\\cache\\xbox_sound_cache.c", 0x170, 1);
+      system_exit(-1);
+    }
+
+    *(int *)(request + 0x2c) = cache_block_index;
+    *(int *)(request + 0x30) = cache_page_index;
+    *(char **)(cache_sound + 8) = request;
+    cache_file_read(*(int *)(request + 0x34), *(int *)(request + 0x48),
+                    *(unsigned int *)(request + 0x40), cache_page_index,
+                    cache_sound + 2, 0);
+    return;
+  }
+
+  /* Cold path: MSVC lays the cache-blown reporting out after the RET. */
+  if (system_milliseconds() - *(unsigned int *)0x4e9374 > 10000u) {
+    terminal_output(
+      *(void **)0x2ee6f4,
+      "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!",
+      NULL);
+    error(2, "SOUND CACHE BLOWN!!!! double-click \"GETSTABBED.BAT\" on your "
+             "PC now!!!");
+    terminal_output(
+      *(void **)0x2ee6f4,
+      "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!",
+      NULL);
+    FUN_0011db90("d:\\stabbed.txt", request, *(int *)(request + 0x40),
+                 *(void **)0x4e9370, (void *)0x18ef30, (void *)0x1be270);
+    *(unsigned int *)0x4e9374 = system_milliseconds();
+  }
+}
+
 /* sound_pitch_push_sample (0x1c7b00)
  *
  * Conditionally applies a pitch sample to an object's pitch-track field.
