@@ -2,6 +2,9 @@
 #include <math.h>
 #else
 #include "../../x87_math.h"
+#ifdef HALO_RNG_TRACE
+#include "halo/math/rng_trace.h"
+#endif
 float sinf(float x);
 float cosf(float x);
 double atan2(double y, double x);
@@ -11174,6 +11177,10 @@ int16_t object_find_in_radius(int flags, unsigned int type_mask,
       float effective_radius = obj->unk_92 + radius;
 
       if (dx * dx + dz * dz + dy * dy <= effective_radius * effective_radius) {
+#ifdef HALO_RNG_TRACE
+        RNG_TRACE_EX(RNG_TRACE_KIND_RADIUS_HIT, found_count, handle);
+#endif
+#line 11177
         out_handles[found_count] = handle;
         found_count++;
       }

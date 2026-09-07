@@ -96,6 +96,11 @@
  * detour at 0x137d20 (build_original_probes.py).  Names every object the
  * damage pass touches, so a differing candidate set is visible. */
 #define RNG_TRACE_KIND_DAMAGE_TARGET 31u /* value=jpt! tag, caller2=object handle  info */
+/* object_find_in_radius accept branch on BOTH builds: value = found_count
+ * before the store, caller2 = accepted object handle.  Host mirror is a
+ * binary detour at 0x141793.  Separates "the radius query returned a
+ * different candidate set" from "the unported applier rejected it". */
+#define RNG_TRACE_KIND_RADIUS_HIT    32u /* value=found_count, caller2=object handle  info */
 
 /* 16 bytes. */
 typedef struct {
