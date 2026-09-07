@@ -25017,7 +25017,8 @@
     },
     {
      "addr": "0x1ba710",
-     "decl": "void FUN_001ba710(void);"
+     "decl": "void FUN_001ba710(char *self@<eax>);",
+     "ported": true
     },
     {
      "addr": "0x1ba7c0",

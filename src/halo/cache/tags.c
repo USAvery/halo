@@ -414,6 +414,69 @@ void cache_copy_compressed_free(void *opaque, void *address)
   *(unsigned int *)(globals + 0x948) = (unsigned int)held_address;
 }
 
+/* 0x1ba710 — lay out the eight 128KB decompression buffers, poison the whole
+ * 5MB region with 0xfd, and reset the write bookkeeping.
+ *
+ * self arrives implicitly in EAX (0x1ba718 MOV ESI,EAX with no prior write to
+ * EAX), so kb.json carries `char *self@<eax>`. Sole caller is
+ * simple_cache_copy_thread (unconditional call at 0x1bbefe), not yet ported.
+ *
+ * The buffer-pointer table is written through the globals POINTER at
+ * 0x32ea98 (0x1ba712 MOV EDI,[0x0032ea98], then LEA ECX,[EDI+0x964]) while
+ * the base address is read from self+0x960 — two different bases in the
+ * original, reproduced verbatim rather than folded together.
+ *
+ *   globals+0x964..+0x980  eight buffer pointers, base + i*0x20000
+ *   globals+0x984          one past the last buffer (base + 8*0x20000)
+ *   self+0x960             base address of the 0x512000-byte region
+ *   self+0x944             0x12000 — an IMMEDIATE dword store
+ *                          (0x1ba792 MOV dword ptr [ESI+0x944],0x12000);
+ *                          Ghidra renders it as the code pointer
+ *                          FUN_00012000, which is an address-as-value
+ *                          artifact, not a function pointer.
+ *   self+0x940 / +0x948    both set to base + 0x500000 (0x1ba782 MOV EAX,
+ *                          [ESI+0x960] / ADD EAX,0x500000, one computation
+ *                          reused by both stores)
+ *   self+0x990             0x1c0 bytes poisoned with 0xfa
+ *
+ * physical_memory_protect is __stdcall (no ADD ESP after CALL 0x001d371d);
+ * pushes are 4, 0x512000, base -> (base, 0x512000, 4) and 2, 0x500000, base
+ * -> (base, 0x500000, 2). Both csmemset calls are 3-push cdecl, each cleaned
+ * by its own ADD ESP,0xc. Each of the four calls re-reads self+0x960 from
+ * memory in the original; the reloads are reproduced.
+ */
+void FUN_001ba710(char *self)
+{
+  unsigned char *globals;
+  unsigned int buffer_base;
+  int *slot;
+  int remaining;
+  unsigned int region_end;
+
+  globals = *(unsigned char **)0x32ea98;
+  buffer_base = *(unsigned int *)(self + 0x960);
+  slot = (int *)(globals + 0x964);
+  remaining = 8;
+  do {
+    *slot = (int)buffer_base;
+    buffer_base += 0x20000;
+    slot++;
+    remaining--;
+  } while (remaining != 0);
+  *(unsigned int *)(globals + 0x984) = buffer_base;
+
+  physical_memory_protect(*(void **)(self + 0x960), 0x512000, 4);
+  csmemset(*(void **)(self + 0x960), 0xfd, 0x500000);
+  physical_memory_protect(*(void **)(self + 0x960), 0x500000, 2);
+
+  region_end = *(unsigned int *)(self + 0x960) + 0x500000;
+  *(int *)(self + 0x944) = 0x12000;
+  *(unsigned int *)(self + 0x940) = region_end;
+  *(unsigned int *)(self + 0x948) = region_end;
+
+  csmemset(self + 0x990, 0xfa, 0x1c0);
+}
+
 /* 0x1ba7c0 — cache_copy_initialize_and_fill_with_garbage: open the source
  * cache file, latch its size into the three remaining-bytes counters, clear
  * the decompression header/state block, and poison the read-buffer bookkeeping
