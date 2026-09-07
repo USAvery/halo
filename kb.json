@@ -19663,7 +19663,8 @@
     },
     {
      "addr": "0x901d0",
-     "decl": "void compare_profile_sections(void);"
+     "decl": "int compare_profile_sections(void **a, void **b);",
+     "ported": true
     },
     {
      "addr": "0x902f0",

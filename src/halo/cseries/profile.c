@@ -232,6 +232,85 @@ void FUN_00090170(void *dest /* @<eax> */, uint32_t value0, uint32_t value1)
   *(uint32_t *)((char *)dest + 4) = value1;
 }
 
+/* compare_profile_sections (0x901d0) - qsort-style comparator over an array
+ * of profile_section pointers (each argument is a pointer TO the element,
+ * i.e. section**; the disassembly dereferences [EBP+8]/[EBP+0xc] once
+ * before touching any field).
+ *
+ * Section fields used here follow this file's raw-offset convention (see
+ * find_profile_section): +0x00 char *name, +0x08 uint8 active. Three more
+ * offsets are only observed here, so their meaning is unconfirmed:
+ *   +0x20 int64 accumulated value (CMP high signed / low unsigned pair)
+ *   +0x5c8 int32 sample count
+ *   +0x5e0 int64 sample total
+ *
+ * Active sections always sort before inactive ones. Ties then dispatch on
+ * the int16 sort mode at 0x3365b8 (MOVSX word + SUB/DEC/DEC switch chain):
+ *   0 - by name via csstrcmp (tail call, its result is returned verbatim)
+ *   1 - by mean sample (FILD qword total / FIDIV dword count; count == 0
+ *       yields the double 0.0 constant at 0x2602c0), descending
+ *   2 - by the 64-bit value at +0x20, descending
+ * Any other mode hits the "unreachable" assert at profile.c:0x34c. */
+int compare_profile_sections(void **a, void **b)
+{
+  char *sa;
+  char *sb;
+  double avg_a;
+  double avg_b;
+  int64_t val_a;
+  int64_t val_b;
+
+  sa = (char *)*a;
+  if (*(uint8_t *)(sa + 8) != 0 && *(uint8_t *)((char *)*b + 8) == 0) {
+    return -1;
+  }
+
+  sb = (char *)*b;
+  if (*(uint8_t *)(sb + 8) != 0 && *(uint8_t *)(sa + 8) == 0) {
+    return 1;
+  }
+
+  switch (*(int16_t *)0x3365b8) {
+  case 0:
+    return csstrcmp(*(char **)sa, *(char **)sb);
+
+  case 1:
+    avg_a = 0.0;
+    if (*(int32_t *)(sa + 0x5c8) != 0) {
+      avg_a = (double)*(int64_t *)(sa + 0x5e0) / *(int32_t *)(sa + 0x5c8);
+    }
+    avg_b = 0.0;
+    if (*(int32_t *)(sb + 0x5c8) != 0) {
+      avg_b = (double)*(int64_t *)(sb + 0x5e0) / *(int32_t *)(sb + 0x5c8);
+    }
+    if (avg_a > avg_b) {
+      return -1;
+    }
+    if (avg_a < avg_b) {
+      return 1;
+    }
+    return 0;
+
+  case 2:
+    val_a = *(int64_t *)(sa + 0x20);
+    val_b = *(int64_t *)(sb + 0x20);
+    if (val_a > val_b) {
+      return -1;
+    }
+    if (val_a < val_b) {
+      return 1;
+    }
+    return 0;
+
+  default:
+    display_assert("!\"unreachable\"", "c:\\halo\\SOURCE\\cseries\\profile.c",
+                   0x34c, 1);
+    system_exit(-1);
+  }
+
+  return 0;
+}
+
 /* profile_dump_to_file (0x90650) — HaloScript "profile_dump" builtin
  * back end (only caller: FUN_000c1fc0). Renders the profile dump into a
  * local scratch buffer via profile_dump() and appends it to
