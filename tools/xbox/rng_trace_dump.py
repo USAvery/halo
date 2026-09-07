@@ -104,6 +104,7 @@ KINDS = {
     31: ("probe:damage_target", "info"),
     32: ("probe:radius_hit", "info"),
     33: ("probe:los_result", "info"),
+    34: ("probe:damage_origin", "info"),
 }
 
 

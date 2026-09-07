@@ -1869,6 +1869,12 @@ void FUN_00138e30(void *damage_params, int target_index)
   int16_t i;
 
   (void)target_index;
+#ifdef HALO_RNG_TRACE
+  RNG_TRACE_EX(RNG_TRACE_KIND_DAMAGE_ORIGIN,
+               *(unsigned int *)((char *)damage_params + 0x28),
+               *(unsigned int *)((char *)damage_params + 0x2c));
+#endif
+#line 1872
   tag = (char *)tag_get(0x6a707421, *(int *)damage_params);
   count = object_find_in_radius(0, 0, (char *)damage_params + 0x14,
                                 (float *)((char *)damage_params + 0x1c),
