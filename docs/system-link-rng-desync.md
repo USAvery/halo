@@ -2141,3 +2141,32 @@ Next suspect if the airborne drift survives run 11: `FUN_0014f2c0`
 excluded from the metric — its net +21 EXTRA masks whatever is left.
 
 Client redeployed; host image unchanged. Run 11 pending.
+
+## RUN 11 (2026-09-07) — drift smaller, not gone; toggle bisect deployed
+
+With all run-10 fixes in the client (build 15:27), the first RNG divergence
+moved to tick 788/789: a grenade bounce (`FUN_000f90d0` draws) landed one tick
+late on the client, the run-3 class. Position data:
+
+- detonation origin at tick 713: 1 ulp off in x, 19 ulp in y (run 10: 4-11
+  ulp before any bounce, thousands after);
+- airborne biped `e2780009`: bit-identical for 36 ticks, then diverges;
+- grounded biped `e2770008`: 1 ulp off in z from tick 328 after 994
+  identical ticks.
+
+The instruction-level audits keep finding partial causes, so the next run is
+a **toggle bisect**: the client on 10.0.0.21 (build 15:40) runs with
+`FUN_000f9c40` (projectile update) and `FUN_001a2f40` (biped physics step) set
+`ported=false` in kb.json — the original bodies execute, still calling our
+ported callees. This kb.json change is deliberately NOT committed.
+
+Reading run 12: if the detonation origins (kind 34) become bit-identical, the
+remaining projectile mismatch is inside `FUN_000f9c40`'s body; if they still
+differ, it is in a callee (`FUN_000f8720`, aim, `object_translate`) or in the
+throw setup (unit/weapon code that seeds the initial velocity). Same logic for
+the biped drift versus `FUN_001a2f40` / `FUN_0014f2c0`.
+
+Fallback if the bisect is inconclusive: capture a client state snapshot with a
+grenade in flight and run `unicorn_diff.py --state-snapshot` on
+`FUN_000f9c40` original vs ours with a memory trace, which pinpoints the first
+differing store without further static guessing.
