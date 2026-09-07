@@ -82,6 +82,118 @@ int __stdcall FUN_0016de80(void *device, uint32_t reg, float a, float b,
  * objects.c so the compiler emits the intrinsic. */
 double pow(double x, double y);
 
+/* rasterizer_xbox_motion_sensor: prepare the motion-sensor blip pass.
+ * 0x16dee0, TU c:\halo\SOURCE\rasterizer\xbox\rasterizer_xbox_motion_sensor.c
+ * (assert __FILE__ at 0x2a399c, line 0x1b).
+ *
+ * Resolves the two interface bitmaps (interface tag indices 0xc and 0xd,
+ * bitmap index 0 in each), asserts the D3D device, then clears the
+ * "motion sensor ready" byte at 0x47e007. When the feature byte at
+ * 0x3256db is set and BOTH bitmaps resolve to a hardware texture, it marks
+ * the pass ready, binds render target 4, sets stage-0 texture state,
+ * render state (each "simple" state mirrored into its module global),
+ * selects vertex shader (4, 8, 0), uploads an identity transform plus a
+ * (1,1,0,1) constant at vertex-shader register -0x44, and programs and
+ * binds the 0xf0-byte pixel-shader state block at 0x5a5ac0.
+ *
+ * Argument evidence (disassembly at 0016dee0):
+ *  - 0016dee9 PUSH 0 / PUSH 0xc / CALL interface_get_tag_index / ADD ESP,4 /
+ *    PUSH EAX / CALL FUN_00076ff0 / ADD ESP,8: the leading PUSH 0 is
+ *    FUN_00076ff0's second (bitmap_index) argument, pushed before the
+ *    interface_get_tag_index call whose own argument is cleaned separately.
+ *  - 0016df55 PUSH EBX(=1) / PUSH 0 / PUSH ESI: last push is the first
+ *    argument, so xbox_texture_cache_get_hardware_format(bitmap, 0, 1).
+ *  - 0016df7d PUSH 0 / PUSH EBX / PUSH 0 / PUSH 0 / PUSH 4 =>
+ *    FUN_00158140(4, 0, 0, 1, 0); the shared ADD ESP,0x1c at 0016df99 also
+ *    retires rasterizer_set_texture_bitmap_data's two pushes (cdecl group).
+ *  - 0016e077 PUSH 0 / PUSH 8 / PUSH 4 => FUN_00178b40(4, 8, 0).
+ *  - vs_const is the EBP-0x50..EBP-0x4 dword block (20 dwords) uploaded by
+ *    D3DDevice_SetVertexShaderConstant(-0x44, &vs_const, 5).
+ */
+void FUN_0016dee0(void)
+{
+  float vs_const[20];
+  void *blip_bitmap;
+  void *background_bitmap;
+
+  blip_bitmap = FUN_00076ff0(interface_get_tag_index(0xc), 0);
+  background_bitmap = FUN_00076ff0(interface_get_tag_index(0xd), 0);
+
+  if (*(int *)0x476ab0 == 0) {
+    display_assert(
+      "global_d3d_device",
+      "c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_motion_sensor.c",
+      0x1b, 1);
+    system_exit(-1);
+  }
+
+  *(char *)0x47e007 = 0;
+  if (*(char *)0x3256db != 0 &&
+      xbox_texture_cache_get_hardware_format(blip_bitmap, 0, 1) != 0 &&
+      xbox_texture_cache_get_hardware_format(background_bitmap, 0, 1) != 0) {
+    *(char *)0x47e007 = 1;
+
+    FUN_00158140(4, 0, 0, 1, 0);
+    rasterizer_set_texture_bitmap_data(0, blip_bitmap);
+
+    D3DDevice_SetTextureStageState(0, 10, 4);
+    D3DDevice_SetTextureStageState(0, 0xb, 4);
+    D3DDevice_SetTextureStageState(0, 0xd, 2);
+    D3DDevice_SetTextureStageState(0, 0xe, 2);
+    D3DDevice_SetTextureStageState(0, 0xf, 1);
+
+    /* Render state: cull mode, six "simple" states; MSVC schedules each
+     * mirror store into the following call's setup window. */
+    D3DDevice_SetRenderState_CullMode(0x901);
+    D3DDevice_SetRenderState_Simple(NV097_SET_COLOR_MASK_CMD,
+                                    NV097_COLOR_MASK_RGB);
+    *(unsigned long *)0x1fb7a4 = 0x10101;
+    D3DDevice_SetRenderState_Simple(0x40304, 1);
+    *(unsigned long *)0x1fb784 = 1;
+    D3DDevice_SetRenderState_Simple(0x40344, 1);
+    *(unsigned long *)0x1fb790 = 1;
+    D3DDevice_SetRenderState_Simple(0x40348, 1);
+    *(unsigned long *)0x1fb794 = 1;
+    D3DDevice_SetRenderState_Simple(0x40350, 0x8006);
+    *(unsigned long *)0x1fb7c0 = 0x8006;
+    D3DDevice_SetRenderState_Simple(0x40300, 0);
+    *(unsigned long *)0x1fb788 = 0;
+    D3DDevice_SetRenderState_ZEnable(0);
+    D3DDevice_SetRenderState_ZBias(0);
+
+    FUN_00178b40(4, 8, 0);
+
+    /* Identity 4x4 followed by the constant row (1,1,0,1). */
+    vs_const[0] = 1.0f;
+    vs_const[1] = 0.0f;
+    vs_const[2] = 0.0f;
+    vs_const[3] = 0.0f;
+    vs_const[4] = 0.0f;
+    vs_const[5] = 1.0f;
+    vs_const[6] = 0.0f;
+    vs_const[7] = 0.0f;
+    vs_const[8] = 0.0f;
+    vs_const[9] = 0.0f;
+    vs_const[10] = 1.0f;
+    vs_const[11] = 0.0f;
+    vs_const[12] = 0.0f;
+    vs_const[13] = 0.0f;
+    vs_const[14] = 0.0f;
+    vs_const[15] = 1.0f;
+    vs_const[16] = 1.0f;
+    vs_const[17] = 1.0f;
+    vs_const[18] = 0.0f;
+    vs_const[19] = 1.0f;
+    D3DDevice_SetVertexShaderConstant(-0x44, vs_const, 5);
+
+    csmemset((void *)0x5a5ac0, 0, 0xf0);
+    *(int *)0x5a5b98 = 1;
+    *(int *)0x5a5b94 = 1;
+    *(int *)0x5a5ae0 = 0x8040000;
+    rasterizer_set_pixel_shader((void *)0x5a5ac0);
+  }
+}
+
 /* rasterizer_plasma_energy_draw (FUN_0016eef0): emit the plasma-energy
  * transparent shader (shader type 10) for one geometry group. Binds the two
  * noise-map textures (primary at shader+0xe0, secondary at shader+0x128),
