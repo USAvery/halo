@@ -2028,3 +2028,53 @@ result does not prove parity — inspect the computed dword stores directly.
 None of the 22 other functions the checker flags in real_math.c / collision_bsp.c
 / objects.c are in the static callee closure of `FUN_0014f2c0` (183 functions).
 Run 10 pending.
+
+## RUN 9 follow-up (2026-09-07) — narrowing audit of the physics/projectile TUs
+
+Three read-only audits walked the remaining flagged functions in real_math.c,
+collision_bsp.c, objects.c (simulation path only) and projectiles.c against the
+XBE, slot by slot. Findings applied (all VC71-neutral unless noted):
+
+- **real_math.c `vector_intersects_pill3d`**: real bug, not just precision.
+  The closest points were six scalars (`closest_a_x, closest_a_y, ...`) and
+  `&closest_a_x` was passed to `fast_vector_intersects_sphere`, which reads
+  three floats through the pointer. Clang dead-stripped the y/z scalars, so the
+  callee read garbage. Now `float closest_a[3], closest_b[3]`. Also matched the
+  reference's narrowing map (`nx/nz/cross_sq/t/inv/d0_d1/d0_sq/d1_sq/diff_*`
+  wide; `ny/nxi/nyi/s/s_start/s_end/t_start/t_end/delta_*` narrowed) and its
+  addend orders. VC71 80.5% -> 82.2%.
+- **real_math.c `FUN_001093b0`** (quaternion to matrix): norm/s/sq0/xx/xy/xz/zz
+  stay wide, sq1/sq2/xw/yw/zw/yy/zy narrow; norm accumulates q0-first.
+  Introducing a named `sq0` temporary cost 27pp of VC71 (cl.exe spills it), so
+  the products are written `s * q[0] * q[3]` as before. 88.7% unchanged.
+- **real_math.c `rotate_vector3d_by_sincos`**: `k` and `cy` wide, `cz` narrowed.
+  100% unchanged.
+- **collision_bsp.c** `bsp3d_test_sphere_recursive` (plane distance `t` wide),
+  `FUN_00148370` (`q` and `radius` round-tripped). 93.5% / 89.5% unchanged.
+- **objects.c** `object_compute_child_marker_position` (cross-product
+  temporaries wide), `object_compute_node_matrices` (row 4..6 products wide),
+  `object_compute_function_values` (eleven round-trips plus a wide additive
+  stage). 92.4% / 80.2% / 95.3% unchanged.
+- **projectiles.c** `projectile_aim_linear` (`dist` round-tripped after
+  normalize3d), `projectile_aim_ballistic` (`inv_t` never stored; `t_min`, `V`
+  round-tripped; `b` split into wide/narrow copies for the 0xf81ad FST-no-pop
+  shape), `FUN_000f8720` (`dx/dy/dz` and the `dir1[i]*radius` products wide,
+  `pt_b1z` never narrowed), `FUN_000f9c40` (`dz` FST-no-pop square, addend order
+  dz,dy,dx). 98.5% / 93.3% / 66.7% unchanged, FUN_000f9c40 89.1% -> 89.0%.
+
+Two rules learned about the VC71 lane, both now encoded in `src/x87_math.h`:
+
+1. cl.exe honours an explicit `(float)` cast on a float expression as a forced
+   store/reload. Narrowing casts in shared source must go through
+   `HALO_NARROW(e)`, which is `(float)(e)` under clang and `(e)` under cl.exe.
+2. A named temporary for a value the reference keeps in ST(i) makes cl.exe spill
+   it. Promote the expression in place (`(x87_wide_t)a * b + ...`) instead of
+   introducing a variable.
+
+Checker caveats confirmed by the audits: `fstp st(k)` / `fst` leak the
+"computed" flag (false EXTRA counts on exact copies), and reloads through
+`fmul/fsub/fadd dword [slot]` are invisible, so the EXTRA-NARROWING counts on
+these functions are mostly qword (53-bit) spills of the promoted temporaries
+and exact float copies, not 24-bit roundings.
+
+Client redeployed with all of the above; host image unchanged. Run 10/11 pending.

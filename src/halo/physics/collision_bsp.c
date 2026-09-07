@@ -974,6 +974,7 @@ char FUN_00148370(float *center, float *origin, float *delta, float *out_t,
   dz = center[2] - origin[2];
 
   q = (dz * dz + dx * dx) + (dy * dy - radius * radius);
+  HALO_FLT_ROUNDTRIP(q); /* 0x14839c FST dword [EBP-4]; 0x148404 reloads it */
   if (q <= 0.0f) {
     *out_t = 0.0f;
     return 1;
@@ -981,6 +982,8 @@ char FUN_00148370(float *center, float *origin, float *delta, float *out_t,
 
   /* The dot product lives in the radius slot -- see the frame note above. */
   radius = dx * delta[0] + dz * delta[2] + dy * delta[1];
+  HALO_FLT_ROUNDTRIP(radius); /* 0x1483ce FST dword [EBP+8]; reloaded at
+                                 0x1483fc, 0x1483ff and 0x148418 */
   if (radius > 0.0f) {
     a = (delta[0] * delta[0] + delta[2] * delta[2]) + delta[1] * delta[1];
     disc = radius * radius - a * q;
@@ -1295,7 +1298,7 @@ void bsp3d_test_sphere_recursive(void *data, int node_index)
   float *center;
   int *results;
   float d;
-  float t;
+  x87_wide_t t; /* 0x148d91 FCHS: the original keeps t in ST(0), never narrowed */
   int leaf_index;
   short k;
   short projection;
@@ -1382,11 +1385,15 @@ void bsp3d_test_sphere_recursive(void *data, int node_index)
                                                ref[0] & 0x7fffffff, 0x10);
         center = *(float **)((char *)data + 0xc);
 
-        t = -(plane[1] * center[1] + plane[2] * center[2] +
-              plane[0] * center[0] - plane[3]);
-        point[0] = t * plane[0] + center[0];
-        point[1] = t * plane[1] + center[1];
-        point[2] = t * plane[2] + center[2];
+        /* 0x148d77-0x148d91: the whole accumulation stays in ST(0).  Without
+         * the x87_wide_t promotion clang spills the p2*c2 + p1*c1 partial to
+         * a dword under register pressure and re-rounds it to 24 bits. */
+        t = -((x87_wide_t)plane[1] * center[1] +
+              (x87_wide_t)plane[2] * center[2] +
+              (x87_wide_t)plane[0] * center[0] - plane[3]);
+        point[0] = HALO_NARROW(t * plane[0] + center[0]);
+        point[1] = HALO_NARROW(t * plane[1] + center[1]);
+        point[2] = HALO_NARROW(t * plane[2] + center[2]);
 
         {
           float ax = (float)fabs((double)plane[0]);

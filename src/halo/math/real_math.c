@@ -447,28 +447,38 @@ void FUN_001092d0(float *out_matrix, float *axis, float sine, float cosine)
  * 80-bit FPU while sq1/sq2 spill to float32. */
 void FUN_001093b0(float *out, float *q)
 {
-  float norm = q[3] * q[3] + q[2] * q[2] + q[1] * q[1] + q[0] * q[0];
-  float s = 0.0f;
+  /* ref 0x1093c4-0x1093d8 accumulates q0-first and never narrows norm/s */
+  x87_wide_t norm = (x87_wide_t)q[0] * q[0] + (x87_wide_t)q[1] * q[1] +
+                    (x87_wide_t)q[2] * q[2] + (x87_wide_t)q[3] * q[3];
+  x87_wide_t s = 0.0f;
   float sq1, sq2;
   float xw, yw, zw;
-  float xx, xy, xz, yy, zy, zz;
+  x87_wide_t xx, xy, xz, zz;
+  float yy, zy;
 
   if (norm != 0.0f) {
     s = 2.0f / norm;
   }
 
-  sq1 = s * q[1];
-  sq2 = s * q[2];
-  xw = s * q[0] * q[3];
-  yw = sq1 * q[3];
-  zw = sq2 * q[3];
+  sq1 = HALO_NARROW(s * q[1]);               /* ref fstp [ebp-4]   @0x10940b */
+  HALO_FLT_ROUNDTRIP(sq1);
+  sq2 = HALO_NARROW(s * q[2]);               /* ref fstp [ebp+0xc] @0x109413 */
+  HALO_FLT_ROUNDTRIP(sq2);
+  xw = HALO_NARROW(s * q[0] * q[3]);
+  HALO_FLT_ROUNDTRIP(xw);
+  yw = HALO_NARROW((x87_wide_t)sq1 * q[3]);
+  HALO_FLT_ROUNDTRIP(yw);
+  zw = HALO_NARROW((x87_wide_t)sq2 * q[3]);
+  HALO_FLT_ROUNDTRIP(zw);
 
-  xx = s * q[0] * q[0];
-  xy = sq1 * q[0];
-  xz = sq2 * q[0];
-  yy = sq1 * q[1];
-  zy = sq2 * q[1];
-  zz = sq2 * q[2];
+  xx = s * q[0] * q[0];                  /* ref keeps xx wide (0x109430) */
+  xy = (x87_wide_t)sq1 * q[0];
+  xz = (x87_wide_t)sq2 * q[0];
+  yy = HALO_NARROW((x87_wide_t)sq1 * q[1]);  /* ref fstp [ebp-0x14] @0x109442 */
+  HALO_FLT_ROUNDTRIP(yy);
+  zy = HALO_NARROW((x87_wide_t)sq2 * q[1]);
+  HALO_FLT_ROUNDTRIP(zy);
+  zz = (x87_wide_t)sq2 * q[2];
 
   ((uint32_t *)out)[0] = 0x3f800000;
   ((uint32_t *)out)[10] = 0;
@@ -1681,20 +1691,23 @@ void perpendicular4d(float *in, float *out)
 void rotate_vector3d_by_sincos(float *vector, float *axis, float sin_angle,
                                float cos_angle)
 {
-  float k;
-  float cy;
-  float cz;
+  x87_wide_t k;  /* ref keeps k in ST(i) 0x10b706..0x10b75a */
+  x87_wide_t cy; /* ref keeps cy in ST(i) 0x10b712..0x10b752 */
+  float cz;      /* ref fstp [ebp+8] @0x10b720, reloaded @0x10b765 */
 
   /* reference (0x10b6e0, 58 insns, zero frame) re-reads vector[]/axis[]
    * per use — do not cache components in locals */
-  k = (vector[1] * axis[1] + axis[2] * vector[2] + vector[0] * axis[0]) *
-      (1.0f - cos_angle);
-  cy = axis[0] * vector[2] - vector[0] * axis[2];
-  cz = vector[0] * axis[1] - vector[1] * axis[0];
-  vector[0] = cos_angle * vector[0] + k * axis[0] -
-              (vector[1] * axis[2] - vector[2] * axis[1]) * sin_angle;
-  vector[1] = cos_angle * vector[1] + k * axis[1] - cy * sin_angle;
-  vector[2] = cos_angle * vector[2] + k * axis[2] - cz * sin_angle;
+  k = ((x87_wide_t)vector[1] * axis[1] + (x87_wide_t)axis[2] * vector[2] +
+       (x87_wide_t)vector[0] * axis[0]) * (1.0f - cos_angle);
+  cy = (x87_wide_t)axis[0] * vector[2] - (x87_wide_t)vector[0] * axis[2];
+  cz = HALO_NARROW((x87_wide_t)vector[0] * axis[1] -
+               (x87_wide_t)vector[1] * axis[0]);
+  HALO_FLT_ROUNDTRIP(cz);
+  vector[0] = HALO_NARROW(cos_angle * vector[0] + k * axis[0] -
+                      ((x87_wide_t)vector[1] * axis[2] -
+                       (x87_wide_t)vector[2] * axis[1]) * sin_angle);
+  vector[1] = HALO_NARROW(cos_angle * vector[1] + k * axis[1] - cy * sin_angle);
+  vector[2] = HALO_NARROW(cos_angle * vector[2] + k * axis[2] - cz * sin_angle);
 }
 
 /* 0x10b780 — Linearly interpolate between two 3D vectors: out = a*(1-t) + b*t.
@@ -2982,48 +2995,70 @@ char vector_intersects_pill2d(float *line_start, float *line_dir,
 bool vector_intersects_pill3d(float *start_a, float *dir_a, float *start_b,
                               float *dir_b, float radius)
 {
-  float delta_x, delta_y, delta_z;
-  float nx, ny, nz;
-  float cross_sq;
-  float s, t;
-  float inv;
-  float d0_d1, d0_sq, d1_sq;
-  float s_start, s_end, t_start, t_end;
+  float delta_x, delta_y, delta_z;      /* ref fstp [ebp-0xc/-8/-4] 0x10e059+ */
+  x87_wide_t nx, nz;                    /* ref never narrows nx/nz */
+  float ny;                             /* ref fstp [ebp-0x14] @0x10e088 */
+  float nxi, nyi;                       /* ref fstp [ebp-0x18/-0x14] 0x10e0c8 */
+  x87_wide_t cross_sq;                  /* ref fdivr on wide ST(0) @0x10e0be */
+  float s;                              /* ref fstp [ebp+8] @0x10e10d */
+  x87_wide_t t;                         /* ref keeps t in ST(0) @0x10e142 */
+  x87_wide_t inv;
+  x87_wide_t d0_d1, d0_sq, d1_sq;       /* ref keeps all three wide */
+  float s_start, s_end, t_start, t_end; /* ref fstp [ebp+0x10]/[ebp+8]/[ebp+0xc] */
   float clamped_s, clamped_t;
-  float closest_a_x, closest_a_y, closest_a_z;
-  float closest_b_x, closest_b_y, closest_b_z;
-  float diff_x, diff_y, diff_z;
+  /* Contiguous arrays: fast_vector_intersects_sphere reads three floats
+   * through the pointer (ref [ebp-0x18..-0x10] / [ebp-0xc..-4]); as separate
+   * scalars clang dead-stripped the y/z components. */
+  float closest_a[3];
+  float closest_b[3];
+  x87_wide_t diff_x, diff_y, diff_z;
   char s_oob, t_oob;
 
   delta_x = start_b[0] - start_a[0];
+  HALO_FLT_ROUNDTRIP(delta_x);
   delta_y = start_b[1] - start_a[1];
+  HALO_FLT_ROUNDTRIP(delta_y);
   delta_z = start_b[2] - start_a[2];
+  HALO_FLT_ROUNDTRIP(delta_z);
 
-  /* cross = dir_a × dir_b */
-  nx = dir_a[1] * dir_b[2] - dir_b[1] * dir_a[2];
-  ny = dir_a[2] * dir_b[0] - dir_a[0] * dir_b[2];
-  nz = dir_b[1] * dir_a[0] - dir_a[1] * dir_b[0];
+  /* cross = dir_a × dir_b; ref narrows only ny (fstp [ebp-0x14] @0x10e088) */
+  nx = (x87_wide_t)dir_a[1] * dir_b[2] - (x87_wide_t)dir_b[1] * dir_a[2];
+  ny = HALO_NARROW((x87_wide_t)dir_a[2] * dir_b[0] -
+               (x87_wide_t)dir_a[0] * dir_b[2]);
+  HALO_FLT_ROUNDTRIP(ny);
+  nz = (x87_wide_t)dir_b[1] * dir_a[0] - (x87_wide_t)dir_a[1] * dir_b[0];
 
-  /* ref: cross_sq accumulates nz^2 + ny^2 + nx^2 (z-first) */
-  cross_sq = nz * nz + ny * ny + nx * nx;
+  /* ref: cross_sq accumulates nz^2 + ny^2 + nx^2 (z-first), ny from the
+   * narrowed slot (0x10e09b: fld [ebp-0x14]; fmul [ebp-0x14]) */
+  cross_sq = nz * nz + (x87_wide_t)ny * ny + nx * nx;
 
   /* non-parallel case first: reference sinks the parallel block to 0x220
    * (test ah,5 / jnp); eps compare is double-width (fcomp QWORD 0x2533d0) */
   if (!(real_math_fabs_double_from_float(cross_sq) < *(double *)0x2533d0)) {
     /* non-parallel case */
     inv = *(float *)0x2533c8 / cross_sq;
-    nx = nx * inv;
-    ny = ny * inv;
+    nxi = HALO_NARROW(nx * inv);             /* ref fstp [ebp-0x18] @0x10e0c8 */
+    HALO_FLT_ROUNDTRIP(nxi);
+    nyi = HALO_NARROW((x87_wide_t)ny * inv); /* ref fstp [ebp-0x14] @0x10e0d0 */
+    HALO_FLT_ROUNDTRIP(nyi);
 
-    /* s = dot(delta x dir_b, n_norm) */
-    s = (delta_y * dir_b[2] - delta_z * dir_b[1]) * nx +
-        (delta_z * dir_b[0] - delta_x * dir_b[2]) * ny +
-        (delta_x * dir_b[1] - delta_y * dir_b[0]) * nz * inv;
+    /* s = dot(delta x dir_b, n_norm); ref accumulates z, y, x (0x10e0fd) and
+     * narrows the result (fstp [ebp+8] @0x10e10d) */
+    s = HALO_NARROW(((x87_wide_t)delta_x * dir_b[1] -
+                 (x87_wide_t)delta_y * dir_b[0]) * nz * inv +
+                ((x87_wide_t)delta_z * dir_b[0] -
+                 (x87_wide_t)delta_x * dir_b[2]) * nyi +
+                ((x87_wide_t)delta_y * dir_b[2] -
+                 (x87_wide_t)delta_z * dir_b[1]) * nxi);
+    HALO_FLT_ROUNDTRIP(s);
 
-    /* t = dot(delta x dir_a, n_norm) */
-    t = (delta_y * dir_a[2] - delta_z * dir_a[1]) * nx +
-        (delta_z * dir_a[0] - delta_x * dir_a[2]) * ny +
-        (delta_x * dir_a[1] - delta_y * dir_a[0]) * nz * inv;
+    /* t = dot(delta x dir_a, n_norm); ref keeps t in ST(0) (0x10e142) */
+    t = ((x87_wide_t)delta_x * dir_a[1] -
+         (x87_wide_t)delta_y * dir_a[0]) * nz * inv +
+        ((x87_wide_t)delta_z * dir_a[0] -
+         (x87_wide_t)delta_x * dir_a[2]) * nyi +
+        ((x87_wide_t)delta_y * dir_a[2] -
+         (x87_wide_t)delta_z * dir_a[1]) * nxi;
 
     s_oob = (s < *(float *)0x2533c0 || s > *(float *)0x2533c8);
     t_oob = (t < *(float *)0x2533c0 || t > *(float *)0x2533c8);
@@ -3031,9 +3066,9 @@ bool vector_intersects_pill3d(float *start_a, float *dir_a, float *start_b,
     if (s_oob) {
       clamped_s =
         (s < *(float *)0x2533c0) ? *(float *)0x2533c0 : *(float *)0x2533c8;
-      closest_a_x = clamped_s * dir_a[0] + start_a[0];
-      closest_a_y = clamped_s * dir_a[1] + start_a[1];
-      closest_a_z = clamped_s * dir_a[2] + start_a[2];
+      closest_a[0] = clamped_s * dir_a[0] + start_a[0];
+      closest_a[1] = clamped_s * dir_a[1] + start_a[1];
+      closest_a[2] = clamped_s * dir_a[2] + start_a[2];
       if (!t_oob)
         goto point_segment_checks;
     } else if (!t_oob) {
@@ -3042,30 +3077,38 @@ bool vector_intersects_pill3d(float *start_a, float *dir_a, float *start_b,
 
     clamped_t =
       (t < *(float *)0x2533c0) ? *(float *)0x2533c0 : *(float *)0x2533c8;
-    closest_b_x = clamped_t * dir_b[0] + start_b[0];
-    closest_b_y = clamped_t * dir_b[1] + start_b[1];
-    closest_b_z = clamped_t * dir_b[2] + start_b[2];
+    closest_b[0] = clamped_t * dir_b[0] + start_b[0];
+    closest_b[1] = clamped_t * dir_b[1] + start_b[1];
+    closest_b[2] = clamped_t * dir_b[2] + start_b[2];
 
   point_segment_checks:
     if (s_oob) {
-      if (fast_vector_intersects_sphere(start_b, dir_b, &closest_a_x, radius))
+      if (fast_vector_intersects_sphere(start_b, dir_b, closest_a, radius))
         return 1;
     }
     if (t_oob) {
-      if (fast_vector_intersects_sphere(start_a, dir_a, &closest_b_x, radius))
+      if (fast_vector_intersects_sphere(start_a, dir_a, closest_b, radius))
         return 1;
     }
     return 0;
   } else {
     /* parallel or nearly parallel lines */
-    d0_d1 = dir_a[0] * dir_b[0] + dir_a[1] * dir_b[1] + dir_a[2] * dir_b[2];
-    d0_sq = dir_a[0] * dir_a[0] + dir_a[1] * dir_a[1] + dir_a[2] * dir_a[2];
+    /* ref accumulates 2,1,0 for d0_d1 (0x10e266) and 0,2,1 for d0_sq
+     * (0x10e282-0x10e290); both stay in ST(i) */
+    d0_d1 = (x87_wide_t)dir_a[2] * dir_b[2] + (x87_wide_t)dir_a[1] * dir_b[1] +
+            (x87_wide_t)dir_a[0] * dir_b[0];
+    d0_sq = (x87_wide_t)dir_a[0] * dir_a[0] + (x87_wide_t)dir_a[2] * dir_a[2] +
+            (x87_wide_t)dir_a[1] * dir_a[1];
 
     if (d0_sq > *(float *)0x253f44) {
       inv = *(float *)0x2533c8 / d0_sq;
-      s_start =
-        (delta_x * dir_a[0] + delta_y * dir_a[1] + delta_z * dir_a[2]) * inv;
-      s_end = inv * d0_d1 + s_start;
+      /* ref dot order z,y,x (0x10e2af); fstp [ebp+0x10] @0x10e2c6 */
+      s_start = HALO_NARROW(((x87_wide_t)delta_z * dir_a[2] +
+                         (x87_wide_t)delta_y * dir_a[1] +
+                         (x87_wide_t)delta_x * dir_a[0]) * inv);
+      HALO_FLT_ROUNDTRIP(s_start);
+      s_end = HALO_NARROW(inv * d0_d1 + s_start); /* fstp [ebp+8] @0x10e2ce */
+      HALO_FLT_ROUNDTRIP(s_end);
 
       /* clamp s_start to [0, 1] */
       if (s_start < *(float *)0x2533c0)
@@ -3086,13 +3129,18 @@ bool vector_intersects_pill3d(float *start_a, float *dir_a, float *start_b,
       s = 0.0f;
     }
 
-    d1_sq = dir_b[0] * dir_b[0] + dir_b[1] * dir_b[1] + dir_b[2] * dir_b[2];
+    d1_sq = (x87_wide_t)dir_b[0] * dir_b[0] + (x87_wide_t)dir_b[1] * dir_b[1] +
+            (x87_wide_t)dir_b[2] * dir_b[2];
 
     if (d1_sq > *(float *)0x253f44) {
       inv = *(float *)0x2533c8 / d1_sq;
-      t_start =
-        -((delta_x * dir_b[0] + delta_y * dir_b[1] + delta_z * dir_b[2]) * inv);
-      t_end = inv * d0_d1 + t_start;
+      /* ref fchs then fstp [ebp+0x10] @0x10e3af-0x10e3b1 */
+      t_start = HALO_NARROW(-(((x87_wide_t)delta_x * dir_b[0] +
+                           (x87_wide_t)delta_y * dir_b[1] +
+                           (x87_wide_t)delta_z * dir_b[2]) * inv));
+      HALO_FLT_ROUNDTRIP(t_start);
+      t_end = HALO_NARROW(inv * d0_d1 + t_start); /* fstp [ebp+0xc] @0x10e3b9 */
+      HALO_FLT_ROUNDTRIP(t_end);
 
       /* clamp t_start to [0, 1] */
       if (t_start < *(float *)0x2533c0)
@@ -3117,18 +3165,26 @@ bool vector_intersects_pill3d(float *start_a, float *dir_a, float *start_b,
   }
 
 distance_check:
-  closest_a_x = s * dir_a[0] + start_a[0];
-  closest_a_y = s * dir_a[1] + start_a[1];
-  closest_a_z = s * dir_a[2] + start_a[2];
-  closest_b_x = t * dir_b[0] + start_b[0];
-  closest_b_y = t * dir_b[1] + start_b[1];
-  closest_b_z = t * dir_b[2] + start_b[2];
+  /* ref narrows closest_a[0..2] and closest_b[0..1] (fstp, 0x10e44f-0x10e47b)
+   * but keeps closest_b[2] in ST(0) (0x10e481) */
+  closest_a[0] = HALO_NARROW((x87_wide_t)s * dir_a[0] + start_a[0]);
+  closest_a[1] = HALO_NARROW((x87_wide_t)s * dir_a[1] + start_a[1]);
+  closest_a[2] = HALO_NARROW((x87_wide_t)s * dir_a[2] + start_a[2]);
+  closest_b[0] = HALO_NARROW(t * dir_b[0] + start_b[0]);
+  closest_b[1] = HALO_NARROW(t * dir_b[1] + start_b[1]);
+  HALO_FLT_ROUNDTRIP(closest_a[0]);
+  HALO_FLT_ROUNDTRIP(closest_a[1]);
+  HALO_FLT_ROUNDTRIP(closest_a[2]);
+  HALO_FLT_ROUNDTRIP(closest_b[0]);
+  HALO_FLT_ROUNDTRIP(closest_b[1]);
 
-  diff_x = closest_b_x - closest_a_x;
-  diff_y = closest_b_y - closest_a_y;
-  diff_z = closest_b_z - closest_a_z;
+  diff_x = (x87_wide_t)closest_b[0] - closest_a[0];
+  diff_y = (x87_wide_t)closest_b[1] - closest_a[1];
+  diff_z = (t * dir_b[2] + start_b[2]) - closest_a[2]; /* closest_b[2] wide */
 
-  if (radius * radius < diff_x * diff_x + diff_y * diff_y + diff_z * diff_z)
+  /* ref sums z, y, x (0x10e495-0x10e4a3) */
+  if ((x87_wide_t)radius * radius <
+      diff_z * diff_z + diff_y * diff_y + diff_x * diff_x)
     return 0;
   return 1;
 }

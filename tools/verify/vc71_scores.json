@@ -55411,16 +55411,16 @@
     "collision_surface_perimeter": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 97.6,
+      "abi_modeled_mnemonic_pct": 100.0,
       "addr": "0x147710",
       "end": "0x1477e1",
       "kind": "auto",
       "n_r": 83,
-      "opnd_percent": 85.5,
-      "raw_mnemonic_pct": 97.6,
+      "opnd_percent": 91.6,
+      "raw_mnemonic_pct": 100.0,
       "ref": "synth",
       "ref_sha": "1c3f1affd7627333",
-      "score": 97.6,
+      "score": 100.0,
       "source": "src/halo/physics/collision_bsp.c"
     },
     "collision_surface_polygon": {
@@ -90406,16 +90406,16 @@
     "vector_intersects_pill3d": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 80.5,
+      "abi_modeled_mnemonic_pct": 82.2,
       "addr": "0x10e040",
       "end": "0x10e4ca",
       "kind": "auto",
       "n_r": 413,
-      "opnd_percent": 73.8,
-      "raw_mnemonic_pct": 80.5,
+      "opnd_percent": 76.4,
+      "raw_mnemonic_pct": 82.2,
       "ref": "synth",
       "ref_sha": "133adc3964ab624f",
-      "score": 80.5,
+      "score": 82.2,
       "source": "src/halo/math/real_math.c"
     },
     "vector_intersects_rectangle2d": {

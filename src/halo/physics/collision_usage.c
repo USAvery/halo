@@ -1553,7 +1553,7 @@ void collision_log_end_time(float *target, float *origin, float *output,
    * quotient (FSTP dword [ebp+8] at 0x14eefb).  When clang inlines this into
    * FUN_0014f2c0 it narrowed the numerator instead and kept t wide; both
    * differences moved a grenade's rest position (system-link run 9). */
-  float t = (float)((((x87_wide_t)target[0] - origin[0]) * dir[0] +
+  float t = HALO_NARROW((((x87_wide_t)target[0] - origin[0]) * dir[0] +
                      ((x87_wide_t)target[1] - origin[1]) * dir[1] +
                      ((x87_wide_t)target[2] - origin[2]) * dir[2]) /
                     ((x87_wide_t)dir[0] * dir[0] + (x87_wide_t)dir[1] * dir[1] +
@@ -1904,7 +1904,7 @@ short FUN_0014f2c0(float *old_pos, float *old_vel, short *features,
           (x87_wide_t)plane_ptr[1] * plane_ptr[1] +
           (x87_wide_t)plane_ptr[2] * plane_ptr[2];
 
-    dot_check = (float)(dot - *(float *)0x2533c8);
+    dot_check = HALO_NARROW(dot - *(float *)0x2533c8);
     if ((*(uint32_t *)&dot_check & 0x7f800000) == 0x7f800000 ||
         !(fabs((double)dot_check) < *(double *)0x2549d8) ||
         ((*(uint32_t *)&plane_ptr[3] & 0x7f800000) == 0x7f800000)) {

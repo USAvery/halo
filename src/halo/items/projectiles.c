@@ -339,6 +339,8 @@ char projectile_aim_ballistic(float speed, float gravity, float *origin,
   float t_min;  /* local_14, EBP-0x10; disc_base then t_min */
   float c4;  /* local_10, EBP-0x0c */
   float b;  /* local_c, EBP-0x08 */
+  float b_wide; /* wide (un-narrowed) companion of b, see 0xf81ad FST */
+  float inv_t;  /* 1/t_sol, never stored by the original (0xf82ea) */
   volatile char ok;  /* local_5, EBP-0x01 */
   float a; /* quadratic coeff a = a_coeff^2 * 0.25 */
   float a_coeff; /* effective gravity: max(0, per_tick*gravity) */
@@ -410,6 +412,8 @@ char projectile_aim_ballistic(float speed, float gravity, float *origin,
 
   /* 7. disc_base = -sqrt(c4); two_a = 2*a. */
   t_min = -sqrtf(c4);
+  /* 0xf815c: FSTP dword [ebp-0x10] -- narrowed before the divide at 0xf816a. */
+  HALO_FLT_ROUNDTRIP(t_min);
   two_a = a + a;
 
   /* t_sq_max = -disc_base / two_a; assert >= 0. */
@@ -419,17 +423,24 @@ char projectile_aim_ballistic(float speed, float gravity, float *origin,
                    "c:\\halo\\SOURCE\\items\\projectiles.c", 0x2fc, 1);
     system_exit(-1);
   }
+  /* 0xf816f: FST dword [ebp+0x14] -- the compare above sees the wide copy,
+   * the FSQRT at 0xf819f reloads the narrowed slot. */
+  HALO_FLT_ROUNDTRIP(V);
   t_max = sqrtf(V); /* t_max */
   /* 0xf81a4: FSTP dword [ebp-0x1c] -- narrowed before the reload at 0xf81fa. */
   HALO_FLT_ROUNDTRIP(t_max);
 
   /* 8. b = a_coeff * dz; t_min = sqrt(b - disc_base) if >= 0, else 0.
    * Branch polarity: original falls through to the zero path, jumps to sqrt. */
-  b = a_coeff * dz;
-  if (b - t_min < *(float *)0x2533c0) {
+  /* 0xf81ad: FST dword [ebp-8] -- no pop.  The subtract at 0xf81b0 uses the
+   * wide copy; the reloads at 0xf8211 and 0xf826f use the narrowed slot. */
+  b_wide = a_coeff * dz;
+  b = b_wide;
+  HALO_FLT_ROUNDTRIP(b);
+  if (b_wide - t_min < *(float *)0x2533c0) {
     t_min = 0.0f;
   } else {
-    t_min = sqrtf(b - t_min);
+    t_min = sqrtf(b_wide - t_min);
   }
 
   /* 9. Choose launch speed V. */
@@ -486,16 +497,19 @@ char projectile_aim_ballistic(float speed, float gravity, float *origin,
 
 LAB_output:
   /* 11. Build velocity direction (dx/t, dy/t, a_coeff*t*0.5 + dz/t). */
-  tmp_f = *(float *)0x2533c8 / speed;
-  aim_x = dx * tmp_f;
+  /* 0xf82ea: FDIV leaves 1/t_sol in ST(0); the original never stores it, so
+   * all three components multiply the un-narrowed reciprocal
+   * (0xf82f6/0xf82fe/0xf8303). */
+  inv_t = *(float *)0x2533c8 / speed;
+  aim_x = dx * inv_t;
   /* 0xf82f8: FSTP dword [ebp-0x34] -- narrowed before the reload at 0xf831d. */
   HALO_FLT_ROUNDTRIP(aim_x);
-  aim_y = dy * tmp_f;
+  aim_y = dy * inv_t;
   /* 0xf8300: FSTP dword [ebp-0x30] -- narrowed before the reload at 0xf8317.
    * aim_z is FST (0xf8314), so its wide stack copy is what param_13 receives
    * at 0xf832a; only the slot copy is narrowed and it is not round-tripped. */
   HALO_FLT_ROUNDTRIP(aim_y);
-  aim_z = tmp_f * dz + speed * a_coeff * *(float *)0x253398;
+  aim_z = inv_t * dz + speed * a_coeff * *(float *)0x253398;
 
   /* Precompute sqrt(aim_y^2 + aim_x^2) for param_14 output, stored early. */
   tmp_f2 = aim_y * aim_y + aim_x * aim_x;
@@ -577,6 +591,9 @@ bool projectile_aim_linear(float speed, float *origin, float *target,
   local_vec[2] = target[2] - origin[2];
 
   dist = normalize3d(local_vec);
+  /* 0xf843e: FSTP dword [ebp+0x10] -- the magnitude is narrowed before the
+   * divide at 0xf8457 and before it is copied to out_dist at 0xf84a7. */
+  HALO_FLT_ROUNDTRIP(dist);
 
   if (speed > *(const float *)0x2533c0) {
     t = dist / speed;
@@ -803,13 +820,19 @@ bool FUN_000f8720(int projectile_handle, float *new_pos,
   float *up_vec;
   float *fwd_vec;
   float radius;
-  float dx, dy, dz;
+  /* 0xf87a2/0xf87ae/0xf87b5: the original recomputes each delta into ST(i)
+   * for the cross product, so the cross sees the un-narrowed difference;
+   * only the copies stored into origin1[] are float32. */
+  x87_wide_t dx, dy, dz;
   /* cross direction: cross(delta, up_vec), stored in dir1 then normalized */
   float dir1[3]; /* normalized cross direction; later reused as sweep dir */
   /* positive-side origin: proj_pos + radius * cross (also reused for initial centre-line delta) */
   float origin1[3];
   /* positive-side endpoint (x,y,z) */
-  float pt_b1x, pt_b1y, pt_b1z;
+  float pt_b1x, pt_b1y;
+  /* pt_b1z is never stored by the original (0xf885b..0xf8861 keeps it in
+   * ST2 for the FSUB at 0xf88d3), so it must not be narrowed here. */
+  x87_wide_t pt_b1z;
   /* negative-side origin: proj_pos - radius * cross */
   float pt_a2[3];
   /* negative-side endpoint: new_pos - radius * cross */
@@ -824,9 +847,9 @@ bool FUN_000f8720(int projectile_handle, float *new_pos,
   dz = new_pos[2] - proj_pos[2];
 
   /* 1. Centre-line collision test (flags 0x1000e9). */
-  origin1[0] = dx;
-  origin1[1] = dy;
-  origin1[2] = dz;
+  origin1[0] = HALO_NARROW(dx);
+  origin1[1] = HALO_NARROW(dy);
+  origin1[2] = HALO_NARROW(dz);
   if (FUN_0014df70(0x1000e9, proj_pos, origin1, *(int *)(proj + 0x1e4),
                    collision_result)) {
     return 1;
@@ -840,9 +863,9 @@ bool FUN_000f8720(int projectile_handle, float *new_pos,
 
   /* Compute cross direction: cross(delta, up_vec). */
   up_vec = *(float **)0x31fc44;
-  dir1[0] = dy * up_vec[2] - dz * up_vec[1];
-  dir1[1] = dz * up_vec[0] - dx * up_vec[2];
-  dir1[2] = dx * up_vec[1] - dy * up_vec[0];
+  dir1[0] = HALO_NARROW(dy * up_vec[2] - dz * up_vec[1]);
+  dir1[1] = HALO_NARROW(dz * up_vec[0] - dx * up_vec[2]);
+  dir1[2] = HALO_NARROW(dx * up_vec[1] - dy * up_vec[0]);
 
   if (normalize3d(dir1) == *(float *)0x2533c0) {
     /* Degenerate (delta parallel to up): fall back to default forward. */
@@ -853,14 +876,21 @@ bool FUN_000f8720(int projectile_handle, float *new_pos,
   }
 
   /* Build positive-side origin: proj_pos + radius * cross_dir. */
-  origin1[0] = dir1[0] * radius + proj_pos[0];
-  origin1[1] = dir1[1] * radius + proj_pos[1];
-  origin1[2] = dir1[2] * radius + proj_pos[2];
+  /* 0xf881b/0xf8846/0xf8871/0xf889f: dir1[i]*radius is recomputed in ST at
+   * all four points; the wide product keeps clang from spilling it as a
+   * dword between uses. */
+  origin1[0] = HALO_NARROW((x87_wide_t)dir1[0] * radius + proj_pos[0]);
+  origin1[1] = HALO_NARROW((x87_wide_t)dir1[1] * radius + proj_pos[1]);
+  origin1[2] = HALO_NARROW((x87_wide_t)dir1[2] * radius + proj_pos[2]);
 
   /* Build positive-side endpoint: new_pos + radius * cross_dir. */
-  pt_b1x = dir1[0] * radius + new_pos[0];
-  pt_b1y = dir1[1] * radius + new_pos[1];
-  pt_b1z = dir1[2] * radius + new_pos[2];
+  pt_b1x = HALO_NARROW((x87_wide_t)dir1[0] * radius + new_pos[0]);
+  /* 0xf884d: FSTP dword [ebp-0x28] -- narrowed before the reload at 0xf88c1. */
+  HALO_FLT_ROUNDTRIP(pt_b1x);
+  pt_b1y = HALO_NARROW((x87_wide_t)dir1[1] * radius + new_pos[1]);
+  /* 0xf8858: FSTP dword [ebp-0x24] -- narrowed before the reload at 0xf88ca. */
+  HALO_FLT_ROUNDTRIP(pt_b1y);
+  pt_b1z = (x87_wide_t)dir1[2] * radius + new_pos[2];
 
   /* Build negative-side origin: proj_pos - radius * cross_dir. */
   pt_a2[0] = dir1[0] * (-radius) + proj_pos[0];
@@ -2666,11 +2696,18 @@ bool FUN_000f9c40(int projectile_handle)
     if (hit_flag != '\0') {
       /* Accumulate total travel distance. */
       {
-        volatile float dx, dy, dz;
+        volatile float dx, dy;
+        /* 0xfa6d2: FST dword [ebp-0x3c] -- no pop, so the square at 0xfa6d5
+         * multiplies the wide ST(0) by the narrowed slot; dx/dy are FSTP'd
+         * (0xfa6c0/0xfa6c9) and squared narrow-by-narrow.  Addend order is
+         * dz, dy, dx (0xfa6d5/0xfa6d8/0xfa6e0). */
+        float dz, dz_wide;
         dx = new_pos[0] - *(float *)(proj + 0xc);
         dy = new_pos[1] - *(float *)(proj + 0x10);
         dz = new_pos[2] - *(float *)(proj + 0x14);
-        *(float *)(proj + 0x200) += sqrtf(dx * dx + dy * dy + dz * dz);
+        dz_wide = dz;
+        HALO_FLT_ROUNDTRIP(dz);
+        *(float *)(proj + 0x200) += sqrtf(dz_wide * dz + dy * dy + dx * dx);
       }
 
       /* Proximity sound check (up to 4 local players). */

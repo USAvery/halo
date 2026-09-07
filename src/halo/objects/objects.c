@@ -1,5 +1,10 @@
 #if defined(_MSC_VER) && !defined(__clang__)
 #include <math.h>
+/* VC71 lane keeps <math.h> (no x87_math.h intrinsic pragmas here); the two
+ * narrowing helpers are no-ops for cl.exe, which narrows on its own. */
+#define HALO_FLT_ROUNDTRIP(lv) ((void)0)
+#define HALO_NARROW(e) (e)
+typedef float x87_wide_t;
 #else
 #include "../../x87_math.h"
 #ifdef HALO_RNG_TRACE
@@ -7900,7 +7905,8 @@ void object_compute_function_values(int object_handle /* @<eax> */)
     char *elem =
       (char *)tag_block_get_element((void *)(obj_tag + 0x158), (int)i, 0x168);
     unsigned char active;
-    float value;
+    float value; /* ref: [ebp-4], narrowed at every assignment */
+    x87_wide_t value_wide;
     float t;
     int16_t fn;
     int16_t mode;
@@ -7919,6 +7925,7 @@ void object_compute_function_values(int object_handle /* @<eax> */)
     }
     t = t * time_base;
     value = FUN_0010a5e0(*(int16_t *)(elem + 0xa), t);
+    HALO_FLT_ROUNDTRIP(value);
 
     /* --- optional amplitude function --- */
     fn = *(int16_t *)(elem + 0xc);
@@ -7926,11 +7933,13 @@ void object_compute_function_values(int object_handle /* @<eax> */)
       value = ((int)fn >= 5 ? *(float *)(obj + 0xe4 + ((int)fn - 5) * 4) :
                               *(float *)(obj + 0xd0 + (int)fn * 4)) *
               value;
+      HALO_FLT_ROUNDTRIP(value);
     }
 
     /* --- inversion (flag bit 0) --- */
     if ((*(unsigned char *)elem & 1) != 0) {
       value = *(float *)0x2533c8 - value;
+      HALO_FLT_ROUNDTRIP(value);
     }
 
     /* --- secondary sinusoidal offset term (when elem+0x14 != 0) --- */
@@ -7939,6 +7948,7 @@ void object_compute_function_values(int object_handle /* @<eax> */)
                              time_base * *(float *)(elem + 0x10));
       w = (w - *(float *)0x253398) * *(float *)(elem + 0x14);
       value = w + w + value;
+      HALO_FLT_ROUNDTRIP(value);
     }
 
     /* --- step threshold (when elem+0x18 != 0): 1.0 if value>thr else 0.0 ---
@@ -7955,6 +7965,7 @@ void object_compute_function_values(int object_handle /* @<eax> */)
     if (*(int16_t *)(elem + 0x1c) > 1) {
       value = (float)floor((double)((float)*(int16_t *)(elem + 0x1c) * value)) *
               *(float *)(elem + 0x140);
+      HALO_FLT_ROUNDTRIP(value);
     }
 
     /* --- modulo wrap (when elem+0x13c > 0) --- */
@@ -7966,15 +7977,20 @@ void object_compute_function_values(int object_handle /* @<eax> */)
 #else
       value = x87_fmod(value, (double)*(float *)(elem + 0x13c));
 #endif
+      HALO_FLT_ROUNDTRIP(value);
     }
 
     /* --- additive function with clamp-to-1 --- */
     fn = *(int16_t *)(elem + 0x22);
     if (fn != 0) {
-      value = ((int)fn >= 5 ? *(float *)(obj + 0xe4 + ((int)fn - 5) * 4) :
-                              *(float *)(obj + 0xd0 + (int)fn * 4)) +
-              value;
-      if (value > *(float *)0x2533c8) {
+      /* 0x13e9a7 FST (not FSTP): the clamp compare reads the wide sum while
+       * the stored value is narrowed. */
+      value_wide = (x87_wide_t)((int)fn >= 5 ? *(float *)(obj + 0xe4 + ((int)fn - 5) * 4) :
+                                               *(float *)(obj + 0xd0 + (int)fn * 4)) +
+                   value;
+      value = HALO_NARROW(value_wide);
+      HALO_FLT_ROUNDTRIP(value);
+      if (value_wide > *(float *)0x2533c8) {
         value = *(float *)0x2533c8;
       }
     }
@@ -7985,14 +8001,17 @@ void object_compute_function_values(int object_handle /* @<eax> */)
       value = ((int)fn >= 5 ? *(float *)(obj + 0xe4 + ((int)fn - 5) * 4) :
                               *(float *)(obj + 0xd0 + (int)fn * 4)) *
               value;
+      HALO_FLT_ROUNDTRIP(value);
     }
 
     /* --- transition remap --- */
     value = transition_function_evaluate(*(int16_t *)(elem + 0x1e), value);
+    HALO_FLT_ROUNDTRIP(value);
 
     /* --- scale (when elem+0x38 > 0) --- */
     if (*(float *)(elem + 0x38) > *(float *)0x2533c0) {
       value = value * *(float *)(elem + 0x38);
+      HALO_FLT_ROUNDTRIP(value);
     }
 
     /* --- range remap (modes 1/2) --- */
@@ -8000,6 +8019,7 @@ void object_compute_function_values(int object_handle /* @<eax> */)
     if (mode == 2) {
       value = (*(float *)(elem + 0x2c) - *(float *)(elem + 0x28)) * value +
               *(float *)(elem + 0x28);
+      HALO_FLT_ROUNDTRIP(value);
       if (*(float *)(elem + 0x28) + *(float *)0x253f44 >= value) {
         active = (unsigned char)(*(unsigned int *)elem >> 2) & 1;
       }
@@ -8013,6 +8033,7 @@ void object_compute_function_values(int object_handle /* @<eax> */)
       }
       if (mode == 1) {
         value = (value - *(float *)(elem + 0x28)) * *(float *)(elem + 0x138);
+        HALO_FLT_ROUNDTRIP(value);
       }
     }
 
@@ -10710,7 +10731,7 @@ void object_compute_child_marker_position(void *object, void *child_marker,
   float *obj_up;
   float fwd_x, fwd_y, fwd_z;
   float up_x, up_y, up_z;
-  float left_x, left_y, left_z;
+  x87_wide_t left_x, left_y, left_z; /* 0x14113e-0x14118d: kept in ST(1..3) */
 
   assert_halt(object != NULL);
   assert_halt(child_marker != NULL);
@@ -10761,9 +10782,9 @@ void object_compute_child_marker_position(void *object, void *child_marker,
   up_z = local_mat[9];
 
   /* left = cross(forward, up) */
-  left_x = fwd_y * up_z - fwd_z * up_y;
-  left_y = fwd_z * up_x - up_z * fwd_x;
-  left_z = up_y * fwd_x - fwd_y * up_x;
+  left_x = (x87_wide_t)fwd_y * up_z - (x87_wide_t)fwd_z * up_y;
+  left_y = (x87_wide_t)fwd_z * up_x - (x87_wide_t)up_z * fwd_x;
+  left_z = (x87_wide_t)up_y * fwd_x - (x87_wide_t)fwd_y * up_x;
 
   /* up_new = cross(left, forward) */
   obj_up[0] = left_y * fwd_z - left_z * fwd_y;
@@ -11524,12 +11545,14 @@ void object_compute_node_matrices(int object_handle)
     node_matrices[8] = *(float *)((char *)obj + 0x34); /* up.y */
     node_matrices[9] = *(float *)((char *)obj + 0x38); /* up.z */
     /* left = up x forward */
-    node_matrices[4] =
-      node_matrices[8] * node_matrices[3] - node_matrices[9] * node_matrices[2];
-    node_matrices[5] =
-      node_matrices[9] * node_matrices[1] - node_matrices[7] * node_matrices[3];
-    node_matrices[6] =
-      node_matrices[7] * node_matrices[2] - node_matrices[8] * node_matrices[1];
+    /* 0x14349f-0x1434ae: both products and the subtraction stay in ST;
+     * without the promotion clang spilled one product to a dword. */
+    node_matrices[4] = (x87_wide_t)node_matrices[8] * node_matrices[3] -
+                       (x87_wide_t)node_matrices[9] * node_matrices[2];
+    node_matrices[5] = (x87_wide_t)node_matrices[9] * node_matrices[1] -
+                       (x87_wide_t)node_matrices[7] * node_matrices[3];
+    node_matrices[6] = (x87_wide_t)node_matrices[7] * node_matrices[2] -
+                       (x87_wide_t)node_matrices[8] * node_matrices[1];
     /* position */
     node_matrices[10] = *(float *)((char *)obj + 0x0c);
     node_matrices[11] = *(float *)((char *)obj + 0x10);
