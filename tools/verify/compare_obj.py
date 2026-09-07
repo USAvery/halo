@@ -1171,7 +1171,9 @@ def narrow_mem_load_shape(insn: str):
     return None  # absolute/global, register-only, store, or unrecognized
 
 
-def compare_load_widths(compiled: list[str], reference: list[str]) -> list[str]:
+def compare_load_widths(compiled: list[str], reference: list[str],
+                        equal_c_idxs: set[int] | None = None,
+                        equal_r_idxs: set[int] | None = None) -> list[str]:
     """Flag fields that one side reads narrow (16/8-bit) and the other does not.
 
     Compares the SET of (width-class, field-offset) narrow reads -- PRESENCE, not
@@ -1181,29 +1183,48 @@ def compare_load_widths(compiled: list[str], reference: list[str]) -> list[str]:
     false-flags even though both read it at the correct width. A field present on
     exactly one side is the real signal: reference-only -> we WIDENED it (the c10
     crash direction); compiled-only -> we over-narrowed a 32-bit value.
+
+    equal_c_idxs / equal_r_idxs: indices (into `compiled` / `reference`) already
+    covered by an "equal"-tagged mnemonic-alignment block from the caller's LCS
+    diff. narrow_mem_load_shape()'s disp(%reg) regex only matches a single base
+    register, so a SIB/indexed access (`disp(%base,%index)` -- typically array
+    indexing into a local buffer) never contributes a shape at all, even though
+    the mnemonic (and thus width) is identical to a plain disp(%reg) access on
+    the other side. When BOTH sides already have the same mnemonic at that
+    position (an "equal" op -- same width by construction, since mnemonic
+    encodes width), the width itself cannot be the divergence: suppress the
+    warning rather than blaming an addressing-mode difference on field width.
     """
     def shapes(insns):
         out = {}
-        for insn in insns:
+        for idx, insn in enumerate(insns):
             s = narrow_mem_load_shape(insn)
             if s is not None:
-                out.setdefault(s, insn.strip())
+                out.setdefault(s, (idx, insn.strip()))
         return out
 
     c_sh = shapes(compiled)
     r_sh = shapes(reference)
+    equal_c_idxs = equal_c_idxs or set()
+    equal_r_idxs = equal_r_idxs or set()
     warnings = []
     for shape in sorted(set(r_sh) - set(c_sh)):
+        idx, insn = r_sh[shape]
+        if idx in equal_r_idxs:
+            continue
         wc, key = shape
         warnings.append(
             f"    LOADW: reference reads a narrow field [{wc} {key}] that our lift "
-            f"does not (ref: `{r_sh[shape]}`) -- likely a narrow field read as a "
+            f"does not (ref: `{insn}`) -- likely a narrow field read as a "
             f"wider type (int vs int16_t/int8_t)")
     for shape in sorted(set(c_sh) - set(r_sh)):
+        idx, insn = c_sh[shape]
+        if idx in equal_c_idxs:
+            continue
         wc, key = shape
         warnings.append(
             f"    LOADW: our lift reads a narrow field [{wc} {key}] the reference "
-            f"does not (ours: `{c_sh[shape]}`) -- possible over-narrowed field "
+            f"does not (ours: `{insn}`) -- possible over-narrowed field "
             f"(reading only the low bits of a wider value)")
     return warnings
 
@@ -1634,7 +1655,14 @@ def compare_functions(compiled: list[str], reference: list[str],
     # Generate unified diff summary (always show raw instructions for readability)
     diffs = []
     sm = SequenceMatcher(None, c_seq, r_seq, autojunk=False)
-    for tag, i1, i2, j1, j2 in sm.get_opcodes():
+    equal_c_idxs: set[int] = set()
+    equal_r_idxs: set[int] = set()
+    opcodes = sm.get_opcodes()
+    for tag, i1, i2, j1, j2 in opcodes:
+        if tag == 'equal':
+            equal_c_idxs.update(range(i1, i2))
+            equal_r_idxs.update(range(j1, j2))
+    for tag, i1, i2, j1, j2 in opcodes:
         if tag == 'replace':
             for k in range(min(i2 - i1, j2 - j1)):
                 ci = i1 + k
@@ -1654,7 +1682,7 @@ def compare_functions(compiled: list[str], reference: list[str],
     fpu_warnings = compare_fpu_blocks(c_fpu, r_fpu)
 
     # Load-width comparison (int vs int16_t/int8_t)
-    loadw_warnings = compare_load_widths(compiled, reference)
+    loadw_warnings = compare_load_widths(compiled, reference, equal_c_idxs, equal_r_idxs)
 
     # Immediate-constant comparison (wrong float/magic literal)
     imm_warnings = compare_immediates(compiled, reference)
@@ -1741,6 +1769,24 @@ def _self_test():
           narrow_mem_load_shape("testl %ecx, 0xc(%eax)") is None)
     check("fused ALU with SIB (indexed) not misread as disp(%reg)",
           narrow_mem_load_shape("testb %cl, 0xc(%eax,%edi,2)") is None)
+
+    # 12. CRITICAL negative: reference reads a struct field with a plain
+    #     disp(%reg) (`movb 0x3c(%ecx), %al`); our lift reads the SAME field via
+    #     a SIB-indexed local array element (`movb -0x20244(%ebp,%edi), %al`) --
+    #     narrow_mem_load_shape() can't classify a SIB operand at all, so without
+    #     the equal-op suppression this always false-flags as "reference reads a
+    #     narrow field our lift does not" even though both sides do an 8-bit
+    #     load and the LCS aligner already paired the two `movb` mnemonics as
+    #     equal (rasterizer_debug_model_vertices +0x3c/+0x3d false positive).
+    w = compare_load_widths(
+        ["movb -0x20244(%ebp,%edi), %al"], ["movb 0x3c(%ecx), %al"],
+        equal_c_idxs={0}, equal_r_idxs={0})
+    check("SIB-indexed candidate load suppressed when mnemonic-paired as equal",
+          w == [])
+    w = compare_load_widths(
+        ["movb -0x20244(%ebp,%edi), %al"], ["movb 0x3c(%ecx), %al"])
+    check("same case WITHOUT equal-op info still flags (documents the gap)",
+          any("n8 disp:0x3c" in x for x in w))
 
     # --- Immediate-constant detector tests ---
 

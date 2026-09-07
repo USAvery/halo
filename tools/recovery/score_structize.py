@@ -35,6 +35,24 @@ if str(ROOT) not in sys.path:
 
 SCORE_CONTEXT_DIR = ROOT / "artifacts" / "score_context"
 
+_PORTED_ADDRS_CACHE = None
+
+
+def _ported_addrs():
+    """Set of int addresses currently ported=true in kb.json (cached)."""
+    global _PORTED_ADDRS_CACHE
+    if _PORTED_ADDRS_CACHE is None:
+        addrs = set()
+        with open(ROOT / "kb.json") as f:
+            kb = json.load(f)
+        for obj in kb.get("objects", []):
+            for fn in obj.get("functions", []):
+                if fn.get("ported") and fn.get("addr"):
+                    addrs.add(int(fn["addr"], 16))
+        _PORTED_ADDRS_CACHE = addrs
+    return _PORTED_ADDRS_CACHE
+
+
 FIXABLE_RULES = {
     "imm_wrong_literal",
     "loadw_field_width",
@@ -196,8 +214,17 @@ def _load_packs_for_tu(source):
             data = json.loads(p.read_text())
         except (json.JSONDecodeError, OSError):
             continue
-        if data.get("tu") == source:
-            packs.append(data)
+        if data.get("tu") != source:
+            continue
+        addr = data.get("addr")
+        if addr is not None and int(addr, 16) not in _ported_addrs():
+            # Stale pack: the function was parked/reverted after this pack
+            # was generated (kb.json no longer marks it ported). Its
+            # classification/warnings describe a candidate that no longer
+            # exists in the tree -- surfacing it as fixable/needs_llm here
+            # sends the caller chasing a function with no source.
+            continue
+        packs.append(data)
     return packs
 
 
