@@ -423,29 +423,31 @@ float plane3d_distance_to_point(float *plane, float *point)
 
 uint32_t real_a_rgb_color_to_pixel32(float alpha, float *color)
 {
-  uint32_t a;
-  uint32_t r;
-  uint32_t g;
+  volatile float scale;
   uint32_t b;
+  uint32_t g;
+  uint32_t r;
+  uint32_t a;
 
-  if (alpha < 0.0f || alpha > 1.0f) {
+  scale = 255.0f;
+  if (!(alpha >= 0.0f && alpha <= 1.0f)) {
     display_assert("alpha>=0.0f && alpha<=1.0f",
                    "..\\bitmaps\\bitmaps_inlines.h", 0xf3, true);
     system_exit(-1);
   }
 
-  if (!(color[0] >= 0.0f && color[0] <= 1.0f && color[1] >= 0.0f &&
-        color[1] <= 1.0f && color[2] >= 0.0f && color[2] <= 1.0f)) {
-    error(2, "%s: assert_valid_real_rgb_color(%f, %f, %f)", "color",
-          (double)color[0], (double)color[1], (double)color[2],
-          "..\\bitmaps\\bitmaps_inlines.h", 0xf4, 1);
+  if (!valid_real_rgb_color(color)) {
+    csprintf((char *)0x5ab100, "%s: assert_valid_real_rgb_color(%f, %f, %f)",
+             "color", (double)color[0], (double)color[1], (double)color[2]);
+    display_assert((const char *)0x5ab100,
+                   "..\\bitmaps\\bitmaps_inlines.h", 0xf4, true);
     system_exit(-1);
   }
 
-  b = (uint32_t)((int)(color[2] * 255.0f + 0.5f)) & 0xff;
-  g = (uint32_t)((int)(color[1] * 255.0f + 0.5f)) & 0xff;
-  r = (uint32_t)((int)(color[0] * 255.0f + 0.5f)) & 0xff;
-  a = (uint32_t)((int)(alpha * 255.0f + 0.5f));
+  b = (uint32_t)(int)(color[2] * scale) & 0xff;
+  g = (uint32_t)(int)(color[1] * scale) & 0xff;
+  r = (uint32_t)(int)(color[0] * scale) & 0xff;
+  a = (uint32_t)(int)(alpha * scale);
 
   return b | (g << 8) | (r << 0x10) | (a << 0x18);
 }

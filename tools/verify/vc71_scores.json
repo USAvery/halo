@@ -79936,16 +79936,16 @@
     "real_a_rgb_color_to_pixel32": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 55.9,
+      "abi_modeled_mnemonic_pct": 73.0,
       "addr": "0x99530",
       "end": "0x99634",
       "kind": "auto",
       "n_r": 79,
-      "opnd_percent": 43.6,
-      "raw_mnemonic_pct": 55.9,
+      "opnd_percent": 57.9,
+      "raw_mnemonic_pct": 73.0,
       "ref": "synth",
       "ref_sha": "d8da71bc5496d252",
-      "score": 55.9,
+      "score": 73.0,
       "source": "src/halo/effects/decals.c"
     },
     "real_hsv_color_to_real_rgb_color": {
