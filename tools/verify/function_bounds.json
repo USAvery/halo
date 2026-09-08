@@ -40058,5 +40058,15 @@
     "end": "0x24d0ae",
     "kind": "auto",
     "name": "XID_fCloseDevice"
+  },
+  "0xdc790": {
+    "end": "0xdc791",
+    "kind": "auto",
+    "name": "FUN_000dc790"
+  },
+  "0xdc7f0": {
+    "end": "0xdc7f1",
+    "kind": "auto",
+    "name": "FUN_000dc7f0"
   }
 }

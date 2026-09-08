@@ -1,24 +1,28 @@
+void FUN_000dc790(void);
+void FUN_000dc7f0(void);
 /* UI/HUD interface subsystem init/dispose. */
 
 void interface_initialize(void)
 {
-  ((void (*)(void))0xe33a0)();
-  ((void (*)(void))0xd02f0)();
-  ((void (*)(void))0x19b320)();
-  ((void (*)(void))0xdc750)();
+  FUN_000e33a0();
+  hud_new();
+  FUN_0019b320();
+  FUN_000dc750();
 }
 
 void interface_dispose_from_old_map(void)
 {
-  ((void (*)(void))0x19b3a0)();
-  ((void (*)(void))0xd03e0)();
+  FUN_0019b3a0();
+  hud_dispose_from_old_map();
+  FUN_000dc7f0();
 }
 
 void interface_dispose(void)
 {
-  ((void (*)(void))0x19b3b0)();
-  ((void (*)(void))0xe33e0)();
-  ((void (*)(void))0xd0340)();
+  FUN_0019b3b0();
+  FUN_000e33e0();
+  hud_dispose();
+  FUN_000dc790();
 }
 
 #define NUMBER_OF_INTERFACE_TAGS 16

@@ -12,6 +12,11 @@ void FUN_000dc750(void)
   }
 }
 
+/* Dispose first-person weapons (0xdc790, stub). */
+void FUN_000dc790(void)
+{
+}
+
 /* Initialize (clear) all 4 first-person weapon slots (0xdc7a0).
  * Each slot is 0x1ea0 bytes. After zeroing, sets sentinel values:
  *   slot+0x04 = -1 (0xffffffff)
@@ -35,6 +40,11 @@ void FUN_000dc7a0(void)
     offset += 0x1ea0;
     i--;
   } while (i != 0);
+}
+
+/* Dispose first-person weapons from old map (0xdc7f0, stub). */
+void FUN_000dc7f0(void)
+{
 }
 
 /* Map a first-person weapon state to an animation graph index (0xdc8c0).
