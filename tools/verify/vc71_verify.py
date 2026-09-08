@@ -1488,6 +1488,13 @@ _PER_FUNCTION_OPT: dict[str, dict[str, str]] = {
     "cseries/xbox_crt.c": {"crt_tolower": "/O1 /Oy", "crt_toupper": "/O1 /Oy"},
     # FUN_000dc800: leaf switch table with register parameter; reference has NO EBP frame.
     "halo/interface/event_manager.c": {"FUN_000dc800": "/O2 /Oy"},
+    # D3D resource/texture functions in XDK D3D; compiled with /Oy (no EBP frame).
+    "rasterizer/xbox/d3d_resource.c": {
+        "D3DTexture_GetLevelDesc": "/O2 /Oy",
+        "D3DTexture_LockRect": "/O2 /Oy",
+        "D3DResource_Register": "/O2 /Oy",
+        "D3DResource_Release": "/O2 /Oy",
+    },
 }
 
 
