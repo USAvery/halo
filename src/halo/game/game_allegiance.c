@@ -11,6 +11,7 @@ void game_allegiance_dispose(void)
 
 void game_allegiance_initialize_for_new_map(void)
 {
+  char *ptr;
   int bit;
   int i;
 
@@ -20,12 +21,14 @@ void game_allegiance_initialize_for_new_map(void)
   csmemset(game_allegiance_globals + 0x94, 0, 0x10);
   csmemset(game_allegiance_globals + 0xa4, 0, 0x10);
 
+  ptr = game_allegiance_globals;
   bit = 0;
-  for (i = 0; i < 10; i++) {
-    *(uint32_t *)(game_allegiance_globals + 0xa4 + (bit >> 5) * 4) |=
+  i = 10;
+  do {
+    *(uint32_t *)(ptr + 0xa4 + (bit >> 5) * 4) |=
       1 << (bit & 0x1f);
     bit += 11;
-  }
+  } while (--i);
 }
 
 void game_allegiance_dispose_from_old_map(void)

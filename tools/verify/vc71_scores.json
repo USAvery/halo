@@ -60901,16 +60901,16 @@
     "game_allegiance_initialize_for_new_map": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 52.0,
+      "abi_modeled_mnemonic_pct": 93.1,
       "addr": "0xa7980",
       "end": "0xa7a18",
       "kind": "auto",
       "n_r": 51,
-      "opnd_percent": 34.0,
-      "raw_mnemonic_pct": 52.0,
+      "opnd_percent": 81.2,
+      "raw_mnemonic_pct": 93.1,
       "ref": "synth",
       "ref_sha": "70dcf0d720c44d50",
-      "score": 52.0,
+      "score": 93.1,
       "source": "src/halo/game/game_allegiance.c"
     },
     "game_allegiance_notify_change": {
