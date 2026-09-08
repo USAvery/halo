@@ -57286,16 +57286,16 @@
     "d3d_find_flipcount": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 44.7,
+      "abi_modeled_mnemonic_pct": 55.3,
       "addr": "0x1cf880",
       "end": "0x1cf8fc",
       "kind": "auto",
       "n_r": 40,
-      "opnd_percent": 44.7,
-      "raw_mnemonic_pct": 44.7,
+      "opnd_percent": 47.4,
+      "raw_mnemonic_pct": 55.3,
       "ref": "synth",
       "ref_sha": "d9a1581df170249b",
-      "score": 44.7,
+      "score": 55.3,
       "source": "src/halo/main/d3d_intimacy.c"
     },
     "damage_data_new": {
