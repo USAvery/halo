@@ -22501,16 +22501,16 @@
     "FUN_000c7b10": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 47.4,
+      "abi_modeled_mnemonic_pct": 94.8,
       "addr": "0xc7b10",
       "end": "0xc7bd2",
       "kind": "auto",
       "n_r": 75,
-      "opnd_percent": 43.6,
-      "raw_mnemonic_pct": 47.4,
+      "opnd_percent": 87.0,
+      "raw_mnemonic_pct": 94.8,
       "ref": "synth",
       "ref_sha": "7295c3ef162da750",
-      "score": 47.4,
+      "score": 94.8,
       "source": "src/halo/hs/hs_compile.c"
     },
     "FUN_000c7be0": {

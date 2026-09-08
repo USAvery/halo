@@ -1689,44 +1689,42 @@ void FUN_000c7b10(int datum_index)
   char *node;
   char *node2;
   int16_t type;
+  void *fn_desc;
+  int child;
+  int str_offset;
 
   node = (char *)datum_get(*(data_t **)0x5aa6c8, datum_index);
   *(uint8_t *)(node + 0x6) |= 0x8;
 
   /* Re-read the node flags to test bit 0 (function vs expression). */
   node2 = (char *)datum_get(*(data_t **)0x5aa6c8, datum_index);
-  if (!(*(uint8_t *)(node2 + 0x6) & 0x1)) {
+  if (*(uint8_t *)(node2 + 0x6) & 0x1) {
+    /* Function node: re-intern the string constant for recompilation. */
+    type = *(int16_t *)(node + 0x4);
+    if (type == 2) {
+      str_offset = *(int *)(node + 0xc);
+      if (str_offset != -1) {
+        *(int *)(node + 0xc) = FUN_000c6a70((char *)(str_offset + *(int *)0x46b6e8));
+        return;
+      }
+      fn_desc = hs_function_table_get((int16_t)*(uint16_t *)(node + 0x2));
+      *(int *)(node + 0xc) = FUN_000c6a70(*(char **)((char *)fn_desc + 0x4));
+      return;
+    }
+
+    if ((*(uint8_t *)(node + 0x6) & 0x4) || type >= 9) {
+      *(int *)(node + 0xc) = FUN_000c6a70((char *)(*(int *)(node + 0xc) + *(int *)0x46b6e8));
+      return;
+    }
+  } else {
     /* Non-function node: recurse into children. */
-    int child = *(int *)(node + 0x10);
+    child = *(int *)(node + 0x10);
     while (child != -1) {
       char *child_node;
       FUN_000c7b10(child);
       child_node = (char *)datum_get(*(data_t **)0x5aa6c8, child);
       child = *(int *)(child_node + 0x8);
     }
-    return;
-  }
-
-  /* Function node: re-intern the string constant for recompilation. */
-  type = *(int16_t *)(node + 0x4);
-  if (type == 2) {
-    int str_offset = *(int *)(node + 0xc);
-    char *str_ptr;
-    if (str_offset == -1) {
-      /* No string interned yet: look up function name from descriptor. */
-      void *fn_desc =
-        hs_function_table_get((int16_t) * (uint16_t *)(node + 0x2));
-      str_ptr = *(char **)((char *)fn_desc + 0x4);
-    } else {
-      str_ptr = (char *)(str_offset + *(int *)0x46b6e8);
-    }
-    *(int *)(node + 0xc) = FUN_000c6a70(str_ptr);
-    return;
-  }
-
-  if ((*(uint8_t *)(node + 0x6) & 0x4) || type >= 9) {
-    char *str_ptr = (char *)(*(int *)(node + 0xc) + *(int *)0x46b6e8);
-    *(int *)(node + 0xc) = FUN_000c6a70(str_ptr);
   }
 }
 
