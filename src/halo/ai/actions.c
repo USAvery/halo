@@ -1774,26 +1774,22 @@ char actor_action_set_default_state(int actor_handle, short state)
 {
   char *actor;
   int game_time;
-  int switch_val;
   short local_88[66];
-  char result;
+  register char result = 0;
 
   actor = (char *)datum_get(actor_data, actor_handle);
   game_time = game_time_get();
-  result = 0;
 
   /* Throttle: if state == -1 and we have a valid timestamp, skip if within
    * cooldown */
   if (state == (short)-1 && ((actor_t *)actor)->field_064 != -1 &&
       ((actor_t *)actor)->field_064 + 0x2d >= game_time) {
-    return 0;
+    goto done;
   }
 
   ((actor_t *)actor)->field_064 = game_time;
 
-  if (state != (short)-1) {
-    /* state already specified, skip fallback resolution */
-  } else {
+  if (state == (short)-1) {
     /* Resolve fallback state from actor fields */
     if (*(unsigned short *)(actor + 0x60) != 0xffff) {
       state = ((actor_t *)actor)->field_060;
@@ -1806,23 +1802,7 @@ char actor_action_set_default_state(int actor_handle, short state)
     }
   }
 
-  switch_val = (int)state;
-
-  switch (switch_val) {
-  case 0:
-  case 2:
-  case 3:
-  case 4:
-  case 5:
-  case 6:
-  case 7:
-    if (((actor_t *)actor)->state_action == _actor_action_alert &&
-        *(short *)(actor + 0x9c) == *(short *)(0x2542e8 + switch_val * 2))
-      break;
-    if (FUN_00012000(actor_handle, (int)*(short *)(0x2542e8 + switch_val * 2),
-                     -1, (int)local_88))
-      goto action_change_2;
-    break;
+  switch (state) {
   case 1:
     if (((actor_t *)actor)->field_06a != 1) {
       ((actor_t *)actor)->field_06a = 1;
@@ -1831,40 +1811,45 @@ char actor_action_set_default_state(int actor_handle, short state)
       return result;
     }
     break;
+
   case 8:
     if ((((actor_t *)actor)->state_action != _actor_action_guard ||
          ((actor_t *)actor)->field_0c0 != 1) &&
-        FUN_00015880(actor_handle, (char *)local_88)) {
+        (char)FUN_00015880(actor_handle, (char *)local_88)) {
       actor_action_change(actor_handle, 6, (int)local_88);
       result = 1;
       return result;
     }
     break;
+
   case 9:
-    if (((actor_t *)actor)->state_action == _actor_action_guard) {
-      if (((actor_t *)actor)->field_0c0 != 3)
-        ((actor_t *)actor)->field_0aa = 1;
-    } else {
-      if (FUN_00015900(actor_handle, 0, (char *)local_88)) {
+    if (((actor_t *)actor)->state_action != _actor_action_guard) {
+      if ((char)FUN_00015900(actor_handle, 0, (char *)local_88)) {
         actor_action_change(actor_handle, 6, (int)local_88);
         result = 1;
         return result;
       }
+      break;
+    }
+    if (((actor_t *)actor)->field_0c0 != 3) {
+      ((actor_t *)actor)->field_0aa = 1;
     }
     break;
+
   case 10:
     if (actor_get_action_priority_flag(actor_handle) != 3) {
       ((actor_t *)actor)->field_06a = 3;
       ((actor_t *)actor)->field_072 = 2;
       ((actor_t *)actor)->field_06e = 2;
       if (!actor_action_handle_lost_contact(actor_handle) &&
-          FUN_00015880(actor_handle, (char *)local_88)) {
+          (char)FUN_00015880(actor_handle, (char *)local_88)) {
         actor_action_change(actor_handle, 6, (int)local_88);
         result = 1;
         return result;
       }
     }
     break;
+
   case 11:
     if (((actor_t *)actor)->state_action != _actor_action_flee) {
       if (FUN_00015040(actor_handle, 0xd, -1, 1, 0, 0, (short *)local_88)) {
@@ -1873,12 +1858,27 @@ char actor_action_set_default_state(int actor_handle, short state)
         return result;
       }
       if (((actor_t *)actor)->state_action != _actor_action_guard &&
-          FUN_00015880(actor_handle, (char *)local_88)) {
+          (char)FUN_00015880(actor_handle, (char *)local_88)) {
         actor_action_change(actor_handle, 6, (int)local_88);
         result = 1;
         return result;
       }
     }
+    break;
+
+  case 0:
+  case 2:
+  case 3:
+  case 4:
+  case 5:
+  case 6:
+  case 7:
+    if (((actor_t *)actor)->state_action == _actor_action_alert &&
+        *(short *)(actor + 0x9c) == *(short *)(0x2542e8 + (int)state * 2))
+      break;
+    if (FUN_00012000(actor_handle, (int)*(short *)(0x2542e8 + (int)state * 2),
+                     -1, (int)local_88))
+      goto action_change_2;
     break;
   }
 
@@ -1890,6 +1890,7 @@ char actor_action_set_default_state(int actor_handle, short state)
     result = 1;
   }
 
+done:
   return result;
 }
 

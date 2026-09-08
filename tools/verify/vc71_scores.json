@@ -48586,16 +48586,16 @@
     "actor_action_set_default_state": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 50.3,
+      "abi_modeled_mnemonic_pct": 85.5,
       "addr": "0x1d7c0",
-      "end": "0x1d938",
+      "end": "0x1da6e",
       "kind": "auto",
-      "n_r": 140,
-      "opnd_percent": 43.5,
-      "raw_mnemonic_pct": 50.3,
+      "n_r": 243,
+      "opnd_percent": 34.8,
+      "raw_mnemonic_pct": 85.5,
       "ref": "synth",
-      "ref_sha": "d3cf05db4134a0c0",
-      "score": 50.3,
+      "ref_sha": "45a9bf901ce51346",
+      "score": 85.5,
       "source": "src/halo/ai/actions.c"
     },
     "actor_action_test_grenade": {
