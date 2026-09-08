@@ -332,8 +332,8 @@ void transport_initialize(void)
 void transport_dispose(void)
 {
   if (*(uint8_t *)0x335090 != 0) {
-    ((void (*)(void))0x2232f5)();
-    ((void (*)(void))0x2232ed)();
+    FUN_002232f5();
+    FUN_002232ed();
     *(uint8_t *)0x335090 = 0;
   }
 }

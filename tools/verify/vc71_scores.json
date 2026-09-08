@@ -86011,16 +86011,16 @@
     "transport_dispose": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 43.5,
+      "abi_modeled_mnemonic_pct": 66.7,
       "addr": "0x822d0",
       "end": "0x822f9",
       "kind": "auto",
       "n_r": 14,
-      "opnd_percent": 43.5,
-      "raw_mnemonic_pct": 43.5,
+      "opnd_percent": 66.7,
+      "raw_mnemonic_pct": 66.7,
       "ref": "synth",
       "ref_sha": "d2771c1e2dd34e2a",
-      "score": 43.5,
+      "score": 66.7,
       "source": "src/halo/bungie_net/network/transport_endpoint_set_winsock.c"
     },
     "transport_get_key": {
