@@ -8934,6 +8934,62 @@
    "metadata": {
     "source_path": "src/halo/networking/network_game_manager.c"
    }
+  },
+  {
+   "name": "halo/network_client_manager_FUN_00126140",
+   "target_path": "build/CMakeFiles/halo.dir/src/halo/networking/network_client_manager.c.obj",
+   "base_path": "delinked/network_client_manager_FUN_00126140.obj",
+   "metadata": {
+    "source_path": "src/halo/networking/network_client_manager.c"
+   }
+  },
+  {
+   "name": "halo/network_client_manager_FUN_001251e0",
+   "target_path": "build/CMakeFiles/halo.dir/src/halo/networking/network_client_manager.c.obj",
+   "base_path": "delinked/network_client_manager_FUN_001251e0.obj",
+   "metadata": {
+    "source_path": "src/halo/networking/network_client_manager.c"
+   }
+  },
+  {
+   "name": "halo/network_client_manager_FUN_00125380",
+   "target_path": "build/CMakeFiles/halo.dir/src/halo/networking/network_client_manager.c.obj",
+   "base_path": "delinked/network_client_manager_FUN_00125380.obj",
+   "metadata": {
+    "source_path": "src/halo/networking/network_client_manager.c"
+   }
+  },
+  {
+   "name": "halo/network_client_manager_FUN_001268a0",
+   "target_path": "build/CMakeFiles/halo.dir/src/halo/networking/network_client_manager.c.obj",
+   "base_path": "delinked/network_client_manager_FUN_001268a0.obj",
+   "metadata": {
+    "source_path": "halo/networking/network_client_manager.c"
+   }
+  },
+  {
+   "name": "halo/network_client_manager_FUN_001263a0",
+   "target_path": "build/CMakeFiles/halo.dir/src/halo/networking/network_client_manager.c.obj",
+   "base_path": "delinked/network_client_manager_FUN_001263a0.obj",
+   "metadata": {
+    "source_path": "src/halo/networking/network_client_manager.c"
+   }
+  },
+  {
+   "name": "halo/network_client_manager_FUN_00125ce0",
+   "target_path": "build/CMakeFiles/halo.dir/src/halo/networking/network_client_manager.c.obj",
+   "base_path": "delinked/network_client_manager_FUN_00125ce0.obj",
+   "metadata": {
+    "source_path": "src/halo/networking/network_client_manager.c"
+   }
+  },
+  {
+   "name": "halo/network_client_manager_FUN_001258a0",
+   "target_path": "build/CMakeFiles/halo.dir/src/halo/networking/network_client_manager.c.obj",
+   "base_path": "delinked/network_client_manager_FUN_001258a0.obj",
+   "metadata": {
+    "source_path": "src/halo/networking/network_client_manager.c"
+   }
   }
  ]
 }

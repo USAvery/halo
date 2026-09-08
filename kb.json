@@ -14563,7 +14563,9 @@
     },
     {
      "addr": "0x1268a0",
-     "decl": "bool FUN_001268a0(void *server /* @<eax> */);"
+     "decl": "bool network_game_client_idle_searching(void *server /* @<eax> */);",
+     "name": "network_game_client_idle_searching",
+     "ported": true
     },
     {
      "addr": "0x126b60",
@@ -14663,11 +14665,15 @@
     },
     {
      "addr": "0x1251e0",
-     "decl": "char network_game_client_game_has_started(void *client);"
+     "decl": "char network_game_client_game_has_started(void *client);",
+     "name": "network_game_client_game_has_started",
+     "ported": true
     },
     {
      "addr": "0x125380",
-     "decl": "char network_game_client_handle_game_update(void *client, void *message);"
+     "decl": "char network_game_client_handle_game_update(void *client, void *message);",
+     "name": "network_game_client_handle_game_update",
+     "ported": true
     },
     {
      "addr": "0x125510",
@@ -14690,7 +14696,8 @@
     {
      "addr": "0x1258a0",
      "decl": "bool network_game_client_add_player(void *client, uint16_t player_index);",
-     "name": "network_game_client_add_player"
+     "name": "network_game_client_add_player",
+     "ported": true
     },
     {
      "addr": "0x125a90",
@@ -14714,7 +14721,8 @@
     },
     {
      "addr": "0x125ce0",
-     "decl": "void FUN_00125ce0(void *message_packet @<edi>, void *param_1);"
+     "decl": "void FUN_00125ce0(void *message_packet @<edi>, void *advertised_games);",
+     "ported": true
     },
     {
      "addr": "0x125fb0",
@@ -14724,11 +14732,14 @@
     },
     {
      "addr": "0x126140",
-     "decl": "void network_game_client_leave_game(void);"
+     "decl": "bool network_game_client_leave_game(void *client);",
+     "name": "network_game_client_leave_game",
+     "ported": true
     },
     {
      "addr": "0x1263a0",
-     "decl": "char network_game_client_request_remove_player(void *client, void *record);"
+     "decl": "char network_game_client_request_remove_player(void *client, void *record);",
+     "ported": true
     },
     {
      "addr": "0x126590",

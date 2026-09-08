@@ -12450,6 +12450,14 @@
       "kind": "function",
       "status": "ported"
     },
+    "0x1251e0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x125380": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0x125510": {
       "kind": "function",
       "status": "ported"
@@ -12499,6 +12507,10 @@
       "status": "ported"
     },
     "0x125cb0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x126140": {
       "kind": "function",
       "status": "ported"
     },
