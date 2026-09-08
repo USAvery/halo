@@ -14643,7 +14643,8 @@
     },
     {
      "addr": "0x124e90",
-     "decl": "void network_game_client_ponged(void);"
+     "decl": "void network_game_client_ponged(void *client, void *source_address, unsigned int echo_time);",
+     "ported": true
     },
     {
      "addr": "0x124f40",
@@ -14763,31 +14764,38 @@
     },
     {
      "addr": "0x127260",
-     "decl": "char FUN_00127260(void *client @<esi>, void *message, int message_size, void *source_address);"
+     "decl": "char FUN_00127260(void *client @<esi>, void *message, int message_size, void *source_address);",
+     "ported": true
     },
     {
      "addr": "0x127310",
-     "decl": "char FUN_00127310(void *client @<esi>, void *message, int message_size, void *source_address);"
+     "decl": "char FUN_00127310(void *client @<esi>, void *message, int message_size, void *source_address);",
+     "ported": true
     },
     {
      "addr": "0x1273a0",
-     "decl": "char FUN_001273a0(void *client @<esi>, void *source_address @<edi>, void *message, int message_size);"
+     "decl": "char FUN_001273a0(void *client @<esi>, void *source_address @<edi>, void *message, int message_size);",
+     "ported": true
     },
     {
      "addr": "0x127440",
-     "decl": "char FUN_00127440(void *client @<esi>, void *source_address @<edi>, void *message, int message_size);"
+     "decl": "char FUN_00127440(void *client @<esi>, void *source_address @<edi>, void *message, int message_size);",
+     "ported": true
     },
     {
      "addr": "0x1274e0",
-     "decl": "char FUN_001274E0(void *client @<esi>, void *source_address @<eax>, void *message, int message_size);"
+     "decl": "char FUN_001274E0(void *client @<esi>, void *source_address @<eax>, void *message, int message_size);",
+     "ported": true
     },
     {
      "addr": "0x127610",
-     "decl": "char FUN_00127610(void *client @<esi>, void *source_address @<eax>, void *message, int message_size);"
+     "decl": "char FUN_00127610(void *client @<esi>, void *source_address @<eax>, void *message, int message_size);",
+     "ported": true
     },
     {
      "addr": "0x127710",
-     "decl": "char FUN_00127710(void *client @<esi>, void *source_address @<edi>, void *message, int message_size);"
+     "decl": "char FUN_00127710(void *client @<esi>, void *source_address @<edi>, void *message, int message_size);",
+     "ported": true
     }
    ],
    "name": "network_client_manager.obj",

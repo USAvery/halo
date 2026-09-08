@@ -72,8 +72,14 @@ void network_game_client_keep_alive(void *client)
 
 /* 0x124a30 — Returns the connection state (int16_t at offset 0xca6) and
  * optionally writes elapsed-time percentage into out_param. The time
- * calculation divides (current_ms - stored_ms) * 100 by 120000. */
-int16_t network_game_client_get_state(void *server, void *out_param)
+ * calculation divides (current_ms - stored_ms) * 100 by 120000.
+ *
+ * noinline (VC71 verification only): small enough for clang -O3 to inline
+ * at some call sites (confirmed at FUN_00127260, 0x127260), producing an
+ * inlined NULL-check + assert_halt in the caller where the reference makes
+ * a real CALL. */
+__declspec(noinline) int16_t network_game_client_get_state(void *server,
+                                                           void *out_param)
 {
   unsigned int diff;
 
@@ -351,6 +357,47 @@ void network_game_client_game_out_of_sync(void *client)
       }
     }
     *((char *)client + 0xcac) = 1;
+  }
+}
+
+/* network_game_client_ponged (0x124e90)
+ *
+ * Handles a received pong reply. Asserts client and source_address are
+ * non-null. Ignores the pong unless the client is actively pinging
+ * (flag byte at +0x82a set) and the reply's source machine id (int at
+ * *source_address) matches the client's expected ping target (int at
+ * +0x808). If echo_time (the timestamp echoed back by the remote) is in
+ * the future relative to system_milliseconds(), logs and ignores it
+ * (clock skew / bad data). Otherwise updates a running average round-trip
+ * time at +0x828 (ushort) using the running sample count at +0x826
+ * (ushort, incremented every call): new_avg = (old_avg*old_count -
+ * echo_time + now) / (old_count+1). */
+void network_game_client_ponged(void *client, void *source_address,
+                                unsigned int echo_time)
+{
+  unsigned int now;
+  unsigned short count;
+
+  assert_halt_at("c:\\halo\\SOURCE\\networking\\network_client_manager.c",
+                 0x307, client && source_address);
+
+  if (*(char *)((char *)client + 0x82a) != 0 &&
+      *(int *)((char *)client + 0x808) == *(int *)source_address) {
+    now = system_milliseconds();
+    if (echo_time <= now) {
+      count = *(unsigned short *)((char *)client + 0x826);
+      *(unsigned short *)((char *)client + 0x828) =
+        (unsigned short)((((unsigned int)*(unsigned short *)((char *)client + 0x828) *
+                            (unsigned int)count -
+                          echo_time) +
+                         now) /
+                        (count + 1));
+      *(unsigned short *)((char *)client + 0x826) = count + 1;
+    } else {
+      network_game_log("received a pong from the future");
+    }
+  } else {
+    network_game_log("received a pong from a system we aren't interested in");
   }
 }
 
@@ -1612,4 +1659,320 @@ void FUN_001271a0(void *client, void *source_address, uint16_t rejection_code)
   network_game_log("unable to join game: reason= #%d/%s", rejection_code,
                    reason);
   network_game_client_reset(client, 1);
+}
+
+/* ------------------------------------------------------------------------
+ * FUN_00127260 — handle message_server_game_advertise (type 2).
+ * (client @esi, message, message_size, source_address) -> char.
+ * source_address is never read. Ignores the advertisement unless the client
+ * is actively looking for new games (get_state() == 0). Decodes the packet
+ * (type 2, version 1, flag 1) into a 276-byte stack buffer via
+ * decode_network_game_message() (FUN_0012bce0), then checks the leading
+ * 8 bytes of the decoded buffer against the global transport nonce
+ * (transport_nonce_is_equal_to_global) before forwarding to
+ * network_game_client_new_advertised_game(). Every path returns 1.
+ * Confirmed via disassembly (0x127260-0x127308): PUSH 0x0/PUSH ESI into
+ * get_state(); local dword at EBP-0x8 (=1) and EBP-0x4 (=2) are adjacent,
+ * forming the decompiler's "local_c[4]" — &EBP-0x4 is the type slot,
+ * &EBP-0x8 the version slot, matching sibling decode call sites in this
+ * TU. message_size is decremented and reused in place (no separate local).
+ * ---------------------------------------------------------------------- */
+char FUN_00127260(void *client, void *message, int message_size,
+                  void *source_address)
+{
+  char decoded[276];
+  int packet_type;
+  int packet_version;
+
+  if (network_game_client_get_state(client, (void *)0) == 0) {
+    message_size -= 2;
+    packet_type = 2;
+    packet_version = 1;
+    if (FUN_0012bce0((int)decoded, (int)message + 2, (short *)&message_size,
+                     (short *)&packet_type, (short *)&packet_version, 1)) {
+      if (transport_nonce_is_equal_to_global(decoded, 8)) {
+        network_game_client_new_advertised_game(client, decoded);
+      }
+    } else {
+      network_game_log(
+        "failed to decode a message_server_game_advertise packet");
+    }
+  } else {
+    network_game_log(
+      "ignoring an advertised game because we are not looking for new games");
+  }
+  return 1;
+}
+
+/* ------------------------------------------------------------------------
+ * FUN_00127310 — handle message_server_pong (type 3).
+ * (client @esi, message, message_size, source_address) -> char.
+ * Ignores the pong unless the client is actively listening for them
+ * (get_state() == 0). Decodes the packet (type 3, version 1, flag 1) into
+ * a 4-byte stack buffer (the echoed send timestamp) and forwards it to
+ * network_game_client_ponged() along with source_address. Every path
+ * returns 1.
+ * ---------------------------------------------------------------------- */
+char FUN_00127310(void *client, void *message, int message_size,
+                  void *source_address)
+{
+  char decoded[4];
+  int packet_type;
+  int packet_version;
+
+  if (network_game_client_get_state(client, (void *)0) == 0) {
+    message_size -= 2;
+    packet_type = 3;
+    packet_version = 1;
+    if (FUN_0012bce0((int)decoded, (int)message + 2, (short *)&message_size,
+                     (short *)&packet_type, (short *)&packet_version, 1)) {
+      network_game_client_ponged(client, source_address,
+                                 *(unsigned int *)decoded);
+    } else {
+      network_game_log("failed to decode a message_server_pong packet");
+    }
+  } else {
+    network_game_log(
+      "ignoring a pong message because we are not listening for them");
+  }
+  return 1;
+}
+
+/* ------------------------------------------------------------------------
+ * FUN_001273a0 — handle message_server_machine_accepted (type 4).
+ * (client @esi, source_address @edi, message, message_size) -> char.
+ * Ignores the message unless source_address matches the server we're
+ * addressing (network_game_client_address_matches_server) AND we are
+ * actively awaiting acceptance (get_state() == 1). Decodes the packet
+ * (type 4, version 1, flag 2) into an 8-byte stack buffer (seed dword +
+ * assigned machine index) and forwards it to
+ * network_game_client_accepted_into_game(). Returns 1 only on the accepted
+ * path; every rejection/failure path returns 0.
+ * ---------------------------------------------------------------------- */
+char FUN_001273a0(void *client, void *source_address, void *message,
+                  int message_size)
+{
+  char decoded[8];
+  int packet_type;
+  int packet_version;
+  char result;
+
+  result = 1;
+  if (network_game_client_address_matches_server(client, source_address) &&
+      network_game_client_get_state(client, (void *)0) == 1) {
+    message_size -= 2;
+    packet_type = 4;
+    packet_version = 1;
+    if (FUN_0012bce0((int)decoded, (int)message + 2, (short *)&message_size,
+                     (short *)&packet_type, (short *)&packet_version, 2)) {
+      network_game_client_accepted_into_game(client, source_address, decoded);
+    } else {
+      network_game_log(
+        "failed to decode a message_server_machine_accepted packet");
+      result = 0;
+    }
+  } else {
+    network_game_log(
+      "ignoring a message_server_machine_accepted message; either a bad "
+      "machine or we aren't joining");
+    result = 0;
+  }
+  return result;
+}
+
+/* ------------------------------------------------------------------------
+ * FUN_00127440 — handle message_server_machine_rejected (type 5).
+ * (client @esi, source_address @edi, message, message_size) -> char.
+ * Ignores the message unless source_address matches the server AND we are
+ * actively awaiting acceptance (get_state() == 1). Decodes the packet
+ * (type 5, version 1, flag 2) into a 4-byte stack buffer (rejection code)
+ * and forwards it to FUN_001271a0(). Returns 1 only on the accepted
+ * decode path; every rejection/failure path returns 0.
+ * ---------------------------------------------------------------------- */
+char FUN_00127440(void *client, void *source_address, void *message,
+                  int message_size)
+{
+  char decoded[4];
+  int packet_type;
+  int packet_version;
+  char result;
+
+  result = 1;
+  if (network_game_client_address_matches_server(client, source_address) &&
+      network_game_client_get_state(client, (void *)0) == 1) {
+    message_size -= 2;
+    packet_type = 5;
+    packet_version = 1;
+    if (FUN_0012bce0((int)decoded, (int)message + 2, (short *)&message_size,
+                     (short *)&packet_type, (short *)&packet_version, 2)) {
+      FUN_001271a0(client, source_address, *(unsigned int *)decoded);
+    } else {
+      network_game_log(
+        "failed to decode a message_server_machine_rejected packet");
+      result = 0;
+    }
+  } else {
+    network_game_log(
+      "ignoring a message_server_machine_rejected message; either a bad "
+      "machine or we aren't joining");
+    result = 0;
+  }
+  return result;
+}
+
+/* ------------------------------------------------------------------------
+ * FUN_001274E0 — handle message_server_game_settings_update (type 6).
+ * (client @esi, source_address @eax, message, message_size) -> char.
+ * Asserts client and source_address are non-null (original assert strings
+ * recovered from network_client_message_handler.c, lines 0x169/0x16a —
+ * this handler's asm frame layout doesn't match that TU's other functions,
+ * so it stays here). Ignores the message (returns 1, logged) unless
+ * source_address matches the server AND we are in the pregame state
+ * (get_state() == 2). Decodes the packet (type 6, version 1, flag 2) into
+ * a 1076-byte stack buffer and forwards it to
+ * network_game_client_game_settings_updated(), whose bool result becomes
+ * the return value (logged on failure).
+ * ---------------------------------------------------------------------- */
+char FUN_001274E0(void *client, void *source_address, void *message,
+                  int message_size)
+{
+  char decoded[1076];
+  int packet_type;
+  int packet_version;
+  char result;
+
+  assert_halt_at(
+    "c:\\halo\\SOURCE\\networking\\network_client_message_handler.c", 0x169,
+    client != NULL);
+  assert_halt_at(
+    "c:\\halo\\SOURCE\\networking\\network_client_message_handler.c", 0x16a,
+    source_address != NULL);
+
+  if (network_game_client_address_matches_server(client, source_address)) {
+    if (network_game_client_get_state(client, (void *)0) == 2) {
+      message_size -= 2;
+      packet_type = 6;
+      packet_version = 1;
+      if (FUN_0012bce0((int)decoded, (int)message + 2, (short *)&message_size,
+                       (short *)&packet_type, (short *)&packet_version, 2)) {
+        result = network_game_client_game_settings_updated(client, decoded);
+        if (result == 0) {
+          network_game_log(
+            "network_game_client_game_settings_updated() failed");
+        }
+      } else {
+        network_game_log(
+          "failed to decode a message_server_game_settings_update packet");
+        result = 0;
+      }
+    } else {
+      network_game_log(
+        "failed to handle a message_server_game_settings_update message; "
+        "not in pregame state");
+      result = 1;
+    }
+  } else {
+    network_game_log(
+      "ignoring a message_server_game_settings_update; came from a bad "
+      "machine");
+    result = 1;
+  }
+  return result;
+}
+
+/* ------------------------------------------------------------------------
+ * FUN_00127610 — handle message_server_pregame_countdown (type 7).
+ * (client @esi, source_address @eax, message, message_size) -> char.
+ * Asserts client and source_address are non-null (original assert strings
+ * recovered from network_client_message_handler.c, lines 0x19b/0x19c).
+ * Ignores the message (logged) unless source_address matches the server
+ * AND we are in the pregame state (get_state() == 2). Decodes the packet
+ * (type 7, version 1, flag 2) into a 4-byte stack buffer (the countdown
+ * value) and forwards it to network_game_client_countdown_timer_update().
+ * Every path returns 1.
+ * ---------------------------------------------------------------------- */
+char FUN_00127610(void *client, void *source_address, void *message,
+                  int message_size)
+{
+  char decoded[4];
+  int packet_type;
+  int packet_version;
+
+  assert_halt_at(
+    "c:\\halo\\SOURCE\\networking\\network_client_message_handler.c", 0x19b,
+    client != NULL);
+  assert_halt_at(
+    "c:\\halo\\SOURCE\\networking\\network_client_message_handler.c", 0x19c,
+    source_address != NULL);
+
+  if (network_game_client_address_matches_server(client, source_address)) {
+    if (network_game_client_get_state(client, (void *)0) == 2) {
+      message_size -= 2;
+      packet_type = 7;
+      packet_version = 1;
+      if (FUN_0012bce0((int)decoded, (int)message + 2, (short *)&message_size,
+                       (short *)&packet_type, (short *)&packet_version, 2)) {
+        network_game_client_countdown_timer_update(client,
+                                                   *(unsigned int *)decoded);
+      } else {
+        network_game_log(
+          "failed to decode a message_server_pregame_countdown packet");
+      }
+    } else {
+      network_game_log(
+        "failed to handle a message_server_pregame_countdown message; not "
+        "in pregame state");
+    }
+  } else {
+    network_game_log(
+      "ignoring a message_server_pregame_countdown; came from a bad "
+      "machine");
+  }
+  return 1;
+}
+
+/* ------------------------------------------------------------------------
+ * FUN_00127710 — handle message_server_pregame_keep_alive (type 10).
+ * (client @esi, source_address @edi, message, message_size) -> char.
+ * Asserts client and source_address are non-null (original assert strings
+ * recovered from network_client_message_handler.c, lines 0x1c4/0x1c5).
+ * Ignores the message (logged) unless source_address matches the server
+ * AND we are in the pregame state (get_state() == 2). Decodes the packet
+ * (type 10, version 1, flag 2) into a 4-byte stack buffer that is not
+ * otherwise used — this is a keep-alive ping, the decode call itself is
+ * the only side effect. Every path returns 1.
+ * ---------------------------------------------------------------------- */
+char FUN_00127710(void *client, void *source_address, void *message,
+                  int message_size)
+{
+  char decoded[4];
+  int packet_type;
+  int packet_version;
+
+  assert_halt_at("c:\\halo\\SOURCE\\networking\\network_client_message_handler.c",
+                 0x1c4, client != NULL);
+  assert_halt_at("c:\\halo\\SOURCE\\networking\\network_client_message_handler.c",
+                 0x1c5, source_address != NULL);
+
+  if (network_game_client_address_matches_server(client, source_address)) {
+    if (network_game_client_get_state(client, (void *)0) == 2) {
+      message_size -= 2;
+      packet_type = 10;
+      packet_version = 1;
+      if (!FUN_0012bce0((int)decoded, (int)message + 2, (short *)&message_size,
+                        (short *)&packet_type, (short *)&packet_version, 2)) {
+        network_game_log(
+          "failed to decode a message_server_pregame_keep_alive packet");
+      }
+    } else {
+      network_game_log(
+        "failed to handle a message_server_pregame_keep_alive message; not "
+        "in pregame state");
+    }
+  } else {
+    network_game_log(
+      "ignoring a message_server_pregame_keep_alive; came from a bad "
+      "machine");
+  }
+  return 1;
 }
