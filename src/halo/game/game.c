@@ -1,6 +1,15 @@
 #ifdef HALO_RNG_TRACE
 #include "halo/math/rng_trace.h"
 #endif
+
+/* memset as a compiler intrinsic (not the csmemset helper): the 0xb4490
+ * reference fills flag_indices with an inline store sequence, not a call. */
+extern void *__cdecl memset(void *, int, unsigned int);
+#if defined(_MSC_VER) && !defined(__clang__)
+#pragma intrinsic(memset)
+#else
+#define memset __builtin_memset
+#endif
 #line 1
 void FUN_000a6a80(void)
 {
@@ -745,6 +754,88 @@ wchar_t *FUN_000b42d0(int param_1, wchar_t *dst)
   return dst;
 }
 
+/* FUN_000b4490 (0xb4490) — race engine: place the race flag objects.
+ *
+ * Walks the player table (0x5aa6d4). For each player it fetches the player's
+ * unit (player+0x34, type mask 3) and asks FUN_000b43b0 for the next race
+ * flag index, passing the unit's position (unit+0xc) or NULL and the array of
+ * flags already chosen in this pass. Collection stops after 8 entries or when
+ * FUN_000b43b0 returns -1. Each collected index then names a netgame flag in
+ * the scenario block at scenario+0x378 (0x94-byte elements), and a flag object
+ * is spawned at that flag's position with a facing vector built from the
+ * flag's facing angle. 0x456fdc (cleared by FUN_000b4960) is set to 1 for
+ * every object actually created.
+ *
+ * FUN_000b43b0 signature: two stack pushes at 0xb44f7/0xb4501 (position-or-
+ * NULL, then &flag_indices) and the result is compared against -1 at 0xb450f.
+ *
+ * Source: c:\halo\SOURCE\game\game_engine_race.c */
+void FUN_000b4490(void)
+{
+  char *scenario;
+  char *player;
+  char *unit;
+  char *volatile flags_block;
+  netgame_flag *flag;
+  data_iter_t iter;
+  char placement[0x88];
+  int flag_indices[8];
+  int count;
+  int i;
+  int flag_index;
+  int tag_index;
+
+  scenario = (char *)global_scenario_get();
+
+  flag_indices[0] = -1;
+  memset(&flag_indices[1], 0, 7 * sizeof(int));
+
+  count = 0;
+  data_iterator_new(&iter, player_data);
+  player = (char *)data_iterator_next(&iter);
+  while (player != NULL) {
+    if (*(int *)(player + 0x34) != -1)
+      unit = (char *)object_get_and_verify_type(*(int *)(player + 0x34), 3);
+    else
+      unit = (char *)0;
+
+    if (count == 8)
+      break;
+
+    if (unit != (char *)0)
+      flag_index = FUN_000b43b0(unit + 0xc, flag_indices);
+    else
+      flag_index = FUN_000b43b0((void *)0, flag_indices);
+
+    if (flag_index == -1)
+      break;
+
+    flag_indices[count] = flag_index;
+    count++;
+    player = (char *)data_iterator_next(&iter);
+  }
+
+  i = 0;
+  if (count > 0) {
+    flags_block = scenario + 0x378;
+    do {
+      flag = (netgame_flag *)tag_block_get_element(flags_block, flag_indices[i],
+                                                   0x94);
+      tag_index = FUN_000b3770(i);
+      if (tag_index != -1) {
+        object_placement_data_new(placement, tag_index, -1);
+        *(int *)(placement + 0x18) = *(int *)&flag->position_x;
+        *(int *)(placement + 0x1c) = *(int *)&flag->position_y;
+        *(int *)(placement + 0x20) = *(int *)&flag->position_z;
+        vector3d_from_angle((float *)(placement + 0x34), flag->facing);
+        object_new(placement);
+        *(char *)0x456fdc = 1;
+      }
+      i++;
+    } while (i < count);
+  }
+}
+
 /* FUN_000b45c0 (0xb45c0) — race engine: pick random flag.
  *
  * Counts the number of valid race flags from the bitmask at 0x456f10.
@@ -1125,19 +1216,19 @@ have_target:
  * player+0x20 (team),
  *   and 0xb50a4: MOV ECX,[ESI*4+0x457020] with ESI =
  * handle & 0xffff — the
- *   same two score tables FUN_000b4da0 / FUN_000b4df0
- * read.
- * Confirmed 0xb50bd: PUSH EDI / PUSH ECX / PUSH 0x26dd64 / PUSH 0x80
- * /
- *   PUSH EDX(local buffer) / CALL 0x19e9f0, ADD ESP,0x24; the 128-wchar
- *
- * local (SUB ESP,0x100) is formatted but never read afterwards — kept
- *
+ *   same two score tables FUN_000b4da0 /
+ * FUN_000b4df0 read.
+ * Confirmed 0xb50bd: PUSH EDI / PUSH ECX / PUSH 0x26dd64
+ * / PUSH 0x80 /
+ *   PUSH EDX(local buffer) / CALL 0x19e9f0, ADD ESP,0x24; the
+ * 128-wchar
+ * local (SUB ESP,0x100) is formatted but never read afterwards —
+ * kept
  * because the call order and side effects must be preserved.
- * Confirmed
- * 0xb50f1: the variant+0x1c == 0 arm uses the shared format at
- *   0x26c118
- * with only the 0x457020 score.
+ *
+ * Confirmed 0xb50f1: the variant+0x1c == 0 arm uses the shared format at
+ *
+ * 0x26c118 with only the 0x457020 score.
  * Confirmed 0xb5104/0xb511d:
  * datum_get(player_data, target_handle), then
  *   PUSH EAX+4 / PUSH 0x26dd48 /

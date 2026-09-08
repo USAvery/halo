@@ -8070,11 +8070,12 @@
     },
     {
      "addr": "0xb43b0",
-     "decl": "void FUN_000b43b0(void);"
+     "decl": "int FUN_000b43b0(void *param_1, int *param_2);"
     },
     {
      "addr": "0xb4490",
-     "decl": "void FUN_000b4490(void);"
+     "decl": "void FUN_000b4490(void);",
+     "ported": true
     },
     {
      "addr": "0xb45c0",
