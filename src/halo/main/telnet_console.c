@@ -60,55 +60,39 @@
  */
 void telnet_console_initialize(void)
 {
-  int16_t result;
   int *ep;
 
-  /* Transport address struct (0x18 bytes).  Layout inferred from bind_endpoint
-   * internals: ip at [+0], unknown word at [+0x10], port (host order) at
-   * [+0x12].  All other bytes are zero (INADDR_ANY, no options). */
-  struct {
-    uint32_t ip; /* [+0x00] INADDR_ANY = 0 */
-    uint8_t pad[0x10]; /* [+0x04..+0x0f] zeroed */
-    uint16_t unk_10; /* [+0x10] = 0x0004 (observed, unknown field) */
-    uint16_t port; /* [+0x12] = 23 (telnet), host byte order */
-    uint32_t pad2; /* [+0x14] = 0 */
-  } addr;
-
-  /* Zero the globals block before populating it. */
   csmemset((void *)0x46eee0, 0, 0x8c);
 
-  /* Allocate a TCP endpoint. */
-  ep = ((int *(*)(int))0x82d70)(TRANSPORT_TYPE_TCP);
-  if (ep == 0) {
-    error(2, "create_transport_endpoint() failed on telnet console endpoint");
-    return;
-  }
+  ep = (int *)get_next_endpoint_from_set(TRANSPORT_TYPE_TCP);
   tc_listening_ep = ep;
+  if (ep != NULL) {
+    struct {
+      uint32_t address[4];
+      uint16_t address_length;
+      uint16_t port;
+      uint32_t pad;
+    } addr = {0};
 
-  /* Build the bind address: INADDR_ANY on port 23. */
-  csmemset(&addr, 0, sizeof(addr));
-  addr.unk_10 = 0x0004;
-  addr.port = 0x0017; /* 23 decimal = telnet */
+    addr.address_length = 4;
+    addr.port = 0x0017;
 
-  result = ((int16_t(*)(int *, void *))0x83ce0)(ep, &addr);
-  if (result != 0) {
-    error(2, "bind_endpoint() failed on telnet console endpoint");
-    goto fail;
+    if (FUN_00083ce0(ep, &addr) == 0) {
+      if (FUN_000843a0((int)tc_listening_ep) == 0) {
+        tc_initialized = 1;
+        return;
+      }
+      error(2, "listen_endpoint() failed on telnet console endpoint");
+      destroy_endpoint(tc_listening_ep);
+      tc_listening_ep = 0;
+    } else {
+      error(2, "bind_endpoint() failed on telnet console endpoint");
+      destroy_endpoint(tc_listening_ep);
+      tc_listening_ep = 0;
+    }
+  } else {
+    error(2, "create_transport_endpoint() failed on telnet console endpoint");
   }
-
-  result = ((int16_t(*)(int *))0x843a0)(ep);
-  if (result != 0) {
-    error(2, "listen_endpoint() failed on telnet console endpoint");
-    goto fail;
-  }
-
-  /* Mark subsystem active. */
-  tc_initialized = 1;
-  return;
-
-fail:
-  ((void (*)(int *))0x848c0)(ep);
-  tc_listening_ep = 0;
 }
 
 /*
