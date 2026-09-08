@@ -255,12 +255,14 @@ int __stdcall FUN_000e1f20(void *device, uint32_t reg, float a, float b,
  */
 void progress_bar_set_quad_texcoords(float u, float v)
 {
-  float margin = *(float *)0x31a00c;
-
-  D3DDevice_SetVertexData2f(9, u - margin, v + margin);
-  D3DDevice_SetVertexData2f(10, u - margin, v - margin);
-  D3DDevice_SetVertexData2f(11, u + margin, v - margin);
-  D3DDevice_SetVertexData2f(12, u + margin, v + margin);
+  D3DDevice_SetVertexData2f(9, u - *(const float *)0x31a00c,
+                            *(const float *)0x31a00c + v);
+  D3DDevice_SetVertexData2f(10, u - *(const float *)0x31a00c,
+                            v - *(const float *)0x31a00c);
+  D3DDevice_SetVertexData2f(11, *(const float *)0x31a00c + u,
+                            v - *(const float *)0x31a00c);
+  D3DDevice_SetVertexData2f(12, *(const float *)0x31a00c + u,
+                            *(const float *)0x31a00c + v);
 }
 
 /*

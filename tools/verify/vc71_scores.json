@@ -77671,16 +77671,16 @@
     "progress_bar_set_quad_texcoords": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 53.5,
+      "abi_modeled_mnemonic_pct": 100.0,
       "addr": "0xe1fa0",
       "end": "0xe2031",
       "kind": "auto",
       "n_r": 40,
-      "opnd_percent": 39.5,
-      "raw_mnemonic_pct": 53.5,
+      "opnd_percent": 80.0,
+      "raw_mnemonic_pct": 100.0,
       "ref": "synth",
       "ref_sha": "cf892e8eeea126d0",
-      "score": 53.5,
+      "score": 100.0,
       "source": "src/halo/interface/progress_bar.c"
     },
     "project_point2d": {
