@@ -624,6 +624,114 @@ done_vision:
          local_c;
 }
 
+/* actor_situation_update_target_status (0x300b0)
+ * Recompute the actor's cached target status word (+0x268), the auxiliary
+ * dword at +0x26c, and the visibility byte at +0x27c from the current target
+ * prop's state.
+ *
+ * With no target (target_target_prop_index == -1) the three fields are reset
+ * (status 0, +0x26c = -1, +0x27c = 0) and the function returns.
+ *
+ * object_get_and_verify_type(prop->field_18, 3) is called BEFORE the
+ * "target_prop->enemy" assert at line 0x10c3 (CALL 0x30106, TEST at 0x30114)
+ * and its result is only consumed on the non-2/3 tail; the call order is
+ * preserved deliberately.
+ *
+ * The status is a switch on the int16 at prop+0x24 (0..5, default asserts with
+ * a NULL reason at line 0x110a).
+ *
+ * Case 2/3 tail (0x301bd): CMP byte [ESI+0x122],2 / JG selects 8; otherwise
+ * FLD [ESI+0x11c] / FCOMP [0x254640] / TEST AH,5 / JP selects 8 when the field
+ * is >= the constant (the parity branch is taken when C0 and C2 are both
+ * clear), else 9.
+ *
+ * Case 5 (0x301f8) is NEG AL / SBB EAX,EAX / ADD EAX,4, i.e. 4 minus a bool;
+ * case 4 (0x30207) is SETNZ / ADD EAX,5.
+ *
+ * Tail: when prop+0x24 is in [2,3] the visibility byte is (prop[0x127] == 0)
+ * and, if prop's int16 at +0x32 is > 0, +0x26c takes prop's dword at +0x8c
+ * and the function returns early. Otherwise the byte is
+ * ~(object[0xb6] >> 2) & 1.
+ * Assertion: "target_prop->enemy" at line 0x10c3. */
+void actor_situation_update_target_status(int actor_handle)
+{
+  actor_t *actor;
+  char *prop;
+  char *object;
+  short status;
+
+  actor = (actor_t *)datum_get(actor_data, actor_handle);
+  if (actor->target_target_prop_index == -1) {
+    actor->target_target_type = 0;
+    actor->field_26c = -1;
+    actor->field_27c = 0;
+    return;
+  }
+
+  prop = (char *)datum_get(prop_data, actor->target_target_prop_index);
+  object = (char *)object_get_and_verify_type(*(int *)(prop + 0x18), 3);
+  if (*(char *)(prop + 0x60) == 0) {
+    display_assert("target_prop->enemy",
+                   "c:\\halo\\SOURCE\\ai\\actor_perception.c", 0x10c3, true);
+    system_exit(-1);
+  }
+
+  switch (*(short *)(prop + 0x24)) {
+  case 0:
+    status = 0;
+    actor->target_target_prop_index = -1;
+    actor->field_26c = -1;
+    break;
+  case 1:
+    status = 1;
+    break;
+  case 2:
+  case 3:
+    if (*(char *)(prop + 0x127) != 0) {
+      status = 2;
+    } else if (*(char *)(prop + 0x74) != 0) {
+      status = 11;
+    } else if (*(short *)(prop + 0x32) >= 2) {
+      status = 10;
+    } else if (*(short *)(prop + 0x38) != 0 && *(short *)(prop + 0x38) != 1) {
+      status = 7;
+    } else if (*(char *)(prop + 0x122) > 2 ||
+               *(float *)(prop + 0x11c) >= *(float *)0x254640) {
+      status = 8;
+    } else {
+      status = 9;
+    }
+    break;
+  case 4:
+    status = (short)(5 + (*(char *)(prop + 0xb8) != 0));
+    break;
+  case 5:
+    if (*(char *)(prop + 0x127) != 0) {
+      status = 2;
+    } else {
+      status = (short)(4 - (*(char *)(prop + 0xbb) != 0));
+    }
+    break;
+  default:
+    display_assert((const char *)0, "c:\\halo\\SOURCE\\ai\\actor_perception.c",
+                   0x110a, true);
+    system_exit(-1);
+    status = 0;
+    break;
+  }
+
+  actor->target_target_type = status;
+  if (*(short *)(prop + 0x24) >= 2 && *(short *)(prop + 0x24) <= 3) {
+    actor->field_27c = (char)(*(char *)(prop + 0x127) == 0);
+    if (*(short *)(prop + 0x32) > 0) {
+      actor->field_26c = *(int *)(prop + 0x8c);
+      return;
+    }
+  } else {
+    actor->field_27c = (char)(~(*(unsigned char *)(object + 0xb6) >> 2) & 1);
+  }
+}
+
 /* actor_situation_try_new_target (0x308e0)
  * Score prop `target` for `actor_handle` and adopt it as the actor's combat
  * target when it beats the currently-held target.

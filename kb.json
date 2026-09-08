@@ -386,7 +386,7 @@
   "decl": "void FUN_000300b0(int actor_handle);",
   "name": "FUN_000300b0",
   "obj": "actor_perception.obj",
-  "ported": false
+  "ported": true
  },
  "0x302b0": {
   "decl": "void FUN_000302b0(int actor_handle);",
@@ -33635,7 +33635,10 @@
     },
     {
      "addr": "0x300b0",
-     "decl": "void actor_situation_update_target_status(int actor_handle);"
+     "decl": "void actor_situation_update_target_status(int actor_handle);",
+     "ported": true,
+     "source": "src/halo/ai/actor_perception.c",
+     "status": "ported"
     },
     {
      "addr": "0x302b0",
