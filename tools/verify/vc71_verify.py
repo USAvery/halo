@@ -1486,6 +1486,8 @@ _PER_FUNCTION_OPT: dict[str, dict[str, str]] = {
     # 100% at /Oy- so this must stay per-function, not a TU-wide flip.
     # 83.7% (/O1 /Oy-) -> ~90% (/O1 /Oy).
     "cseries/xbox_crt.c": {"crt_tolower": "/O1 /Oy", "crt_toupper": "/O1 /Oy"},
+    # FUN_000dc800: leaf switch table with register parameter; reference has NO EBP frame.
+    "halo/interface/event_manager.c": {"FUN_000dc800": "/O2 /Oy"},
 }
 
 

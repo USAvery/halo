@@ -761,10 +761,10 @@ int16_t FUN_000dc800(int event)
     return 4;
   case 15:
     return 1;
-  case 16:
-    return 23;
   case 17:
     return 20;
+  case 16:
+    return 23;
   default:
     return -1;
   }
