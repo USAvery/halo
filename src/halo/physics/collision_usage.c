@@ -579,7 +579,8 @@ void collision_log_end_period(void)
   int16_t period = *(int16_t *)0x325058;
   if (period < 0 || period >= 3) {
     display_assert(
-      "(collision_usage_current_period >= 0) && (collision_usage_current_period < NUMBER_OF_COLLISION_TIME_PERIODS)",
+      "(collision_usage_current_period >= 0) && "
+      "(collision_usage_current_period < NUMBER_OF_COLLISION_TIME_PERIODS)",
       "c:\\halo\\SOURCE\\physics\\collision_usage.c", 0xc6, 1);
     system_exit(-1);
   }
@@ -671,7 +672,8 @@ void collision_log_render(void)
             int p_off2 = 0;
             int p_left = 3;
             int *p_total_calls = (int *)(user_stats + (int)u * 0x48 + 8);
-            int64_t *p_total_time = (int64_t *)(user_stats + (int)u * 0x48 + 0x10);
+            int64_t *p_total_time =
+              (int64_t *)(user_stats + (int)u * 0x48 + 0x10);
             int *p_period_calls = (int *)(user_stats + (int)u * 0x48 + 0x18);
             int64_t *p_tot_period_time = (int64_t *)(total_stats + 0x20);
 
@@ -711,14 +713,16 @@ void collision_log_render(void)
           do {
             short u_idx = *(int16_t *)p_user_elem;
             if (u_idx < 0 || u_idx > 0x15) {
-              display_assert(
-                "(user_index >= 0) && (user_index < NUMBER_OF_COLLISION_USER_TYPES)",
-                "c:\\halo\\SOURCE\\physics\\collision_usage.c", 0x156, 1);
+              display_assert("(user_index >= 0) && (user_index < "
+                             "NUMBER_OF_COLLISION_USER_TYPES)",
+                             "c:\\halo\\SOURCE\\physics\\collision_usage.c",
+                             0x156, 1);
               system_exit(-1);
             }
             if (*(int *)(p_user_elem + 8) > 0) {
               char user_buf[512];
-              snprintf(user_buf, 0x200, " %s", *(char **)(0x324ff8 + (int)u_idx * 4));
+              snprintf(user_buf, 0x200, " %s",
+                       *(char **)(0x324ff8 + (int)u_idx * 4));
               if (*(char *)0x4761d1 != '\0') {
                 short p = 0;
                 char *p_pstat = p_user_elem + 0x18;
@@ -728,12 +732,14 @@ void collision_log_render(void)
                     int64_t freq;
                     QueryPerformanceFrequency(&freq);
                     crt_sprintf(stat_buf, "%d/%.2f", *(int *)p_pstat,
-                                (double)((float)*(int64_t *)(p_pstat + 8) * *(float *)0x254cb8 / (float)freq));
+                                (double)((float)*(int64_t *)(p_pstat + 8) *
+                                         *(float *)0x254cb8 / (float)freq));
                   } else {
                     crt_sprintf(stat_buf, "%d", *(int *)p_pstat);
                   }
-                  snprintf(user_buf + csstrlen(user_buf), 0x200 - csstrlen(user_buf),
-                            "%c%s", (p != 0 ? '/' : ' '), stat_buf);
+                  snprintf(user_buf + csstrlen(user_buf),
+                           0x200 - csstrlen(user_buf), "%c%s",
+                           (p != 0 ? '/' : ' '), stat_buf);
                   p++;
                   p_pstat += 0x10;
                 } while (p < 3);
@@ -743,12 +749,13 @@ void collision_log_render(void)
                   int64_t freq;
                   QueryPerformanceFrequency(&freq);
                   crt_sprintf(stat_buf, "%d/%.2f", *(int *)(p_user_elem + 8),
-                              (double)((float)*(int64_t *)(p_user_elem + 0x10) * *(float *)0x254cb8 / (float)freq));
+                              (double)((float)*(int64_t *)(p_user_elem + 0x10) *
+                                       *(float *)0x254cb8 / (float)freq));
                 } else {
                   crt_sprintf(stat_buf, "%d", *(int *)(p_user_elem + 8));
                 }
-                snprintf(user_buf + csstrlen(user_buf), 0x200 - csstrlen(user_buf),
-                          " %s", stat_buf);
+                snprintf(user_buf + csstrlen(user_buf),
+                         0x200 - csstrlen(user_buf), " %s", stat_buf);
               }
               FUN_0008dc30(line, user_buf);
             }
@@ -767,12 +774,14 @@ void collision_log_render(void)
                 int64_t freq;
                 QueryPerformanceFrequency(&freq);
                 crt_sprintf(stat_buf, "%d/%.2f", *(int *)p_pstat,
-                            (double)((float)*(int64_t *)(p_pstat + 8) * *(float *)0x254cb8 / (float)freq));
+                            (double)((float)*(int64_t *)(p_pstat + 8) *
+                                     *(float *)0x254cb8 / (float)freq));
               } else {
                 crt_sprintf(stat_buf, "%d", *(int *)p_pstat);
               }
-              snprintf(summary_buf + csstrlen(summary_buf), 0x200 - csstrlen(summary_buf),
-                        "%c%s", (p != 0 ? '/' : ' '), stat_buf);
+              snprintf(summary_buf + csstrlen(summary_buf),
+                       0x200 - csstrlen(summary_buf), "%c%s",
+                       (p != 0 ? '/' : ' '), stat_buf);
               p++;
               p_pstat += 0x10;
             } while (p < 3);
@@ -782,12 +791,13 @@ void collision_log_render(void)
               int64_t freq;
               QueryPerformanceFrequency(&freq);
               crt_sprintf(stat_buf, "%d/%.2f", *(int *)(total_stats + 8),
-                          (double)((float)*(int64_t *)(total_stats + 0x10) * *(float *)0x254cb8 / (float)freq));
+                          (double)((float)*(int64_t *)(total_stats + 0x10) *
+                                   *(float *)0x254cb8 / (float)freq));
             } else {
               crt_sprintf(stat_buf, "%d", *(int *)(total_stats + 8));
             }
-            snprintf(summary_buf + csstrlen(summary_buf), 0x200 - csstrlen(summary_buf),
-                      " %s", stat_buf);
+            snprintf(summary_buf + csstrlen(summary_buf),
+                     0x200 - csstrlen(summary_buf), " %s", stat_buf);
           }
           FUN_0008dc30(line, summary_buf);
         }
@@ -861,7 +871,8 @@ void collision_log_add_time(short collision_function, unsigned int start_lo,
   if (user != -1) {
     elapsed = current - *(int64_t *)&start_lo;
     *(int64_t *)(0x5a80f0 + (int)collision_function * 0x170) += elapsed;
-    *(int64_t *)(0x5a8100 + ((int)collision_function * 0x17 + (int)user) * 0x10) += elapsed;
+    *(int64_t *)(0x5a8100 + ((int)collision_function * 0x17 + (int)user) *
+                              0x10) += elapsed;
   }
 }
 
@@ -873,7 +884,8 @@ void collision_log_add_call(short collision_function)
   user = FUN_0014d840(collision_function);
   if (user != -1) {
     *(int *)(0x5a80e8 + (int)collision_function * 0x170) += 1;
-    *(int *)(0x5a80f8 + ((int)collision_function * 0x17 + (int)user) * 0x10) += 1;
+    *(int *)(0x5a80f8 + ((int)collision_function * 0x17 + (int)user) * 0x10) +=
+      1;
   }
 }
 
@@ -893,11 +905,8 @@ void FUN_0014da20(char *display_line)
 {
   if (*(uint8_t *)0x5a5e40) {
     crt_sprintf(display_line + csstrlen(display_line), (char *)0x29d548,
-                *(int *)0x5a6128,
-                *(int *)0x5a66e8 + *(int *)0x5a6858,
-                *(int *)0x5a5e48,
-                *(int *)0x5a6578,
-                *(int *)0x5a5fb8,
+                *(int *)0x5a6128, *(int *)0x5a66e8 + *(int *)0x5a6858,
+                *(int *)0x5a5e48, *(int *)0x5a6578, *(int *)0x5a5fb8,
                 *(int *)0x5a6408);
   }
 }
@@ -1740,33 +1749,32 @@ epilog:
  *   ebp-0x78 = clip_staging[0] (short)
  *   ebp-0x76 = saved clip_index (short)
  *   ebp-0x1c = collision_count */
-#define COLLISION_FINITE3(vector)                                           \
-  (((*(uint32_t *)&(vector)[0] & 0x7f800000) != 0x7f800000) &&             \
-   ((*(uint32_t *)&(vector)[1] & 0x7f800000) != 0x7f800000) &&             \
+#define COLLISION_FINITE3(vector)                              \
+  (((*(uint32_t *)&(vector)[0] & 0x7f800000) != 0x7f800000) && \
+   ((*(uint32_t *)&(vector)[1] & 0x7f800000) != 0x7f800000) && \
    ((*(uint32_t *)&(vector)[2] & 0x7f800000) != 0x7f800000))
 
 
-
-#define CHECK_FINITE3_POINT(vec, name, line) \
-  if ((*(uint32_t *)&(vec)[0] & 0x7f800000) == 0x7f800000 || \
-      (*(uint32_t *)&(vec)[1] & 0x7f800000) == 0x7f800000 || \
-      (*(uint32_t *)&(vec)[2] & 0x7f800000) == 0x7f800000) { \
-    display_assert( \
+#define CHECK_FINITE3_POINT(vec, name, line)                                  \
+  if ((*(uint32_t *)&(vec)[0] & 0x7f800000) == 0x7f800000 ||                  \
+      (*(uint32_t *)&(vec)[1] & 0x7f800000) == 0x7f800000 ||                  \
+      (*(uint32_t *)&(vec)[2] & 0x7f800000) == 0x7f800000) {                  \
+    display_assert(                                                           \
       csprintf((char *)0x5ab100, "%s: assert_valid_real_point3d(%f, %f, %f)", \
-               name, (double)(vec)[0], (double)(vec)[1], (double)(vec)[2]), \
-      "c:\\\\halo\\\\SOURCE\\\\physics\\\\collisions.c", line, 1); \
-    system_exit(-1); \
+               name, (double)(vec)[0], (double)(vec)[1], (double)(vec)[2]),   \
+      "c:\\\\halo\\\\SOURCE\\\\physics\\\\collisions.c", line, 1);            \
+    system_exit(-1);                                                          \
   }
 
-#define CHECK_FINITE3_VEC(vec, name, line) \
-  if ((*(uint32_t *)&(vec)[0] & 0x7f800000) == 0x7f800000 || \
-      (*(uint32_t *)&(vec)[1] & 0x7f800000) == 0x7f800000 || \
-      (*(uint32_t *)&(vec)[2] & 0x7f800000) == 0x7f800000) { \
-    display_assert( \
+#define CHECK_FINITE3_VEC(vec, name, line)                                     \
+  if ((*(uint32_t *)&(vec)[0] & 0x7f800000) == 0x7f800000 ||                   \
+      (*(uint32_t *)&(vec)[1] & 0x7f800000) == 0x7f800000 ||                   \
+      (*(uint32_t *)&(vec)[2] & 0x7f800000) == 0x7f800000) {                   \
+    display_assert(                                                            \
       csprintf((char *)0x5ab100, "%s: assert_valid_real_vector2d(%f, %f, %f)", \
-               name, (double)(vec)[0], (double)(vec)[1], (double)(vec)[2]), \
-      "c:\\\\halo\\\\SOURCE\\\\physics\\\\collisions.c", line, 1); \
-    system_exit(-1); \
+               name, (double)(vec)[0], (double)(vec)[1], (double)(vec)[2]),    \
+      "c:\\\\halo\\\\SOURCE\\\\physics\\\\collisions.c", line, 1);             \
+    system_exit(-1);                                                           \
   }
 
 short FUN_0014f2c0(float *old_pos, float *old_vel, short *features,
@@ -1808,19 +1816,19 @@ short FUN_0014f2c0(float *old_pos, float *old_vel, short *features,
   clip_count = 0;
 
   if (!valid_real_point3d(old_pos)) {
-    display_assert(
-      csprintf((char *)0x5ab100, "%s: assert_valid_real_point3d(%f, %f, %f)",
-               "old_position", (double)old_pos[0], (double)old_pos[1],
-               (double)old_pos[2]),
-      "c:\\\\halo\\\\SOURCE\\\\physics\\\\collisions.c", 0x3ad, 1);
+    display_assert(csprintf((char *)0x5ab100,
+                            "%s: assert_valid_real_point3d(%f, %f, %f)",
+                            "old_position", (double)old_pos[0],
+                            (double)old_pos[1], (double)old_pos[2]),
+                   "c:\\\\halo\\\\SOURCE\\\\physics\\\\collisions.c", 0x3ad, 1);
     system_exit(-1);
   }
   if (!real_vector3d_valid(old_vel)) {
-    display_assert(
-      csprintf((char *)0x5ab100, "%s: assert_valid_real_vector2d(%f, %f, %f)",
-               "old_velocity", (double)old_vel[0], (double)old_vel[1],
-               (double)old_vel[2]),
-      "c:\\\\halo\\\\SOURCE\\\\physics\\\\collisions.c", 0x3ae, 1);
+    display_assert(csprintf((char *)0x5ab100,
+                            "%s: assert_valid_real_vector2d(%f, %f, %f)",
+                            "old_velocity", (double)old_vel[0],
+                            (double)old_vel[1], (double)old_vel[2]),
+                   "c:\\\\halo\\\\SOURCE\\\\physics\\\\collisions.c", 0x3ae, 1);
     system_exit(-1);
   }
 
@@ -1854,7 +1862,8 @@ short FUN_0014f2c0(float *old_pos, float *old_vel, short *features,
 
     if (collision_count >= max_clips) {
       display_assert("collision_count<maximum_collision_count",
-                     "c:\\\\halo\\\\SOURCE\\\\physics\\\\collisions.c", 0x3bf, 1);
+                     "c:\\\\halo\\\\SOURCE\\\\physics\\\\collisions.c", 0x3bf,
+                     1);
       system_exit(-1);
     }
 
@@ -1868,11 +1877,12 @@ short FUN_0014f2c0(float *old_pos, float *old_vel, short *features,
       position[2] = collision_record[3];
 
       if (!valid_real_point3d(position)) {
-        display_assert(
-          csprintf((char *)0x5ab100, "%s: assert_valid_real_point3d(%f, %f, %f)",
-                   "&clipped_position", (double)position[0], (double)position[1],
-                   (double)position[2]),
-          "c:\\\\halo\\\\SOURCE\\\\physics\\\\collisions.c", 0x418, 1);
+        display_assert(csprintf((char *)0x5ab100,
+                                "%s: assert_valid_real_point3d(%f, %f, %f)",
+                                "&clipped_position", (double)position[0],
+                                (double)position[1], (double)position[2]),
+                       "c:\\\\halo\\\\SOURCE\\\\physics\\\\collisions.c", 0x418,
+                       1);
         system_exit(-1);
       }
       break;
@@ -1908,17 +1918,20 @@ short FUN_0014f2c0(float *old_pos, float *old_vel, short *features,
     if ((*(uint32_t *)&dot_check & 0x7f800000) == 0x7f800000 ||
         !(fabs((double)dot_check) < *(double *)0x2549d8) ||
         ((*(uint32_t *)&plane_ptr[3] & 0x7f800000) == 0x7f800000)) {
-      display_assert(
-        csprintf((char *)0x5ab100, "%s: assert_valid_real_plane3d(%f, %f, %f / %f)",
-                 "&collision->plane", (double)plane_ptr[0], (double)plane_ptr[1],
-                 (double)plane_ptr[2], (double)plane_ptr[3]),
-        "c:\\\\halo\\\\SOURCE\\\\physics\\\\collisions.c", 0x3ce, 1);
+      display_assert(csprintf((char *)0x5ab100,
+                              "%s: assert_valid_real_plane3d(%f, %f, %f / %f)",
+                              "&collision->plane", (double)plane_ptr[0],
+                              (double)plane_ptr[1], (double)plane_ptr[2],
+                              (double)plane_ptr[3]),
+                     "c:\\\\halo\\\\SOURCE\\\\physics\\\\collisions.c", 0x3ce,
+                     1);
       system_exit(-1);
     }
 
     if (clip_count >= 3) {
-      display_assert("clip_count<3", "c:\\\\halo\\\\SOURCE\\\\physics\\\\collisions.c",
-                     0x3d1, 1);
+      display_assert("clip_count<3",
+                     "c:\\\\halo\\\\SOURCE\\\\physics\\\\collisions.c", 0x3d1,
+                     1);
       system_exit(-1);
     }
 
@@ -1965,7 +1978,8 @@ short FUN_0014f2c0(float *old_pos, float *old_vel, short *features,
             (x87_wide_t)prev_plane_ptr[0] * velocity[0];
 
       if (dot < *(float *)0x26a810 &&
-          line_from_planes3d(plane_ptr, prev_plane_ptr, clip_result, clip_line)) {
+          line_from_planes3d(plane_ptr, prev_plane_ptr, clip_result,
+                             clip_line)) {
         CHECK_FINITE3_POINT(clip_result, "&clip_line_point", 0x3e1);
         CHECK_FINITE3_VEC(clip_line, "&clip_line_vector", 0x3e2);
 
@@ -2034,12 +2048,12 @@ short FUN_0014f2c0(float *old_pos, float *old_vel, short *features,
               (x87_wide_t)prev_plane_ptr[0] * velocity[0];
 
         if (dot < *(float *)0x26a810 &&
-            line_from_planes3d(
-              (float *)((char *)collisions +
-                        (int)clip_staging[0] * 0x2c + 0x10),
-              (float *)((char *)collisions +
-                        (int)(short)clip_indices[1] * 0x2c + 0x10),
-              clip_result, clip_line)) {
+            line_from_planes3d((float *)((char *)collisions +
+                                         (int)clip_staging[0] * 0x2c + 0x10),
+                               (float *)((char *)collisions +
+                                         (int)(short)clip_indices[1] * 0x2c +
+                                         0x10),
+                               clip_result, clip_line)) {
           if (!valid_real_point3d(clip_result)) {
             display_assert(
               csprintf((char *)0x5ab100,
@@ -2104,10 +2118,10 @@ short FUN_0014f2c0(float *old_pos, float *old_vel, short *features,
   case 1:
     if (!FUN_0010a480((int)collision_plane)) {
       display_assert(
-        csprintf((char *)0x5ab100,
-                 "%s: assert_valid_real_plane3d(%f, %f, %f / %f)", "&clip_plane",
-                 (double)collision_plane[0], (double)collision_plane[1],
-                 (double)collision_plane[2], (double)collision_plane[3]),
+        csprintf(
+          (char *)0x5ab100, "%s: assert_valid_real_plane3d(%f, %f, %f / %f)",
+          "&clip_plane", (double)collision_plane[0], (double)collision_plane[1],
+          (double)collision_plane[2], (double)collision_plane[3]),
         "c:\\\\halo\\\\SOURCE\\\\physics\\\\collisions.c", 0x428, 1);
       system_exit(-1);
     }
@@ -2155,26 +2169,26 @@ short FUN_0014f2c0(float *old_pos, float *old_vel, short *features,
     break;
 
   default:
-    display_assert("unreachable", "c:\\\\halo\\\\SOURCE\\\\physics\\\\collisions.c",
-                   0x438, 1);
+    display_assert("unreachable",
+                   "c:\\\\halo\\\\SOURCE\\\\physics\\\\collisions.c", 0x438, 1);
     system_exit(-1);
     break;
   }
 
   if (!valid_real_point3d(new_pos)) {
-    display_assert(
-      csprintf((char *)0x5ab100, "%s: assert_valid_real_point3d(%f, %f, %f)",
-               "new_position", (double)new_pos[0], (double)new_pos[1],
-               (double)new_pos[2]),
-      "c:\\\\halo\\\\SOURCE\\\\physics\\\\collisions.c", 0x43b, 1);
+    display_assert(csprintf((char *)0x5ab100,
+                            "%s: assert_valid_real_point3d(%f, %f, %f)",
+                            "new_position", (double)new_pos[0],
+                            (double)new_pos[1], (double)new_pos[2]),
+                   "c:\\\\halo\\\\SOURCE\\\\physics\\\\collisions.c", 0x43b, 1);
     system_exit(-1);
   }
   if (!real_vector3d_valid(new_vel)) {
-    display_assert(
-      csprintf((char *)0x5ab100, "%s: assert_valid_real_vector2d(%f, %f, %f)",
-               "new_velocity", (double)new_vel[0], (double)new_vel[1],
-               (double)new_vel[2]),
-      "c:\\\\halo\\\\SOURCE\\\\physics\\\\collisions.c", 0x43c, 1);
+    display_assert(csprintf((char *)0x5ab100,
+                            "%s: assert_valid_real_vector2d(%f, %f, %f)",
+                            "new_velocity", (double)new_vel[0],
+                            (double)new_vel[1], (double)new_vel[2]),
+                   "c:\\\\halo\\\\SOURCE\\\\physics\\\\collisions.c", 0x43c, 1);
     system_exit(-1);
   }
 
@@ -2275,3 +2289,23 @@ short FUN_0014f2c0(float *old_pos, float *old_vel, short *features,
   return (short)collision_count;
 }
 
+
+/* FUN_001506d0 — thin forwarder to the 10-arg collision/line-of-sight query
+ * FUN_00150550, supplying a literal 0 for that callee's 4th parameter
+ * (PUSH 0x0 at 0x1506f4). All nine incoming stack slots [EBP+0x08 .. EBP+0x28]
+ * are forwarded verbatim; push order at 0x1506dc..0x1506f8 (last push = first
+ * C argument) gives 0x08,0x0c,0x10 then 0, then 0x14,0x18,0x1c,0x20,0x24,0x28.
+ * cdecl: ADD ESP,0x28 after the CALL confirms 10 pushed dwords.
+ * EAX is not touched after the CALL, so the callee's int result is the
+ * wrapper's return value.
+ * Types mirror FUN_00150550's kb.json declaration; the two int slots are
+ * dword-copied (callers pun floats through them), meaning unproven here.
+ * 0x1506d0 / collision_usage.obj
+ */
+int FUN_001506d0(void *out_point, float *direction, float *origin, int arg5,
+                 int arg6, float *out_point2, void *out_arg8, int max_results,
+                 void *results)
+{
+  return FUN_00150550(out_point, direction, origin, 0, arg5, arg6, out_point2,
+                      out_arg8, max_results, results);
+}
