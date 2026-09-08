@@ -361,14 +361,18 @@ __declspec(noinline) bool network_game_server_start_network_game(void *server)
     data = 0;
     csmemcpy(local_buf, (char *)server + 8, 0x434);
     msg = encode_network_game_message(6, local_buf, 0x434);
-    if (msg && FUN_0012f430(server, msg)) {
-      msg = encode_network_game_message(8, &data, 4);
-      if (msg && FUN_0012f430(server, msg)) {
-        network_game_log(
-          "signalling client machines to begin loading for network game");
-        *(int *)((char *)server + 0x47c) = 0;
-        *(char *)((char *)server + 0x4b9) = 1;
-        return true;
+    if (msg) {
+      if (FUN_0012f430(server, msg)) {
+        msg = encode_network_game_message(8, &data, 4);
+        if (msg) {
+          if (FUN_0012f430(server, msg)) {
+            network_game_log(
+              "signalling client machines to begin loading for network game");
+            *(int *)((char *)server + 0x47c) = 0;
+            *(char *)((char *)server + 0x4b9) = 1;
+            return true;
+          }
+        }
       }
     }
     network_game_log(
@@ -416,9 +420,9 @@ void network_server_manager_game_over(void *server)
  * sends type 0x1f. Other states return false immediately. */
 bool network_game_server_graceful_shutdown(void *server)
 {
-  char *s;
+  int data;
   void *msg;
-  bool result;
+  bool result = false;
 
   if (!server) {
     display_assert("server",
@@ -430,30 +434,29 @@ bool network_game_server_graceful_shutdown(void *server)
                    0x1f2, 1);
     system_exit(-1);
   }
-  s = (char *)server;
-  switch (*(uint16_t *)(s + 4)) {
+  switch (*(uint16_t *)((char *)server + 4)) {
   case 0:
-    server = 0;
-    msg = encode_network_game_message(9, &server, 4);
+    data = 0;
+    msg = encode_network_game_message(9, &data, 4);
     if (!msg) {
       network_game_log(
         "failed to create a message_server_graceful_game_exit_pregame");
-      return false;
+      return result;
     }
     break;
   case 2:
-    server = 0;
-    msg = encode_network_game_message(0x1f, &server, 4);
+    data = 0;
+    msg = encode_network_game_message(0x1f, &data, 4);
     if (!msg) {
       network_game_log(
         "failed to create a message_server_graceful_game_exit_postgame");
-      return false;
+      return result;
     }
     break;
   default:
-    return false;
+    return result;
   }
-  result = FUN_0012f430(s, msg);
+  result = FUN_0012f430(server, msg);
   if (result == 1) {
     network_game_log(
       "server closing down; all client machines were properly informed");
@@ -1595,7 +1598,7 @@ void FUN_0012da90(int endpoint, unsigned short reason)
 {
   unsigned short local_reason;
   void *msg;
-  unsigned short msg_len;
+  int msg_len;
   int send_result;
 
   local_reason = reason;
@@ -1606,29 +1609,31 @@ void FUN_0012da90(int endpoint, unsigned short reason)
     system_exit(-1);
   }
   msg = encode_network_game_message(5, &local_reason, 2);
-  if (!msg) {
-    network_game_log(
-      "failed to create a message_server_machine_rejected message in "
-      "network_game_server_send_rejection_message");
+  if (msg) {
+    msg_len = (int)(*(unsigned short *)msg) >> 4;
+    byte_swap_message_header((unsigned short *)msg, 1);
+    send_result = send_endpoint((int *)endpoint, (const char *)msg, msg_len);
+    if (send_result != msg_len) {
+      const char *err = FUN_00081c80(send_result);
+      network_game_log(
+        "error sending rejection message to client; transport error= \'%s\'",
+        err);
+    }
     return;
   }
-  msg_len = (*(unsigned short *)msg) >> 4;
-  byte_swap_message_header((unsigned short *)msg, 1);
-  send_result = send_endpoint((int *)endpoint, (const char *)msg, msg_len);
-  if (send_result != msg_len) {
-    const char *err = FUN_00081c80(send_result);
-    network_game_log(
-      "error sending rejection message to client; transport error= \'%s\'",
-      err);
-  }
+  network_game_log(
+    "failed to create a message_server_machine_rejected message in "
+    "network_game_server_send_rejection_message");
 }
 
-/* Connection refused (game full) callback (0x12db30).
- * Forwards endpoint @<ebx> and reason @<ax> to FUN_0012da90. */
-void FUN_0012db30(int endpoint, unsigned short reason)
+/* Connection refused (game full) callback (0x12db30). Registered as the
+ * connection's rejection procedure, called with just the endpoint; reason is
+ * hardcoded to 4 (server full), not a parameter (confirmed via disasm:
+ * MOV EAX,0x4 before the call, param comes off the stack into EBX). */
+void FUN_0012db30(int endpoint)
 {
   network_game_log("client connection refused; game is full");
-  FUN_0012da90(endpoint, reason);
+  FUN_0012da90(endpoint, 4);
 }
 
 /* Postgame state handler (0x12db60).
@@ -2382,56 +2387,49 @@ bool FUN_0012e750(int server)
  * and resets the in-use flag. */
 void network_game_client_dispose(void *server)
 {
-  char *s;
   void *msg;
-  const char *log_msg;
 
-  s = (char *)server;
   if (!server) {
     display_assert("server",
                    "c:\\halo\\SOURCE\\networking\\network_server_manager.c",
                    0x120, 1);
     system_exit(-1);
   }
-  switch (*(uint16_t *)(s + 4)) {
+  switch (*(uint16_t *)((char *)server + 4)) {
   case 0:
     msg = encode_network_game_message(9, &server, 4);
     if (!msg) {
-      log_msg = "failed to create a "
-                "_message_type_server_graceful_game_exit_pregame message";
+      network_game_log(
+        "failed to create a _message_type_server_graceful_game_exit_pregame message");
+      break;
+    }
+    if (FUN_0012f430(server, msg)) {
+      network_game_log("notified all clients that we are going down");
     } else {
-      goto broadcast;
+      network_game_log("failed to notify all clients that we are going down");
     }
     break;
   case 2:
     msg = encode_network_game_message(0x1f, &server, 4);
-    if (msg) {
-      goto broadcast;
+    if (!msg) {
+      network_game_log(
+        "failed to create a _message_type_server_graceful_game_exit_postgame message");
+      break;
     }
-    log_msg = "failed to create a "
-              "_message_type_server_graceful_game_exit_postgame message";
+    if (FUN_0012f430(server, msg)) {
+      network_game_log("notified all clients that we are going down");
+    } else {
+      network_game_log("failed to notify all clients that we are going down");
+    }
     break;
-  default:
-    goto skip_message;
   }
-  goto do_log;
 
-broadcast:
-  if (FUN_0012f430(server, msg)) {
-    log_msg = "notified all clients that we are going down";
-  } else {
-    log_msg = "failed to notify all clients that we are going down";
-  }
-do_log:
-  network_game_log(log_msg);
-
-skip_message:
   if (!FUN_0012e580((int)server)) {
     error(2, "network_game_server_handle_client_machines() failed inside "
              "network_game_server_dispose()");
   }
-  if (*(int *)s != 0) {
-    network_connection_delete(*(int *)s);
+  if (*(int *)server != 0) {
+    network_connection_delete(*(int *)server);
   }
   SleepEx(1000, 0);
   FUN_00082b30();
@@ -2633,7 +2631,6 @@ bool network_server_manager_pregame_start(void *server)
  * Creates a connection, sets up game data, initializes machine slots. */
 void *FUN_0012eef0(void)
 {
-  int *server;
   int i;
   int *slot;
 
@@ -2644,22 +2641,21 @@ void *FUN_0012eef0(void)
     system_exit(-1);
   }
   *(char *)0x46eed4 = 1;
-  server = (int *)0x5a90e0;
-  csmemset(server, 0, 0x4bc);
-  server[0] = network_connection_new(1, 0x141e);
-  if (!server[0]) {
+  csmemset((void *)0x5a90e0, 0, 0x4bc);
+  *(int *)0x5a90e0 = network_connection_new(1, 0x141e);
+  if (!*(int *)0x5a90e0) {
     error(2, "failed to create the server connection");
-    network_game_client_dispose((void *)server);
+    network_game_client_dispose((void *)0x5a90e0);
     return (void *)0;
   }
   FUN_00082a90();
-  *(short *)((char *)server + 4) = 0;
-  *(short *)((char *)server + 6) = 2;
-  csmemset((char *)server + 8, 0, 0x434);
-  network_connection_set_connection_rejection_procedure(server[0],
+  *(short *)0x5a90e4 = 0;
+  *(short *)0x5a90e6 = 2;
+  csmemset((void *)0x5a90e8, 0, 0x434);
+  network_connection_set_connection_rejection_procedure(*(int *)0x5a90e0,
                                                         (void *)FUN_0012db30);
-  network_game_invalidate((char *)server + 8);
-  *(short *)((char *)server + 0x118) = (short)main_get_difficulty();
+  network_game_invalidate((void *)0x5a90e8);
+  *(short *)0x5a91f8 = (short)main_get_difficulty();
   *(int *)0x5a9514 = -1;
   i = 0;
   slot = (int *)0x5a9520;
@@ -2669,18 +2665,18 @@ void *FUN_0012eef0(void)
     slot[1] = 0;
     *(unsigned short *)(slot + 2) = 0xffff;
     *(unsigned short *)((char *)(slot + 2) + 2) = 0;
-    network_game_invalidate_machine((void *)((char *)server + 8), i);
+    network_game_invalidate_machine((void *)0x5a90e8, i);
     slot += 4;
     i++;
   } while ((int)slot < 0x5a9560);
   *(char *)0x5a9599 = 0;
   *(int *)0x5a9564 = 0;
-  if (!network_server_manager_pregame_start((void *)server)) {
+  if (!network_server_manager_pregame_start((void *)0x5a90e0)) {
     error(2, "failed to initialize server pregame settings");
-    network_game_client_dispose((void *)server);
+    network_game_client_dispose((void *)0x5a90e0);
     return (void *)0;
   }
-  return (void *)server;
+  return (void *)0x5a90e0;
 }
 
 /* Handle game-start request from client (0x12f040).
@@ -2991,17 +2987,17 @@ bool FUN_0012f540(int server, void *player)
   }
   local_buf = *(player_msg_t *)player;
   msg = (int)encode_network_game_message(0x15, &local_buf, 0x20);
-  if (!msg) {
-    network_game_log(
-      "failed to create a message_server_add_player_ingame message");
-    return false;
+  if (msg) {
+    sent = FUN_0012f430((void *)server, (void *)msg);
+    if (!sent)
+      network_game_log(
+        "network_game_server_send_message_to_all_machines() failed in "
+        "network_game_server_send_player_joined_info_ingame()");
+    return sent;
   }
-  sent = FUN_0012f430((void *)server, (void *)msg);
-  if (!sent)
-    network_game_log(
-      "network_game_server_send_message_to_all_machines() failed in "
-      "network_game_server_send_player_joined_info_ingame()");
-  return sent;
+  network_game_log(
+    "failed to create a message_server_add_player_ingame message");
+  return false;
 }
 
 /* Send updated game settings to all client machines (0x12f5d0).

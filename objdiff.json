@@ -8878,6 +8878,62 @@
    "metadata": {
     "source_path": "src/halo/networking/network_client_manager.c"
    }
+  },
+  {
+   "name": "halo/network_server_manager_FUN_0012c160",
+   "target_path": "build/CMakeFiles/halo.dir/src/halo/networking/network_server_manager.c.obj",
+   "base_path": "delinked/network_server_manager_FUN_0012c160.obj",
+   "metadata": {
+    "source_path": "src/halo/networking/network_server_manager.c"
+   }
+  },
+  {
+   "name": "halo/network_server_manager_FUN_0012da90",
+   "target_path": "build/CMakeFiles/halo.dir/src/halo/networking/network_server_manager.c.obj",
+   "base_path": "delinked/network_server_manager_FUN_0012da90.obj",
+   "metadata": {
+    "source_path": "src/halo/networking/network_server_manager.c"
+   }
+  },
+  {
+   "name": "halo/network_server_manager_FUN_0012db30",
+   "target_path": "build/CMakeFiles/halo.dir/src/halo/networking/network_server_manager.c.obj",
+   "base_path": "delinked/network_server_manager_FUN_0012db30.obj",
+   "metadata": {
+    "source_path": "src/halo/networking/network_server_manager.c"
+   }
+  },
+  {
+   "name": "halo/network_game_manager_FUN_0012aaf0",
+   "target_path": "build/CMakeFiles/halo.dir/src/halo/networking/network_game_manager.c.obj",
+   "base_path": "delinked/network_game_manager_FUN_0012aaf0.obj",
+   "metadata": {
+    "source_path": "src/halo/networking/network_game_manager.c"
+   }
+  },
+  {
+   "name": "halo/network_game_manager_FUN_0012a9f0",
+   "target_path": "build/CMakeFiles/halo.dir/src/halo/networking/network_game_manager.c.obj",
+   "base_path": "delinked/network_game_manager_FUN_0012a9f0.obj",
+   "metadata": {
+    "source_path": "src/halo/networking/network_game_manager.c"
+   }
+  },
+  {
+   "name": "halo/network_game_manager_FUN_0012b0c0",
+   "target_path": "build/CMakeFiles/halo.dir/src/halo/networking/network_game_manager.c.obj",
+   "base_path": "delinked/network_game_manager_FUN_0012b0c0.obj",
+   "metadata": {
+    "source_path": "src/halo/networking/network_game_manager.c"
+   }
+  },
+  {
+   "name": "halo/network_game_manager_FUN_0012b6b0",
+   "target_path": "build/CMakeFiles/halo.dir/src/halo/networking/network_game_manager.c.obj",
+   "base_path": "delinked/network_game_manager_FUN_0012b6b0.obj",
+   "metadata": {
+    "source_path": "src/halo/networking/network_game_manager.c"
+   }
   }
  ]
 }

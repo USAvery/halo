@@ -15114,7 +15114,7 @@
     {
      "addr": "0x12c160",
      "decl": "bool network_game_server_game_is_valid(void *server);",
-     "ported": false
+     "ported": true
     },
     {
      "addr": "0x12c1c0",
@@ -15437,12 +15437,12 @@
     {
      "addr": "0x12da90",
      "decl": "void FUN_0012da90(int endpoint @<ebx>, unsigned short reason @<ax>);",
-     "ported": false
+     "ported": true
     },
     {
      "addr": "0x12db30",
-     "decl": "void FUN_0012db30(int endpoint @<ebx>, unsigned short reason @<ax>);",
-     "ported": false
+     "decl": "void FUN_0012db30(int endpoint);",
+     "ported": true
     },
     {
      "addr": "0x12e1d0",
@@ -37161,7 +37161,8 @@
    "functions": [
     {
      "addr": "0x12aaf0",
-     "decl": "void network_game_generate_local_machine_name(void *name_buffer);"
+     "decl": "void network_game_generate_local_machine_name(void *name_buffer);",
+     "ported": true
     },
     {
      "addr": "0x12ab80",
@@ -37200,7 +37201,8 @@
     },
     {
      "addr": "0x12a9f0",
-     "decl": "bool network_game_update_machine(void *game, void *machine);"
+     "decl": "bool network_game_update_machine(void *game, void *machine);",
+     "ported": true
     },
     {
      "addr": "0x12aa80",
@@ -37224,7 +37226,8 @@
     },
     {
      "addr": "0x12b0c0",
-     "decl": "bool network_game_player_is_valid(void *player, void *game);"
+     "decl": "bool network_game_player_is_valid(void *player, void *game);",
+     "ported": true
     },
     {
      "addr": "0x12b150",
@@ -37254,7 +37257,8 @@
     {
      "addr": "0x12b6b0",
      "decl": "bool network_game_message_encode(void *message_struct @<edi>, char *encoded_message @<ebx>, int16_t *encoded_message_size @<esi>, int16_t type, int one);",
-     "name": "network_game_message_encode"
+     "name": "network_game_message_encode",
+     "ported": true
     }
    ],
    "name": "network_game_manager.obj",
