@@ -83371,16 +83371,16 @@
     "sound_dsound_set_channel_properties": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 50.8,
+      "abi_modeled_mnemonic_pct": 84.8,
       "addr": "0x1caa80",
       "end": "0x1caaa5",
       "kind": "auto",
       "n_r": 16,
-      "opnd_percent": 47.5,
-      "raw_mnemonic_pct": 50.8,
+      "opnd_percent": 42.4,
+      "raw_mnemonic_pct": 84.8,
       "ref": "synth",
       "ref_sha": "5d519a580c357fec",
-      "score": 50.8,
+      "score": 84.8,
       "source": "src/halo/sound/sound_dsound_xbox.c"
     },
     "sound_dsound_set_last_error": {
