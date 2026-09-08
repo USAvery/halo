@@ -5295,6 +5295,105 @@ void encounter_build_firing_position_owner_actor_indices(
   }
 }
 
+/* encounter_mark_examined_pursuit_position (0x5b5e0) - Record `actor_handle`
+ * in the "examined pursuit position" record for `firing_pos` inside encounter
+ * `enc_idx`, creating the record if it does not exist yet.
+ *
+ * Record layout (same 0x28-byte record documented on FUN_00059c40):
+ *   +0x02 int16_t  firing_position_index  (asserted to match the argument)
+ *   +0x04 int      last-touched game time (refreshed on every path that runs)
+ *   +0x08 int16_t  examined count
+ *   +0x0a int16_t  next_actor_index_index (ring cursor, 0..5)
+ *   +0x0c int[6]   actor indices
+ *
+ * Confirmed (disassembly 0x5b5e0-0x5b6d8):
+ *   - Four cdecl stack parameters; the return value is the byte at [EBP-1]
+ *     loaded into AL, i.e. a bool: 0 when the actor was already recorded (or
+ *     the record could not be obtained), 1 when a new entry was inserted.
+ *     MOV byte ptr [EBP-1],0 at 0x5b5f1 initialises it before the first call.
+ *   - FUN_00059c40 receives encounter_handle in EAX (@<eax>, from [EBP+0x8])
+ *     and firing_position_index in BX (@<bx>, from [EBP+0x10]); the pushes are
+ *     PUSH 1 then PUSH [EBP+0x14], and ADD ESP,0x8 confirms exactly two stack
+ *     args -> (threshold = [EBP+0x14], create_if_missing = 1).  Unlike the
+ *     sibling lookup at 0x5b6e0 this one creates the record.
+ *   - datum_get is called as PUSH EAX (handle) ; PUSH ECX (*0x5ab26c), so
+ *     datum_get(pursuit_data, pursuit_handle).
+ *   - The scan is a do-while over a 16-bit counter sign-extended each
+ *     iteration (XOR EAX,EAX / MOVSX EDX,AX / CMP [ESI+EDX*4+0xc],EDI), hence
+ *     the `short` loop variable.  A match re-tests CMP AX,0x6 / JL before
+ *     taking the "already present" exit; the exhausted loop falls into the
+ *     same overflow check.  Both tests are preserved.
+ *   - Insert path order at 0x5b68c-0x5b6a7: store the actor index at the ring
+ *     cursor, INC word [ESI+8], then store the wrapped cursor (IDIV by 6),
+ *     then MOV BL,1.
+ *   - Both exits that reach a live record end with CALL 0x000b5aa0
+ *     (game_time_get) ; MOV [ESI+4],EAX, so the time stamp is refreshed on the
+ *     already-present path as well as the insert path.
+ *   - Assert tails are display_assert(..., halt = 1) followed by
+ *     PUSH -1 / CALL system_exit at lines 0x407 and 0x414.
+ *
+ * Call-site verification:
+ *   FUN_00059c40 | EAX = [EBP+0x8]            | encounter_handle      | match
+ *                | BX  = EBX = [EBP+0x10]     | firing_position_index | match
+ *                | push [EBP+0x14] (2nd push) | threshold             | match
+ *                | push 1          (1st push) | create_if_missing = 1 | match
+ *   datum_get    | push ECX = *0x5ab26c       | pursuit data_t        | match
+ *                | push EAX = FUN_00059c40    | pursuit_handle        | match
+ *   game_time_get| no arguments, result in EAX                        | match
+ *   display_assert | pushes msg, file, 0x407 / 0x414, 1               | match
+ *   system_exit  | push -1                                            | match
+ */
+char encounter_mark_examined_pursuit_position(int enc_idx, int actor_handle,
+                                              int16_t firing_pos,
+                                              int threat_enc)
+{
+  char *pursuit;
+  int pursuit_handle;
+  short i;
+  volatile char inserted;
+
+  inserted = 0;
+  pursuit_handle =
+    FUN_00059c40(enc_idx /* @<eax> */, firing_pos /* @<bx> */, threat_enc, 1);
+  if (pursuit_handle == -1) {
+    return inserted;
+  }
+
+  pursuit = (char *)datum_get(*(data_t **)0x5ab26c, pursuit_handle);
+  if (*(short *)(pursuit + 2) != firing_pos) {
+    display_assert("pursuit->firing_position_index == firing_position_index",
+                   "c:\\halo\\SOURCE\\ai\\encounters.c", 0x407, 1);
+    system_exit(-1);
+  }
+
+  i = 0;
+  do {
+    if (*(int *)(pursuit + i * 4 + 0xc) == actor_handle) {
+      if (i < 6) {
+        *(int *)(pursuit + 4) = game_time_get();
+        return inserted;
+      }
+      break;
+    }
+    i = i + 1;
+  } while (i < 6);
+
+  if (*(short *)(pursuit + 10) < 0 || *(short *)(pursuit + 10) >= 6) {
+    display_assert("(pursuit->next_actor_index_index >= 0) && "
+                   "(pursuit->next_actor_index_index < "
+                   "NUMBER_OF_ACTOR_INDICES_PER_EXAMINED_PURSUIT_POSITION)",
+                   "c:\\halo\\SOURCE\\ai\\encounters.c", 0x414, 1);
+    system_exit(-1);
+  }
+
+  *(int *)(pursuit + *(short *)(pursuit + 10) * 4 + 0xc) = actor_handle;
+  *(short *)(pursuit + 8) = *(short *)(pursuit + 8) + 1;
+  *(short *)(pursuit + 10) = (short)((*(short *)(pursuit + 10) + 1) % 6);
+  inserted = 1;
+  *(int *)(pursuit + 4) = game_time_get();
+  return inserted;
+}
+
 /* encounter_pursuit_position_already_examined (0x5b6e0) — Look up the
  * "examined pursuit position" record for `firing_position_index` inside an
  * encounter (via FUN_00059c40, non-creating) and report whether `position`
@@ -6407,11 +6506,12 @@ void FUN_0005c680(int encounter_handle)
   short j; /* pass-2 loop index: the reference keeps it in DI and compares it
             * 16-bit against encounter+0x6 (cmp di, word [edx+6]), so it is a
             * distinct short variable, not a reuse of pass 1's int i. */
-  volatile int idx; /* redundant (int16_t)i copy, mirrors the reference's separate
-            * EBP-0x8 stack slot (local_c) used for the squad_def index and
-            * the recruit_bitmap bit position -- kept distinct from i so the
-            * frame size matches (score-context frame_mismatch: cand
-            * sub esp,0x14 vs ref sub esp,0x18). */
+  volatile int
+    idx; /* redundant (int16_t)i copy, mirrors the reference's separate
+          * EBP-0x8 stack slot (local_c) used for the squad_def index and
+          * the recruit_bitmap bit position -- kept distinct from i so the
+          * frame size matches (score-context frame_mismatch: cand
+          * sub esp,0x14 vs ref sub esp,0x18). */
 
   encounter = (char *)datum_get(*(data_t **)0x5ab270, encounter_handle);
   if (encounter[0x3c] == '\0') {
@@ -6492,7 +6592,8 @@ void FUN_0005c680(int encounter_handle)
       /* Reference compares the sign-extended value already in EAX (0x5c841
        * movsx / 0x5c844 cmp) and only then stores it to the idx slot, so the
        * loop test must not re-read the volatile idx. */
-    } while ((int16_t)i < ((encounter_definition *)encounter_def)->squads.count);
+    } while ((int16_t)i <
+             ((encounter_definition *)encounter_def)->squads.count);
 
     if (recruit_count > 0 && *(int16_t *)(encounter + 0x3e) == 0) {
       recruit_count =
@@ -7485,7 +7586,8 @@ void FUN_0005de80(void)
     if (encounter == NULL)
       return;
     (*(short *)0x5abb34)++;
-    if ((short)((((int)iter.datum_handle) & 0xffff) % 15) == (short)tick_mod15) {
+    if ((short)((((int)iter.datum_handle) & 0xffff) % 15) ==
+        (short)tick_mod15) {
       encounter_update_status((int)iter.datum_handle);
       FUN_0005acf0((int)iter.datum_handle);
       FUN_0005c680((int)iter.datum_handle);

@@ -9911,6 +9911,7 @@
     "0x1b2740": "void unit_select_weapon_after_vehicle_exit(int unit_handle@<eax>);",
     "0x1b56b0": "void FUN_001b56b0(int vehicle_handle@<eax>, void *state_array@<edi>);",
     "0x1b9bf0": "int *tag_instance_resolve(int tag_index@<edi>);",
+    "0x1ba710": "void FUN_001ba710(char *self@<eax>);",
     "0x1ba7c0": "void cache_copy_initialize_and_fill_with_garbage(char *self@<esi>);",
     "0x1ba8b0": "void FUN_001ba8b0(char *self@<esi>);",
     "0x1ba930": "void FUN_001ba930(char *self@<esi>);",

@@ -35342,7 +35342,8 @@
     },
     {
      "addr": "0x5b5e0",
-     "decl": "char encounter_mark_examined_pursuit_position(int enc_idx, int actor_handle, int16_t firing_pos, int threat_enc);"
+     "decl": "char encounter_mark_examined_pursuit_position(int enc_idx, int actor_handle, int16_t firing_pos, int threat_enc);",
+     "ported": true
     },
     {
      "addr": "0x5b6e0",
