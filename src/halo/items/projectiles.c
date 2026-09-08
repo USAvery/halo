@@ -832,28 +832,25 @@ bool FUN_000f8720(int projectile_handle, float *new_pos,
                   int16_t *collision_result)
 {
   char *proj;
-  void *tag_def;
+  void * volatile tag_def;
   float *proj_pos; /* &obj->position (float[3] at proj+0xc) */
   float *up_vec;
   float *fwd_vec;
   float radius;
-  /* 0xf87a2/0xf87ae/0xf87b5: the original recomputes each delta into ST(i)
-   * for the cross product, so the cross sees the un-narrowed difference;
-   * only the copies stored into origin1[] are float32. */
-  x87_wide_t dx, dy, dz;
+  float dx, dy, dz;
   /* cross direction: cross(delta, up_vec), stored in dir1 then normalized */
-  float dir1[3]; /* normalized cross direction; later reused as sweep dir */
-  /* positive-side origin: proj_pos + radius * cross (also reused for initial centre-line delta) */
-  float origin1[3];
-  /* positive-side endpoint (x,y,z) */
-  float pt_b1x, pt_b1y;
-  /* pt_b1z is never stored by the original (0xf885b..0xf8861 keeps it in
-   * ST2 for the FSUB at 0xf88d3), so it must not be narrowed here. */
-  x87_wide_t pt_b1z;
-  /* negative-side origin: proj_pos - radius * cross */
-  float pt_a2[3];
-  /* negative-side endpoint: new_pos - radius * cross */
-  float pt_b2[3];
+  struct {
+    float pt_a2[3];  /* -0x40 */
+    float pt_b2[3];  /* -0x34 */
+    float pt_b1[3];  /* -0x28 */
+    float origin[3];/* -0x1c */
+    float dir[3];   /* -0x10 */
+  } s;
+#define dir1 s.dir
+#define origin1 s.origin
+#define pt_b1 s.pt_b1
+#define pt_b2 s.pt_b2
+#define pt_a2 s.pt_a2
 
 #ifdef HALO_RNG_TRACE
   RNG_TRACE_EX(RNG_TRACE_KIND_SWEEP_POS, RNG_TRACE_BITS(new_pos[0]),
@@ -863,86 +860,79 @@ bool FUN_000f8720(int projectile_handle, float *new_pos,
   tag_def = tag_get(0x70726f6a, *(int *)proj);
   proj_pos = (float *)(proj + 0xc);
 
-  dx = new_pos[0] - proj_pos[0];
-  dy = new_pos[1] - proj_pos[1];
-  dz = new_pos[2] - proj_pos[2];
-
   /* 1. Centre-line collision test (flags 0x1000e9). */
-  origin1[0] = HALO_NARROW(dx);
-  origin1[1] = HALO_NARROW(dy);
-  origin1[2] = HALO_NARROW(dz);
+  origin1[0] = new_pos[0] - proj_pos[0];
+  origin1[1] = new_pos[1] - proj_pos[1];
+  origin1[2] = new_pos[2] - proj_pos[2];
   if (SWEEP_LOS(FUN_0014df70(0x1000e9, proj_pos, origin1, *(int *)(proj + 0x1e4),
-                   collision_result))) {
-    return 1;
+                   collision_result)) == 0) {
+    /* Check sweep radius; if too small skip lateral tests. */
+    if (*(float *)((char *)tag_def + 0x1a0) < *(float *)0x253f44) {
+      return 0;
+    } else {
+      /* Compute cross direction: cross(delta, up_vec). */
+      up_vec = *(float **)0x31fc44;
+      dx = new_pos[0] - proj_pos[0];
+      dy = new_pos[1] - proj_pos[1];
+      dz = new_pos[2] - proj_pos[2];
+
+      dir1[0] = dy * up_vec[2] - dz * up_vec[1];
+      dir1[1] = dz * up_vec[0] - dx * up_vec[2];
+      dir1[2] = dx * up_vec[1] - dy * up_vec[0];
+
+      if (normalize3d(dir1) == *(float *)0x2533c0) {
+        /* Degenerate (delta parallel to up): fall back to default forward. */
+        fwd_vec = *(float **)0x31fc40;
+        dir1[0] = fwd_vec[0];
+        dir1[1] = fwd_vec[1];
+        dir1[2] = fwd_vec[2];
+      }
+
+      radius = *(float *)((char *)tag_def + 0x1a0);
+
+      /* Build positive-side origin: proj_pos + radius * cross_dir. */
+      origin1[0] = dir1[0] * radius + proj_pos[0];
+      origin1[1] = dir1[1] * radius + proj_pos[1];
+      origin1[2] = dir1[2] * radius + proj_pos[2];
+
+      /* Build positive-side endpoint: new_pos + radius * cross_dir. */
+      pt_b1[0] = dir1[0] * radius + new_pos[0];
+      pt_b1[1] = dir1[1] * radius + new_pos[1];
+      pt_b1[2] = dir1[2] * radius + new_pos[2];
+
+      /* Build negative-side origin: proj_pos - radius * cross_dir. */
+      pt_a2[0] = dir1[0] * (-radius) + proj_pos[0];
+      pt_a2[1] = dir1[1] * (-radius) + proj_pos[1];
+      pt_a2[2] = dir1[2] * (-radius) + proj_pos[2];
+
+      /* Build negative-side endpoint: new_pos - radius * cross_dir. */
+      pt_b2[0] = dir1[0] * (-radius) + new_pos[0];
+      pt_b2[1] = dir1[1] * (-radius) + new_pos[1];
+      pt_b2[2] = dir1[2] * (-radius) + new_pos[2];
+
+      /* Compute sweep direction for positive-side cast: pt_b1 - origin1. */
+      dir1[0] = pt_b1[0] - origin1[0];
+      dir1[1] = pt_b1[1] - origin1[1];
+      dir1[2] = pt_b1[2] - origin1[2];
+
+      /* 2. Positive-side lateral collision test (flags 0x89). */
+      /* 3. Negative-side lateral collision test: segment pt_a2 -> pt_b2 (flags 0x89). */
+      if (SWEEP_LOS(FUN_0014df70(0x89, origin1, dir1, *(int *)(proj + 0x1e4),
+                       collision_result)) == 0 &&
+          FUN_000130d0(0x89, pt_a2, pt_b2, *(int *)(proj + 0x1e4),
+                       collision_result) == 0) {
+        return 0;
+      }
+    }
   }
 
-  /* Check sweep radius; if too small skip lateral tests. */
-  radius = *(float *)((char *)tag_def + 0x1a0);
-  if (radius < *(float *)0x253f44) {
-    return 0;
-  }
-
-  /* Compute cross direction: cross(delta, up_vec). */
-  up_vec = *(float **)0x31fc44;
-  dir1[0] = HALO_NARROW(dy * up_vec[2] - dz * up_vec[1]);
-  dir1[1] = HALO_NARROW(dz * up_vec[0] - dx * up_vec[2]);
-  dir1[2] = HALO_NARROW(dx * up_vec[1] - dy * up_vec[0]);
-
-  if (normalize3d(dir1) == *(float *)0x2533c0) {
-    /* Degenerate (delta parallel to up): fall back to default forward. */
-    fwd_vec = *(float **)0x31fc40;
-    dir1[0] = fwd_vec[0];
-    dir1[1] = fwd_vec[1];
-    dir1[2] = fwd_vec[2];
-  }
-
-  /* Build positive-side origin: proj_pos + radius * cross_dir. */
-  /* 0xf881b/0xf8846/0xf8871/0xf889f: dir1[i]*radius is recomputed in ST at
-   * all four points; the wide product keeps clang from spilling it as a
-   * dword between uses. */
-  origin1[0] = HALO_NARROW((x87_wide_t)dir1[0] * radius + proj_pos[0]);
-  origin1[1] = HALO_NARROW((x87_wide_t)dir1[1] * radius + proj_pos[1]);
-  origin1[2] = HALO_NARROW((x87_wide_t)dir1[2] * radius + proj_pos[2]);
-
-  /* Build positive-side endpoint: new_pos + radius * cross_dir. */
-  pt_b1x = HALO_NARROW((x87_wide_t)dir1[0] * radius + new_pos[0]);
-  /* 0xf884d: FSTP dword [ebp-0x28] -- narrowed before the reload at 0xf88c1. */
-  HALO_FLT_ROUNDTRIP(pt_b1x);
-  pt_b1y = HALO_NARROW((x87_wide_t)dir1[1] * radius + new_pos[1]);
-  /* 0xf8858: FSTP dword [ebp-0x24] -- narrowed before the reload at 0xf88ca. */
-  HALO_FLT_ROUNDTRIP(pt_b1y);
-  pt_b1z = (x87_wide_t)dir1[2] * radius + new_pos[2];
-
-  /* Build negative-side origin: proj_pos - radius * cross_dir. */
-  pt_a2[0] = dir1[0] * (-radius) + proj_pos[0];
-  pt_a2[1] = dir1[1] * (-radius) + proj_pos[1];
-  pt_a2[2] = dir1[2] * (-radius) + proj_pos[2];
-
-  /* Build negative-side endpoint: new_pos - radius * cross_dir. */
-  pt_b2[0] = dir1[0] * (-radius) + new_pos[0];
-  pt_b2[1] = dir1[1] * (-radius) + new_pos[1];
-  pt_b2[2] = dir1[2] * (-radius) + new_pos[2];
-
-  /* Compute sweep direction for positive-side cast: pt_b1 - origin1. */
-  dir1[0] = pt_b1x - origin1[0];
-  dir1[1] = pt_b1y - origin1[1];
-  dir1[2] = pt_b1z - origin1[2];
-
-  /* 2. Positive-side lateral collision test (flags 0x89). */
-  if (SWEEP_LOS(FUN_0014df70(0x89, origin1, dir1, *(int *)(proj + 0x1e4),
-                   collision_result))) {
-    return 1;
-  }
-
-  /* 3. Negative-side lateral collision test: segment pt_a2 -> pt_b2 (flags
-   * 0x89). */
-  if (FUN_000130d0(0x89, pt_a2, pt_b2, *(int *)(proj + 0x1e4),
-                   collision_result)) {
-    return 1;
-  }
-
-  return 0;
+  return 1;
 }
+#undef dir1
+#undef origin1
+#undef pt_b1
+#undef pt_b2
+#undef pt_a2
 
 /* Detonate a projectile: fire effects, apply area damage, notify AI.
  *
@@ -1492,20 +1482,19 @@ void FUN_000f90d0(int projectile_handle, float *hit_pos, float param_3,
   char *tag_elem; /* tag element for the current detonation result index  */
   char *dtag_elem; /* tag element for the secondary (bounce) pass          */
 
-  /* Normalised incoming velocity / local working copy. */
-  float dir_x, dir_y, dir_z;
-
   /* "Detonation fraction": how far along the projectile's range we are. */
   float det_frac;
 
-  /* Per-tick velocity scale (from caller, stored in param_3). */
-  float vel_scale;
-
   /* Detonation result: 0=none/attach, 1=attached_rest, 2=deflect,
    *                    3=ricochet, 4=detonate.                             */
-  int16_t det_result; /* low 16 bits of local_1c / local_18 */
+  int16_t det_result;
 
-  /* Effect scale weights (alpha, intensity). */
+  /* Effect scale weights (alpha, intensity).  The reference seeds them in
+   * the normalize3d argument setup, before the call at 0xf912a:
+   *   0xf9116  movl $0x3f800000,-0x1c(%ebp)   scale_a = 1.0f
+   *   0xf911d  movl $0x0,-0x14(%ebp)          scale_b = 0.0f
+   * param_3 (0x10(%ebp)) is never read anywhere in 0xf90d0..0xf9c26, so
+   * scale_b's only later source is damage_params+0x48 (0xf92b8). */
   float scale_a, scale_b;
 
   /* Squared magnitude of velocity after response processing. */
@@ -1520,6 +1509,10 @@ void FUN_000f90d0(int projectile_handle, float *hit_pos, float param_3,
 
   /* Miscellaneous temporaries. */
   float ftemp;
+  /* Single-assignment normalize result: ref keeps this ST-resident across
+   * the == 0 test (fcoms no-pop) and the det_frac fraction — must NOT be a
+   * multi-assignment temp or MSVC spills it to a slot. */
+  float mag;
   float ang_dot; /* dot product of velocity with surface normal       */
   float deflect_dot; /* normal-speed component for deflect case           */
   float ang_speed; /* angular speed for deflect case                    */
@@ -1557,33 +1550,24 @@ void FUN_000f90d0(int projectile_handle, float *hit_pos, float param_3,
   proj_tag = (char *)tag_get(0x70726f6a /* 'proj' */, proj[0]);
 
   /* 2. Copy velocity to local and normalise.                            */
-  dir_x = in_velocity[0];
-  dir_y = in_velocity[1];
-  dir_z = in_velocity[2];
-
   /* local_8 = word [ESI+0x34] (current detonation-result index).       */
   tag_idx = (int)(int16_t)(col_result[0x1a]);
 
-  vel_scale = param_3;
+  vel_local[0] = in_velocity[0];
+  vel_local[1] = in_velocity[1];
+  vel_local[2] = in_velocity[2];
+  mag = normalize3d(vel_local); /* single call; magnitude in mag */
 
-  /* 000f9112..000f912f: normalise vel_local; FPU result (magnitude) is
-   * compared to 0 and also reused for the detonation-fraction calculation.
-   * Binary calls normalize3d exactly once; the ST(0) result is compared
-   * against [0x2533c0] (0.0f) and then reused in the fraction calculation. */
-  vel_local[0] = dir_x;
-  vel_local[1] = dir_y;
-  vel_local[2] = dir_z;
-  ftemp = normalize3d(vel_local); /* single call; magnitude in ftemp */
+  /* Ref 0xf9166/f916d: 1.0f -> -0x1c, 0.0f -> -0x14 (scale_a/scale_b). */
+  scale_a = 1.0f;
+  scale_b = 0.0f;
 
   /* If velocity is zero, replace direction with the global up vector.
    * Also update vel_local so marker_forwards[3..11] are valid unit vectors. */
-  if (ftemp == *(float *)0x2533c0) {
-    dir_x = *(float *)(*(int *)0x31fc44);
-    dir_y = *(float *)(*(int *)0x31fc44 + 4);
-    dir_z = *(float *)(*(int *)0x31fc44 + 8);
-    vel_local[0] = dir_x;
-    vel_local[1] = dir_y;
-    vel_local[2] = dir_z;
+  if (mag == *(float *)0x2533c0) {
+    vel_local[0] = *(float *)(*(int *)0x31fc44);
+    vel_local[1] = *(float *)(*(int *)0x31fc44 + 4);
+    vel_local[2] = *(float *)(*(int *)0x31fc44 + 8);
   }
 
   /* 3. Compute detonation fraction (det_frac = local_24).              */
@@ -1591,24 +1575,29 @@ void FUN_000f90d0(int projectile_handle, float *hit_pos, float param_3,
   if (*(float *)(proj_tag + 0x1e8) == *(float *)(proj_tag + 0x1e4)) {
     det_frac = 1.0f;
   } else {
-    /* ftemp = magnitude from normalize3d; reused from FPU at 0xf9156. */
-    det_frac = (ftemp - *(float *)(proj_tag + 0x1e8)) /
+    /* mag = magnitude from normalize3d; reused from FPU at 0xf9156. */
+    det_frac = (mag - *(float *)(proj_tag + 0x1e8)) /
                (*(float *)(proj_tag + 0x1e4) - *(float *)(proj_tag + 0x1e8));
     if (det_frac < *(float *)0x2533c0) {
       det_frac = 0.0f;
     } else {
       /* 0xf9180: FST dword [ebp-0x20] -- no pop, so the "< 0" compare at
-       * 0xf9183 still sees the wide stack copy; the "> 1.0" compare reloads
-       * the narrowed slot at 0xf9199, as does every later use. */
+       * 0xf9183 still sees the wide stack copy; the "> 1.0" compare
+       * reloads the narrowed slot at 0xf9199, as does every later use. */
       HALO_FLT_ROUNDTRIP(det_frac);
+      /* 0xf9199: FLDS [ebp-0x20]; FCOMPS [1.0f]; FNSTSW; TEST $0x41,AH;
+       * JNE 0xf91b4.  Mask 0x41 is C3|C0 (equal OR less), so JNE skips the
+       * store whenever det_frac <= 1.0 and the assignment is reached only
+       * when it is strictly greater -- an ordinary upper clamp.  The
+       * equality idiom in this same function uses mask 0x44 (C3|C2), e.g.
+       * 0xf913a / 0xf9167 / 0xf93a3; do not confuse the two. */
       if (det_frac > *(float *)0x2533c8) {
         det_frac = 1.0f;
       }
     }
   }
 
-  /* 4. Initial det_result = -1 (tag index word stored in low 16).      */
-  det_result = -1;
+  /* 4. Initial det_result: the reference has no store before the tag read. */
 
   /* ------------------------------------------------------------------ */
   /* Collision state == 3 (world surface) + detonation causer present.  */
@@ -1652,7 +1641,7 @@ void FUN_000f90d0(int projectile_handle, float *hit_pos, float param_3,
     if ((short)*(int16_t *)(damage_params + 0x4c) != -1) {
       tag_idx = (int)(short)*(int16_t *)(damage_params + 0x4c);
     }
-    vel_scale = *(float *)(damage_params + 0x48);
+    scale_b = *(float *)(damage_params + 0x48);
   }
 
   /* Write det_result index to projectile obj+0x1e2 (word).             */
@@ -1956,24 +1945,22 @@ apply_speed_scale:
       /* 0xf9827: FSTP dword [ebp-0x1c] -- narrowed before both clamp
        * compares reload it at 0xf9832 and 0xf984b. */
       HALO_FLT_ROUNDTRIP(scale_a);
-      if (scale_a < *(float *)0x2533c0) {
-        scale_a = 0.0f;
-      } else if (scale_a > *(float *)0x2533c8) {
-        scale_a = 1.0f;
-      }
+    } else {
+      goto clamp_scale_b; /* ref 1b6c: JNE -> scale_b clamp */
     }
-    /* else: scale_a stays 0.0 (from LAB_000f9862 fallthrough) */
   }
 
-  /* Clamp scale_a. */
+  /* Clamp scale_a into [0,1].  0xf9835 lower bound (TEST $0x5,AH; JP),
+   * 0xf984e upper bound (TEST $0x41,AH; JNE) -- same shape as det_frac. */
   if (scale_a < *(float *)0x2533c0) {
     scale_a = 0.0f;
   } else if (scale_a > *(float *)0x2533c8) {
     scale_a = 1.0f;
   }
 
-  /* scale_b (local_18 / local_14) — intensity weight. */
-  scale_b = vel_scale;
+clamp_scale_b:
+  /* scale_b (local_18 / local_14) -- intensity weight.  Clamped into [0,1]
+   * at 0xf9865 / 0xf987e, same shape as scale_a. */
   if (scale_b < *(float *)0x2533c0) {
     scale_b = 0.0f;
   } else if (scale_b > *(float *)0x2533c8) {
@@ -2187,8 +2174,8 @@ apply_speed_scale:
  */
 bool FUN_000f9c40(int projectile_handle)
 {
-  char *proj; /* object data for the projectile                     */
-  char *proj_tag; /* tag data ('proj') for the projectile               */
+  register char *proj; /* object data for the projectile                     */
+  register char *proj_tag; /* tag data ('proj') for the projectile               */
   int contrail_handle; /* handle of the attached contrail sub-object         */
   int time_tick; /* game_time_get() result for seeding randomness      */
   int player_idx; /* loop var: local player index (0-3)                 */

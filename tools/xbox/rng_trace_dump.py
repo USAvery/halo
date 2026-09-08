@@ -326,13 +326,25 @@ def capture(args) -> int:
     print(f"runtime_base = 0x{runtime_base:x} ({base_source})", file=sys.stderr)
     print(f"{TRACE_SYMBOL} VA = 0x{buffer_va:x}", file=sys.stderr)
 
+    hmp = None
+    sock = None
     try:
-        sock = xbdm_connect(args.host, args.port, args.timeout)
-    except XbdmError as exc:
+        if args.hmp_port:
+            from lockstep_datum_diff import HMP
+            hmp = HMP("127.0.0.1", args.hmp_port, timeout=max(args.timeout, 20.0))
+
+            def _read(addr, length):
+                return hmp.read_mem(addr, length)
+        else:
+            sock = xbdm_connect(args.host, args.port, args.timeout)
+
+            def _read(addr, length):
+                return getmem(sock, addr, length, args.chunk)
+    except (XbdmError, OSError, TimeoutError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
     try:
-        header = getmem(sock, buffer_va, HEADER_SIZE, args.chunk)
+        header = _read(buffer_va, HEADER_SIZE)
         magic, version, capacity, write_index = struct.unpack("<IIII", header)
         if magic != TRACE_MAGIC:
             print(f"error: magic mismatch at 0x{buffer_va:x}: read 0x{magic:08x}, "
@@ -352,15 +364,18 @@ def capture(args) -> int:
         span = capacity * RECORD_SIZE if write_index >= capacity else count * RECORD_SIZE
         print(f"version={version} capacity={capacity} write_index={write_index} "
               f"records={count} (reading {span} bytes)", file=sys.stderr)
-        blob = getmem(sock, buffer_va + HEADER_SIZE, span, args.chunk)
+        blob = _read(buffer_va + HEADER_SIZE, span)
         # The game keeps running while we read (no XBDM halt: a halted title
         # does not resume cleanly on this box).  Re-read the header and drop
         # every slot the ring may have touched meanwhile, so the decoded
         # records are all from one generation.
-        header_after = getmem(sock, buffer_va, HEADER_SIZE, args.chunk)
+        header_after = _read(buffer_va, HEADER_SIZE)
         write_index_after = struct.unpack("<IIII", header_after)[3]
     finally:
-        sock.close()
+        if sock is not None:
+            sock.close()
+        if hmp is not None:
+            hmp.close()
 
     torn = write_index_after - write_index
     if torn < 0 or torn >= capacity:
@@ -536,6 +551,8 @@ def main() -> int:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--host", default="127.0.0.1", help="XBDM host")
     ap.add_argument("--port", type=int, default=XBDM_PORT)
+    ap.add_argument("--hmp-port", type=int, default=None,
+                    help="dump via xemu HMP on 127.0.0.1:PORT instead of XBDM")
     ap.add_argument("--timeout", type=float, default=15.0)
     ap.add_argument("--chunk", type=int, default=4096,
                     help="getmem chunk size in bytes (default 4096)")

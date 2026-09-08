@@ -764,6 +764,24 @@ void FUN_00147ed0(void *state, int surface_index)
        * float32 and the squares are summed x, y, z.  The x87 helper
        * distance_squared3d accumulates at 64-bit significand and compares
        * wide, which flips the boundary test; round after each op instead. */
+#if defined(_MSC_VER) && !defined(__clang__)
+      __asm {
+        mov eax, vertex
+        mov ecx, point
+        movss xmm0, dword ptr [eax]
+        movhps xmm0, qword ptr [eax + 4]
+        movss xmm1, dword ptr [ecx]
+        movhps xmm1, qword ptr [ecx + 4]
+        subps xmm0, xmm1
+        mulps xmm0, xmm0
+        movss xmm2, xmm0
+        shufps xmm0, xmm0, 0xe
+        addss xmm2, xmm0
+        shufps xmm0, xmm0, 0x39
+        addss xmm2, xmm0
+        movss dist2, xmm2
+      }
+#else
       delta[0] = vertex[0] - point[0];
       HALO_FLT_ROUNDTRIP(delta[0]);
       delta[1] = vertex[1] - point[1];
@@ -780,6 +798,7 @@ void FUN_00147ed0(void *state, int surface_index)
       HALO_FLT_ROUNDTRIP(sq);
       dist2 = dist2 + sq;
       HALO_FLT_ROUNDTRIP(dist2);
+#endif
       if (dist2 <= radius2) {
         results = *(int **)((char *)state + 0x14);
         for (i = 0; i < results[0x202]; i++) {

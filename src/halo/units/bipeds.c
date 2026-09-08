@@ -2887,7 +2887,6 @@ void FUN_001a2f40(void *physics_arg /* @esi */)
   float r, t, fdist;
   void *obj;
   void *tag;
-  float proj_seg[3]; /* scale_add scratch in the LOS gate */
   float los_dir2[3]; /* local_18: second LOS out point */
   unsigned int isnan_tmp;
   char material_local; /* [EBP-0x31]: (flags>>9)&1 material flag */
@@ -3050,9 +3049,9 @@ void FUN_001a2f40(void *physics_arg /* @esi */)
       vecB[1] = physics[9];
       vecB[2] = physics[10];
       cross_product3d(gp, vecB, vecA);
-      if (normalize3d(vecA) == *(float *)0x2533c0) {
+      if (normalize3d(vecA) == 0.0f) {
         cross_product3d(gp, (float *)(*(int *)0x31fc44), vecA);
-        if (normalize3d(vecA) == *(float *)0x2533c0) {
+        if (normalize3d(vecA) == 0.0f) {
           cross_product3d(gp, (float *)(*(int *)0x31fc3c), vecA);
           normalize3d(vecA);
         }
@@ -3133,18 +3132,16 @@ void FUN_001a2f40(void *physics_arg /* @esi */)
              (physics[0x1b] - physics[0x1a]) +
            *(float *)0x2533c8) *
           magnitude;
-      } else if (d[2] < physics[0x1e]) {
-        if (d[2] <= physics[0x1d]) {
-          curve_scale = magnitude;
-        } else {
-          curve_scale =
-            ((physics[0x1f] - *(float *)0x2533c8) * (d[2] - physics[0x1d]) /
-               (physics[0x1e] - physics[0x1d]) +
-             *(float *)0x2533c8) *
-            magnitude;
-        }
-      } else {
+      } else if (d[2] >= physics[0x1e]) {
         curve_scale = magnitude * physics[0x1f];
+      } else if (d[2] <= physics[0x1d]) {
+        curve_scale = magnitude;
+      } else {
+        curve_scale =
+          ((physics[0x1f] - *(float *)0x2533c8) * (d[2] - physics[0x1d]) /
+             (physics[0x1e] - physics[0x1d]) +
+           *(float *)0x2533c8) *
+          magnitude;
       }
 
       damp2 = (*(float *)0x2533c8 - physics[0x12]) * curve_scale;
@@ -3163,7 +3160,7 @@ void FUN_001a2f40(void *physics_arg /* @esi */)
       vecB[2] = d[2] * damp2 - physics[0xd];
       disp[2] = vecB[2];
       length3 = normalize3d(disp); /* 0x1a35e2; ST0 -> compare */
-      if (length3 < physics[0x13] || length3 == physics[0x13]) {
+      if (length3 <= physics[0x13]) {
         /* 0x1a361f: keep raw (pre-normalize) disp -> restore saved vecB */
         disp[0] = vecB[0];
         disp[1] = vecB[1];
@@ -3370,7 +3367,7 @@ LAB_001a36a4:
                                                *(int *)edge, 0x10);
               void *v1 = tag_block_get_element(
                 (void *)(surf_block + 0x54), *(int *)((char *)edge + 4), 0x10);
-              float ev[3], t2;
+              float ev[3], t2, dist;
               pa = (float *)v0;
               pb = (float *)v1;
               ev[0] = pb[0] - pa[0];
@@ -3390,8 +3387,9 @@ LAB_001a36a4:
                 planeN[1] = pb[1];
                 planeN[2] = pb[2];
               }
-              if (distance_squared3d(proj, planeN) < best_dist) {
-                best_dist = distance_squared3d(proj, planeN);
+              dist = distance_squared3d(proj, planeN);
+              if (dist < best_dist) {
+                best_dist = dist;
                 best_edge = sel_edge;
                 bestN[0] = plane0[0];
                 bestN[1] = plane0[1];
@@ -3419,7 +3417,7 @@ LAB_001a36a4:
           float face = bestN[0] * los_dir[0] + bestN[2] * los_dir[2] +
                        bestN[1] * los_dir[1];
           /* push-out de-penetrates los_dir2 (-> new_position), disasm 0xcec */
-          float pushv = -depth;
+          float pushv = -best_dist;
           los_dir2[0] = bestN[0] * pushv + los_dir2[0];
           los_dir2[1] = bestN[1] * pushv + los_dir2[1];
           los_dir2[2] = bestN[2] * pushv + los_dir2[2];
@@ -3565,8 +3563,10 @@ LAB_001a36a4:
            * (mask & (1 << (type & 0x1f))) test, but adds salt/generation
            * validation so a stale handle returns NULL instead of dereferencing
            * a freed datum slot. */
-          if (object_try_and_get_and_verify_type(e->object_handle, 0x40) !=
-              (void *)0) {
+          if (e->object_handle == -1) {
+            goto loopA_nomark;
+          }
+          if (((1 << ((char *)datum_get(*(data_t **)0x5a8d50, e->object_handle))[3]) & 0x40) != 0) {
             goto loopA_nomark;
           }
         }
@@ -3590,16 +3590,15 @@ LAB_001a36a4:
       }
       if ((*(unsigned short *)((char *)physics + 4) & 1) != 0 &&
           physics[0x17] < *(float *)0x2548fc) {
-        float seg[3], slen;
-        vector3d_scale_add(&new_pos[0], &e->normal[0], best_t, proj_seg);
-        slen = FUN_00012170(proj_seg);
+        float slen;
+        vector3d_scale_add(&new_pos[0], &e->normal[0], best_t, surf);
+        slen = FUN_00012170(surf);
         if (physics[0x17] * physics[0x17] < slen) {
           float md = FUN_00012fe0(&new_pos[0]);
           if (best_t / md < physics[0x18]) {
             goto LAB_001a401e;
           }
         }
-        (void)seg;
         (void)slen;
       }
     }
@@ -3681,16 +3680,19 @@ LAB_001a4062_done:
           ddy = *(float *)((char *)o + 0x1c) - los_dir[1];
           ddz = *(float *)((char *)o + 0x20) - los_dir[2];
           d2 = ddx * ddx + ddy * ddy + ddz * ddz;
-          if (near_obj != -1) {
-            if ((short)near_type == 1) {
-              if (*(short *)((char *)o + 0x64) != 1)
-                goto loopB_next;
-            } else if (*(short *)((char *)o + 0x64) == 1) {
-              goto loopB_take;
-            }
-            if (d2 <= near_dist)
-              goto loopB_next;
+          if (near_obj == -1) {
+            goto loopB_take;
           }
+          if ((short)near_type == 1) {
+            if (*(short *)((char *)o + 0x64) != 1)
+              goto loopB_next;
+          } else if (*(short *)((char *)o + 0x64) == 1) {
+            goto loopB_take;
+          }
+          if (d2 < near_dist) {
+            goto loopB_take;
+          }
+          goto loopB_next;
         loopB_take:
           near_dist = d2;
           near_obj = *eh;
