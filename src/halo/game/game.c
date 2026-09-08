@@ -1072,7 +1072,7 @@ const char *FUN_000b5490(short material_type)
  *   then FLD [EAX+EDX*4] for the raw (DI<0) path at 0xb554b.
  * Confirmed: CMP DI,3 / MOV ECX,3 / JG / MOV ECX,EDI clamping at 0xb555e.
  */
-float game_globals_difficulty_scale(int16_t value_type, int16_t difficulty)
+__declspec(noinline) float game_globals_difficulty_scale(int16_t value_type, int16_t difficulty)
 {
   float default_val = 1.0f;
   void *globals;
