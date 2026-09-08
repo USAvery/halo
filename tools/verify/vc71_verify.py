@@ -1480,7 +1480,10 @@ _PER_FUNCTION_OPT: dict[str, dict[str, str]] = {
     # get_ui_argb_white: reference keeps a 0x10-byte frame and spills the
     # struct-copy temps to EBP slots before overwriting 3 of them with the
     # RGB constants -- classic /Od codegen. 65.1% (/O2) -> 82.4% (/Od).
-    "halo/interface/ui_widget.c": {"get_ui_argb_white": "/Od"},
+    "halo/interface/ui_widget.c": {
+        "get_ui_argb_white": "/Od",
+        "ui_widget_load_error_screen": "/O2 /Ob1",
+    },
     # crt_tolower/crt_toupper: reference has NO EBP frame at all (leaf CRT
     # helper); default /Oy- forces one. crt_localtime in the same TU scores
     # 100% at /Oy- so this must stay per-function, not a TU-wide flip.

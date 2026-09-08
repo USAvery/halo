@@ -86866,16 +86866,16 @@
     "ui_widget_load_error_screen": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 40.2,
+      "abi_modeled_mnemonic_pct": 100.0,
       "addr": "0xe8c90",
       "end": "0xe8d1d",
       "kind": "auto",
       "n_r": 52,
-      "opnd_percent": 33.7,
-      "raw_mnemonic_pct": 40.2,
+      "opnd_percent": 98.1,
+      "raw_mnemonic_pct": 100.0,
       "ref": "synth",
       "ref_sha": "7880085751ea17bf",
-      "score": 40.2,
+      "score": 100.0,
       "source": "src/halo/interface/ui_widget.c"
     },
     "ui_widget_load_progress_widget": {

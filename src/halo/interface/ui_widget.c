@@ -2367,13 +2367,14 @@ void ui_widget_load_error_screen(int16_t error_handle, int allow_abort)
 {
   const char *widget_name;
   void *widget;
+  bool abort = *(bool *)&allow_abort;
 
-  if (allow_abort == 1) {
+  if (abort == 1) {
     widget_name = "ui\\shell\\error\\error_abort_to_dashboard";
   } else {
     widget_name =
       "ui\\shell\\error\\error_abort_to_dashboard_you_have_no_choice";
-    if (allow_abort == 0) {
+    if (abort == 0) {
       ui_widgets_close_all();
     }
   }
