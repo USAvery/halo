@@ -21733,7 +21733,8 @@
     },
     {
      "addr": "0x21e50",
-     "decl": "char FUN_00021e50(int actor_handle, short param_2, float *param_3, int param_4, int param_5);"
+     "decl": "char FUN_00021e50(int actor_handle, short param_2, float *param_3, int param_4, int param_5);",
+     "ported": true
     },
     {
      "addr": "0x21f70",
@@ -33357,7 +33358,7 @@
     },
     {
      "addr": "0x218d0",
-     "decl": "void actor_combat_build_grenade_trajectory(void);"
+     "decl": "char actor_combat_build_grenade_trajectory(float *position @<eax>, float *out_aim_direction @<ebx>, int definition_index, int definition_field_190, float *point, int param_6, int param_7, float *out_speed, int *out_target, float *out_impact_point, float *out_acceleration);"
     },
     {
      "addr": "0x219e0",

@@ -3438,17 +3438,17 @@
     "FUN_00021e50": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 7.6,
+      "abi_modeled_mnemonic_pct": 92.9,
       "addr": "0x21e50",
       "end": "0x21f61",
       "kind": "auto",
       "n_r": 100,
-      "opnd_percent": 5.7,
-      "raw_mnemonic_pct": 7.6,
+      "opnd_percent": 61.6,
+      "raw_mnemonic_pct": 92.9,
       "ref": "synth",
       "ref_sha": "27d4bcd61b3f53cc",
-      "score": 7.6,
-      "source": "src/halo/unported_thunks.c"
+      "score": 92.9,
+      "source": "src/halo/math/vector_math.c"
     },
     "FUN_00021f70": {
       "abi_model": "raw",

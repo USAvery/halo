@@ -9147,6 +9147,7 @@
     "0x21430": "void FUN_00021430(float *target /* @<esi> */, float distance);",
     "0x21590": "void actor_combat_set_fire_timer(int actor_handle @<esi>);",
     "0x21640": "bool actor_combat_evaluate_firing(int actor_handle @<eax>, void *timing_data @<edi>);",
+    "0x218d0": "char actor_combat_build_grenade_trajectory(float *position@<eax>, float *out_aim_direction@<ebx>, int definition_index, int definition_field_190, float *point, int param_6, int param_7, float *out_speed, int *out_target, float *out_impact_point, float *out_acceleration);",
     "0x22010": "int actor_combat_check_fire_target(int actor_handle @<edi>, short mode);",
     "0x22b40": "void FUN_00022b40(int actor_handle @<ebx>, float *aim_vector @<esi>);",
     "0x24000": "void FUN_00024000(void *ctx, float score, int type, void *position @<esi>);",
