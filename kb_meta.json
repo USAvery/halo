@@ -12494,6 +12494,10 @@
       "kind": "function",
       "status": "ported"
     },
+    "0x1258a0": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0x125a90": {
       "kind": "function",
       "status": "ported"
@@ -12514,6 +12518,10 @@
       "kind": "function",
       "status": "ported"
     },
+    "0x1263a0": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0x126590": {
       "kind": "function",
       "status": "ported"
@@ -12527,6 +12535,10 @@
       "status": "ported"
     },
     "0x1267c0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x1268a0": {
       "kind": "function",
       "status": "ported"
     },
@@ -13074,6 +13086,50 @@
       ]
     },
     "0x130d60": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x130ec0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x130ef0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x130f00": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x130f10": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x130f30": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x131130": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x131150": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x131280": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x1313f0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x131700": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x131790": {
       "kind": "function",
       "status": "ported"
     },

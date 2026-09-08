@@ -26004,47 +26004,69 @@
     },
     {
      "addr": "0x130ec0",
-     "decl": "void FUN_00130ec0(void);"
+     "decl": "void antenna_debug_data_new(void);",
+     "name": "antenna_debug_data_new",
+     "ported": true
     },
     {
      "addr": "0x130ef0",
-     "decl": "void FUN_00130ef0(void);"
+     "decl": "void antenna_debug_data_dispose(void);",
+     "name": "antenna_debug_data_dispose",
+     "ported": true
     },
     {
      "addr": "0x130f00",
-     "decl": "void FUN_00130f00(void);"
+     "decl": "void antenna_debug_data_invalidate(void);",
+     "name": "antenna_debug_data_invalidate",
+     "ported": true
     },
     {
      "addr": "0x130f10",
-     "decl": "void FUN_00130f10(void);"
+     "decl": "void antenna_debug_data_clear(void);",
+     "name": "antenna_debug_data_clear",
+     "ported": true
     },
     {
      "addr": "0x130f30",
-     "decl": "void FUN_00130f30(void);"
+     "decl": "int antenna_debug_data_add(int tag_id);",
+     "name": "antenna_debug_data_add",
+     "ported": true
     },
     {
      "addr": "0x131130",
-     "decl": "void FUN_00131130(void);"
+     "decl": "void antenna_debug_data_remove(int datum_handle);",
+     "name": "antenna_debug_data_remove",
+     "ported": true
     },
     {
      "addr": "0x131150",
-     "decl": "void FUN_00131150(void);"
+     "decl": "void antenna_debug_data_relocate_marker(void *world_pos_out @<eax>, void *rec @<esi>, void *marker_pos @<edi>, void *tag_def, void *location_out);",
+     "name": "antenna_debug_data_relocate_marker",
+     "ported": true
     },
     {
      "addr": "0x131280",
-     "decl": "void FUN_00131280(void);"
+     "decl": "void antenna_debug_data_draw_beams(void *tag_def @<ecx>, void *rec);",
+     "name": "antenna_debug_data_draw_beams",
+     "ported": true
     },
     {
      "addr": "0x1313f0",
-     "decl": "void FUN_001313f0(void);"
+     "decl": "void antenna_debug_data_simulate_rope(void *rec, void *tag_def, float delta_time);",
+     "name": "antenna_debug_data_simulate_rope",
+     "ported": true
     },
     {
      "addr": "0x131700",
-     "decl": "void FUN_00131700(void);"
+     "decl": "void antenna_debug_data_set_object(int object_handle, int datum_handle);",
+     "name": "antenna_debug_data_set_object",
+     "ported": true
     },
     {
      "addr": "0x131790",
-     "decl": "void FUN_00131790(void);"
+     "decl": "void antenna_debug_data_update_all(float delta_time);",
+     "name": "antenna_debug_data_update_all",
+     "ported": true
     },
     {
      "addr": "0x131840",
