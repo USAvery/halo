@@ -381,7 +381,6 @@ int FUN_0003fb00(unsigned char *param_1, unsigned char *param_2)
   return (*param_1 < *param_2);
 }
 
-
 /* ai_find_inactive_encounters (0x3fb40): build the "potentially releasable
  * storage" list — every clump actor and every encounter that is currently
  * inactive — into the caller's working memory, then sort it.
@@ -484,6 +483,7 @@ void ai_find_inactive_encounters(void *working_memory,
           (qsort_compar_proc)FUN_0003fb00);
   }
 }
+
 /* ai_release_inactive_encounters (0x3fc90): release ONE entry from the
  * "potentially releasable storage" list built by ai_find_inactive_encounters,
  * describe it into result_description, and report whether more entries remain.
@@ -1230,6 +1230,84 @@ void ai_create_mounted_weapons_for_unit(int param_1)
           "WARNING: cannot create mounted weapons for %s, exceeded "
           "MAXIMUM_NUMBER_OF_MOUNTED_WEAPON_UNITS",
           stripped);
+  }
+}
+
+/* 0x40860 — ai_handle_unit_effect: broadcast an AI unit effect (sound/visual
+ * cue) from a unit to its AI actor(s), rate-limited per unit.
+ *
+ * Confirmed: gated on byte[ai_globals+1] (AI active); early RET when clear.
+ * Confirmed: two asserts at ai.c:0x729 (volume 0..4) and 0x72a (effect_type
+ * 0..3), each display_assert(...,1) + system_exit(-1). The 16-bit compares
+ * (TEST SI,SI / CMP SI,0x5) prove both params are truncated to short.
+ * Confirmed: guards unit_handle != -1 and volume > 0 (JLE) before any call.
+ * Confirmed: call order object_get_and_verify_type(unit_handle,3) -> ESI,
+ * game_time_get() -> EDI, game_connection() -> AX.
+ * Confirmed: network/rider guard — returns only when game_connection()==0 AND
+ * byte[0x5ac9c6]!=0 AND unit+0x1c8 != -1.
+ * Confirmed: rate limit — proceeds when effect > word[unit+0x1cc] (CMP BX,
+ * [ESI+0x1cc]; JG) or time > int[unit+0x1d0]+0x1e (JLE returns).
+ * Confirmed: word[unit+0x64] is read into AX BEFORE the two stores to
+ * unit+0x1cc / unit+0x1d0, then tested against 1 and 0.
+ * Confirmed: kind==1 walks the child list from int[unit+0xc8], verifying each
+ * with object_get_and_verify_type(handle,-1) (type_mask -1), dispatching
+ * actors_handle_unit_effect(child_handle, effect, priority) for children whose
+ * word+0x64 is 0, advancing via int[child+0xc4] until -1.
+ * Confirmed: kind==0 dispatches actors_handle_unit_effect(unit_handle, effect,
+ * priority) for the unit itself; any other kind falls through.
+ * Confirmed: all calls cdecl (ADD ESP,0x8 / 0xc). No return value. */
+void ai_handle_unit_effect(int unit_handle, int effect_type, int priority)
+{
+  short volume;
+  short effect;
+  short kind;
+  char *unit_obj;
+  char *child_obj;
+  int time;
+  int child_handle;
+
+  if (*(char *)(*(int *)0x632574 + 1) == '\0') {
+    return;
+  }
+  volume = (short)priority;
+  if ((volume < 0) || (volume > 4)) {
+    display_assert("volume>=0 && volume<NUMBER_OF_AI_SOUND_VOLUMES",
+                   "c:\\halo\\SOURCE\\ai\\ai.c", 0x729, 1);
+    system_exit(-1);
+  }
+  effect = (short)effect_type;
+  if ((effect < 0) || (effect > 3)) {
+    display_assert("effect_type>=0 && effect_type<NUMBER_OF_AI_UNIT_EFFECTS",
+                   "c:\\halo\\SOURCE\\ai\\ai.c", 0x72a, 1);
+    system_exit(-1);
+  }
+  if ((unit_handle == -1) || (volume <= 0)) {
+    return;
+  }
+  unit_obj = (char *)object_get_and_verify_type(unit_handle, 3);
+  time = game_time_get();
+  if (game_connection() == 0 && *(char *)0x5ac9c6 != '\0' &&
+      *(int *)(unit_obj + 0x1c8) != -1) {
+    return;
+  }
+  if (effect <= *(short *)(unit_obj + 0x1cc) &&
+      time <= *(int *)(unit_obj + 0x1d0) + 0x1e) {
+    return;
+  }
+  kind = *(short *)(unit_obj + 0x64);
+  *(short *)(unit_obj + 0x1cc) = effect;
+  *(int *)(unit_obj + 0x1d0) = time;
+  if (kind == 1) {
+    child_handle = *(int *)(unit_obj + 0xc8);
+    while (child_handle != -1) {
+      child_obj = (char *)object_get_and_verify_type(child_handle, -1);
+      if (*(short *)(child_obj + 0x64) == 0) {
+        actors_handle_unit_effect(child_handle, effect, priority);
+      }
+      child_handle = *(int *)(child_obj + 0xc4);
+    }
+  } else if (kind == 0) {
+    actors_handle_unit_effect(unit_handle, effect, priority);
   }
 }
 
