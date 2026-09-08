@@ -26318,7 +26318,8 @@
     },
     {
      "addr": "0x81300",
-     "decl": "void FUN_00081300(void);"
+     "decl": "void FUN_00081300(unsigned int *public_key, unsigned int *p, unsigned int *x, unsigned int *private_key);",
+     "ported": true
     },
     {
      "addr": "0x81410",
@@ -26330,7 +26331,8 @@
     },
     {
      "addr": "0x815f0",
-     "decl": "void FUN_000815f0(void);"
+     "decl": "void FUN_000815f0(void);",
+     "ported": true
     },
     {
      "addr": "0x817e0",
@@ -26338,15 +26340,18 @@
     },
     {
      "addr": "0x81910",
-     "decl": "void FUN_00081910(int *mutex_reference);"
+     "decl": "void FUN_00081910(int *mutex_reference);",
+     "ported": true
     },
     {
      "addr": "0x81980",
-     "decl": "void FUN_00081980(void);"
+     "decl": "void *FUN_00081980(const unsigned int *address, unsigned short field_10, unsigned short field_12);",
+     "ported": true
     },
     {
      "addr": "0x81a20",
-     "decl": "void FUN_00081a20(void);"
+     "decl": "void FUN_00081a20(void *address);",
+     "ported": true
     }
    ],
    "name": "thread_win32.obj",

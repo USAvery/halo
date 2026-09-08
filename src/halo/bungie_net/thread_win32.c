@@ -5,11 +5,14 @@
  * Re-implemented functions (by XBE address, ascending):
  *   0x81170  FUN_00081170 (from public_key_crypt.c — same COFF object)
  *   0x81250  FUN_00081250 (from public_key_crypt.c — same COFF object)
+ *   0x81300  FUN_00081300 (from public_key_crypt.c — same COFF object)
  *   0x81630  thread_new
  *   0x81720  thread_is_done
  *   0x81770  thread_close
  *   0x81870  mutex_acquire (take_mutex)
  *   0x818d0  mutex_release (release_mutex)
+ *   0x81910  FUN_00081910
+ *   0x81980  FUN_00081980
  */
 
 #include "common.h"
@@ -121,6 +124,117 @@ void FUN_00081250(unsigned int *p, unsigned int *x, unsigned int *g,
 
   error(2, "p= %8lX%8lX\nx= %8lX%8lX\ng= %8lX%8lX\npublic key= %8lX%8lX\n\n",
         p[0], p[1], x[0], x[1], g[0], g[1], public_key[0], public_key[1]);
+}
+
+/*
+ * 0x81300 - compute the shared/private key from (public_key, p, x) and dump
+ * all four 64-bit values through error() at severity 2.
+ *
+ * From public_key_crypt.c (same COFF object as FUN_00081250 above), cdecl
+ * with four stack params: public_key@[EBP+8], p@[EBP+0xc], x@[EBP+0x10],
+ * private_key@[EBP+0x14]. Parameter names come from the format string at
+ * 0x265e68 ("public_key= ... p= ... x= ... private key= ...", read verbatim
+ * from the pristine XBE .rdata) and from the assert reason "x<(p-1)".
+ *
+ * Confirmed: the loop runs exactly 2 iterations ([EBP-4] initialised to 2,
+ * DEC/JNZ at 0x813bf-0x813c9). The original walks p with a single cursor
+ * (ESI) and reaches the other three arrays through precomputed byte deltas
+ * (public_key-p, x-p, private_key-p) folded into MOV [reg+ESI*1]; that is a
+ * strength-reduction of the plain per-array index used here.
+ * Confirmed: assert reason "p>2" at 0x265de0, line 0x85 (CMP EDI,2 / JA
+ * skips the assert, so it fires when p[i] <= 2); assert reason "x<(p-1)" at
+ * 0x265dd8, line 0x86 (LEA ECX,[EDI-1] / CMP EBX,ECX / JC skips it, so it
+ * fires when x[i] >= p[i] - 1). Both strings read verbatim from the
+ * pristine XBE .rdata.
+ * Confirmed by register order at 0x8138a-0x81391: EAX = x[i], ECX =
+ * public_key[i], EDX = p[i], matching FUN_00080fc0's declared
+ * exponent@eax / base@ecx / modulus@edx.
+ * Confirmed: the EAX result is byte-reversed at 0x81396-0x813ba (the exact
+ * shift/mask sequence kept below) before the store to private_key[i] at
+ * 0x813bc.
+ * Confirmed: the error() varargs are pushed high-to-low as private_key[1],
+ * private_key[0], x[1], x[0], p[1], p[0], public_key[1], public_key[0],
+ * format, 2 -- first PUSH is the last argument, so the printed order
+ * matches the format string.
+ * Unknown: the semantic name of this function and of FUN_00080fc0 (no
+ * string or symbol evidence).
+ */
+void FUN_00081300(unsigned int *public_key, unsigned int *p, unsigned int *x,
+                  unsigned int *private_key)
+{
+  int public_key_delta = (int)public_key - (int)p;
+  int x_delta = (int)x - (int)p;
+  int private_key_delta = (int)private_key - (int)p;
+  unsigned int *cursor = p;
+  int count = 2;
+  unsigned int base;
+  unsigned int exponent;
+  unsigned int modulus;
+  unsigned int value;
+
+  while (1) {
+    exponent = *(unsigned int *)((int)cursor + x_delta);
+    modulus = *cursor;
+    base = *(unsigned int *)((int)cursor + public_key_delta);
+
+    if (modulus < 3) {
+      display_assert("p>2",
+                     "c:\\halo\\SOURCE\\bungie_net\\common\\public_key_crypt.c",
+                     0x85, 1);
+      system_exit(-1);
+    }
+    if (exponent >= modulus - 1) {
+      display_assert("x<(p-1)",
+                     "c:\\halo\\SOURCE\\bungie_net\\common\\public_key_crypt.c",
+                     0x86, 1);
+      system_exit(-1);
+    }
+
+    value = FUN_00080fc0(exponent, base, modulus);
+    *(unsigned int *)((int)cursor + private_key_delta) =
+      (((value & 0xff0000) | (value >> 16)) >> 8) |
+      (((value << 16) | (value & 0xff00)) << 8);
+
+    cursor++;
+    count--;
+    if (count == 0) {
+      break;
+    }
+  }
+
+  error(2,
+        "public_key= %8lX%8lX\np= %8lX%8lX\nx= %8lX%8lX\nprivate key= "
+        "%8lX%8lX\n\n",
+        public_key[0], public_key[1], p[0], p[1], x[0], x[1], private_key[0],
+        private_key[1]);
+}
+
+/*
+ * FUN_000815f0 — initialize the first available 0x28-byte thread slot.
+ *
+ * Confirmed: scans byte 0x334ab4 with stride 0x28 through 0x334fb4; on
+ * the first zero it clears dwords 0x334a90 + index*0x28 and +4, then sets
+ * byte +0x24. Unknown: the pool type and field meanings.
+ */
+void FUN_000815f0(void)
+{
+  char *slot_in_use;
+  int index;
+  int *slot;
+
+  index = 0;
+  slot_in_use = (char *)0x334ab4;
+  do {
+    if (*slot_in_use == 0) {
+      slot = (int *)(0x334a90 + index * 0x28);
+      *(char *)(slot + 1) = 0;
+      *slot = 0;
+      *(char *)((char *)slot + 0x24) = 1;
+      return;
+    }
+    slot_in_use = slot_in_use + 0x28;
+    index = index + 1;
+  } while ((int)slot_in_use < 0x334fb4);
 }
 
 /*
@@ -298,4 +412,110 @@ void release_mutex(int *mutex_reference)
     system_exit(-1);
   }
   ReleaseMutex(*mutex_reference);
+}
+
+/*
+ * FUN_00081910 — close a mutex handle and clear its reference.
+ *
+ * Confirmed: asserts "mutex_reference" at line 0xf0 and
+ * "mutex_reference->in_use" at line 0xf1; calls CloseHandle before clearing
+ * offsets +0x04, +0x00, and +0x24, in that order.
+ */
+void FUN_00081910(int *mutex_reference)
+{
+  if (mutex_reference == NULL) {
+    display_assert("mutex_reference",
+                   "c:\\halo\\SOURCE\\bungie_net\\common\\thread_win32.c", 0xf0,
+                   1);
+    system_exit(-1);
+  }
+  if (*(char *)((char *)mutex_reference + 0x24) == 0) {
+    display_assert("mutex_reference->in_use",
+                   "c:\\halo\\SOURCE\\bungie_net\\common\\thread_win32.c", 0xf1,
+                   1);
+    system_exit(-1);
+  }
+
+  CloseHandle(*mutex_reference);
+  *(char *)((char *)mutex_reference + 4) = 0;
+  *mutex_reference = 0;
+  *(char *)((char *)mutex_reference + 0x24) = 0;
+}
+
+
+/*
+ * FUN_00081980 — allocate and initialize a 0x18-byte transport address copy.
+ *
+ * Confirmed: asserts transport_initialized and address at transport_address.c
+ * lines 0x1e and 0x1f; debug_malloc(0x18, false, __FILE__, 0x21) returns the
+ * copied address. The four dword input fields and two word parameters occupy
+ * output offsets +0x00 through +0x13; output offset +0x14 is zeroed.
+ */
+typedef struct {
+  unsigned int field_00;
+  unsigned int field_04;
+  unsigned int field_08;
+  unsigned int field_0c;
+  unsigned short field_10;
+  unsigned short field_12;
+  unsigned int field_14;
+} transport_address_copy_t;
+
+void *FUN_00081980(const unsigned int *address, unsigned short field_10,
+                   unsigned short field_12)
+{
+  transport_address_copy_t *result;
+
+  if (*(char *)0x335090 == 0) {
+    display_assert("transport_initialized",
+                   "c:\\halo\\SOURCE\\bungie_net\\network\\transport_address.c",
+                   0x1e, 1);
+    system_exit(-1);
+  }
+  if (address == NULL) {
+    display_assert("address",
+                   "c:\\halo\\SOURCE\\bungie_net\\network\\transport_address.c",
+                   0x1f, 1);
+    system_exit(-1);
+  }
+
+  result = (transport_address_copy_t *)debug_malloc(
+    0x18, 0, "c:\\halo\\SOURCE\\bungie_net\\network\\transport_address.c",
+    0x21);
+  if (result != NULL) {
+    result->field_00 = address[0];
+    result->field_04 = address[1];
+    result->field_08 = address[2];
+    result->field_0c = address[3];
+    result->field_10 = field_10;
+    result->field_12 = field_12;
+    result->field_14 = 0;
+  }
+  return result;
+}
+
+
+/*
+ * FUN_00081a20 — free a transport-address allocation.
+ *
+ * Confirmed: asserts transport_initialized and address at transport_address.c
+ * lines 0x2f and 0x30, then calls debug_free(address, __FILE__, 0x32).
+ */
+void FUN_00081a20(void *address)
+{
+  if (*(char *)0x335090 == 0) {
+    display_assert("transport_initialized",
+                   "c:\\halo\\SOURCE\\bungie_net\\network\\transport_address.c",
+                   0x2f, 1);
+    system_exit(-1);
+  }
+  if (address == NULL) {
+    display_assert("address",
+                   "c:\\halo\\SOURCE\\bungie_net\\network\\transport_address.c",
+                   0x30, 1);
+    system_exit(-1);
+  }
+  debug_free(address,
+             "c:\\halo\\SOURCE\\bungie_net\\network\\transport_address.c",
+             0x32);
 }
