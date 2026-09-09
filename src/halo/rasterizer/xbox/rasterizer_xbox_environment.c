@@ -1378,7 +1378,15 @@ void FUN_00163590(int light_index)
   struct vs_vec3 {
     float x, y, z;
   };
-  char *light;
+  struct point_light_t {
+    char *owner;
+    float position[3];
+    float color[3];
+    char pad_1c[0xc];
+    float field_28[3];
+    float radius;
+  };
+  const struct point_light_t *light;
   float vs_const[20];
 
   if (*(void **)0x476ab0 == 0) {
@@ -1398,9 +1406,9 @@ void FUN_00163590(int light_index)
       system_exit(-1);
     }
 
-    light = (char *)0x5a37e4 + light_index * 0x38;
+    light = (const struct point_light_t *)0x5a37e4 + light_index;
 
-    if (*(float *)(light + 0x34) == *(float *)0x2533c0) {
+    if (light->radius == 0.0f) {
       display_assert(
         "light->radius",
         "c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_environment.c",
@@ -1408,22 +1416,25 @@ void FUN_00163590(int light_index)
       system_exit(-1);
     }
 
-    if (*(uint32_t *)(*(char **)light + 0x1c) != 0xbf800000 &&
-        (*(int *)(*(char **)light + 0x70) != -1 ||
-         *(int *)(*(char **)light + 0x88) != -1)) {
+    if (*(uint32_t *)(light->owner + 0x1c) != 0xbf800000 &&
+        (*(int *)(light->owner + 0x70) != -1 ||
+         *(int *)(light->owner + 0x88) != -1)) {
       *(uint16_t *)0x325170 = 1;
-      *(float *)0x47dca8 = real_rgb_color_brightness((float *)(light + 0x28));
+      *(float *)0x47dca8 = real_rgb_color_brightness((float *)light->field_28);
       FUN_001631d0(light_index);
       return;
     }
 
     *(uint16_t *)0x325170 = 0;
-    *(float *)0x47dca8 = real_rgb_color_brightness((float *)(light + 0x28));
+    *(float *)0x47dca8 = real_rgb_color_brightness((float *)light->field_28);
 
     /* Constant 0 is the light position (copied as raw dwords, as the reference
      * does with MOV EDX/EAX/ECX) plus a scale in .w; constants 1..4 are the
      * rows of an identity-like basis. */
-    *(struct vs_vec3 *)&vs_const[0] = *(const struct vs_vec3 *)(light + 4);
+    vs_const[3] = (*(float *)0x2533c8 / (*(float *)(light->owner + 0x24) *
+                                         light->radius)) *
+                  *(float *)0x253398;
+    *(struct vs_vec3 *)&vs_const[0] = *(const struct vs_vec3 *)light->position;
     vs_const[4] = 0.0f;
     vs_const[5] = 0.0f;
     vs_const[6] = 0.0f;
@@ -1440,9 +1451,6 @@ void FUN_00163590(int light_index)
     vs_const[17] = 0.0f;
     vs_const[18] = 0.0f;
     vs_const[19] = 1.0f;
-    vs_const[3] = (*(float *)0x2533c8 / (*(float *)(*(char **)light + 0x24) *
-                                         *(float *)(light + 0x34))) *
-                  *(float *)0x253398;
 
     D3DDevice_SetVertexShaderConstant(-0x51, vs_const, 5);
 
