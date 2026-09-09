@@ -45076,16 +45076,16 @@
     "FUN_001bdd80": {
       "abi_model": "regparam_stripped",
       "abi_model_items": 1,
-      "abi_modeled_mnemonic_pct": 87.0,
+      "abi_modeled_mnemonic_pct": 93.1,
       "addr": "0x1bdd80",
       "end": "0x1bde0f",
       "kind": "auto",
       "n_r": 58,
-      "opnd_percent": 80.0,
-      "raw_mnemonic_pct": 86.2,
+      "opnd_percent": 86.2,
+      "raw_mnemonic_pct": 92.3,
       "ref": "synth",
       "ref_sha": "785ecc891793fb72",
-      "score": 87.0,
+      "score": 93.1,
       "source": "src/halo/cache/predicted_resources.c"
     },
     "FUN_001bde90": {
@@ -77281,16 +77281,16 @@
     "predicted_resources_precache": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 68.6,
+      "abi_modeled_mnemonic_pct": 98.0,
       "addr": "0x1bde10",
       "end": "0x1bde82",
       "kind": "auto",
       "n_r": 49,
-      "opnd_percent": 49.0,
-      "raw_mnemonic_pct": 68.6,
+      "opnd_percent": 96.0,
+      "raw_mnemonic_pct": 98.0,
       "ref": "synth",
       "ref_sha": "d0bccdee01b09251",
-      "score": 68.6,
+      "score": 98.0,
       "source": "src/halo/cache/predicted_resources.c"
     },
     "prime_compare": {
