@@ -778,7 +778,6 @@ int FUN_0009eb40(int definition_index, int object_index, short marker_index,
 {
   char *iVar4;
   int iVar3;
-  float *default_scale;
 
   if (object_index == -1) {
     display_assert("object_index!=NONE", "c:\\halo\\SOURCE\\effects\\effects.c",
@@ -798,12 +797,9 @@ int FUN_0009eb40(int definition_index, int object_index, short marker_index,
     *(int *)(iVar4 + 0x34) = 0;
     *(int *)(iVar4 + 0x38) = 0;
     if (unknown == -1) {
-      default_scale = *(float **)0x2ee708;
-      *(int *)(iVar4 + 0x18) = *(int *)default_scale;
-      *(int *)(iVar4 + 0x1c) = *(int *)((char *)default_scale + 4);
-      *(int *)(iVar4 + 0x20) = *(int *)((char *)default_scale + 8);
+      *(vector3_t *)(iVar4 + 0x18) = **(vector3_t **)0x2ee708;
     }
-    *(unsigned char *)(iVar4 + 2) = *(unsigned char *)(iVar4 + 2) | 2;
+    *(uint8_t *)(iVar4 + 2) |= 2;
     csmemset(iVar4 + 0x5c, -1, 0x80);
     FUN_0009d4e0((int)iVar4, (void *)&object_get_markers_by_string_id);
     if (*(short *)(iVar4 + 0x4c) != -1) {
