@@ -84046,16 +84046,16 @@
     "sound_volume_crossfade": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 89.7,
+      "abi_modeled_mnemonic_pct": 92.3,
       "addr": "0x1cc490",
       "end": "0x1cc4ec",
       "kind": "auto",
       "n_r": 38,
-      "opnd_percent": 89.7,
-      "raw_mnemonic_pct": 89.7,
+      "opnd_percent": 92.3,
+      "raw_mnemonic_pct": 92.3,
       "ref": "synth",
       "ref_sha": "b7e7d4e1e3a98c24",
-      "score": 89.7,
+      "score": 92.3,
       "source": "src/halo/sound/sound_manager.c"
     },
     "sphere_intersects_rectangle3d": {

@@ -1050,22 +1050,20 @@ float sound_update_channel_attenuation(int sound_handle)
  * current to avoid overshoot. */
 float sound_volume_crossfade(float current, float target, float rate)
 {
-  if (rate != 0.0f && current != target) {
-    if (current > target) {
-      /* Fading down: multiply target by rate. */
-      float result = target * rate;
-      if (current > result)
-        return result;
-      return current;
-    } else {
-      /* Fading up: divide target by rate. */
-      float result = target / rate;
-      if (current <= result)
-        return result;
-    }
-  }
+  if (rate == 0.0f || current == target)
+    return current;
 
-  return current;
+  if (current > target) {
+    float result = target * rate;
+    if (current > result)
+      return result;
+    return current;
+  } else {
+    float result = target / rate;
+    if (current > result)
+      return current;
+    return result;
+  }
 }
 
 /* sound_compute_random_scale (0x1cc8c0)
