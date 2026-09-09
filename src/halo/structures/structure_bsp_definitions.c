@@ -4,19 +4,15 @@
 uint32_t *structure_bsp_get_cluster_sound_data(void *bsp, int16_t cluster_index)
 {
   char *b = (char *)bsp;
-  int count = *(int *)(b + 0x134);
-  int bit_vector_longs;
 
-  if (cluster_index < 0 || (int)cluster_index >= count) {
+  if (cluster_index < 0 || (int)cluster_index >= *(int *)(b + 0x134)) {
     display_assert(
       "cluster_index>=0 && cluster_index<structure_bsp->clusters.count",
       "c:\\halo\\SOURCE\\structures\\structure_bsp_definitions.c", 0x24, 1);
     system_exit(-1);
   }
 
-  bit_vector_longs = (count + 0x1f) >> 5;
-
-  if ((int16_t)(cluster_index + 1) * bit_vector_longs > *(int *)(b + 0x140)) {
+  if ((cluster_index + 1) * ((*(int *)(b + 0x134) + 31) >> 5) > *(int *)(b + 0x140)) {
     display_assert("(cluster_index+1)*BIT_VECTOR_SIZE_IN_LONGS(structure_bsp->"
                    "clusters.count)<=structure_bsp->cluster_data.size",
                    "c:\\halo\\SOURCE\\structures\\structure_bsp_definitions.c",
@@ -25,7 +21,7 @@ uint32_t *structure_bsp_get_cluster_sound_data(void *bsp, int16_t cluster_index)
   }
 
   return (uint32_t *)(*(int *)(b + 0x14c) +
-                      bit_vector_longs * (int)cluster_index * 4);
+                      ((*(int *)(b + 0x134) + 31) >> 5) * (int)cluster_index * 4);
 }
 
 /* Return a pointer to the sound encoding byte for a cluster pair (0x1937d0).
@@ -66,6 +62,7 @@ uint8_t structure_bsp_cluster_sound_encoding(void *bsp, int16_t from_cluster,
                                              int16_t to_cluster)
 {
   char *b = (char *)bsp;
+  int16_t tmp;
 
   if (from_cluster < 0 || (int)from_cluster >= *(int *)(b + 0x134)) {
     display_assert("from_cluster_index>=0 && from_cluster_index<structure_bsp->"
@@ -82,15 +79,16 @@ uint8_t structure_bsp_cluster_sound_encoding(void *bsp, int16_t from_cluster,
     system_exit(-1);
   }
 
-  if (from_cluster == to_cluster)
-    return 0;
+  if (from_cluster != to_cluster) {
+    if (from_cluster > to_cluster) {
+      tmp = from_cluster;
+      from_cluster = to_cluster;
+      to_cluster = tmp;
+    }
 
-  if (from_cluster > to_cluster) {
-    int16_t tmp = from_cluster;
-    from_cluster = to_cluster;
-    to_cluster = tmp;
+    return *structure_bsp_get_cluster_encoded_sound_data(bsp, from_cluster,
+                                                         to_cluster);
   }
 
-  return *structure_bsp_get_cluster_encoded_sound_data(bsp, from_cluster,
-                                                       to_cluster);
+  return 0;
 }
