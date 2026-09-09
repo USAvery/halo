@@ -70246,16 +70246,16 @@
     "network_game_client_dispose": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 89.9,
+      "abi_modeled_mnemonic_pct": 95.1,
       "addr": "0x12ea00",
       "end": "0x12eb19",
       "kind": "auto",
       "n_r": 90,
-      "opnd_percent": 72.0,
-      "raw_mnemonic_pct": 89.9,
+      "opnd_percent": 80.0,
+      "raw_mnemonic_pct": 95.1,
       "ref": "synth",
       "ref_sha": "2d3582f358b88d3c",
-      "score": 89.9,
+      "score": 95.1,
       "source": "src/halo/networking/network_server_manager.c"
     },
     "network_game_client_end_frame": {

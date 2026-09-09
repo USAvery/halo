@@ -2398,31 +2398,31 @@ void network_game_client_dispose(void *server)
   switch (*(uint16_t *)((char *)server + 4)) {
   case 0:
     msg = encode_network_game_message(9, &server, 4);
-    if (!msg) {
-      network_game_log(
-        "failed to create a _message_type_server_graceful_game_exit_pregame message");
-      break;
+    if (msg) {
+      goto notify;
     }
-    if (FUN_0012f430(server, msg)) {
-      network_game_log("notified all clients that we are going down");
-    } else {
-      network_game_log("failed to notify all clients that we are going down");
-    }
+    network_game_log(
+      "failed to create a _message_type_server_graceful_game_exit_pregame message");
     break;
   case 2:
     msg = encode_network_game_message(0x1f, &server, 4);
-    if (!msg) {
-      network_game_log(
-        "failed to create a _message_type_server_graceful_game_exit_postgame message");
-      break;
+    if (msg) {
+      goto notify;
     }
-    if (FUN_0012f430(server, msg)) {
-      network_game_log("notified all clients that we are going down");
-    } else {
-      network_game_log("failed to notify all clients that we are going down");
-    }
+    network_game_log(
+      "failed to create a _message_type_server_graceful_game_exit_postgame message");
     break;
   }
+  goto after_notify;
+
+notify:
+  if (FUN_0012f430(server, msg)) {
+    network_game_log("notified all clients that we are going down");
+  } else {
+    network_game_log("failed to notify all clients that we are going down");
+  }
+
+after_notify:
 
   if (!FUN_0012e580((int)server)) {
     error(2, "network_game_server_handle_client_machines() failed inside "
