@@ -493,63 +493,51 @@ bool game_all_quiet(void)
 
 bool game_safe_to_save(void)
 {
+  bool safe = true;
+
   if (ai_enemies_can_see_player()) {
     if (debug_game_save) {
       console_warning("not safe to save: ai_enemies_can_see_player");
     }
-    return false;
-  }
-
-  if (dangerous_projectiles_near_player()) {
+    safe = false;
+  } else if (dangerous_projectiles_near_player()) {
     if (debug_game_save) {
       console_warning("not safe to save: dangerous_projectiles_near_player");
     }
-    return false;
-  }
-
-  if (dangerous_items_near_player()) {
+    safe = false;
+  } else if (dangerous_items_near_player()) {
     if (debug_game_save) {
       console_warning("not safe to save: dangerous_items_near_player");
     }
-    return false;
-  }
-
-  if (dangerous_effects_near_player()) {
+    safe = false;
+  } else if (dangerous_effects_near_player()) {
     if (debug_game_save) {
       console_warning("not safe to save: dangerous_effects_near_player");
     }
-    return false;
-  }
-
-  if (any_unit_is_dangerous()) {
+    safe = false;
+  } else if (any_unit_is_dangerous()) {
     if (debug_game_save) {
       console_warning("not safe to save: any_unit_is_dangerous");
     }
-    return false;
-  }
-
-  if (any_player_is_in_the_air()) {
+    safe = false;
+  } else if (any_player_is_in_the_air()) {
     if (debug_game_save) {
       console_warning("not safe to save: any_player_is_in_the_air");
     }
-    return false;
-  }
-
-  if (any_player_is_dead()) {
+    safe = false;
+  } else if (any_player_is_dead()) {
     if (debug_game_save) {
       console_warning("not safe to save: any_player_is_dead");
     }
-    return false;
-  }
-
-  if (vehicle_moving_near_any_player()) {
+    safe = false;
+  } else if (vehicle_moving_near_any_player()) {
     if (debug_game_save) {
       console_warning("not safe to save: vehicle_moving_near_any_player");
     }
-    return false;
+    safe = false;
   }
 
-  return true;
+  return safe;
 }
 
 bool game_safe_to_speak(void)

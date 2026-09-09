@@ -63181,16 +63181,16 @@
     "game_safe_to_save": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 89.8,
+      "abi_modeled_mnemonic_pct": 100.0,
       "addr": "0xa7530",
       "end": "0xa766b",
       "kind": "auto",
       "n_r": 106,
-      "opnd_percent": 81.6,
-      "raw_mnemonic_pct": 89.8,
+      "opnd_percent": 100.0,
+      "raw_mnemonic_pct": 100.0,
       "ref": "synth",
       "ref_sha": "077d7887760a08ad",
-      "score": 89.8,
+      "score": 100.0,
       "source": "src/halo/game/game.c"
     },
     "game_safe_to_speak": {
