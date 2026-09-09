@@ -32,11 +32,7 @@ typedef struct {
   char pad[3];
 } thread_slot_t;
 
-/* 32-entry thread slot array at 0x334990 */
-static thread_slot_t *thread_slots(void)
-{
-  return (thread_slot_t *)0x334990;
-}
+#define g_thread_slots ((thread_slot_t *)0x334990)
 
 /*
  * thread_new — allocate a thread slot and create an Xbox thread.
@@ -53,10 +49,9 @@ static thread_slot_t *thread_slots(void)
 bool thread_new(int priority_flags, void *function, int param,
                 void **thread_reference)
 {
-  thread_slot_t *slots = thread_slots();
+  void **ref = thread_reference;
   thread_slot_t *slot = NULL;
   int i;
-  int thread_id;
   int handle;
   int priority;
 
@@ -66,7 +61,7 @@ bool thread_new(int priority_flags, void *function, int param,
                    1);
     system_exit(-1);
   }
-  if (thread_reference == NULL) {
+  if (ref == NULL) {
     display_assert("thread_reference",
                    "c:\\halo\\SOURCE\\bungie_net\\common\\thread_win32.c", 0x6c,
                    1);
@@ -74,8 +69,8 @@ bool thread_new(int priority_flags, void *function, int param,
   }
 
   for (i = 0; i < MAXIMUM_THREADS; i++) {
-    if (slots[i].in_use == 0) {
-      slot = &slots[i];
+    if (g_thread_slots[i].in_use == 0) {
+      slot = &g_thread_slots[i];
       slot->handle = 0;
       slot->in_use = 1;
       break;
@@ -84,7 +79,7 @@ bool thread_new(int priority_flags, void *function, int param,
 
   if (slot != NULL) {
     handle =
-      (int)CreateThread(NULL, 0x4000, function, (void *)param, 4, &thread_id);
+      (int)CreateThread(NULL, 0x4000, function, (void *)param, 4, (int *)&function);
     slot->handle = handle;
     if (handle != 0) {
       priority = 0;
@@ -93,19 +88,18 @@ bool thread_new(int priority_flags, void *function, int param,
       } else if ((priority_flags & 4) != 0) {
         priority = 1;
       }
-      if (SetThreadPriority(handle, priority) != 0) {
-        if (ResumeThread(slot->handle) != -1) {
-          *thread_reference = slot;
-          return true;
-        }
+      if (SetThreadPriority(handle, priority) != 0 &&
+          ResumeThread(slot->handle) != -1) {
+        *ref = slot;
+        return true;
       }
       CloseHandle(slot->handle);
-      *thread_reference = NULL;
+      *ref = NULL;
       return false;
     }
   }
 
-  *thread_reference = slot;
+  *ref = slot;
   return false;
 }
 
@@ -121,6 +115,7 @@ bool thread_new(int priority_flags, void *function, int param,
 bool thread_is_done(void *thread_reference)
 {
   thread_slot_t *slot = (thread_slot_t *)thread_reference;
+  bool is_done = false;
   int exit_code;
 
   if (slot == NULL) {
@@ -130,13 +125,13 @@ bool thread_is_done(void *thread_reference)
     system_exit(-1);
   }
 
-  if (GetExitCodeThread(slot->handle, &exit_code) == 0) {
-    return false;
+  if (GetExitCodeThread(slot->handle, &exit_code) != 0) {
+    if (exit_code != STILL_ACTIVE) {
+      is_done = true;
+    }
   }
-  if (exit_code == STILL_ACTIVE) {
-    return false;
-  }
-  return true;
+
+  return is_done;
 }
 
 /*
@@ -180,6 +175,7 @@ void thread_close(void *thread_reference)
  */
 bool take_mutex(int *mutex_reference, int timeout_ms)
 {
+  bool success = false;
   int result;
 
   if (mutex_reference == NULL) {
@@ -189,10 +185,10 @@ bool take_mutex(int *mutex_reference, int timeout_ms)
     system_exit(-1);
   }
   result = WaitForSingleObject(*mutex_reference, timeout_ms);
-  if (result != WAIT_OBJECT_0 && result != WAIT_ABANDONED) {
-    return false;
+  if (result == WAIT_OBJECT_0 || result == WAIT_ABANDONED) {
+    success = true;
   }
-  return true;
+  return success;
 }
 
 /*
