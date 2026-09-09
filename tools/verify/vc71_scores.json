@@ -60961,16 +60961,16 @@
     "game_all_quiet": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 89.5,
+      "abi_modeled_mnemonic_pct": 100.0,
       "addr": "0xa74f0",
       "end": "0xa7523",
       "kind": "auto",
       "n_r": 19,
-      "opnd_percent": 89.5,
-      "raw_mnemonic_pct": 89.5,
+      "opnd_percent": 100.0,
+      "raw_mnemonic_pct": 100.0,
       "ref": "synth",
       "ref_sha": "1cbe993d72632ef2",
-      "score": 89.5,
+      "score": 100.0,
       "source": "src/halo/game/game.c"
     },
     "game_allegiance_apply_change": {

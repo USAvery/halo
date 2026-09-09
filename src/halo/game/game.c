@@ -484,9 +484,11 @@ void game_set_game_engine_index(void)
 
 bool game_all_quiet(void)
 {
-  return !dangerous_projectiles_near_player() &&
-         !dangerous_items_near_player() && !dangerous_effects_near_player() &&
-         !any_unit_is_dangerous() && !ai_enemies_can_see_player();
+  return (char)!(dangerous_projectiles_near_player() ||
+                 dangerous_items_near_player() ||
+                 dangerous_effects_near_player() ||
+                 any_unit_is_dangerous() ||
+                 ai_enemies_can_see_player());
 }
 
 bool game_safe_to_save(void)
