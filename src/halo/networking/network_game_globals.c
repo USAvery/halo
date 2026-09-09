@@ -370,14 +370,14 @@ bool network_game_player_is_local(void *player)
     return false;
   }
 
-  if (game_connection() != 3) {
-    return true;
+  if (game_connection() == 3) {
+    assert_halt_at("c:\\halo\\SOURCE\\networking\\network_game_globals.c", 0x9b,
+                   player);
+
+    return *(char *)((char *)player + 0x1c) == '\0';
   }
 
-  assert_halt_at("c:\\halo\\SOURCE\\networking\\network_game_globals.c", 0x9b,
-                 player);
-
-  return *(char *)((char *)player + 0x1c) == '\0';
+  return true;
 }
 
 /* network_game_set_accept_remote_connections (0x12a150)
@@ -448,8 +448,10 @@ void *network_game_server_get(void)
  */
 void dispose_global_network_game_client(void)
 {
-  if (*(void **)0x46e8bc != NULL) {
-    network_game_client_dispose(*(void **)0x46e8bc);
+  void *client = *(void **)0x46e8bc;
+
+  if (client != NULL) {
+    network_game_client_dispose(client);
     *(void **)0x46e8bc = NULL;
     *(uint8_t *)0x46e8c5 = 0;
   }

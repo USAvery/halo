@@ -70906,16 +70906,16 @@
     "network_game_player_is_local": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 88.9,
+      "abi_modeled_mnemonic_pct": 99.0,
       "addr": "0x12a0d0",
       "end": "0x12a14a",
       "kind": "auto",
       "n_r": 49,
-      "opnd_percent": 84.8,
-      "raw_mnemonic_pct": 88.9,
+      "opnd_percent": 94.9,
+      "raw_mnemonic_pct": 99.0,
       "ref": "synth",
       "ref_sha": "85c65e2d2c19002c",
-      "score": 88.9,
+      "score": 99.0,
       "source": "src/halo/networking/network_game_globals.c"
     },
     "network_game_remove_machine": {
