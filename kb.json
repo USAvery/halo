@@ -33669,7 +33669,8 @@
     },
     {
      "addr": "0x32b50",
-     "decl": "void actor_perception_tried_to_uncover(int actor_handle, int prop_handle);"
+          "decl": "void actor_perception_tried_to_uncover(int actor_handle, int prop_handle);",
+          "ported": true
     },
     {
      "addr": "0x32bb0",
