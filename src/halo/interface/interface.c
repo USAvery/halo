@@ -36,18 +36,18 @@ int interface_get_tag_index(int interface_tag_index)
 {
   char *globals;
   char *element;
+  int16_t index = (int16_t)interface_tag_index;
 
-  assert_halt(interface_tag_index >= 0 &&
-              interface_tag_index < NUMBER_OF_INTERFACE_TAGS);
+  assert_halt(index >= 0 &&
+              index < NUMBER_OF_INTERFACE_TAGS);
 
   globals = (char *)game_globals_get();
   if (*(int *)(globals + 0x140) != 0) {
-    globals = (char *)game_globals_get();
-    element = (char *)tag_block_get_element(globals + 0x140, 0, 0x130);
-    return *(int *)(element + interface_tag_index * 0x10 + 0xc);
+    element = (char *)tag_block_get_element((char *)game_globals_get() + 0x140, 0, 0x130);
+    return *(int *)(element + index * 0x10 + 0xc);
   }
 
-  return *(int *)((char *)0 + interface_tag_index * 0x10 + 0xc);
+  return *(int *)((char *)0 + index * 0x10 + 0xc);
 }
 
 /* Look up an ARGB float color from a color_table ('colo') tag.
@@ -62,7 +62,7 @@ void *interface_get_color(int interface_tag_index, short color_index,
   int tag_idx;
   int *color_tag;
   int count;
-  char *entry;
+  float *color_entry;
   float *out = (float *)out_color;
 
   tag_idx = interface_get_tag_index(interface_tag_index);
@@ -76,12 +76,13 @@ void *interface_get_color(int interface_tag_index, short color_index,
     color_tag = (int *)tag_get(0x636f6c6f, tag_idx);
     count = *color_tag;
     if (count != 0) {
-      entry = (char *)tag_block_get_element(color_tag,
-                                            (short)(color_index % count), 0x30);
-      out[0] = *(float *)(entry + 0x20);
-      out[1] = *(float *)(entry + 0x24);
-      out[2] = *(float *)(entry + 0x28);
-      out[3] = *(float *)(entry + 0x2c);
+      color_entry = (float *)((char *)tag_block_get_element(
+                                color_tag, (short)(color_index % count), 0x30) +
+                              0x20);
+      out[0] = color_entry[0];
+      out[1] = color_entry[1];
+      out[2] = color_entry[2];
+      out[3] = color_entry[3];
     }
   }
 
@@ -170,18 +171,16 @@ void interface_initialize_for_new_map(void)
   char *globals;
   char *element;
 
-  ((void (*)(void))0xd0360)();
-  ((void (*)(void))0x19b330)();
-  ((void (*)(void))0xdc7a0)();
+  hud_initialize_for_new_map();
+  FUN_0019B330();
+  FUN_000dc7a0();
 
   globals = (char *)game_globals_get();
-  if (*(int *)(globals + 0x140) == 0) {
-    element = 0;
+  if (*(int *)(globals + 0x140) != 0) {
+    element = (char *)tag_block_get_element((char *)game_globals_get() + 0x140, 0, 0x130);
   } else {
-    globals = (char *)game_globals_get();
-    element = (char *)tag_block_get_element(globals + 0x140, 0, 0x130);
+    element = 0;
   }
 
-  ((void (*)(int, int, int, int, void *))0x19b8b0)(*(int *)(element + 0x1c), -1,
-                                                   0, 0, *(void **)0x2ee6c4);
+  draw_string_set_font(*(int *)(element + 0x1c), -1, 0, 0, *(void **)0x2ee6c4);
 }
