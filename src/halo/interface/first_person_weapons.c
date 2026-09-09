@@ -408,10 +408,9 @@ int first_person_weapon_get_local_index(int object_handle)
  * player's first-person weapon animation state (0xdd410).
  * Validates the local_player_index (0..3) and node_index against the
  * animation graph node count. Returns fp_base + 0x108c + node_index * 0x34. */
-void *first_person_weapon_get_node_matrix(int param_1, int param_2)
+void *first_person_weapon_get_node_matrix(int16_t local_player_index,
+                                          int16_t node_index)
 {
-  int16_t local_player_index = (int16_t)param_1;
-  int16_t node_index = (int16_t)param_2;
   char *fp;
   int *weapon_obj;
   char *weapon_tag;

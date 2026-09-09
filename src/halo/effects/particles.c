@@ -201,17 +201,18 @@ void FUN_000a1590(void)
       position = particle + 0x30;
     } else {
       if ((*(uint8_t *)(particle + 0x2) & 0x40) != 0) {
+        int16_t local_player_index = *(uint8_t *)(particle + 0xf);
+        int16_t node_index = *(uint16_t *)(particle + 0xc);
         position =
           (char *)first_person_weapon_get_node_matrix(
-            *(uint8_t *)(particle + 0xf), *(int16_t *)(particle + 0xc)) +
+            local_player_index, node_index) +
           0x28;
       } else if (object_try_and_get_and_verify_type(owner, -1) != 0) {
         position = (char *)object_get_node_matrix(
-                     *(int *)(particle + 0x8), *(int16_t *)(particle + 0xc)) +
+                     *(int *)(particle + 0x8), *(uint16_t *)(particle + 0xc)) +
                    0x28;
       } else {
-        datum_delete(particle_data, handle);
-        goto next;
+        position = NULL;
       }
     }
     if (position == NULL) {
@@ -222,7 +223,6 @@ void FUN_000a1590(void)
         datum_delete(particle_data, handle);
       }
     }
-  next:
     handle = data_next_index(particle_data, handle);
   }
 }
