@@ -182,20 +182,19 @@ void widget_free(void *widget)
  * XOR AL,AL. */
 bool ui_widgets_active(void)
 {
-  int *root_slots;
+  int *slot;
+  bool active;
 
-  if (*(uint8_t *)0x46cc82 == 0) {
-    return false;
-  }
-
-  root_slots = (int *)0x46cc20;
-  while (*root_slots == 0) {
-    root_slots++;
-    if ((int)root_slots >= 0x46cc30) {
-      return false;
+  active = false;
+  if (*(uint8_t *)0x46cc82 != 0) {
+    for (slot = (int *)0x46cc20; (int)slot < 0x46cc30; slot++) {
+      if (*slot != 0) {
+        return true;
+      }
     }
   }
-  return true;
+
+  return active;
 }
 
 /* ui_widget_set_events_suppressed — sets or clears the events-suppressed
