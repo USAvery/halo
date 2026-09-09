@@ -4,31 +4,34 @@
  * tag block from game globals and initializes rendering subsystems. */
 void rasterizer_initialize_for_new_map(void)
 {
-  char *globals = (char *)game_globals_get();
+  char *globals;
+  int rasterizer_data;
+
+  globals = (char *)game_globals_get();
   assert_halt(globals);
-
-  if (*(int *)(globals + 0x134) == 0) {
-    *(int *)0x476204 = 0;
+  if (*(int *)(globals + 0x134) != 0) {
+    rasterizer_data = (int)tag_block_get_element(globals + 0x134, 0, 0x1ac);
   } else {
-    *(int *)0x476204 = (int)tag_block_get_element(globals + 0x134, 0, 0x1ac);
+    rasterizer_data = 0;
   }
-  assert_halt(*(int *)0x476204);
+  *(int *)0x476204 = rasterizer_data;
+  assert_halt(rasterizer_data);
 
-  ((void (*)(void))0x181150)();
-  ((void (*)(void))0x1836f0)();
-  ((void (*)(void))0x17d950)();
+  FUN_00181150();
+  rasterizer_text_cache_flush();
+  FUN_0017d950();
 
   if (*(void **)0x47e4d0 != 0)
     csmemset(*(void **)0x47e4d0, 0, 0x10);
 
-  ((void (*)(int))0x17dec0)(0);
+  FUN_0017dec0(0);
 }
 
 /* Dispose rasterizer state from old map. */
 void rasterizer_dispose_from_old_map(void)
 {
-  ((void (*)(void))0x17d980)();
-  ((void (*)(void))0x1836f0)();
+  FUN_0017d980();
+  rasterizer_text_cache_flush();
   *(int *)0x476204 = 0;
 }
 
@@ -50,9 +53,8 @@ void FUN_001550c0(unsigned int arg_eax /* @<eax> */,
                   unsigned int stack_arg3)
 {
   (void)unused_stack0;
-  ((void(__stdcall *)(unsigned int, unsigned int, unsigned int, unsigned int,
-                      unsigned int, unsigned int))0x1edec0)(
-    stack_arg1, stack_arg2, stack_arg3, arg_edx, arg_ecx, arg_eax);
+  Direct3D_CreateDevice(stack_arg1, stack_arg2, (void *)stack_arg3, arg_edx,
+                        (void *)arg_ecx, (void **)arg_eax);
 }
 
 /* Read one entry from D3D_g_DeferredTextureState[stage][sub_index] into
