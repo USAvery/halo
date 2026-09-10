@@ -32237,7 +32237,7 @@
     },
     {
      "addr": "0x1d2240",
-     "decl": "int xapi_GetLastError(void);"
+     "decl": "int __stdcall xapi_GetLastError(void);"
     },
     {
      "addr": "0x1d2268",
@@ -32350,11 +32350,11 @@
     },
     {
      "addr": "0x1d3410",
-     "decl": "int CreateDirectoryA(const char *path, int access);"
+     "decl": "int __stdcall CreateDirectoryA(const char *path, int access);"
     },
     {
      "addr": "0x1d347c",
-     "decl": "bool FUN_001d347c(const char *path);"
+     "decl": "bool __stdcall FUN_001d347c(const char *path);"
     },
     {
      "addr": "0x1d350a",
@@ -32647,7 +32647,7 @@
     },
     {
      "addr": "0x1d0df0",
-     "decl": "bool FUN_001d0df0(const char *path, unsigned int attributes);"
+     "decl": "bool __stdcall FUN_001d0df0(const char *path, unsigned int attributes);"
     }
    ],
    "name": "XAPILIB:xvutil.obj"

@@ -1324,6 +1324,10 @@ def write_to_vaddr(xbe: Xbe, vaddr: int, data: bytes):
 
     raw_offset = vaddr - section.header.virtual_addr
     new_data = bytearray(section.data)
+    end_offset = raw_offset + len(data)
+    if len(new_data) < end_offset:
+        new_data.extend(b'\0' * (end_offset - len(new_data)))
+        section.header.raw_size = end_offset
     new_data[raw_offset:raw_offset + len(data)] = data
     section.data = bytes(new_data)
 
