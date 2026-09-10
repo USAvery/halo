@@ -24599,7 +24599,9 @@
     },
     {
      "addr": "0x1ac350",
-     "decl": "int16_t unit_find_weapon_to_ready(int unit_handle);"
+     "decl": "int16_t unit_find_weapon_to_ready(int unit_handle);",
+     "ported": true,
+     "source_path": "units/units.c"
     },
     {
      "addr": "0x1ac3b0",
@@ -24643,7 +24645,8 @@
     },
     {
      "addr": "0x1c8ee0",
-     "decl": "void FUN_001c8ee0(void);"
+     "decl": "void FUN_001c8ee0(void *pitch_range);",
+     "ported": true
     },
     {
      "addr": "0x1cb1a0",

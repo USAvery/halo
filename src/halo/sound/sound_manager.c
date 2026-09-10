@@ -332,6 +332,27 @@ short sound_select_pitch_range(void *sound_tag, float random_scale,
   return best_index;
 }
 
+/* Reset the played-permutation mask after every permutation in this pitch
+ * range has been selected (0x1c8ee0). */
+void FUN_001c8ee0(void *pitch_range)
+{
+  char *record;
+  short count;
+  unsigned int all_played;
+
+  record = (char *)pitch_range;
+  count = *(short *)(record + 0x2c);
+  all_played = (1u << ((unsigned char)count & 0x1f)) - 1u;
+
+  if ((~*(unsigned int *)(record + 0x34) & all_played) == 0) {
+    *(int *)(record + 0x34) = 0;
+    if (count > 1) {
+      *(int *)(record + 0x34) =
+        1u << (*(unsigned char *)(record + 0x38) & 0x1f);
+    }
+  }
+}
+
 /* Sample a pitch value from a permutation's mouth data (0x1c8f20).
  *
  * Clamps permutation_index into [0, mouth_data.size-1], reads the

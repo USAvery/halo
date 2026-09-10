@@ -8660,6 +8660,28 @@ int16_t vehicle_scripting_find_available_seats(int unit_handle,
   return found_count;
 }
 
+/* Return first weapon slot requiring a ready transition (0x1ac350). */
+int16_t unit_find_weapon_to_ready(int unit_handle)
+{
+  char *unit;
+  int weapon_handle;
+  short index;
+
+  unit = (char *)object_get_and_verify_type(unit_handle, 3);
+  index = 0;
+  do {
+    weapon_handle = *(int *)(unit + index * 4 + 0x2a8);
+    if (weapon_handle != -1) {
+      if ((char)weapon_must_be_readied(weapon_handle) != 0) {
+        return index;
+      }
+    }
+    index++;
+  } while (index < 4);
+
+  return -1;
+}
+
 /* unit_open (0x1ae160)
  * Opens a unit by transitioning to animation state 0x25. */
 void unit_open(int unit_handle)

@@ -45763,6 +45763,21 @@
       "score": 100.0,
       "source": "src/halo/sound/sound_definitions.c"
     },
+    "FUN_001c8ee0": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 88.0,
+      "addr": "0x1c8ee0",
+      "end": "0x1c8f1b",
+      "kind": "auto",
+      "n_r": 23,
+      "opnd_percent": 88.0,
+      "raw_mnemonic_pct": 88.0,
+      "ref": "synth",
+      "ref_sha": "8a004dd788e48504",
+      "score": 88.0,
+      "source": "src/halo/sound/sound_manager.c"
+    },
     "FUN_001c93f0": {
       "abi_model": "raw",
       "abi_model_items": 0,
@@ -88246,17 +88261,17 @@
     "unit_find_weapon_to_ready": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 18.2,
+      "abi_modeled_mnemonic_pct": 91.9,
       "addr": "0x1ac350",
       "end": "0x1ac3a3",
       "kind": "auto",
       "n_r": 39,
-      "opnd_percent": 13.6,
-      "raw_mnemonic_pct": 18.2,
+      "opnd_percent": 89.2,
+      "raw_mnemonic_pct": 91.9,
       "ref": "synth",
       "ref_sha": "8df446c4b93c99a0",
-      "score": 18.2,
-      "source": "src/halo/unported_thunks.c"
+      "score": 91.9,
+      "source": "src/halo/units/units.c"
     },
     "unit_flame_to_death": {
       "abi_model": "raw",
