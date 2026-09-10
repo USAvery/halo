@@ -1752,7 +1752,6 @@ void FUN_00105980(float *matrix, short *out_vertex_count,
   float fVar9, fVar10, fVar11, fVar12, fVar_sin;
   int iVar5;
   float *pfVar6;
-  float *pfVar7;
   short sVar8;
   /* normal[0]=local_38, normal[1]=local_34, normal[2]=local_30; the three
    * must be contiguous+ascending because &normal[0] is passed as the axis

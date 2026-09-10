@@ -191,40 +191,6 @@ void sound_object_apply_pitch_delta(int object_handle, float pitch)
   *stored_pitch += delta;
 }
 
-/* unit_find_weapon_to_ready (0x1ac350)
- *
- * Scans the unit's four weapon-handle slots at +0x2a8 (0x2a8 + index*4) and
- * returns the index of the first slot whose weapon reports that it must be
- * readied.  Slots holding NONE (-1) are skipped.  Returns -1 when no weapon
- * needs readying (reference materializes -1 in EBX before the loop and moves
- * BX into AX on the fallthrough exit; the found exit moves SI into AX).
- *
- * Loop is a do/while in the reference (JMP into the head at 0x1ac36b, JL back
- * at 0x1ac391).  Index is a signed 16-bit counter: MOVSX ECX,SI at 0x1ac370
- * and CMP SI,0x4 at 0x1ac38d. */
-int16_t unit_find_weapon_to_ready(int unit_handle)
-{
-  char *unit;
-  int weapon_handle;
-  short index;
-
-  unit = (char *)object_get_and_verify_type(unit_handle, 3);
-
-  index = 0;
-  do {
-    weapon_handle = *(int *)(unit + index * 4 + 0x2a8);
-    if (weapon_handle != -1) {
-      /* TEST AL,AL at 0x1ac388 tests only the low byte of the return. */
-      if ((char)weapon_must_be_readied(weapon_handle) != 0) {
-        return index;
-      }
-    }
-    index++;
-  } while (index < 4);
-
-  return -1;
-}
-
 /* FUN_001ac3b0 (0x1ac3b0)
  *
  * Returns non-zero when the given weapon handle occupies one of the unit's
