@@ -85,28 +85,24 @@ void xbox_set_machine_name(const char *name)
 void network_game_generate_local_machine_name(void *name_buffer)
 {
   int iVar1;
-  wchar_t *uVar2;
   char local_24[32];
   wchar_t *name;
 
   name = (wchar_t *)name_buffer;
   iVar1 = FUN_001d29eb(0, name, 0x20);
-  if (iVar1 != -1) {
-    FUN_001d33a2(iVar1);
+  if (iVar1 == -1) {
+    ustrncpy(name, network_game_get_random_player_name(), 0x20);
+    name[31] = 0;
+    if (XSetNicknameW(name, 1) != 0) {
+      error(2, "system nickname set to '%s'", wide_to_ascii(name, local_24, 0x20));
+      name[31] = 0;
+      return;
+    }
+    error(2, "XSetNickname() failed to set system nickname");
     name[31] = 0;
     return;
   }
-  uVar2 = network_game_get_random_player_name();
-  ustrncpy(name, uVar2, 0x20);
-  name[31] = 0;
-  iVar1 = XSetNicknameW(name, 1);
-  if (iVar1 != 0) {
-    char *ascii_name = wide_to_ascii(name, local_24, 0x20);
-    error(2, "system nickname set to '%s'", ascii_name);
-    name[31] = 0;
-    return;
-  }
-  error(2, "XSetNickname() failed to set system nickname");
+  FUN_001d33a2(iVar1);
   name[31] = 0;
 }
 

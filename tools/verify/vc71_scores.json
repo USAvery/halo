@@ -59266,16 +59266,16 @@
     "encode_network_game_message": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 58.9,
+      "abi_modeled_mnemonic_pct": 96.6,
       "addr": "0x12b700",
       "end": "0x12bc52",
       "kind": "auto",
       "n_r": 319,
-      "opnd_percent": 52.6,
-      "raw_mnemonic_pct": 58.9,
+      "opnd_percent": 81.5,
+      "raw_mnemonic_pct": 96.6,
       "ref": "synth",
       "ref_sha": "63269248dc173c84",
-      "score": 58.9,
+      "score": 96.6,
       "source": "src/halo/networking/network_messages.c"
     },
     "encode_packet_group": {
@@ -69691,16 +69691,16 @@
     "network_game_client_add_player": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 72.4,
+      "abi_modeled_mnemonic_pct": 96.8,
       "addr": "0x1258a0",
       "end": "0x125a74",
       "kind": "auto",
       "n_r": 173,
-      "opnd_percent": 49.4,
-      "raw_mnemonic_pct": 72.4,
+      "opnd_percent": 85.2,
+      "raw_mnemonic_pct": 96.8,
       "ref": "synth",
       "ref_sha": "c690a9b70cdbf9d4",
-      "score": 72.4,
+      "score": 96.8,
       "source": "src/halo/networking/network_client_manager.c"
     },
     "network_game_client_add_player_to_game": {
@@ -70141,16 +70141,16 @@
     "network_game_client_request_remove_player": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 64.0,
+      "abi_modeled_mnemonic_pct": 84.6,
       "addr": "0x1263a0",
       "end": "0x126574",
       "kind": "auto",
       "n_r": 181,
-      "opnd_percent": 55.3,
-      "raw_mnemonic_pct": 64.0,
+      "opnd_percent": 71.7,
+      "raw_mnemonic_pct": 84.6,
       "ref": "synth",
       "ref_sha": "3147fbd7da9be799",
-      "score": 64.0,
+      "score": 84.6,
       "source": "src/halo/networking/network_client_manager.c"
     },
     "network_game_client_request_start_time_change": {

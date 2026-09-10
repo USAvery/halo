@@ -1400,251 +1400,94 @@ void *encode_network_game_message(int type, void *data,
 {
   char encoded_buf[0x600];
   int32_t encoded_size;
-  const char *assertion;
-  int assertion_line;
 
   encoded_size = 0x600;
 
+#define CHECK_MSG_SIZE(sz, msg_str, line) \
+  if (message_struct_size != (sz)) { \
+    display_assert((msg_str), "c:\\halo\\SOURCE\\networking\\network_messages.c", (line), 1); \
+    system_exit(-1); \
+  } break
+
   switch ((int16_t)type) {
   case 0:
-    if (message_struct_size == 0xc)
-      goto size_ok;
-    assertion =
-      "message_struct_size==sizeof(message_client_broadcast_game_search)";
-    assertion_line = 0xa0;
-    break;
+    CHECK_MSG_SIZE(0xc, "message_struct_size==sizeof(message_client_broadcast_game_search)", 0xa0);
   case 1:
-    if (message_struct_size == 8)
-      goto size_ok;
-    assertion = "message_struct_size==sizeof(message_client_ping)";
-    assertion_line = 0xa1;
-    break;
+    CHECK_MSG_SIZE(8, "message_struct_size==sizeof(message_client_ping)", 0xa1);
   case 2:
-    if (message_struct_size == 0x114)
-      goto size_ok;
-    assertion = "message_struct_size==sizeof(message_server_game_advertise)";
-    assertion_line = 0xa4;
-    break;
+    CHECK_MSG_SIZE(0x114, "message_struct_size==sizeof(message_server_game_advertise)", 0xa4);
   case 3:
-    if (message_struct_size == 4)
-      goto size_ok;
-    assertion = "message_struct_size==sizeof(message_server_pong)";
-    assertion_line = 0xa5;
-    break;
+    CHECK_MSG_SIZE(4, "message_struct_size==sizeof(message_server_pong)", 0xa5);
   case 4:
-    if (message_struct_size == 8)
-      goto size_ok;
-    assertion = "message_struct_size==sizeof(message_server_machine_accepted)";
-    assertion_line = 0xa8;
-    break;
+    CHECK_MSG_SIZE(8, "message_struct_size==sizeof(message_server_machine_accepted)", 0xa8);
   case 5:
-    if (message_struct_size == 2)
-      goto size_ok;
-    assertion = "message_struct_size==sizeof(message_server_machine_rejected)";
-    assertion_line = 0xa9;
-    break;
+    CHECK_MSG_SIZE(2, "message_struct_size==sizeof(message_server_machine_rejected)", 0xa9);
   case 6:
-    if (message_struct_size == 0x434)
-      goto size_ok;
-    assertion =
-      "message_struct_size==sizeof(message_server_game_settings_update)";
-    assertion_line = 0xaa;
-    break;
+    CHECK_MSG_SIZE(0x434, "message_struct_size==sizeof(message_server_game_settings_update)", 0xaa);
   case 7:
-    if (message_struct_size == 2)
-      goto size_ok;
-    assertion = "message_struct_size==sizeof(message_server_pregame_countdown)";
-    assertion_line = 0xab;
-    break;
+    CHECK_MSG_SIZE(2, "message_struct_size==sizeof(message_server_pregame_countdown)", 0xab);
   case 8:
-    if (message_struct_size == 4)
-      goto size_ok;
-    assertion = "message_struct_size==sizeof(message_server_begin_game)";
-    assertion_line = 0xad;
-    break;
+    CHECK_MSG_SIZE(4, "message_struct_size==sizeof(message_server_begin_game)", 0xad);
   case 9:
-    if (message_struct_size == 4)
-      goto size_ok;
-    assertion =
-      "message_struct_size==sizeof(message_server_graceful_game_exit_pregame)";
-    assertion_line = 0xae;
-    break;
+    CHECK_MSG_SIZE(4, "message_struct_size==sizeof(message_server_graceful_game_exit_pregame)", 0xae);
   case 10:
-    if (message_struct_size == 2)
-      goto size_ok;
-    assertion =
-      "message_struct_size==sizeof(message_server_pregame_keep_alive)";
-    assertion_line = 0xac;
-    break;
+    CHECK_MSG_SIZE(2, "message_struct_size==sizeof(message_server_pregame_keep_alive)", 0xac);
   case 11:
-    if (message_struct_size == 2)
-      goto size_ok;
-    assertion =
-      "message_struct_size==sizeof(message_server_postgame_keep_alive)";
-    assertion_line = 0xb1;
-    break;
+    CHECK_MSG_SIZE(2, "message_struct_size==sizeof(message_server_postgame_keep_alive)", 0xb1);
   case 12:
-    if (message_struct_size == 0x50)
-      goto size_ok;
-    assertion = "message_struct_size==sizeof(message_client_join_game_request)";
-    assertion_line = 0xb4;
-    break;
+    CHECK_MSG_SIZE(0x50, "message_struct_size==sizeof(message_client_join_game_request)", 0xb4);
   case 13:
-    if (message_struct_size == 0x20)
-      goto size_ok;
-    assertion =
-      "message_struct_size==sizeof(message_client_add_player_request_pregame)";
-    assertion_line = 0xb5;
-    break;
+    CHECK_MSG_SIZE(0x20, "message_struct_size==sizeof(message_client_add_player_request_pregame)", 0xb5);
   case 14:
-    if (message_struct_size == 0x20)
-      goto size_ok;
-    assertion = "message_struct_size==sizeof(message_client_remove_player_"
-                "request_pregame)";
-    assertion_line = 0xb6;
-    break;
+    CHECK_MSG_SIZE(0x20, "message_struct_size==sizeof(message_client_remove_player_request_pregame)", 0xb6);
   case 15:
-    if (message_struct_size == 0x44)
-      goto size_ok;
-    assertion = "message_struct_size==sizeof(message_client_settings_request)";
-    assertion_line = 0xb7;
-    break;
+    CHECK_MSG_SIZE(0x44, "message_struct_size==sizeof(message_client_settings_request)", 0xb7);
   case 16:
-    if (message_struct_size == 0x20)
-      goto size_ok;
-    assertion =
-      "message_struct_size==sizeof(message_client_player_settings_request)";
-    assertion_line = 0xb8;
-    break;
+    CHECK_MSG_SIZE(0x20, "message_struct_size==sizeof(message_client_player_settings_request)", 0xb8);
   case 17:
-    if (message_struct_size == 2)
-      goto size_ok;
-    assertion =
-      "message_struct_size==sizeof(message_client_game_start_request)";
-    assertion_line = 0xb9;
-    break;
+    CHECK_MSG_SIZE(2, "message_struct_size==sizeof(message_client_game_start_request)", 0xb9);
   case 18:
-    if (message_struct_size == 4)
-      goto size_ok;
-    assertion =
-      "message_struct_size==sizeof(message_client_graceful_game_exit_pregame)";
-    assertion_line = 0xba;
-    break;
+    CHECK_MSG_SIZE(4, "message_struct_size==sizeof(message_client_graceful_game_exit_pregame)", 0xba);
   case 19:
-    if (message_struct_size == 0x100)
-      goto size_ok;
-    assertion =
-      "message_struct_size==sizeof(message_client_map_is_precached_pregame)";
-    assertion_line = 0xbb;
-    break;
+    CHECK_MSG_SIZE(0x100, "message_struct_size==sizeof(message_client_map_is_precached_pregame)", 0xbb);
   case 20:
-    if (message_struct_size == 0x210)
-      goto size_ok;
-    assertion = "message_struct_size==sizeof(message_server_game_update)";
-    assertion_line = 0xbe;
-    break;
+    CHECK_MSG_SIZE(0x210, "message_struct_size==sizeof(message_server_game_update)", 0xbe);
   case 21:
-    if (message_struct_size == 0x20)
-      goto size_ok;
-    assertion = "message_struct_size==sizeof(message_server_add_player_ingame)";
-    assertion_line = 0xbf;
-    break;
+    CHECK_MSG_SIZE(0x20, "message_struct_size==sizeof(message_server_add_player_ingame)", 0xbf);
   case 22:
-    if (message_struct_size == 0x24)
-      goto size_ok;
-    assertion =
-      "message_struct_size==sizeof(message_server_remove_player_ingame)";
-    assertion_line = 0xc0;
-    break;
+    CHECK_MSG_SIZE(0x24, "message_struct_size==sizeof(message_server_remove_player_ingame)", 0xc0);
   case 23:
-    if (message_struct_size == 4)
-      goto size_ok;
-    assertion = "message_struct_size==sizeof(message_server_game_over)";
-    assertion_line = 0xc1;
-    break;
+    CHECK_MSG_SIZE(4, "message_struct_size==sizeof(message_server_game_over)", 0xc1);
   case 24:
-    if (message_struct_size == 4)
-      goto size_ok;
-    assertion = "message_struct_size==sizeof(message_client_loaded)";
-    assertion_line = 0xc4;
-    break;
+    CHECK_MSG_SIZE(4, "message_struct_size==sizeof(message_client_loaded)", 0xc4);
   case 25:
-    if (message_struct_size == 0x88)
-      goto size_ok;
-    assertion = "message_struct_size==sizeof(message_client_game_update)";
-    assertion_line = 0xc5;
-    break;
+    CHECK_MSG_SIZE(0x88, "message_struct_size==sizeof(message_client_game_update)", 0xc5);
   case 26:
-    if (message_struct_size == 0x20)
-      goto size_ok;
-    assertion =
-      "message_struct_size==sizeof(message_client_add_player_request_ingame)";
-    assertion_line = 0xc6;
-    break;
+    CHECK_MSG_SIZE(0x20, "message_struct_size==sizeof(message_client_add_player_request_ingame)", 0xc6);
   case 27:
-    if (message_struct_size == 0x20)
-      goto size_ok;
-    assertion = "message_struct_size==sizeof(message_client_remove_player_"
-                "request_ingame)";
-    assertion_line = 0xc7;
-    break;
+    CHECK_MSG_SIZE(0x20, "message_struct_size==sizeof(message_client_remove_player_request_ingame)", 0xc7);
   case 28:
-    if (message_struct_size == 0x10)
-      goto size_ok;
-    assertion =
-      "message_struct_size==sizeof(message_client_host_crashed_cry_for_help)";
-    assertion_line = 0xc9;
-    break;
+    CHECK_MSG_SIZE(0x10, "message_struct_size==sizeof(message_client_host_crashed_cry_for_help)", 0xc9);
   case 29:
-    if (message_struct_size == 0x10)
-      goto size_ok;
-    assertion = "message_struct_size==sizeof(message_client_join_new_host)";
-    assertion_line = 0xca;
-    break;
+    CHECK_MSG_SIZE(0x10, "message_struct_size==sizeof(message_client_join_new_host)", 0xca);
   case 30:
-    if (message_struct_size == 4)
-      goto size_ok;
-    assertion = "message_struct_size==sizeof(message_server_switch_to_pregame)";
-    assertion_line = 0xcd;
-    break;
+    CHECK_MSG_SIZE(4, "message_struct_size==sizeof(message_server_switch_to_pregame)", 0xcd);
   case 31:
-    if (message_struct_size == 4)
-      goto size_ok;
-    assertion =
-      "message_struct_size==sizeof(message_server_graceful_game_exit_postgame)";
-    assertion_line = 0xce;
-    break;
+    CHECK_MSG_SIZE(4, "message_struct_size==sizeof(message_server_graceful_game_exit_postgame)", 0xce);
   case 32:
-    if (message_struct_size == 0x20)
-      goto size_ok;
-    assertion = "message_struct_size==sizeof(message_client_remove_player_"
-                "request_postgame)";
-    assertion_line = 0xd1;
-    break;
+    CHECK_MSG_SIZE(0x20, "message_struct_size==sizeof(message_client_remove_player_request_postgame)", 0xd1);
   case 33:
-    if (message_struct_size == 4)
-      goto size_ok;
-    assertion = "message_struct_size==sizeof(message_client_switch_to_pregame)";
-    assertion_line = 0xd2;
-    break;
+    CHECK_MSG_SIZE(4, "message_struct_size==sizeof(message_client_switch_to_pregame)", 0xd2);
   case 34:
-    if (message_struct_size == 4)
-      goto size_ok;
-    assertion =
-      "message_struct_size==sizeof(message_client_graceful_game_exit_postgame)";
-    assertion_line = 0xd3;
-    break;
+    CHECK_MSG_SIZE(4, "message_struct_size==sizeof(message_client_graceful_game_exit_postgame)", 0xd3);
   default:
-    assertion = "unknown network game message structure type";
-    assertion_line = 0xd5;
+    display_assert("unknown network game message structure type",
+                   "c:\\halo\\SOURCE\\networking\\network_messages.c",
+                   0xd5, 1);
+    system_exit(-1);
     break;
   }
-
-  display_assert(assertion, "c:\\halo\\SOURCE\\networking\\network_messages.c",
-                 assertion_line, 1);
-  system_exit(-1);
-
-size_ok:
+#undef CHECK_MSG_SIZE
   if (data == NULL || (int16_t)encoded_size < 1) {
     display_assert("message_struct && encoded_message && encoded_message_size "
                    "&& (*encoded_message_size>0)",

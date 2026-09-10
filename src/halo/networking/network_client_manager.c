@@ -1006,10 +1006,13 @@ bool network_client_get_oos(void *server)
 bool network_game_client_add_player(void *client, uint16_t player_index)
 {
   char *c;
+  bool result;
   unsigned char profile[0x30];
+  unsigned char buf[0x20];
   unsigned char record[0x20];
   unsigned short *packet;
 
+  result = true;
   c = (char *)client;
 
   if (client == NULL || (int16_t)player_index < 0 ||
@@ -1023,65 +1026,63 @@ bool network_game_client_add_player(void *client, uint16_t player_index)
 
   player_ui_get_active_player_profile((int16_t)player_index, profile);
 
+  record[0x1c] = *(unsigned char *)c;
+  record[0x1d] = (unsigned char)player_index;
   ustrncpy((wchar_t *)record, (wchar_t *)profile, 0xb);
   *(uint16_t *)(record + 0x16) = 0;
   *(uint16_t *)(record + 0x18) = *(uint16_t *)(profile + 0x18);
   *(uint16_t *)(record + 0x1a) = 0xffff;
-  record[0x1c] = *(unsigned char *)c;
-  record[0x1d] = (unsigned char)player_index;
   record[0x1e] = 0xff;
   record[0x1f] = 0xff;
 
   network_game_log("requesting a player addition (controller index #%d)",
                    (signed char)record[0x1d]);
 
-  switch (*(int16_t *)(c + 0xca6)) {
+  switch (*(uint16_t *)(c + 0xca6)) {
   case 0:
   case 1:
     network_game_log(
       "can't add players to a game until after a game is joined");
     return false;
-  case 2: {
-    unsigned char buf[0x20];
+  case 2:
     csmemcpy(buf, record, 0x20);
     packet = (unsigned short *)encode_network_game_message(0xd, buf, 0x20);
-    if (packet == NULL) {
+    if (packet != NULL) {
+      result = network_connection_write(*(void **)(c + 0x82c), packet,
+                                        (unsigned short)(*packet >> 4), 0, true);
+      if (!result) {
+        network_game_log("network_game_client_write() failed while sending a "
+                         "message_client_add_player_request_pregame message");
+      }
+    } else {
       network_game_log(
         "failed to create a message_client_add_player_request_pregame message");
-      return true;
     }
-    if (network_connection_write(*(void **)(c + 0x82c), packet,
-                                 (unsigned short)(*packet >> 4), 0, true)) {
-      return true;
-    }
-    network_game_log("network_game_client_write() failed while sending a "
-                     "message_client_add_player_request_pregame message");
-    return false;
-  }
-  case 3: {
-    unsigned char buf[0x20];
+    return result;
+  case 3:
     csmemcpy(buf, record, 0x20);
     packet = (unsigned short *)encode_network_game_message(0x1a, buf, 0x20);
-    if (packet == NULL) {
+    if (packet != NULL) {
+      result = network_connection_write(*(void **)(c + 0x82c), packet,
+                                        (unsigned short)(*packet >> 4), 0, true);
+      if (!result) {
+        network_game_log("network_game_client_write() failed while sending a "
+                         "message_client_add_player_request_ingame message");
+      }
+    } else {
       network_game_log(
         "failed to create a message_client_add_player_request_ingame message");
-      return true;
     }
-    if (network_connection_write(*(void **)(c + 0x82c), packet,
-                                 (unsigned short)(*packet >> 4), 0, true)) {
-      return true;
-    }
-    network_game_log("network_game_client_write() failed while sending a "
-                     "message_client_add_player_request_ingame message");
-    return false;
-  }
+    return result;
   case 4:
     network_game_log("client tried to add a new player in post-game");
     return false;
   default:
     network_game_log("client is in an unknown state");
-    return true;
+    break;
   }
+
+  return result;
 }
 
 /* network_game_client_update_local_player_data (0x125a90)
@@ -1720,21 +1721,19 @@ done:
  * through — a MSVC jump-table layout artifact, not a behavioral difference. */
 char network_game_client_request_remove_player(void *client, void *record)
 {
-  char *c;
-  char *r;
+  uint16_t state;
+  char result;
   unsigned char buf[0x20];
   unsigned short *packet;
-  int16_t state;
 
-  c = (char *)client;
-  r = (char *)record;
+  result = 1;
   if (client == NULL || !network_player_is_valid(record)) {
     display_assert("client && network_player_is_valid(player)",
                    "c:\\halo\\SOURCE\\networking\\network_client_manager.c",
                    0x208, true);
     system_exit(-1);
   }
-  if (*(char *)(c + 0x9b0 + (*(uint16_t *)c) * 0x44) != *(char *)(r + 0x1c)) {
+  if (*(char *)((char *)client + 0x9b0 + (*(uint16_t *)client) * 0x44) != *(char *)((char *)record + 0x1c)) {
     display_assert("client's can only remove players from their own machines",
                    "c:\\halo\\SOURCE\\networking\\network_client_manager.c",
                    0x209, true);
@@ -1742,9 +1741,9 @@ char network_game_client_request_remove_player(void *client, void *record)
   }
 
   network_game_log("requesting a player removal (controller index #%d)",
-                   *(signed char *)(r + 0x1d));
+                   *(signed char *)((char *)record + 0x1d));
 
-  state = *(int16_t *)(c + 0xca6);
+  state = *(uint16_t *)((char *)client + 0xca6);
   switch (state) {
   case 0:
   case 1:
@@ -1752,17 +1751,17 @@ char network_game_client_request_remove_player(void *client, void *record)
       "can't remove players from a game until after a game is joined");
     return 0;
   case 2:
-    csmemcpy(buf, r, 0x20);
+    csmemcpy(buf, record, 0x20);
     packet = (unsigned short *)encode_network_game_message(0xe, buf, 0x20);
-    if (packet == NULL) {
-      network_game_log(
-        "failed to create a message_client_remove_player_request_pregame "
-        "mesage");
-      return 0;
+    if (packet != NULL) {
+      goto send_packet;
     }
-    break;
+    network_game_log(
+      "failed to create a message_client_remove_player_request_pregame "
+      "mesage");
+    return 0;
   case 3:
-    csmemcpy(buf, r, 0x20);
+    csmemcpy(buf, record, 0x20);
     packet = (unsigned short *)encode_network_game_message(0x1b, buf, 0x20);
     if (packet == NULL) {
       network_game_log(
@@ -1770,9 +1769,11 @@ char network_game_client_request_remove_player(void *client, void *record)
         "message");
       return 0;
     }
-    break;
+send_packet:
+    return network_connection_write(*(void **)((char *)client + 0x82c), packet,
+                                    (unsigned short)(*packet >> 4), 0, true);
   case 4:
-    csmemcpy(buf, r, 0x20);
+    csmemcpy(buf, record, 0x20);
     packet = (unsigned short *)encode_network_game_message(0x20, buf, 0x20);
     if (packet == NULL) {
       network_game_log(
@@ -1780,20 +1781,19 @@ char network_game_client_request_remove_player(void *client, void *record)
         "message");
       return 0;
     }
-    if (network_connection_write(*(void **)(c + 0x82c), packet,
-                                 (unsigned short)(*packet >> 4), 0, true)) {
-      return 1;
+    result = network_connection_write(*(void **)((char *)client + 0x82c), packet,
+                                      (unsigned short)(*packet >> 4), 0, true);
+    if (!result) {
+      network_game_log("network_game_client_write() failed while sending a "
+                       "message_client_remove_player_request_postgame message");
     }
-    network_game_log("network_game_client_write() failed while sending a "
-                     "message_client_remove_player_request_postgame message");
-    return 0;
+    break;
   default:
     network_game_log("client is in an unknown state");
-    return 1;
+    break;
   }
 
-  return network_connection_write(*(void **)(c + 0x82c), packet,
-                                  (unsigned short)(*packet >> 4), 0, true);
+  return result;
 }
 
 /* network_game_client_remove_player (0x126590)
@@ -2084,9 +2084,6 @@ bool network_game_client_idle_searching(void *server)
     unsigned int *p;
     int i;
 
-    /* Matches the original's inline REP STOSD/STOSW/STOSB zero-fill
-     * (0xe4 bytes = 0x39 dwords exactly) rather than a csmemset() call —
-     * the reference has no CALL here; using csmemset would add one. */
     p = (unsigned int *)game_buf;
     for (i = 0; i < 0x39; i++) {
       p[i] = 0;
