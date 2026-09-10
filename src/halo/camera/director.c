@@ -136,15 +136,17 @@ void director_init_player_cameras(int16_t local_player_index)
               local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
 
   src = (uint32_t *)0x2ee604;
-  dst = (char *)0x335380 + (int)local_player_index * 0xf8 + 0xd0;
+  dst = (char *)0x3352b0 + (int)local_player_index * 0xf8 + 0xd0;
 
-  for (i = 0; i < 4; i++) {
+  i = 4;
+  do {
     *(uint32_t *)(dst - 8) = *src;
     *(uint32_t *)dst = 0;
     *(uint32_t *)(dst - 4) = 0;
-    src += 7;
+    src = (uint32_t *)((char *)src + 0x1c);
     dst += 0xc;
-  }
+    i--;
+  } while (i != 0);
 }
 
 /* Reset director state for all 4 players when disposing old map.
