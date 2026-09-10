@@ -111,21 +111,28 @@ typedef bool(__stdcall *move_file_fn)(const char *existing_path,
 
 #define XFindFirstFile ((find_first_file_fn)0x1d3576)
 #define XFindNextFile ((find_next_file_fn)0x1d3683)
-#define XCloseHandle ((close_handle_fn)0x1cf900)
-#define XCreateFile ((create_file_fn)0x1d1d85)
-#define XSetFilePointer ((set_file_pointer_fn)0x1d1610)
-#define XGetFileSize ((get_file_size_fn)0x1d1d4a)
-#define XReadFile ((read_file_fn)0x1d13c9)
+#define XCloseHandle CloseHandle
+#define XCreateFile CreateFileA
+#define XSetFilePointer SetFilePointer
+#define XGetFileSize GetFileSize
+#define XReadFile ReadFile
 #define IntlStringPrevChar ((intl_string_prev_char_fn)0x19d240)
 #define XIsAlpha ((is_alpha_fn)0x1daaaa)
-#define DEBUG_LOG ((debug_log_fn)0x8f390)
-#define XGetLastError ((xget_last_error_fn)0x1d2240)
-#define XSetLastError ((xset_last_error_fn)0x1d2268)
-#define XNtCreateFile ((nt_create_file_fn)0x1d3410)
-#define XRemoveDirectory ((remove_directory_fn)0x1d347c)
-#define XSetFileAttributes ((set_file_attributes_fn)0x1d0df0)
-#define XDeleteFile ((delete_file_fn)0x1d0ff9)
-#define XMoveFile ((move_file_fn)0x1d0f63)
+#define DEBUG_LOG error
+#define XGetLastError xapi_GetLastError
+#define XSetLastError SetLastError
+#define XNtCreateFile CreateDirectoryA
+#define XRemoveDirectory FUN_001d347c
+#define XSetFileAttributes FUN_001d0df0
+#define XDeleteFile DeleteFileA
+#define XMoveFile MoveFileA
+
+#if defined(_MSC_VER) && !defined(__clang__)
+extern void *__cdecl memset(void *, int, unsigned int);
+#pragma intrinsic(memset)
+#else
+#define memset(p, c, n) csmemset((p), (c), (n))
+#endif
 
 static uint32_t g_find_files_flags;
 static int16_t g_find_files_index = -1;
@@ -431,6 +438,8 @@ file_ref_t *file_reference_create_from_path(file_ref_t *info,
 void find_files_begin(int flags, file_ref_t *dir)
 {
   file_ref_t *ref;
+  int16_t count;
+  int *handle_ptr;
 
   ref = file_reference_verify(dir);
 
@@ -445,13 +454,15 @@ void find_files_begin(int flags, file_ref_t *dir)
     system_exit(-1);
   }
 
-  while (g_find_files_index >= 0) {
-    int handle = g_find_file_handles[(uint16_t)g_find_files_index];
-    if (handle != -1) {
-      XCloseHandle(handle);
-      g_find_file_handles[(uint16_t)g_find_files_index] = -1;
+  if (g_find_files_index >= 0) {
+    handle_ptr = &g_find_file_handles[g_find_files_index];
+    for (count = g_find_files_index + 1; count > 0; count--) {
+      if (*handle_ptr != -1) {
+        XCloseHandle(*handle_ptr);
+        *handle_ptr = -1;
+      }
+      handle_ptr--;
     }
-    g_find_files_index--;
   }
 
   g_find_files_flags = (uint32_t)flags;
@@ -518,18 +529,21 @@ void path_add_extension(char *path, const char *extension)
 
 void path_remove_filename(char *path)
 {
-  int i;
-  int length;
+  char *base;
 
-  length = csstrlen(path);
-  for (i = length - 1; i >= 0; i--) {
-    if (path[i] == '\\') {
-      path[i] = '\0';
-      return;
+  base = path;
+  path = (char *)csstrlen(path);
+  do {
+    if ((int16_t)(uintptr_t)path == 0) {
+      break;
     }
-  }
+  } while (unicode_cursor_backward(base, (int16_t *)&path) != '\\');
 
-  *path = '\0';
+  if (unicode_cursor_forward(base, (int16_t *)&path) == '\\') {
+    base[(int16_t)((uintptr_t)path - 1)] = '\0';
+    return;
+  }
+  base[(int16_t)(uintptr_t)path] = '\0';
 }
 
 void path_split(const char *path, char **directory, char **parent_directory,
@@ -602,11 +616,11 @@ void path_from_file_reference(int16_t location, const char *path, char *out)
 void file_error(file_ref_t *info, const char *function_name)
 {
   file_ref_t *ref;
-  uint32_t error;
+  uint32_t err_code;
 
   ref = file_reference_verify(info);
-  error = XGetLastError();
-  DEBUG_LOG(2, "%s('%s') error 0x%08x", function_name, ref->unk_8, error);
+  err_code = XGetLastError();
+  DEBUG_LOG(2, "%s('%s') error 0x%08x", function_name, ref->unk_8, err_code);
   XSetLastError(0);
 }
 
@@ -629,21 +643,21 @@ bool file_create(file_ref_t *info)
 
   ref = file_reference_verify(info);
 
-  csmemset(path, 0, sizeof(path));
+  memset(path, 0, sizeof(path));
 
   path_from_file_reference(ref->unk_6, ref->unk_8, path);
 
-  if ((ref->unk_4[0] & 1) == 0) {
-    handle = XNtCreateFile(ref->unk_8, 0);
-    if (handle == 0) {
-      goto error;
-    }
-  } else {
+  if (ref->unk_4[0] & 1) {
     handle = XCreateFile(path, 0x40000000, 0, 0, 2, 0x80, 0);
     if (handle == -1) {
       goto error;
     }
     XCloseHandle(handle);
+  } else {
+    handle = XNtCreateFile(ref->unk_8, 0);
+    if (handle == 0) {
+      goto error;
+    }
   }
   return true;
 
@@ -666,18 +680,18 @@ bool file_delete(file_ref_t *info)
   char path[256];
 
   ref = file_reference_verify(info);
-  csmemset(path, 0, sizeof(path));
+  memset(path, 0, sizeof(path));
   path_from_file_reference(ref->unk_6, ref->unk_8, path);
 
-  if ((ref->unk_4[0] & 1) == 0) {
-    if (XRemoveDirectory(path)) {
-      return true;
-    }
-  } else {
+  if (ref->unk_4[0] & 1) {
     if (XSetFileAttributes(path, 0x80)) {
       if (XDeleteFile(path)) {
         return true;
       }
+    }
+  } else {
+    if (XRemoveDirectory(path)) {
+      return true;
     }
   }
 
@@ -705,7 +719,7 @@ bool file_exists(file_ref_t *info)
 
   ref = file_reference_verify(info);
 
-  csmemset(path, 0, sizeof(path));
+  memset(path, 0, sizeof(path));
 
   path_from_file_reference(ref->unk_6, ref->unk_8, path);
 
@@ -735,8 +749,8 @@ bool file_rename(file_ref_t *info, const char *new_name)
   char dst_path[256];
 
   ref = file_reference_verify(info);
-  csmemset(src_path, 0, sizeof(src_path));
-  csmemset(dst_path, 0, sizeof(dst_path));
+  memset(src_path, 0, sizeof(src_path));
+  memset(dst_path, 0, sizeof(dst_path));
   path_from_file_reference(ref->unk_6, ref->unk_8, src_path);
   csstrcpy(dst_path, src_path);
   path_remove_filename(dst_path);
@@ -759,7 +773,7 @@ bool file_open(file_ref_t *info, int flags)
 
   ref = file_reference_verify(info);
 
-  csmemset(path, 0, sizeof(path));
+  memset(path, 0, sizeof(path));
 
   if ((flags & PERMISSION_FLAGS_INVALID_MASK) != 0) {
     display_assert("VALID_FLAGS(flags, NUMBER_OF_PERMISSION_FLAGS)",
@@ -792,7 +806,7 @@ bool file_open(file_ref_t *info, int flags)
     access |= 0x40000000;
   }
 
-  handle = XCreateFile(path, access, 0, NULL, 3, 0x80, 0);
+  handle = XCreateFile(path, access, 0, 0, 3, 0x80, 0);
   if (handle != -1) {
     *(int *)&ref->unk_8[256] = handle;
     if ((flags & (1 << _permission_append_bit)) == 0) {
@@ -882,7 +896,7 @@ int file_get_eof(file_ref_t *info)
 bool file_read(file_ref_t *info, int size, void *buffer)
 {
   file_ref_t *ref;
-  int bytes_read;
+  uint32_t bytes_read;
 
   ref = file_reference_verify(info);
   if (buffer == NULL) {
