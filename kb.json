@@ -10174,7 +10174,7 @@
     },
     {
      "addr": "0xb5d60",
-     "decl": "void game_time_statistics_frame(int16_t, int16_t, int16_t);",
+     "decl": "void game_time_statistics_frame(int16_t a@<si>, int16_t b@<di>, int16_t c@<bx>);",
      "ported": true
     },
     {
@@ -20717,7 +20717,7 @@
     },
     {
      "addr": "0x17c790",
-     "decl": "void rasterizer_window_set_fog(void);",
+     "decl": "bool rasterizer_window_set_fog(void);",
      "ported": true
     },
     {
@@ -23739,7 +23739,7 @@
    "functions": [
     {
      "addr": "0x1910f0",
-     "decl": "int shell_initialize(void);",
+     "decl": "bool shell_initialize(void);",
      "ported": true
     },
     {
@@ -23759,7 +23759,7 @@
     },
     {
      "addr": "0x191180",
-     "decl": "void FUN_00191180(char param_1);",
+     "decl": "void FUN_00191180(int param_1);",
      "ported": true
     },
     {
@@ -24189,7 +24189,7 @@
     {
      "addr": "0x1c90e0",
      "comment": "Return the sample rate for the given codec index (0=22050, 1=44100). Asserts index in [0, 2).",
-     "decl": "int sound_dsound_get_sample_rate(int codec_index);",
+     "decl": "int sound_dsound_get_sample_rate(short sample_rate);",
      "ported": true
     },
     {
@@ -26242,7 +26242,7 @@
     },
     {
      "addr": "0xe39e0",
-     "decl": "void terminal_update(void);",
+     "decl": "bool terminal_update(void);",
      "ported": true
     },
     {
@@ -32136,7 +32136,7 @@
     },
     {
      "addr": "0x1d0f63",
-     "decl": "void MoveFileA(void);"
+     "decl": "bool __stdcall MoveFileA(const char *existing_path, const char *new_path);"
     },
     {
      "addr": "0x1d0ff9",
