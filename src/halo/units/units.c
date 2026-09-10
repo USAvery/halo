@@ -4061,6 +4061,7 @@ void unit_estimate_position(int unit_handle, int16_t estimate_mode,
   int parent_handle;
   int result;
   vector3_t local_body_pos;
+  volatile float delta_z;
 
   unit = (char *)object_get_and_verify_type(unit_handle, 3);
 
@@ -4107,7 +4108,9 @@ apply_delta:
   /* Add (body_position - local_body_pos) delta to out_position */
   out_position->x += body_position->x - local_body_pos.x;
   out_position->y += body_position->y - local_body_pos.y;
-  out_position->z += body_position->z - local_body_pos.z;
+  /* 0x1a94f6: the Z delta is narrowed before it is added. */
+  delta_z = body_position->z - local_body_pos.z;
+  out_position->z += delta_z;
 }
 
 /* unit_impulse_to_animation_kind (0x1a9560)
