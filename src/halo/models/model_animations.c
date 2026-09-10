@@ -1,6 +1,7 @@
 #ifdef HALO_RNG_TRACE
 #include "halo/math/rng_trace.h"
 #endif
+#include "../../x87_math.h"
 #line 1
 /* FUN_00120250 (0x120250) — Allocate a rectangle in a texture page's packed
  * bitmap layout.
@@ -894,7 +895,7 @@ int16_t model_animation_choose_random(int update_kind,
 
 /* floor: the original calls MSVC CRT floor (0x1d9c2b).
  * We provide a local implementation since we don't link the CRT math lib. */
-static double anim_floor(double x)
+static __declspec(noinline) double anim_floor(double x)
 {
   int i = (int)x;
   return (double)((x < (double)i) ? (i - 1) : i);
@@ -1009,6 +1010,8 @@ void animation_get_node_orientations(void *animation, float frame,
 
   /* Compute integer frame index from floor(frame) */
   frame_floor_f = (float)anim_floor((double)frame);
+  /* 0x121764: FSTP dword / 0x12176a: FLD dword before FISTP. */
+  HALO_FLT_ROUNDTRIP(frame_floor_f);
   frame_index = (short)(int)frame_floor_f;
 
   /* Assert: frame_index >= 0 && frame_index <=
@@ -1213,6 +1216,8 @@ void overlay_animation_apply_continuous_scaled(void *animation, float frame,
 
   /* Compute integer frame index from floor(frame) */
   frame_floor_f = (float)anim_floor((double)frame);
+  /* 0x121a54: FSTP dword / 0x121a5a: FLD dword before FISTP. */
+  HALO_FLT_ROUNDTRIP(frame_floor_f);
   frame_index = (short)(int)frame_floor_f;
 
   /* Assert: frame_index >= 0 && frame_index <=
