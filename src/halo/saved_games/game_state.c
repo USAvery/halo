@@ -29,29 +29,22 @@ void game_state_dispose(void)
  * populate it with the scenario name, build version, and tag checksums. */
 void game_state_initialize_for_new_map(void)
 {
-  char *header;
-
+  csmemset(*(void **)0x4ea9ac, 0, 0x14c);
   *(uint8_t *)0x4ea9a4 = 1;
   *(uint8_t *)0x4ea9a5 = 0;
   *(int *)0x4ea9a8 = -1;
 
-  header = *(char **)0x4ea9ac;
-  csmemset(header, 0, 0x14c);
-
   /* copy scenario name into header at byte offset 4 */
-  {
-    char *name = ((char *(*)(int))0x1ba1f0)(*(int *)0x326a08);
-    ((void (*)(char *, char *))0x8dff0)(header + 0x4, name);
-  }
+  csstrcpy((char *)*(void **)0x4ea9ac + 4, tag_get_name(*(int *)0x326a08));
 
   /* copy build version string at byte offset 0x104 */
-  ((void (*)(char *, const char *))0x8dff0)(header + 0x104, "01.10.12.2276");
+  csstrcpy((char *)*(void **)0x4ea9ac + 0x104, "01.10.12.2276");
 
   /* store map type (0x124), tag checksum (0x126), and cache checksum (0x128) */
-  *(int16_t *)(header + 0x124) = *(int16_t *)0x31fa94;
-  *(int16_t *)(header + 0x126) = ((int16_t(*)(void))0xa7460)();
-  *(int *)(header + 0x128) = ((int (*)(void))0x1b9920)();
-  *(int *)header = *(int *)0x4ea9a0;
+  *(int16_t *)((char *)*(void **)0x4ea9ac + 0x124) = *(int16_t *)0x31fa94;
+  *(int16_t *)((char *)*(void **)0x4ea9ac + 0x126) = game_difficulty_level_get();
+  *(int *)((char *)*(void **)0x4ea9ac + 0x128) = FUN_001b9920();
+  *(int *)*(void **)0x4ea9ac = *(int *)0x4ea9a0;
 }
 
 void game_state_dispose_from_old_map(void)
@@ -64,11 +57,11 @@ void game_state_save(void)
 {
   char saved;
 
-  (*(void (**)())0x32eaa0)();
-  ((void (*)(void))0x101c90)();
-  saved = ((char (*)(void))0x1c0370)();
+  (*(void (**)(void))0x32eaa0)();
+  main_lost_map();
+  saved = game_state_write_to_file();
   *(uint8_t *)0x4ea9a5 = (saved != 0);
-  ((void (*)(void))0x101ca0)();
+  main_start_time();
 }
 
 /* Revert to the last saved game state. If no save exists or the map is
@@ -76,20 +69,24 @@ void game_state_save(void)
  * loads the save and calls 13 initialize-for-new-map callbacks. */
 void game_state_revert(void)
 {
+  void (**callbacks)(void);
+  int count;
+
   if (*(uint8_t *)0x4ea9a5 == 0 && *(uint8_t *)0x5054e8 == 0) {
-    ((void (*)(void))0x1002a0)();
+    main_reset_map();
     return;
   }
 
-  (*(void (**)())0x32eaa4)();
-  ((void (*)(void))0x1c0450)();
+  (*(void (**)(void))0x32eaa4)();
+  game_state_read_from_file();
 
-  {
-    void (**callbacks)() = (void (**)())0x32eaa8;
-    int i;
-    for (i = 0; i < 13; i++)
-      callbacks[i]();
-  }
+  callbacks = (void (**)(void))0x32eaa8;
+  count = 13;
+  do {
+    (*callbacks)();
+    callbacks++;
+    count--;
+  } while (count != 0);
 }
 
 /* Save game state header to persistent storage. If the map type is
@@ -157,83 +154,52 @@ bool game_state_reverted(void)
  */
 bool game_state_validate_core_header(char *header, bool fatal)
 {
-  const char *expected_map_name;
-  int16_t expected_players;
-  int16_t saved_players;
-  int expected_checksum;
-  typedef int(__cdecl * fn_csstrcmp_t)(const char *, const char *);
-  typedef char *(__cdecl * fn_csprintf_t)(char *, const char *, ...);
-  typedef void(__cdecl * fn_display_assert_t)(const char *, const char *, int,
-                                              bool);
-  typedef void(__cdecl * fn_system_exit_t)(int);
-  typedef char *(__cdecl * fn_tag_get_name_t)(int);
-  typedef int(__cdecl * fn_get_map_checksum_t)(void);
+  bool result;
 
-  fn_csstrcmp_t fn_csstrcmp = (fn_csstrcmp_t)0x8dcb0;
-
-  if (fn_csstrcmp(header + 0x104, "01.10.12.2276") != 0) {
-    if (!fatal) {
-      return false;
+  result = false;
+  if (csstrcmp(header + 0x104, "01.10.12.2276") != 0) {
+    if (fatal) {
+      display_assert(
+        csprintf((char *)0x5ab100, "expected build #%d but got #%d",
+                 "01.10.12.2276", header + 0x104),
+        "c:\\halo\\SOURCE\\saved games\\game_state.c", 0x195, 1);
+      system_exit(-1);
     }
-    ((fn_display_assert_t)0x8d9f0)(
-      ((fn_csprintf_t)0x8d9d0)((char *)0x5ab100,
-                               "expected build #%s but got #%s",
-                               "01.10.12.2276", header + 0x104),
-      "c:\\halo\\SOURCE\\saved games\\game_state.c", 0x195, 1);
-    ((fn_system_exit_t)0x1029a0)(-1);
+  } else if (csstrcmp(header + 0x4, tag_get_name(*(int *)0x326a08)) != 0) {
+    if (fatal) {
+      display_assert(
+        csprintf((char *)0x5ab100, "expected \"%s\" but got \"%s\"",
+                 tag_get_name(*(int *)0x326a08), header + 0x4),
+        "c:\\halo\\SOURCE\\saved games\\game_state.c", 0x199, 1);
+      system_exit(-1);
+    }
+  } else if (*(int *)header != *(int *)0x4ea9a0) {
+    if (fatal) {
+      display_assert(
+        csprintf((char *)0x5ab100, "allocation checksum mismatch"),
+        "c:\\halo\\SOURCE\\saved games\\game_state.c", 0x19d, 1);
+      system_exit(-1);
+    }
+  } else if (*(int16_t *)(header + 0x124) != *(int16_t *)0x31fa94) {
+    if (fatal) {
+      display_assert(
+        csprintf((char *)0x5ab100, "expected #%d players but got #%d",
+                 *(int16_t *)0x31fa94, *(int16_t *)(header + 0x124)),
+        "c:\\halo\\SOURCE\\saved games\\game_state.c", 0x1a1, 1);
+      system_exit(-1);
+    }
+  } else if (*(int *)(header + 0x128) != FUN_001b9920()) {
+    if (fatal) {
+      display_assert(
+        csprintf((char *)0x5ab100, "checksum from map file doesn't match"),
+        "c:\\halo\\SOURCE\\saved games\\game_state.c", 0x1a6, 1);
+      system_exit(-1);
+    }
+  } else {
+    result = true;
   }
 
-  expected_map_name = ((fn_tag_get_name_t)0x1ba1f0)(*(int *)0x326a08);
-  if (fn_csstrcmp(header + 0x4, expected_map_name) != 0) {
-    if (!fatal) {
-      return false;
-    }
-    ((fn_display_assert_t)0x8d9f0)(
-      ((fn_csprintf_t)0x8d9d0)((char *)0x5ab100,
-                               "expected \"%s\" but got \"%s\"",
-                               expected_map_name, header + 0x4),
-      "c:\\halo\\SOURCE\\saved games\\game_state.c", 0x199, 1);
-    ((fn_system_exit_t)0x1029a0)(-1);
-  }
-
-  if (*(int *)header != *(int *)0x4ea9a0) {
-    if (!fatal) {
-      return false;
-    }
-    ((fn_display_assert_t)0x8d9f0)(
-      ((fn_csprintf_t)0x8d9d0)((char *)0x5ab100,
-                               "allocation checksum mismatch"),
-      "c:\\halo\\SOURCE\\saved games\\game_state.c", 0x19d, 1);
-    ((fn_system_exit_t)0x1029a0)(-1);
-  }
-
-  expected_players = *(int16_t *)0x31fa94;
-  saved_players = *(int16_t *)(header + 0x124);
-  if (saved_players != expected_players) {
-    if (!fatal) {
-      return false;
-    }
-    ((fn_display_assert_t)0x8d9f0)(
-      ((fn_csprintf_t)0x8d9d0)((char *)0x5ab100,
-                               "expected #%d players but got #%d",
-                               (int)expected_players, (int)saved_players),
-      "c:\\halo\\SOURCE\\saved games\\game_state.c", 0x1a1, 1);
-    ((fn_system_exit_t)0x1029a0)(-1);
-  }
-
-  expected_checksum = ((fn_get_map_checksum_t)0x1b9920)();
-  if (*(int *)(header + 0x128) != expected_checksum) {
-    if (!fatal) {
-      return false;
-    }
-    ((fn_display_assert_t)0x8d9f0)(
-      ((fn_csprintf_t)0x8d9d0)((char *)0x5ab100,
-                               "checksum from map file doesn't match"),
-      "c:\\halo\\SOURCE\\saved games\\game_state.c", 0x1a6, 1);
-    ((fn_system_exit_t)0x1029a0)(-1);
-  }
-
-  return true;
+  return result;
 }
 
 /*
@@ -351,28 +317,25 @@ void *game_state_memory_pool_new(const char *name, int pool_config)
 void game_state_load_core(const char *name)
 {
   char header[0x14c];
+  void (**callbacks)(void);
+  int count;
 
-  if (!((char (*)(const char *, void *, int))0x1c0600)(name, header, 0x14c))
-    goto fail;
+  if (game_state_read_core_header(name, header, 0x14c) &&
+      game_state_validate_core_header(header, 1)) {
+    (*(void (**)(void))0x32eaa4)();
+    game_state_read_core(name, *(void **)0x4ea994, 0x345000);
+    console_printf(0, "loaded '%s'", name);
 
-  if (!game_state_validate_core_header(header, 1))
-    goto fail;
-
-  (*(void (**)())0x32eaa4)();
-  ((void (*)(const char *, void *, void *))0x1c0680)(name, *(void **)0x4ea994,
-                                                     (void *)0x345000);
-  ((void (*)(int, const char *, ...))0xff4d0)(0, "loaded '%s'", name);
-
-  {
-    void (**callbacks)() = (void (**)())0x32eaa8;
-    int i;
-    for (i = 0; i < 13; i++)
-      callbacks[i]();
+    callbacks = (void (**)(void))0x32eaa8;
+    count = 13;
+    do {
+      (*callbacks)();
+      callbacks++;
+      count--;
+    } while (count != 0);
+  } else {
+    console_printf(0, "couldn't open '%s'", name);
   }
-  return;
-
-fail:
-  ((void (*)(int, const char *, ...))0xff4d0)(0, "couldn't open '%s'", name);
 }
 
 /* 0x1c0070 / game_state.obj
