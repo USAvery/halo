@@ -33,8 +33,8 @@ Progress breakdown from the [Decompilation Progress Dashboard](https://stianeklu
   `[█████████████████████████████████░░░░░░░] 81.58%`
 * **Ported Code Bytes:** `1,179,209 / 1,729,403` (`68.19%`)
   `[███████████████████████████░░░░░░░░░░░░░] 68.19%`
-* **Average VC71 Match Accuracy:** `92.90%` (`5,534` scored functions, weighted: `88.20%`)
-* **Equivalence Verified:** `4,705` functions tested (`1,197` high confidence)
+* **Average VC71 Match Accuracy:** `93.00%` (`5,535` scored functions, weighted: `88.20%`)
+* **Equivalence Verified:** `4,702` functions tested (`1,197` high confidence)
 * **Translation Units:** `189` source units (`39` platform/SDK buckets tracked separately)
 
 > Explore the interactive call graph and unit breakdown: **[Decompilation Progress Dashboard](https://stianeklund.github.io/halo/)** (or locally at [`artifacts/progress/index.html`](artifacts/progress/index.html))
