@@ -31,23 +31,23 @@
  *   00191131: POP  EBX
  *   00191132: RET
  */
-int shell_initialize(void)
+bool shell_initialize(void)
 {
   bool result;
   bool success;
 
   success = false;
-  ((void (*)(void))0x8d830)();
+  cseries_initialize();
   result = FUN_001911b0();
   if (result) {
-    ((void (*)(void))0x8f370)();
-    ((void (*)(void))0x1b98c0)();
-    ((void (*)(void))0x10b5c0)();
-    ((void (*)(void))0x1c0070)();
-    result = ((bool (*)(void))0x17c790)();
+    errors_initialize();
+    tag_files_close();
+    real_math_initialize();
+    game_state_lruv_cache_new();
+    result = rasterizer_window_set_fog();
     if (result) {
-      ((void (*)(void))0xd01c0)();
-      ((void (*)(void))0x1cc710)();
+      input_initialize();
+      sound_initialize();
       success = true;
     }
     FUN_00191210();
@@ -74,14 +74,14 @@ int shell_initialize(void)
  */
 void shell_dispose(void)
 {
-  ((void (*)(void))0x1cb820)();
-  ((void (*)(void))0xcf490)();
-  ((void (*)(void))0x17c940)();
-  ((void (*)(void))0x10b5d0)();
-  ((void (*)(void))0x1b98d0)();
-  ((void (*)(void))0x8f1f0)();
-  ((void (*)(void))0x191220)();
-  ((void (*)(void))0x8d850)();
+  FUN_001cb820();
+  FUN_000cf490();
+  rasterizer_dynamic_screen_geometry_draw();
+  real_math_dispose();
+  tag_groups_checksum();
+  errors_dispose();
+  FUN_00191220();
+  cseries_dispose();
 }
 
 /* shell_application_is_paused (0x191170)
@@ -121,11 +121,11 @@ bool shell_application_is_paused(void)
  *   00191199: ADD  ESP,0x4                ; caller cleans 4 bytes (cdecl)
  *   0019119c: POP  EBP / RET
  */
-void FUN_00191180(char param_1)
+void FUN_00191180(int param_1)
 {
   if (*(char *)0x4d8a84 != (char)param_1) {
-    FUN_00191230(param_1);
     *(char *)0x4d8a84 = (char)param_1;
+    FUN_00191230(param_1);
   }
 }
 
@@ -203,12 +203,22 @@ void FUN_00191210(void)
   physical_memory_map_verify();
 }
 
+#if defined(_MSC_VER)
+void _ReadWriteBarrier(void);
+#pragma intrinsic(_ReadWriteBarrier)
+#endif
+
 /* FUN_00191220 (0x191220)
  * Single-RET stub (no-op). Called from shell_dispose.
  * Single 0xC3 byte.
  */
-void FUN_00191220(void)
+__declspec(noinline) void FUN_00191220(void)
 {
+#if defined(_MSC_VER)
+  _ReadWriteBarrier();
+#elif defined(__GNUC__) || defined(__clang__)
+  __asm__ __volatile__("" ::: "memory");
+#endif
 }
 
 /* FUN_00191230 (0x191230)
@@ -216,9 +226,14 @@ void FUN_00191220(void)
  * (shell_application_set_paused) with the pause-state argument.
  * Single 0xC3 byte.
  */
-void FUN_00191230(int param_1)
+__declspec(noinline) void FUN_00191230(int param_1)
 {
   (void)param_1;
+#if defined(_MSC_VER)
+  _ReadWriteBarrier();
+#elif defined(__GNUC__) || defined(__clang__)
+  __asm__ __volatile__("" ::: "memory");
+#endif
 }
 
 /* shell_get_command_line (0x191240)
