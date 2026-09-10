@@ -127,7 +127,7 @@ void game_time_statistics_frame(int16_t a, int16_t b, int16_t c)
   int16_t wall_delta;
   int16_t min_a;
   int16_t new_val;
-  int16_t field4;
+  char *globals;
 
   if (!byte_457068) {
     *(int16_t *)0x457070 = 0;
@@ -147,58 +147,73 @@ void game_time_statistics_frame(int16_t a, int16_t b, int16_t c)
     byte_457068 = 1;
     return;
   }
+
   now = system_milliseconds();
   wall_delta = (int16_t)(now - *(unsigned int *)0x45706c);
-  *(unsigned int *)0x45706c = now;
   *(int16_t *)0x457070 += 1;
   *(int16_t *)0x457072 += wall_delta;
-  if (*(int16_t *)0x457076 < wall_delta)
+  if (wall_delta > *(int16_t *)0x457076)
     *(int16_t *)0x457076 = wall_delta;
+  *(unsigned int *)0x45706c = now;
   if (wall_delta < *(int16_t *)0x457074)
     *(int16_t *)0x457074 = wall_delta;
+
   *(int16_t *)0x457078 += a;
-  if (*(int16_t *)0x45707c < a)
+  if (a > *(int16_t *)0x45707c)
     *(int16_t *)0x45707c = a;
   min_a = *(int16_t *)0x45707a;
   if (a < min_a) {
     min_a = a;
     *(int16_t *)0x45707a = min_a;
   }
+
   *(int16_t *)0x45707e += b;
-  if (*(int16_t *)0x457082 < b)
+  if (b > *(int16_t *)0x457082)
     *(int16_t *)0x457082 = b;
   if (b < *(int16_t *)0x457080)
     *(int16_t *)0x457080 = b;
+
   *(int16_t *)0x457084 += c;
-  if (*(int16_t *)0x457088 < c)
+  if (c > *(int16_t *)0x457088)
     *(int16_t *)0x457088 = c;
   if (c < *(int16_t *)0x457086)
     *(int16_t *)0x457086 = c;
+
   if (*(int16_t *)0x457072 < 1000 || *(int16_t *)0x457070 <= 0)
     return;
+
   if (min_a == 0) {
     *(int16_t *)((char *)game_time_globals + 4) = -1;
     byte_457068 = 0;
     return;
   }
+
+  globals = (char *)game_time_globals;
   new_val = (min_a >= 0) ? 1 : 0;
-  if (new_val != *(int16_t *)((char *)game_time_globals + 4)) {
-    *(int16_t *)((char *)game_time_globals + 4) = new_val;
-    *(int16_t *)((char *)game_time_globals + 6) = 0;
-    *(int16_t *)((char *)game_time_globals + 8) = new_val ? 0x7fff : -0x8000;
+  if (new_val != *(int16_t *)(globals + 4)) {
+    *(int16_t *)(globals + 4) = new_val;
+    *(int16_t *)(globals + 6) = 0;
+    *(int16_t *)(globals + 8) = new_val ? 0x7fff : -0x8000;
     min_a = *(int16_t *)0x45707a;
   }
-  field4 = *(int16_t *)((char *)game_time_globals + 4);
-  if (field4 == 0) {
-    if (*(int16_t *)((char *)game_time_globals + 8) < min_a)
-      *(int16_t *)((char *)game_time_globals + 8) = min_a;
-  } else if (field4 == 1) {
-    if (min_a < *(int16_t *)((char *)game_time_globals + 8))
-      *(int16_t *)((char *)game_time_globals + 8) = min_a;
+
+  switch (*(int16_t *)(globals + 4)) {
+  case 0:
+    if (min_a > *(int16_t *)(globals + 8))
+      *(int16_t *)(globals + 8) = min_a;
+    break;
+  case 1:
+    if (min_a < *(int16_t *)(globals + 8))
+      *(int16_t *)(globals + 8) = min_a;
+    break;
+  default:
+    break;
   }
-  *(int16_t *)((char *)game_time_globals + 6) += 1;
-  if (*(int16_t *)((char *)game_time_globals + 6) == 5)
-    *(int16_t *)((char *)game_time_globals + 4) = -1;
+
+  *(int16_t *)(globals + 6) += 1;
+  if (*(int16_t *)(globals + 6) == 5) {
+    *(int16_t *)(globals + 4) = -1;
+  }
   byte_457068 = 0;
 }
 
