@@ -2679,33 +2679,37 @@ void *FUN_0012eef0(void)
   return (void *)0x5a90e0;
 }
 
-/* Handle game-start request from client (0x12f040).
- * Checks pregame state, decodes, then triggers countdown update. */
+#if defined(_MSC_VER) && !defined(__clang__)
+#pragma inline_depth(0)
+#endif
 bool FUN_0012f040(int server, int machine, void *message_data, int message_size)
 {
-  int s = server;
-  char decoded_buf[4];
-  short packet_type;
-  short packet_version;
+  int packet_type;
+  int packet_version;
+  int decoded_buf;
 
-  if (network_game_server_get_state(s, (short *)0) != 0) {
+  if (network_game_server_get_state(server, (short *)0) == 0) {
+    message_size -= 2;
+    packet_type = 0x10;
+    packet_version = 1;
+    if (FUN_0012bce0((int)&decoded_buf, (int)((char *)message_data + 2),
+                     (short *)&message_size, (short *)&packet_type,
+                     (short *)&packet_version, 3)) {
+      network_game_server_update_countdown((void *)server, decoded_buf);
+      return true;
+    }
     network_game_log(
-      "failed to handle a message_client_game_start_request because the "
-      "server is not in pregame");
-    return true;
-  }
-  message_size -= 2;
-  packet_type = 0x10;
-  packet_version = 1;
-  if (FUN_0012bce0((int)decoded_buf, (int)((char *)message_data + 2),
-                   (short *)&message_size, &packet_type, &packet_version, 3)) {
-    network_game_server_update_countdown((void *)s, *(short *)decoded_buf);
+      "server failed to decode a message_client_game_start_request packet");
     return true;
   }
   network_game_log(
-    "server failed to decode a message_client_game_start_request packet");
+    "failed to handle a message_client_game_start_request because the "
+    "server is not in pregame");
   return true;
 }
+#if defined(_MSC_VER) && !defined(__clang__)
+#pragma inline_depth()
+#endif
 
 /* Handle map-precached notification from client (0x12f0d0). */
 #if defined(_MSC_VER) && !defined(__clang__)
@@ -2749,31 +2753,37 @@ bool FUN_0012f0d0(int server, int machine, void *message_data, int message_size)
 #pragma inline_depth()
 #endif
 
-/* Handle client-loaded notification from client (0x12f170). */
+#if defined(_MSC_VER) && !defined(__clang__)
+#pragma inline_depth(0)
+#endif
 bool FUN_0012f170(int server, int machine, void *message_data, int message_size)
 {
-  char decoded_buf[4];
-  short packet_type;
-  short packet_version;
+  int packet_type;
+  int packet_version;
+  int decoded_buf;
 
-  if (network_game_server_get_state(server, (short *)0) != 0) {
-    network_game_log(
-      "failed to handle a message_client_loaded message because the server is "
-      "not in pregame");
+  if (network_game_server_get_state(server, (short *)0) == 0) {
+    message_size -= 2;
+    packet_type = 0x18;
+    packet_version = 1;
+    if (FUN_0012bce0((int)&decoded_buf, (int)((char *)message_data + 2),
+                     (short *)&message_size, (short *)&packet_type,
+                     (short *)&packet_version, 5)) {
+      network_game_server_client_machine_game_loading_completed((void *)server,
+                                                                (void *)machine);
+      return true;
+    }
+    network_game_log("server failed to decode a message_client_loaded packet");
     return false;
   }
-  message_size -= 2;
-  packet_type = 0x18;
-  packet_version = 1;
-  if (FUN_0012bce0((int)decoded_buf, (int)((char *)message_data + 2),
-                   (short *)&message_size, &packet_type, &packet_version, 5)) {
-    network_game_server_client_machine_game_loading_completed((void *)server,
-                                                              (void *)machine);
-    return true;
-  }
-  network_game_log("server failed to decode a message_client_loaded packet");
+  network_game_log(
+    "failed to handle a message_client_loaded message because the server is "
+    "not in pregame");
   return false;
 }
+#if defined(_MSC_VER) && !defined(__clang__)
+#pragma inline_depth()
+#endif
 
 /* Handle add-player request ingame (0x12f200). */
 #if defined(_MSC_VER) && !defined(__clang__)
@@ -3016,29 +3026,29 @@ bool FUN_0012f5d0(void *server)
     display_assert(
       "server",
       "c:\\halo\\SOURCE\\networking\\network_server_message_handler.c", 0x1c8,
-      1);
+      true);
     system_exit(-1);
   }
 
   game_data = network_game_server_get_game(server);
-  if (game_data == 0) {
-    network_game_log(
-      "failed to handle a message_server_game_settings_update because their "
-      "was no server game");
-  } else {
+  if (game_data != 0) {
     csmemcpy(local_buf, (void *)game_data, 0x434);
     msg = encode_network_game_message(6, local_buf, 0x434);
-    if (!msg) {
-      network_game_log(
-        "failed to create a message_server_game_settings_update message");
-    } else {
+    if (msg != NULL) {
       result = FUN_0012f430(server, msg);
       if (!result) {
         network_game_log(
           "failed to send message_server_game_settings_update message to all "
           "machines");
       }
+    } else {
+      network_game_log(
+        "failed to create a message_server_game_settings_update message");
     }
+  } else {
+    network_game_log(
+      "failed to handle a message_server_game_settings_update because their "
+      "was no server game");
   }
 
   return result;

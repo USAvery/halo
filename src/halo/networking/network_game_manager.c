@@ -198,15 +198,18 @@ bool network_game_add_player(void *game, void *player)
 {
   char *g = (char *)game;
   char *p = (char *)player;
+  char *pcVar4;
+  char *slot_ptr;
+  int i;
+  int empty_slot;
   char machine_index;
   char controller_index;
-  int i;
-  int empty_slot = -1;
+  bool result = false;
 
   if (g == NULL || p == NULL) {
     display_assert("game && player",
                    "c:\\halo\\SOURCE\\networking\\network_game_manager.c", 0xbb,
-                   1);
+                   true);
     system_exit(-1);
   }
 
@@ -216,32 +219,59 @@ bool network_game_add_player(void *game, void *player)
       controller_index = p[0x1d];
       if (controller_index >= 0 && controller_index < 4) {
         /* Check for duplicates */
-        char *player_slot = g + 0x226;
-        for (i = 0; i < 16; i++) {
-          if (player_slot[0x1c] == machine_index &&
-              player_slot[0x1d] == controller_index) {
+        i = 0;
+        pcVar4 = g + 0x243;
+        do {
+          if (pcVar4[-1] == machine_index && *pcVar4 == controller_index) break;
+          if (pcVar4[0x1f] == machine_index && pcVar4[0x20] == controller_index) {
+            i += 1;
             break;
           }
-          player_slot += 0x20;
-        }
+          if (pcVar4[0x3f] == machine_index && pcVar4[0x40] == controller_index) {
+            i += 2;
+            break;
+          }
+          if (pcVar4[0x5f] == machine_index && pcVar4[0x60] == controller_index) {
+            i += 3;
+            break;
+          }
+          if (pcVar4[0x7f] == machine_index && pcVar4[0x80] == controller_index) {
+            i += 4;
+            break;
+          }
+          if (pcVar4[0x9f] == machine_index && pcVar4[0xa0] == controller_index) {
+            i += 5;
+            break;
+          }
+          if (pcVar4[0xbf] == machine_index && pcVar4[0xc0] == controller_index) {
+            i += 6;
+            break;
+          }
+          if (pcVar4[0xdf] == machine_index && pcVar4[0xe0] == controller_index) {
+            i += 7;
+            break;
+          }
+          i += 8;
+          pcVar4 += 0x100;
+        } while (i < 16);
 
         if (i == 16 && network_player_is_valid(p)) {
           /* Find empty slot (player_index == -1) */
-          player_slot = g + 0x226;
-          for (i = 0; i < 16; i++) {
-            if (player_slot[0x1f] == (char)-1) {
+          empty_slot = -1;
+          slot_ptr = g + 0x245;
+          for (i = 0; i < 16; i++, slot_ptr += 0x20) {
+            if (*slot_ptr == (char)-1) {
               empty_slot = i;
               break;
             }
-            player_slot += 0x20;
           }
 
-          if (empty_slot != -1 &&
-              (p[0x1f] == (char)-1 || p[0x1f] == (char)empty_slot)) {
+          if ((p[0x1f] == (char)-1 || empty_slot == (int)(signed char)p[0x1f]) &&
+              empty_slot != -1) {
             p[0x1f] = (char)empty_slot;
             csmemcpy(g + 0x226 + empty_slot * 0x20, p, 0x20);
             *(short *)(g + 0x224) += 1;
-            return true;
+            result = true;
           }
         }
       }
@@ -249,7 +279,7 @@ bool network_game_add_player(void *game, void *player)
   } else {
     error(2, "game is already at maximum players; can't add new player");
   }
-  return false;
+  return result;
 }
 
 int FUN_0012af00(void *p1, void *p2)
@@ -267,39 +297,30 @@ int FUN_0012af00(void *p1, void *p2)
   if (!network_player_is_valid(player1) && !network_player_is_valid(player2)) {
     return 0;
   }
-  /* qsort comparator: valid players sort ahead of invalid ones. cmp(p1,p2)
-   * returns -1 when p1 should precede p2. Reference (0x12af00): valid(p1) with
-   * invalid(p2) jumps to the -1 return (683); invalid(p1) with valid(p2) jumps
-   * to the +1 return (645). */
-  if (network_player_is_valid(player1) && !network_player_is_valid(player2)) {
-    return -1;
-  }
   if (!network_player_is_valid(player1) && network_player_is_valid(player2)) {
     return 1;
   }
+  if (network_player_is_valid(player1) && !network_player_is_valid(player2)) {
+    return -1;
+  }
 
   /* Both are valid, compare machine indices first */
-  if (player1[0x1c] > player2[0x1c]) {
-    return 1;
-  }
-  if (player1[0x1c] < player2[0x1c]) {
+  if (player1[0x1c] <= player2[0x1c]) {
+    if (player2[0x1c] <= player1[0x1c]) {
+      if (player2[0x1d] < player1[0x1d]) {
+        return 1;
+      }
+      if (player2[0x1d] <= player1[0x1d]) {
+        display_assert("multiple players on the same machine cannot have the same "
+                       "controller index",
+                       "c:\\halo\\SOURCE\\networking\\network_game_manager.c", 0x165,
+                       true);
+        system_exit(-1);
+      }
+    }
     return -1;
   }
-
-  /* Machine indices are equal, compare controller/player indices */
-  if (player1[0x1d] > player2[0x1d]) {
-    return 1;
-  }
-  if (player1[0x1d] < player2[0x1d]) {
-    return -1;
-  }
-
-  display_assert("multiple players on the same machine cannot have the same "
-                 "controller index",
-                 "c:\\halo\\SOURCE\\networking\\network_game_manager.c", 0x165,
-                 1);
-  system_exit(-1);
-  return 0;
+  return 1;
 }
 
 bool network_game_spawn_player(void *player)
@@ -331,7 +352,7 @@ bool network_game_spawn_player(void *player)
   return false;
 }
 
-bool FUN_0012b0c0(void *player, void *game)
+bool network_game_player_is_valid(void *player, void *game)
 {
   char *p = (char *)player;
   char *g = (char *)game;
@@ -483,56 +504,53 @@ bool network_game_create_game_objects(void *game)
   if (conn > 0) {
     if (conn < 3) {
       options.random_seed = network_game_get_number_of_games_played();
-    } else if (conn == 3) {
-      options.random_seed = *(uint32_t *)(g + 0x428);
     } else {
-      /* Reference asserts on any connection type > 3 (cmp 3 / jne assert). */
-      display_assert("!\"bad game connection\"",
-                     "c:\\halo\\SOURCE\\networking\\network_game_manager.c",
-                     0x17f, 1);
-      system_exit(-1);
+      if (conn != 3) {
+        goto bad_connection;
+      }
+      options.random_seed = *(uint32_t *)(g + 0x428);
     }
-  } else {
-    display_assert("!\"bad game connection\"",
-                   "c:\\halo\\SOURCE\\networking\\network_game_manager.c",
-                   0x17f, 1);
-    system_exit(-1);
-  }
 
-  game_precache_new_map(options.map_name, 1);
-  main_menu_unload();
-  if (game_in_progress()) {
-    game_dispose_from_old_map();
-    game_unload();
-  }
-
-  if (*(int *)(g + 0xbc) != 0) {
-    game_set_game_variant((game_variant_t *)(g + 0xa4));
-  }
-
-  if (!game_load(&options)) {
-    error(0, "game_load() failed.");
-    return g[0x430] != 0;
-  }
-
-  g[0x430] = 1;
-  game_initialize_for_new_map();
-  qsort(g + 0x226, 16, 32, (int (*)(const void *, const void *))FUN_0012af00);
-
-  player = g + 0x226;
-  for (i = 0; i < 16; i++) {
-    if (player[0x1d] < 0 || player[0x1d] > 3)
-      break;
-    if (player[0x1c] < 0 || player[0x1c] > 3)
-      break;
-    if (!network_game_spawn_player(player)) {
-      g[0x430] = 0;
-      return false;
+    game_precache_new_map(options.map_name, true);
+    main_menu_unload();
+    if (game_in_progress()) {
+      game_dispose_from_old_map();
+      game_unload();
     }
-    player += 0x20;
+
+    if (*(int *)(g + 0xbc) != 0) {
+      game_set_game_variant((game_variant_t *)(g + 0xa4));
+    }
+
+    if (!game_load(&options)) {
+      error(0, "game_load() failed.");
+      return (bool)g[0x430];
+    }
+
+    g[0x430] = 1;
+    game_initialize_for_new_map();
+    qsort(g + 0x226, 16, 32, (int (*)(const void *, const void *))FUN_0012af00);
+
+    player = g + 0x226;
+    for (i = 0; i < 16; i++, player += 0x20) {
+      if (!network_player_is_valid(player)) {
+        break;
+      }
+      if (!network_game_spawn_player(player)) {
+        g[0x430] = 0;
+        return (bool)g[0x430];
+      }
+    }
+
+    return (bool)g[0x430];
   }
 
-  return g[0x430] != 0;
+bad_connection:
+  display_assert("!\"bad game connection\"",
+                 "c:\\halo\\SOURCE\\networking\\network_game_manager.c",
+                 0x17f, true);
+  system_exit(-1);
+  return false;
 }
 
 bool network_game_remove_machine(void *game, void *machine)

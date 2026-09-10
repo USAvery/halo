@@ -1328,17 +1328,18 @@ void FUN_00125ce0(void *message_packet, void *advertised_games)
   char *m;
   char *g;
   char *entry;
+  char *p;
   bool local_open;
   int i;
-  int now;
   const char *platform_str;
   const char *open_str;
 
+  local_open =
+    (*(unsigned char *)((char *)message_packet + 0x102) & 2) != 0 &&
+    *(int16_t *)((char *)message_packet + 0xfa) < 4;
+
   m = (char *)message_packet;
   g = (char *)advertised_games;
-
-  local_open =
-    (*(unsigned char *)(m + 0x102) & 2) != 0 && *(int16_t *)(m + 0xfa) < 4;
 
   entry = g;
   for (i = 0; i < 9; i++) {
@@ -1349,36 +1350,42 @@ void FUN_00125ce0(void *message_packet, void *advertised_games)
     entry += 0xe4;
   }
 
-  entry = g;
+  entry = NULL;
+  p = g;
   for (i = 0; i < 9; i++) {
-    if (transport_nonce_is_equal(entry + 0x24, m + 8)) {
-      goto fill_in;
+    if (transport_nonce_is_equal(p + 0x24, m + 8)) {
+      entry = p;
+      break;
     }
-    entry += 0xe4;
+    p += 0xe4;
+  }
+  if (entry != NULL) {
+    goto fill_in;
   }
 
-  entry = g;
-  for (i = 0; i < 9; i++) {
-    if (*(unsigned char *)(entry + 0xe1) == 0) {
+  for (p = g, i = 0; i < 9; i++) {
+    if (*(unsigned char *)(p + 0xe1) == 0) {
+      entry = p;
       goto fill_in;
     }
-    entry += 0xe4;
+    p += 0xe4;
   }
 
   if (local_open) {
-    entry = g;
+    p = g + 0xe0;
     for (i = 0; i < 9; i++) {
-      if (*(unsigned char *)(entry + 0xe1) == 0) {
+      if (p[1] == 0) {
         display_assert("current->valid",
                        "c:\\halo\\SOURCE\\networking\\network_client_manager.c",
                        0x61f, true);
         system_exit(-1);
       }
-      if (*(unsigned char *)(entry + 0xe0) == 0) {
+      if (*p == 0) {
+        entry = p - 0xe0;
         csmemset(entry, 0, 0xe4);
         goto fill_in;
       }
-      entry += 0xe4;
+      p += 0xe4;
     }
   }
 
@@ -1399,8 +1406,7 @@ fill_in:
   *(unsigned int *)(entry + 0x1c) = *(unsigned int *)(m + 0x2c);
   *(unsigned int *)(entry + 0x20) = *(unsigned int *)(m + 0x30);
   csmemcpy(entry + 0x24, m + 8, 8);
-  now = system_milliseconds();
-  *(int *)(entry + 0x2c) = now;
+  *(int *)(entry + 0x2c) = system_milliseconds();
   *(uint16_t *)(entry + 0xde) = *(uint16_t *)(m + 0x38);
   if (*(uint16_t *)(m + 0x3a) == 0) {
     ustrncpy((wchar_t *)(entry + 0x30), (wchar_t *)0x292468, 0xf);
@@ -1475,6 +1481,14 @@ void FUN_00125fb0(unsigned short reason, void *client)
     *(int16_t *)((char *)client + 0xca8) = (int16_t)reason;
 }
 
+#if defined(_MSC_VER) && !defined(__clang__)
+extern void *__cdecl memset(void *, int, unsigned int);
+#pragma intrinsic(memset)
+#define client_zero_bytes(p, n) memset((p), 0, (n))
+#else
+#define client_zero_bytes(p, n) csmemset((p), 0, (n))
+#endif
+
 /* FUN_00126000 (0x126000) — network_game_client_send_graceful_exit_pregame
  *
  * Periodically (every 1000ms) encodes and sends a
@@ -1493,7 +1507,7 @@ void FUN_00126000(void *server)
     map_name = main_get_multiplayer_map_name();
     *(int *)((char *)server + 0xca0) = now;
     if (cache_files_give_time_to_precache(map_name)) {
-      csmemset(buf, 0, sizeof(buf));
+      client_zero_bytes(buf, sizeof(buf));
       csstrncpy(buf, map_name, 0x100);
       encoded = (unsigned short *)encode_network_game_message(0x13, buf, 0x100);
       if (encoded != NULL) {

@@ -4182,7 +4182,7 @@
     {
      "addr": "0x40700",
      "decl": "void ai_handle_deleted_object(int object_handle);",
-     "ported": true
+     "ported": false
     },
     {
      "addr": "0x40860",
@@ -15042,7 +15042,7 @@
     },
     {
      "addr": "0x11beb0",
-     "decl": "int FUN_0011beb0(short *table, short growth_bits);",
+     "decl": "bool FUN_0011beb0(short *table, short growth_bits);",
      "name": "FUN_0011beb0",
      "ported": true
     },
@@ -24673,7 +24673,7 @@
     {
      "addr": "0x1c88a0",
      "decl": "void sound_is_active(void *data);",
-     "ported": true
+     "ported": false
     },
     {
      "addr": "0x1c8ee0",
@@ -24699,34 +24699,34 @@
     {
      "addr": "0x1cb820",
      "decl": "void FUN_001cb820(void);",
-     "ported": true,
+     "ported": false,
      "comment": "Tear down the sound manager: stop the hardware backend via vtable+0x8, invalidate and dispose the sounds (0x4fdba4) and looping-sounds (0x4fdba0) tables, then tail-call FUN_001bde90."
     },
     {
      "addr": "0x1cb8f0",
      "decl": "void sound_reconnect_to_structure_bsp(void);",
-     "ported": true,
+     "ported": false,
      "comment": "Re-resolve the cached scenario location of every active sound after a structure BSP switch: when initialized (0x4eaf40) and hardware present (0x4eaf41), walk the sounds table (0x4fdba4) and for entries with the 16-bit field at +0x14 == 1 call scenario_location_from_point(entry+0x44, entry+0x20)."
     },
     {
      "addr": "0x1cb960",
      "decl": "int sound_try_and_get(int absolute_index);",
-     "ported": true
+     "ported": false
     },
     {
      "addr": "0x1cb980",
      "decl": "void sound_enable(bool enable);",
-     "ported": true
+     "ported": false
     },
     {
      "addr": "0x1cb990",
      "decl": "bool sound_scripted_dialog_is_playing(void);",
-     "ported": true
+     "ported": false
     },
     {
      "addr": "0x1cb9b0",
      "decl": "void sound_manager_set_sound_environment(const void *sound_environment);",
-     "ported": true
+     "ported": false
     },
     {
      "addr": "0x1cb9d0",
@@ -24743,14 +24743,14 @@
     {
      "addr": "0x1cbc40",
      "decl": "bool FUN_001cbc40(int sound_index@<ebx>);",
-     "ported": true,
+     "ported": false,
      "comment": "Per-sound update tick. sound_index in EBX, bool result in AL. Validates the cached playing channel (entry+0x8c) against the channel array at 0x4fc3a0 (stride 0x18), then calls the entry update callback at +0x10 with (entry+0xc, entry+0x54, entry+0x14) when unflagged and entry+0x84 < render time (0x4eaf4c); clears the callback when the sound class definition byte at +0x08 is zero."
     },
     {
      "addr": "0x1cc1c0",
      "comment": "Looping-sound source refresh callback (stored at sound_entry+0x10): look up the looping handle in the looping-sounds table (0x4fdba0); on success copy the 0x40-byte source block at +0xc to the caller buffer and return 1, else 0.",
      "decl": "char FUN_001cc1c0(int looping_handle, int param_2, void *out_source_data);",
-     "ported": true
+     "ported": false
     },
     {
      "addr": "0x1cc200",
@@ -39021,7 +39021,7 @@
     },
     {
      "addr": "0x60330",
-     "decl": "void FUN_00060330(void *param_1);"
+     "decl": "void FUN_00060330(void *param_1@<eax>);"
     },
     {
      "addr": "0x604e0",

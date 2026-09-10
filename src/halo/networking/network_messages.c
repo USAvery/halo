@@ -24,11 +24,11 @@
 
 #define csstrcpy ((char *(*)(char *, const char *))0x8dff0)
 
-#define array_get_element ((int (*)(int *, int, int))0x117ee0)
+#define array_get_element FUN_00117ee0
 
-#define array_reset ((void (*)(int *, int))0x117b20)
+#define array_reset array_new
 
-#define array_dispose ((void (*)(int *))0x117cf0)
+#define array_dispose FUN_00117cf0
 
 /* packet_header byte-swap definition at 0x3220c0 */
 #define packet_header_bs_def ((void *)0x3220c0)
@@ -824,15 +824,16 @@ void hashtable_set_user_data(void *table, int user_data)
  *   t+0x20  int     capacity field inside array header (checked when
  *                   slot_index != -1)
  */
+#define hashtable_valid(t) \
+  ((t) != (void *)0 && *(t) > 0 && (t)[1] > 0 && \
+   *(float *)((t) + 4) > 0.0f && *(float *)((t) + 4) <= 1.0f && \
+   ((t)[3] == -1 || (1 << (t)[3]) == *(int *)((t) + 16)))
+
 void hashtable_dispose(short *table)
 {
   char *t;
 
-  if (table == NULL || *table < 1 || table[1] < 1 ||
-      !(*(float *)((char *)table + 0x08) > 0.0f &&
-        *(float *)((char *)table + 0x08) <= 1.0f) ||
-      (table[3] != -1 && (1 << ((unsigned char)table[3] & 0x1f)) !=
-                           *(int *)((char *)table + 0x20))) {
+  if (!hashtable_valid(table)) {
     display_assert("hashtable_valid(table)",
                    "c:\\halo\\SOURCE\\memory\\hashtable.c", 0x6e, 1);
     system_exit(-1);
@@ -893,7 +894,7 @@ int FUN_0011ba50(short *table, void *key, unsigned short *slot_index_out)
   slot = (short)((unsigned short)(table[0x10] - 1) & hash_val);
   while (1) {
     if ((*(unsigned int *)(*(int *)(table + 0xc) + ((int)slot >> 5) * 4) &
-         (1 << ((unsigned char)slot & 0x1f))) == 0) {
+         (1 << (slot & 0x1f))) == 0) {
       *slot_index_out = (unsigned short)slot;
       return 0;
     }
@@ -929,16 +930,14 @@ int FUN_0011bb70(short *table, void *key)
   char found;
   int element_ptr;
   short slot;
+  int result = 0;
 
-  psVar1 = table;
-  if ((((table == NULL) || (*table < 1)) || (table[1] < 1)) ||
-      (((*(float *)(table + 4) <= 0.0f) || (*(float *)(table + 4) > 1.0f)) ||
-       ((table[3] != -1 && ((1 << ((unsigned char)table[3] & 0x1f)) !=
-                            *(int *)(table + 0x10)))))) {
+  if (!hashtable_valid(table)) {
     display_assert("hashtable_valid(table)",
                    "c:\\halo\\SOURCE\\memory\\hashtable.c", 0x4d, 1);
     system_exit(-1);
   }
+  psVar1 = table;
   if (psVar1[2] != 0) {
     found = (char)FUN_0011ba50(psVar1, key, (unsigned short *)&slot);
     if (found != '\0') {
@@ -947,7 +946,7 @@ int FUN_0011bb70(short *table, void *key)
       return element_ptr + *psVar1;
     }
   }
-  return 0;
+  return result;
 }
 
 /* hashtable_remove — remove a key using backward-shift deletion (0x11bc20).
@@ -964,79 +963,76 @@ void FUN_0011bc20(short *table, void *key)
   short removed_slot;
   int cur_pos;
 
-  psVar3 = table;
-  if (((((table == NULL) || (*table < 1)) || (table[1] < 1)) ||
-       ((*(float *)(table + 4) <= 0.0f) || (*(float *)(table + 4) > 1.0f))) ||
-      ((table[3] != -1 && ((1 << ((unsigned short)table[3] & 0x1f)) !=
-                           *(int *)(table + 0x10))))) {
+  if (!hashtable_valid(table)) {
     display_assert("hashtable_valid(table)",
                    "c:\\halo\\SOURCE\\memory\\hashtable.c", 0xc3, 1);
     system_exit(-1);
   }
+  psVar3 = table;
   if (key == NULL) {
     display_assert("key", "c:\\halo\\SOURCE\\memory\\hashtable.c", 0xc4, 1);
     system_exit(-1);
   }
   found = (char)FUN_0011ba50(psVar3, key, (unsigned short *)&removed_slot);
-  if (found == '\0') {
-    display_assert("removing key not in hashtable",
-                   "c:\\halo\\SOURCE\\memory\\hashtable.c", 0xe1, 1);
-    system_exit(-1);
-    return;
-  }
-  next_slot = (unsigned short)((int)(removed_slot + 1) &
-                               (int)(unsigned short)(psVar3[0x10] - 1));
-  cur_pos = (int)(short)next_slot;
-  bit_mask = *(unsigned int *)(*(int *)(psVar3 + 0xc) + (cur_pos >> 5) * 4) &
-             (1 << ((unsigned char)next_slot & 0x1f));
-  while (bit_mask != 0) {
-    next_element =
-      array_get_element((int *)(psVar3 + 0xe), cur_pos, (int)psVar3[1]);
-    if (*(int *)(psVar3 + 8) == 0) {
-      key_hash = (unsigned short)FUN_0011ba00((unsigned char *)next_element,
-                                              (unsigned int)*psVar3);
-    } else {
-      key_hash = (unsigned short)(*(int (**)(int, int))(psVar3 + 8))(
-        *(int *)(psVar3 + 6), next_element);
-    }
-    key_hash = (unsigned short)(psVar3[0x10] - 1) & key_hash;
-    if ((short)key_hash < (short)next_slot) {
-      if ((short)removed_slot < (short)key_hash) {
-        goto no_shift;
-      }
-      if ((short)removed_slot < (short)next_slot) {
-        goto do_shift;
-      }
-    } else if ((short)key_hash > (short)next_slot) {
-      if ((short)removed_slot >= (short)key_hash) {
-        goto do_shift;
-      }
-      if ((short)removed_slot < (short)next_slot) {
-        goto do_shift;
-      }
-    }
-    goto no_shift;
-  do_shift: {
-    int src_element;
-    int dst_element;
-    src_element =
-      array_get_element((int *)(psVar3 + 0xe), cur_pos, (int)psVar3[1]);
-    dst_element = array_get_element((int *)(psVar3 + 0xe), (int)removed_slot,
-                                    (int)psVar3[1]);
-    csmemcpy((void *)dst_element, (void *)src_element, *(int *)(psVar3 + 0xe));
-    removed_slot = (short)next_slot;
-  }
-  no_shift:
-    (void)0;
-    next_slot = (unsigned short)((int)(next_slot + 1) &
+  if (found != '\0') {
+    next_slot = (unsigned short)((int)(removed_slot + 1) &
                                  (int)(unsigned short)(psVar3[0x10] - 1));
     cur_pos = (int)(short)next_slot;
     bit_mask = *(unsigned int *)(*(int *)(psVar3 + 0xc) + (cur_pos >> 5) * 4) &
-               (1 << ((unsigned char)next_slot & 0x1f));
+               (1 << (next_slot & 0x1f));
+    while (bit_mask != 0) {
+      next_element =
+        array_get_element((int *)(psVar3 + 0xe), cur_pos, (int)psVar3[1]);
+      if (*(int *)(psVar3 + 8) == 0) {
+        key_hash = (unsigned short)FUN_0011ba00((unsigned char *)next_element,
+                                                (unsigned int)*psVar3);
+      } else {
+        key_hash = (unsigned short)(*(int (**)(int, int))(psVar3 + 8))(
+          *(int *)(psVar3 + 6), next_element);
+      }
+      key_hash = (unsigned short)(psVar3[0x10] - 1) & key_hash;
+      if ((short)key_hash < (short)next_slot) {
+        if ((short)removed_slot < (short)key_hash) {
+          goto no_shift;
+        }
+        if ((short)removed_slot < (short)next_slot) {
+          goto do_shift;
+        }
+      } else if ((short)key_hash > (short)next_slot) {
+        if ((short)removed_slot >= (short)key_hash) {
+          goto do_shift;
+        }
+        if ((short)removed_slot < (short)next_slot) {
+          goto do_shift;
+        }
+      }
+      goto no_shift;
+    do_shift: {
+      int src_element;
+      int dst_element;
+      src_element =
+        array_get_element((int *)(psVar3 + 0xe), cur_pos, (int)psVar3[1]);
+      dst_element = array_get_element((int *)(psVar3 + 0xe), (int)removed_slot,
+                                      (int)psVar3[1]);
+      csmemcpy((void *)dst_element, (void *)src_element, *(int *)(psVar3 + 0xe));
+      removed_slot = (short)next_slot;
+    }
+    no_shift:
+      (void)0;
+      next_slot = (unsigned short)((int)(next_slot + 1) &
+                                   (int)(unsigned short)(psVar3[0x10] - 1));
+      cur_pos = (int)(short)next_slot;
+      bit_mask = *(unsigned int *)(*(int *)(psVar3 + 0xc) + (cur_pos >> 5) * 4) &
+                 (1 << (next_slot & 0x1f));
+    }
+    bitmap_word =
+      (unsigned int *)(*(int *)(psVar3 + 0xc) + ((int)removed_slot >> 5) * 4);
+    *bitmap_word = *bitmap_word & ~(1 << (removed_slot & 0x1f));
+  } else {
+    display_assert("removing key not in hashtable",
+                   "c:\\halo\\SOURCE\\memory\\hashtable.c", 0xe1, 1);
+    system_exit(-1);
   }
-  bitmap_word =
-    (unsigned int *)(*(int *)(psVar3 + 0xc) + ((int)removed_slot >> 5) * 4);
-  *bitmap_word = *bitmap_word & ~(1 << ((unsigned char)removed_slot & 0x1f));
 }
 
 /* hashtable_put — insert a key into a slot (0x11be10).
@@ -1066,15 +1062,13 @@ int FUN_0011be10(short *table, void *key)
 
 /* hashtable_grow — resize the hashtable by adding capacity bits (0x11beb0).
  * Source: hashtable.c lines 0x86-0xb0. */
-int FUN_0011beb0(short *table, short growth_bits)
+bool FUN_0011beb0(short *table, short growth_bits)
 {
   short *array_hdr;
-  unsigned short old_capacity_bits;
+  int old_capacity_bits;
   short old_count;
   int old_bitmap;
-  int old_array_data;
-  int old_array_capacity;
-  int old_array_p2;
+  int old_array[3];
   int new_capacity;
   int bitmap_bytes;
   int new_bitmap;
@@ -1086,32 +1080,28 @@ int FUN_0011beb0(short *table, short growth_bits)
   old_count = table[2];
   old_bitmap = *(int *)(table + 0xc);
   array_hdr = table + 0xe;
-  old_capacity_bits = (unsigned short)table[3];
-  old_array_data = *(int *)array_hdr;
-  old_array_capacity = *(int *)(table + 0x10);
-  old_array_p2 = *(int *)(table + 0x12);
-  if (((*table < 1) || (table[1] < 1)) ||
-      ((*(float *)(table + 4) <= 0.0f) || (*(float *)(table + 4) > 1.0f) ||
-       ((old_capacity_bits != 0xffff &&
-         ((1 << ((unsigned char)old_capacity_bits & 0x1f)) !=
-          *(int *)(table + 0x10)))))) {
+  old_capacity_bits = (int)table[3];
+  old_array[0] = *(int *)array_hdr;
+  old_array[1] = *(int *)(table + 0x10);
+  old_array[2] = *(int *)(table + 0x12);
+  if (!hashtable_valid(table)) {
     display_assert("hashtable_valid(table)",
                    "c:\\halo\\SOURCE\\memory\\hashtable.c", 0x86, 1);
     system_exit(-1);
   }
-  if (growth_bits < 1) {
+  if (growth_bits <= 0) {
     display_assert("growth_bits>0", "c:\\halo\\SOURCE\\memory\\hashtable.c",
                    0x87, 1);
     system_exit(-1);
   }
-  if ((int)growth_bits + (int)table[3] > 0xf) {
+  if (table[3] + growth_bits >= 16) {
     display_assert("table->capacity_bits+growth_bits<SHORT_BITS",
                    "c:\\halo\\SOURCE\\memory\\hashtable.c", 0x88, 1);
     system_exit(-1);
   }
-  table[3] = table[3] + growth_bits;
-  new_capacity = (int)(short)(1 << ((unsigned char)table[3] & 0x1f));
-  bitmap_bytes = ((new_capacity + 0x1f) >> 5) << 2;
+  table[3] += growth_bits;
+  new_capacity = (short)(1 << table[3]);
+  bitmap_bytes = ((new_capacity + 31) >> 5) * 4;
   table[2] = 0;
   new_bitmap = (int)debug_malloc(bitmap_bytes, 0,
                                  "c:\\halo\\SOURCE\\memory\\hashtable.c", 0x8f);
@@ -1120,26 +1110,26 @@ int FUN_0011beb0(short *table, short growth_bits)
     array_reset((int *)array_hdr, *(int *)array_hdr);
     if (array_resize((int *)array_hdr, new_capacity)) {
       csmemset((void *)*(int *)(table + 0xc), 0, bitmap_bytes);
-      if (0 < old_array_capacity) {
+      if (0 < old_array[1]) {
         idx = 0;
         i = 0;
         do {
           if ((*(unsigned int *)(old_bitmap + (i >> 5) * 4) &
-               (1 << ((unsigned char)i & 0x1f))) != 0) {
-            element_ptr = array_get_element(&old_array_data, i, old_array_data);
+               (1 << (i & 0x1f))) != 0) {
+            element_ptr = array_get_element(old_array, i, old_array[0]);
             dest_ptr = FUN_0011be10(table, (void *)element_ptr);
             csmemcpy((void *)dest_ptr, (void *)(element_ptr + *table),
                      (int)table[1]);
           }
           idx = idx + 1;
           i = (int)idx;
-        } while (i < old_array_capacity);
+        } while (i < old_array[1]);
       }
       if (old_bitmap != 0) {
         debug_free((void *)old_bitmap, "c:\\halo\\SOURCE\\memory\\hashtable.c",
                    0xa8);
       }
-      array_dispose(&old_array_data);
+      array_dispose(old_array);
       return 1;
     }
     debug_free((void *)*(int *)(table + 0xc),
@@ -1148,9 +1138,9 @@ int FUN_0011beb0(short *table, short growth_bits)
   table[3] = (short)old_capacity_bits;
   table[2] = old_count;
   *(int *)(table + 0xc) = old_bitmap;
-  *(int *)array_hdr = old_array_data;
-  *(int *)(table + 0x10) = old_array_capacity;
-  *(int *)(table + 0x12) = old_array_p2;
+  *(int *)array_hdr = old_array[0];
+  *(int *)(table + 0x10) = old_array[1];
+  *(int *)(table + 0x12) = old_array[2];
   return 0;
 }
 
@@ -1161,17 +1151,14 @@ int FUN_0011c0f0(short *table, void *key)
   char grew;
   int result;
 
-  if (((((table == NULL) || (*table < 1)) || (table[1] < 1)) ||
-       ((*(float *)(table + 4) <= 0.0f) || (*(float *)(table + 4) > 1.0f))) ||
-      ((table[3] != -1 &&
-        ((1 << ((unsigned char)table[3] & 0x1f)) != *(int *)(table + 0x10))))) {
+  if (!hashtable_valid(table)) {
     display_assert("hashtable_valid(table)",
                    "c:\\halo\\SOURCE\\memory\\hashtable.c", 0x5d, 1);
     system_exit(-1);
   }
   if ((table[3] == -1) ||
-      ((float)*(int *)(table + 0x10) * *(float *)(table + 4) <=
-       (float)(int)table[2])) {
+      ((float)(int)table[2] >=
+       (float)*(int *)(table + 0x10) * *(float *)(table + 4))) {
     grew = (char)FUN_0011beb0(table, (short)((table[3] == -1) + 1));
     if (grew == '\0') {
       return 0;
