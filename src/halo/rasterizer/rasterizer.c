@@ -6279,13 +6279,13 @@ char FUN_0017c2f0(void *shader, void *pixel_shader)
  * tail-call FUN_00157010.
  * Original TU: c:\halo\SOURCE\rasterizer\rasterizer.c (assert line 0x121)
  */
-void rasterizer_window_set_fog(void)
+bool rasterizer_window_set_fog(void)
 {
   global_rasterizer_model_ambient_reflection_tint =
     game_state_malloc("rasterizer model ambient reflection tint", 0, 0x10);
   assert_halt_at("c:\\halo\\SOURCE\\rasterizer\\rasterizer.c", 0x121,
                  global_rasterizer_model_ambient_reflection_tint);
-  FUN_00157010();
+  return FUN_00157010();
 }
 
 void FUN_0017C7D0(void)
