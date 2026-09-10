@@ -608,7 +608,6 @@ bool network_game_client_end_frame(void)
 {
   int16_t state;
   int now;
-  int last_send;
   bool result;
   uint32_t flags;
   uint16_t *msg;
@@ -625,13 +624,11 @@ bool network_game_client_end_frame(void)
   }
 
   state = network_game_client_get_state(*(void **)0x46e8c0, NULL);
-  last_send = *(int *)0x46e8c8;
 
   if (state == 3) {
     now = system_milliseconds();
-    last_send = *(int *)0x46e8c8;
 
-    if ((unsigned int)(now - *(int *)0x46e8c8) > 0xf &&
+    if ((unsigned int)(now - *(int *)0x46e8c8) >= 0x10 &&
         network_game_client_get_available_games(*(void **)0x46e8c0)) {
       network_game_client_get_error(*(void **)0x46e8c0);
       network_game_client_get_machine_index(*(void **)0x46e8c0);
@@ -648,15 +645,9 @@ bool network_game_client_end_frame(void)
       msg_buf[0] = flags;
       csmemcpy((char *)msg_buf + 8, out_buf, 0x80);
       *(uint16_t *)((char *)msg_buf + 6) = (uint16_t)local_player_count();
-
       msg = (uint16_t *)encode_network_game_message(0x19, msg_buf, 0x88);
-      last_send = now;
 
-      if (msg == NULL) {
-        network_game_log(
-          "failed to create a _message_type_client_game_update message");
-        result = false;
-      } else {
+      if (msg != NULL) {
         network_game_client_switch_to_postgame(*(void **)0x46e8c0, addr_buf);
         /* arg1 is the client's connection handle at +0x82c, fetched via the
          * 0x125710 getter (its kb name is a misnomer; it returns
@@ -672,11 +663,15 @@ bool network_game_client_end_frame(void)
           *(int *)0x46e8c8 = now;
           return false;
         }
+      } else {
+        network_game_log(
+          "failed to create a _message_type_client_game_update message");
+        result = false;
       }
+      *(int *)0x46e8c8 = now;
     }
   }
 
-  *(int *)0x46e8c8 = last_send;
   return result;
 }
 
