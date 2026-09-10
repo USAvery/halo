@@ -70,12 +70,14 @@ void player_register_machine(unsigned __int16 local_player_index,
   for (i = 0; i < 4; i++) {
     if (slots[i] == -1) {
       slots[i] = player_handle;
-      return;
+      break;
     }
   }
-  display_assert("failed to create a player",
-                 "c:\\halo\\SOURCE\\game\\players.c", 0xef, 1);
-  system_exit(-1);
+  if (i == 4) {
+    display_assert("failed to create a player",
+                   "c:\\halo\\SOURCE\\game\\players.c", 0xef, 1);
+    system_exit(-1);
+  }
 }
 
 bool local_player_exists(int16_t local_player_index)
