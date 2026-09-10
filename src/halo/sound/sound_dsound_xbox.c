@@ -1,16 +1,31 @@
+#if defined(__clang__)
+#ifndef fabs
+#define fabs __builtin_fabs
+#endif
+#ifndef fabsf
+#define fabsf __builtin_fabsf
+#endif
+#elif defined(_MSC_VER)
+extern double __cdecl fabs(double);
+#pragma intrinsic(fabs)
+#ifndef fabsf
+#define fabsf(x) ((float)fabs((double)(x)))
+#endif
+#endif
+
 /* sound_dsound_get_sample_rate (0x1c90e0)
  *
  * Return the sample rate for the given codec index.  Index 0 yields
  * 22050 Hz, index 1 yields 44100 Hz.  Asserts codec_index is in the
  * range [0, NUMBER_OF_SOUND_SAMPLE_RATES=2). */
-int sound_dsound_get_sample_rate(int codec_index)
+int sound_dsound_get_sample_rate(short sample_rate)
 {
-  if (codec_index < 0 || codec_index >= 2) {
+  if (sample_rate < 0 || sample_rate >= 2) {
     display_assert("sample_rate>=0 && sample_rate<NUMBER_OF_SOUND_SAMPLE_RATES",
                    "c:\\halo\\source\\sound\\sound_definitions.h", 0x135, 1);
     system_exit(-1);
   }
-  return *(int *)((char *)0x2bcc18 + codec_index * 4);
+  return *(int *)((char *)0x2bcc18 + sample_rate * 4);
 }
 
 /* sound_dsound_gain_to_volume (0x1c9130)
@@ -23,20 +38,21 @@ int sound_dsound_gain_to_volume(float gain, int ceiling)
 {
   int volume;
 
-  if (gain < 0.0f || gain > 1.0f) {
+  if (!(gain >= 0.0f && gain <= 1.0f)) {
     display_assert("gain>=0.f && gain<=1.f",
                    "c:\\halo\\source\\sound\\sound_dsound.h", 0x23, 1);
     system_exit(-1);
   }
 
-  if (gain == 0.0f)
-    return -10000;
-
-  volume = (int)(*(double *)0x2c07b8 * log10(gain) + ceiling);
-  if (volume < -10000)
-    return -10000;
-  if (volume > ceiling)
-    volume = ceiling;
+  if (gain == 0.0f) {
+    volume = -10000;
+  } else {
+    volume = (int)(*(double *)0x2c07b8 * log10(gain) + ceiling);
+    if (volume < -10000)
+      volume = -10000;
+    else if (volume > ceiling)
+      volume = ceiling;
+  }
   return volume;
 }
 
@@ -288,31 +304,38 @@ bool sound_dsound_channel_stop_check(short channel_index)
  * error via error().  HRESULT is passed in ESI. */
 void sound_dsound_log_error(int hresult, const char *message, ...)
 {
-  static char buffer[0x1000];
+  char buffer[0x1000];
   const char *error_name;
   char *arglist;
 
   arglist = (char *)&message + 4;
   vsprintf(buffer, message, arglist);
 
-  error_name = "<unknown error>";
-
-  if (hresult > (int)0x8007000E) {
-    if (hresult == (int)0x8878001E) {
-      error_name = "DSERR_CONTROLUNAVAIL";
-    } else if (hresult == (int)0x88780032) {
-      error_name = "DSERR_INVALIDCALL";
-    } else if (hresult == (int)0x88780078) {
-      error_name = "DSERR_NODRIVER";
-    }
-  } else if (hresult == (int)0x8007000E) {
+  switch (hresult) {
+  case (int)0x8878001E:
+    error_name = "DSERR_CONTROLUNAVAIL";
+    break;
+  case (int)0x88780032:
+    error_name = "DSERR_INVALIDCALL";
+    break;
+  case (int)0x88780078:
+    error_name = "DSERR_NODRIVER";
+    break;
+  case (int)0x8007000E:
     error_name = "DSERR_OUTOFMEMORY";
-  } else if (hresult == (int)0x80004001) {
+    break;
+  case (int)0x80004001:
     error_name = "DSERR_UNSUPPORTED";
-  } else if (hresult == (int)0x80004005) {
+    break;
+  case (int)0x80004005:
     error_name = "DSERR_GENERIC";
-  } else if (hresult == (int)0x80040110) {
+    break;
+  case (int)0x80040110:
     error_name = "DSERR_NOAGGREGATION";
+    break;
+  default:
+    error_name = "<unknown error>";
+    break;
   }
 
   error(2, "DirectSound:  '%s' (%s#%d)", buffer, error_name);
