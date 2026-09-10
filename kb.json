@@ -39021,15 +39021,15 @@
     },
     {
      "addr": "0x60330",
-     "decl": "void FUN_00060330(void *param_1@<eax>);"
+     "decl": "void FUN_00060330(void *param_1@<eax>, const char *param_2);"
     },
     {
      "addr": "0x604e0",
-     "decl": "void FUN_000604e0(int16_t param_1);"
+     "decl": "void FUN_000604e0(void *param_1@<esi>, int16_t param_2);"
     },
     {
      "addr": "0x60670",
-     "decl": "void FUN_00060670(int param_1);"
+     "decl": "void FUN_00060670(void *param_1@<esi>, int param_2);"
     },
     {
      "addr": "0x60910",

@@ -7323,9 +7323,7 @@
   "0x601f0": "void FUN_000601f0(void);",
   "0x60200": "void FUN_00060200(void);",
   "0x60260": "void FUN_00060260(void);",
-  "0x60330": "void FUN_00060330(void *param_1@<eax>);",
-  "0x604e0": "void FUN_000604e0(int16_t param_1);",
-  "0x60670": "void FUN_00060670(int param_1);",
+  "0x60330": "void FUN_00060330(void *param_1@<eax>, const char *param_2);",
   "0x609e0": "void FUN_000609e0(void *path);",
   "0x62960": "void path_obstacles_debug_render(void *obstacles, float radius);",
   "0x62b20": "bool FUN_00062b20(unsigned char *param_1 @<eax>, int surface_index @<edx>, unsigned char param_3 @<ebx>, void *bsp_surfaces, unsigned int *breakable_bitmap);",
@@ -9222,7 +9220,7 @@
     "0x5e680": "void path_heap_insert(void *state /* @<eax> */, short node_index, short quantized_cost_estimate);",
     "0x5e700": "char FUN_0005e700(void *structure_bsp /* @<eax> */, int surface_index);",
     "0x5ef80": "char FUN_0005ef80(unsigned int *path_buf @<edi>);",
-    "0x60330": "void FUN_00060330(void *param_1@<eax>);",
+    "0x60330": "void FUN_00060330(void *param_1@<eax>, const char *param_2);",
     "0x60910": "char FUN_00060910(void *param_1@<eax>, int16_t value@<bx>);",
     "0x60970": "int16_t FUN_00060970(void *param_1@<eax>);",
     "0x60ea0": "void FUN_00060ea0(void *avoidance_record @<ecx>, float *end_point @<eax>, void *param_2, void *scenario, unsigned char param_4, float radius, float *start_point, int param_7, float param_8, unsigned char param_9, unsigned char param_10);",
@@ -10008,7 +10006,9 @@
     "0x2256bb": "int __stdcall recv(void *xnet@<ecx>, unsigned int socket, char *buf, int len, int flags);",
     "0x002256bb": "int __stdcall recv(void *xnet@<ecx>, unsigned int socket, char *buf, int len, int flags);",
     "0x2258a4": "int __stdcall send(void *xnet@<ecx>, unsigned int socket, const char *buf, int len, int flags);",
-    "0x002258a4": "int __stdcall send(void *xnet@<ecx>, unsigned int socket, const char *buf, int len, int flags);"
+    "0x002258a4": "int __stdcall send(void *xnet@<ecx>, unsigned int socket, const char *buf, int len, int flags);",
+    "0x604e0": "void FUN_000604e0(void *param_1@<esi>, int16_t param_2);",
+    "0x60670": "void FUN_00060670(void *param_1@<esi>, int param_2);"
   },
   "0x57330": "short FUN_00057330(int16_t scenario_index@<eax>, void *record@<esi>, int field_1a8_val, int child_handle, int reserved);",
   "0x1631d0": "void FUN_001631d0(void);"

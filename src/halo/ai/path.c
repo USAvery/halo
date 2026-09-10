@@ -1265,7 +1265,7 @@ float FUN_00060200(void *path, int16_t param_2)
  *   param_1 (EAX) = pointer to the owning structure
  *   value   (BX)  = 16-bit value to append
  *
- * Bracketed by FUN_00060330(tag) calls with two different literal .rdata
+ * Bracketed by FUN_00060330(path, tag) calls with two different literal .rdata
  * addresses (0x25eb18 on entry, 0x25eb04 only on the success exit — NOT
  * called on the full-list failure path; the JGE at 0x60930 branches straight
  * to the return-0 tail without a second bracket call). FUN_000600f0(param_1,
@@ -1285,14 +1285,14 @@ char FUN_00060910(void *param_1, int16_t value)
 {
   short count;
 
-  FUN_00060330((void *)0x25eb18);
+  FUN_00060330(param_1, (const char *)0x25eb18);
   count = *(short *)((char *)param_1 + 0x1430);
   if (count < 0x80) {
     *(short *)((char *)param_1 + 0x1430) = count + 1;
     FUN_000600f0(param_1, value);
     *(short *)((char *)param_1 + 0x1432 + count * 2) = value;
-    FUN_000604e0(count);
-    FUN_00060330((void *)0x25eb04);
+    FUN_000604e0(param_1, count);
+    FUN_00060330(param_1, (const char *)0x25eb04);
     return 1;
   }
   return 0;
@@ -1307,7 +1307,7 @@ char FUN_00060910(void *param_1, int16_t value)
  * at entry, no other incoming register use):
  *   param_1 (EAX) = pointer to the owning structure
  *
- * Bracketed by FUN_00060330(tag) calls with two different literal .rdata
+ * Bracketed by FUN_00060330(path, tag) calls with two different literal .rdata
  * addresses, same pattern as FUN_00060910: 0x25eb40 fires unconditionally on
  * entry; 0x25eb2c only fires on the non-empty exit (the JLE at 0x6098c goes
  * straight to the empty-return tail without it). FUN_00060670(0) runs right
@@ -1331,7 +1331,7 @@ int16_t FUN_00060970(void *param_1)
   short front;
   short last;
 
-  FUN_00060330((void *)0x25eb40);
+  FUN_00060330(param_1, (const char *)0x25eb40);
   count = *(short *)((char *)param_1 + 0x1430);
   if (0 < count) {
     count = count - 1;
@@ -1339,8 +1339,8 @@ int16_t FUN_00060970(void *param_1)
     last = *(short *)((char *)param_1 + 0x1432 + count * 2);
     front = *(short *)((char *)param_1 + 0x1432);
     *(short *)((char *)param_1 + 0x1432) = last;
-    FUN_00060670(0);
-    FUN_00060330((void *)0x25eb2c);
+    FUN_00060670(param_1, 0);
+    FUN_00060330(param_1, (const char *)0x25eb2c);
     return front;
   }
   return (int16_t)-1;
