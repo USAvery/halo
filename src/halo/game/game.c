@@ -781,9 +781,9 @@ void FUN_000b4490(void)
   char placement[0x88];
   int flag_indices[8];
   int count;
-  int i;
   int flag_index;
   int tag_index;
+  int i;
 
   scenario = (char *)global_scenario_get();
 
@@ -968,13 +968,13 @@ int FUN_000b4960(void)
   short sVar1;
   int iVar2;
   int iVar3;
-  int iVar4;
+  int min_flag;
   int *piVar5;
 
-  iVar4 = 0x20;
+  min_flag = 0x20;
   iVar2 = (int)global_scenario_get();
   FUN_000b3860();
-  *(int *)0x456fdc = 0;
+  *(char *)0x456fdc = 0;
   csmemset((void *)0x456f10, 0, 0xd0);
   piVar5 = (int *)(iVar2 + 0x378);
   *(int *)0x5aa744 = 0x1e;
@@ -984,20 +984,18 @@ int FUN_000b4960(void)
       iVar3 = (int)tag_block_get_element(piVar5, iVar2, 0x94);
       if (*(short *)(iVar3 + 0x10) == 3) {
         sVar1 = *(short *)(iVar3 + 0x12);
-        if (sVar1 < 0x20) {
-          if (sVar1 < iVar4) {
-            iVar4 = (int)sVar1;
-          }
-          *(int *)0x456f10 =
-            *(int *)0x456f10 | (1 << ((unsigned char)sVar1 & 0x1f));
-          game_engine_set_goal_position((int)*(short *)(iVar3 + 0x12),
-                                        (void *)iVar3, 0, "flag_blue", -1, -1,
-                                        -1);
-        } else {
+        if (sVar1 >= 0x20) {
           error(2,
                 "one of the netgameflags that defines the track was out of "
                 "the legal range 0..%d",
                 0x20);
+        } else {
+          if (min_flag > (int)sVar1) {
+            min_flag = (int)sVar1;
+          }
+          *(int *)0x456f10 |= (1 << ((unsigned char)sVar1 & 0x1f));
+          game_engine_set_goal_position((int)sVar1, (void *)iVar3, 0.0f,
+                                        "flag_blue", -1, -1, -1);
         }
       }
       iVar2 = iVar2 + 1;
@@ -1009,20 +1007,20 @@ int FUN_000b4960(void)
     return 1;
   }
   iVar2 = (int)game_engine_get_variant();
-  piVar5 = (int *)0x456f14;
-  iVar3 = 0x10;
-  if (*(int *)(iVar2 + 0x4c) != 0) {
-    for (; iVar3 != 0; iVar3 = iVar3 + -1) {
-      *piVar5 = -1;
-      piVar5 = piVar5 + 1;
+  {
+    int *dest = (int *)0x456f14;
+    int count = 16;
+    if (*(int *)(iVar2 + 0x4c) == 0) {
+      while (count--) {
+        *dest++ = min_flag;
+      }
+      return 1;
     }
-    return (int)0xffffff01u;
+    while (count--) {
+      *dest++ = -1;
+    }
+    return 1;
   }
-  for (; iVar3 != 0; iVar3 = iVar3 + -1) {
-    *piVar5 = iVar4;
-    piVar5 = piVar5 + 1;
-  }
-  return 1;
 }
 
 /* FUN_000b4b10 (0xb4b10) — invalidate a player's race timestamp
