@@ -1,5 +1,5 @@
 
-char *player_effect_get(int16_t local_player_index)
+__declspec(noinline) char *player_effect_get(int16_t local_player_index)
 {
   assert_halt(local_player_index >= 0 &&
               local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
