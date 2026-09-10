@@ -334,10 +334,10 @@ bool network_game_spawn_player(void *player)
   }
 
   is_local = network_game_player_is_local(p);
-  if (!is_local) {
-    controller = -1;
-  } else {
+  if (is_local) {
     controller = (int16_t)p[0x1d];
+  } else {
+    controller = -1;
   }
 
   player_index = player_new((int)p[0x1c], 0xffffffff, controller, p);

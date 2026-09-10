@@ -268,11 +268,13 @@ void message_encrypt(unsigned short *msgptr, unsigned int *key)
   unsigned short *cursor;
   unsigned int key_copy[4];
   unsigned int i;
+  unsigned int flags;
 
   assert_halt_msg(msgptr != (unsigned short *)0 && key != (unsigned int *)0,
                   "msgptr && key");
 
   hdr = *msgptr;
+  flags = (unsigned int)(hdr & 3);
   if ((hdr & 1) == 0) {
     blocks = (unsigned int)(((unsigned short)(hdr >> 4) - 2) >> 3);
     remain = (unsigned int)((unsigned char)((char)((hdr >> 4) - 2)) & 7);
@@ -295,7 +297,7 @@ void message_encrypt(unsigned short *msgptr, unsigned int *key)
     if ((short)remain != 0) {
       key_message_xor_keystream((int)cursor, (int)(short)remain, (int)key, 8);
     }
-    hdr = (unsigned short)(hdr & 3) | 1;
+    hdr = (unsigned short)flags | 1;
     assert_halt_msg(!(3 < hdr),
                     "(0<=flags) && ((flags)<=MESSAGE_FLAG_BITS_MASK)");
     *msgptr = (*msgptr & 0xfffc) | hdr;
