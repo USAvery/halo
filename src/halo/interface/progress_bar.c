@@ -455,7 +455,6 @@ void progress_bar_decode_texture(int height, int width, void *out_texture,
 {
   int src_idx;
   uint32_t *dst;
-  uint8_t *src;
   /* D3DLOCKED_RECT: { INT Pitch; void *pBits; } */
   uint32_t locked_rect[2];
   /* D3DSURFACE_DESC — 0x1c bytes, contents not used after the call */
@@ -471,19 +470,14 @@ void progress_bar_decode_texture(int height, int width, void *out_texture,
   D3DTexture_GetLevelDesc(*(void **)out_texture, 0, level_desc);
 
   dst = (uint32_t *)locked_rect[1]; /* pBits */
-  src = (uint8_t *)data;
 
   /* RLE decode loop */
   for (src_idx = 0; src_idx < data_size; src_idx++) {
-    uint8_t byte_val = src[src_idx];
-    uint8_t color_nibble = byte_val & 0x0f;
-    uint8_t run_length = byte_val >> 4;
-    uint32_t color;
+    char byte_val = ((char *)data)[src_idx];
+    uint32_t color = (uint32_t)(byte_val % 16) << 4;
+    uint8_t run_length = (uint8_t)byte_val >> 4;
     uint32_t pixel;
     int i;
-
-    /* Expand 4-bit color to 8-bit */
-    color = (uint32_t)color_nibble << 4;
 
     /* Build A8B8G8R8 pixel:
      * pixel = (color << 16) | (color << 7) | (color >> 2) */
@@ -492,10 +486,9 @@ void progress_bar_decode_texture(int height, int width, void *out_texture,
 
     /* Fill run_length pixels */
     if (run_length != 0) {
-      for (i = 0; i < run_length; i++) {
-        *dst = pixel;
-        dst++;
-      }
+      for (i = 0; i < (int)run_length; i++)
+        dst[i] = pixel;
+      dst += run_length;
     }
   }
 }

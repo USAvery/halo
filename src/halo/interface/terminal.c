@@ -155,32 +155,27 @@ void terminal_dispose(void *terminal)
  */
 bool terminal_process_input(void)
 {
-  char *state;
   int now;
   int key;
-  int16_t key_count;
 
-  state = *(char **)0x46c414;
-  if (state == NULL)
+  if (*(char **)0x46c414 == NULL)
     return 0;
 
   now = local_time_get();
 
   /* Reset the per-frame key accumulation counter. */
-  *(int16_t *)state = 0;
+  *(int16_t *)*(char **)0x46c414 = 0;
 
   /* Drain the keyboard buffer: loop while keystrokes are available. */
   while (input_get_buffered_key(&key)) {
-    key_count = *(int16_t *)state;
-
     /* Store in the key array if there is room (max 32 entries). */
-    if (key_count < 0x20) {
-      *(int *)(state + 2 + (int)key_count * 4) = key;
-      *(int16_t *)state = key_count + 1;
+    if (*(int16_t *)*(char **)0x46c414 < 0x20) {
+      *(int *)(*(char **)0x46c414 + 2 + (int)*(int16_t *)*(char **)0x46c414 * 4) = key;
+      (*(int16_t *)*(char **)0x46c414)++;
     }
 
     /* Forward to the edit_text widget for cursor/character handling. */
-    edit_text_process_key(state + 0x1b4, &key);
+    edit_text_process_key(*(char **)0x46c414 + 0x1b4, &key);
 
     /* Mark terminal as active and record the time of this keypress. */
     *(uint8_t *)0x46c418 = 1;
@@ -188,7 +183,7 @@ bool terminal_process_input(void)
   }
 
   /* If no keys were received for 30+ ticks, clear the activity flag. */
-  if (*(int *)0x46c41c + 0x1e < now) {
+  if (now > *(int *)0x46c41c + 0x1e) {
     *(uint8_t *)0x46c418 = (*(uint8_t *)0x46c418 == 0);
     *(int *)0x46c41c = now;
   }
@@ -478,14 +473,18 @@ int terminal_get_line(void)
  * AL,BL restores it. Confirmed: return type is void (caller in main_loop
  * ignores EAX).
  */
-void terminal_update(void)
+bool terminal_update(void)
 {
+  bool result;
+
+  result = false;
   if (*(uint8_t *)0x46c404 != 0) {
-    terminal_process_input();
+    result = terminal_process_input();
     if (!console_is_active()) {
       terminal_age_lines();
     }
   }
+  return result;
 }
 
 /*
