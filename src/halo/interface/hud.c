@@ -3,12 +3,15 @@
  * clear, or its scalar field (+0x4) equals 1.0f.  EAX = state buffer. */
 int FUN_000d02c0(void *state_buf)
 {
-  if (*(short *)((char *)state_buf + 0x10) != 0 &&
-      *(short *)((char *)state_buf + 0xe) == 0 &&
-      *(short *)((char *)state_buf + 0x12) == 0) {
-    return 1;
+  if (*(short *)((char *)state_buf + 0x10) != 0) {
+    if (*(short *)((char *)state_buf + 0xe) == 0) {
+      if (*(short *)((char *)state_buf + 0x12) == 0) {
+        goto ret_1;
+      }
+    }
   }
-  if (*(unsigned int *)((char *)state_buf + 4) == 0x3f800000) {
+  if (*(int *)((char *)state_buf + 4) == 0x3f800000) {
+  ret_1:
     return 1;
   }
   return 0;
