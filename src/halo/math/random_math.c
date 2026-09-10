@@ -61,6 +61,21 @@ __declspec(dllexport) void rng_trace_note(const void *seed, unsigned int kind,
 #line 1
 #include "x87_math.h"
 
+#if defined(_MSC_VER) && !defined(__clang__)
+double __cdecl fmod(double, double);
+double __cdecl cos(double);
+double __cdecl sin(double);
+#pragma intrinsic(cos, sin)
+#define RM_FMOD(val, div) ((float)fmod((double)(val), (double)(div)))
+#define RM_COS(val)       ((float)cos((double)(val)))
+#define RM_SIN(val)       ((float)sin((double)(val)))
+#else
+#define RM_FMOD(val, div) x87_fmod((val), (div))
+#define RM_COS(val)       ((float)cos((double)(val)))
+#define RM_SIN(val)       ((float)sin((double)(val)))
+#endif
+#line 3
+
 /* Fill a 0x400-byte periodic function lookup table for one of 6 types:
  * raw(0), pow_a(1), pow_b(2), pow_c(3), pow_d(4), sine_wave(5).
  * Each sample is scaled by *(float*)0x2602c8 then clamped to [0, 255].
@@ -161,13 +176,13 @@ void FUN_0010aa60(short type_index, void *buffer)
       sample = 0.0f;
       break;
     case 2:
-      sample = x87_fcos_mul(phase, *(float *)0x255a54);
+      sample = RM_COS(phase * *(float *)0x255a54);
       break;
     case 3:
-      sample = x87_fcos_mul(phase_var, *(float *)0x255a54);
+      sample = RM_COS(phase_var * *(float *)0x255a54);
       break;
     case 4:
-      p = x87_fmod(phase, *(double *)0x2573d8);
+      p = RM_FMOD(phase, *(double *)0x2573d8);
       if (p < *(float *)0x253398)
         sample = p + p;
       else
@@ -175,7 +190,7 @@ void FUN_0010aa60(short type_index, void *buffer)
                  ((p - *(float *)0x253398) + (p - *(float *)0x253398));
       break;
     case 5:
-      p = x87_fmod(phase_var, *(double *)0x2573d8);
+      p = RM_FMOD(phase_var, *(double *)0x2573d8);
       if (p < *(float *)0x253398)
         sample = p + p;
       else
@@ -183,10 +198,10 @@ void FUN_0010aa60(short type_index, void *buffer)
                  ((p - *(float *)0x253398) + (p - *(float *)0x253398));
       break;
     case 6:
-      sample = x87_fmod(phase, *(double *)0x2573d8);
+      sample = RM_FMOD(phase, *(double *)0x2573d8);
       break;
     case 7:
-      sample = x87_fmod(phase_var, *(double *)0x2573d8);
+      sample = RM_FMOD(phase_var, *(double *)0x2573d8);
       break;
     case 8:
       sample =
@@ -194,16 +209,16 @@ void FUN_0010aa60(short type_index, void *buffer)
       break;
     case 9:
     case 10:
-      sample = (x87_fcos_mul(phase, *(float *)0x28c8ec) *
-                  x87_fcos_mul(phase, *(float *)0x28c8e8) +
-                x87_fcos_mul(phase, *(float *)0x28c8e4) *
-                  x87_fsin_mul(phase, *(float *)0x2568bc)) *
+      sample = (RM_COS(phase * *(float *)0x28c8ec) *
+                  RM_COS(phase * *(float *)0x28c8e8) +
+                RM_COS(phase * *(float *)0x28c8e4) *
+                  RM_SIN(phase * *(float *)0x2568bc)) *
                  *(float *)0x253398 +
-               x87_fsin_mul(phase, *(float *)0x256980) *
-                 x87_fcos_mul(phase, *(float *)0x255a54);
+               RM_SIN(phase * *(float *)0x256980) *
+                 RM_COS(phase * *(float *)0x255a54);
       break;
     case 11:
-      p = x87_fmod(phase_var, *(double *)0x2573d8);
+      p = RM_FMOD(phase_var, *(double *)0x2573d8);
       sample = p * p;
       break;
     default:
@@ -503,7 +518,7 @@ char FUN_0010af70(short param_1, int param_2, short *param_3)
 
 void lock_global_random_seed(void)
 {
-  *(int *)0x46e3f0 = *(int *)0x46e3f0 + 1;
+  ++*(int *)0x46e3f0;
 }
 
 void unlock_global_random_seed(void)
@@ -512,7 +527,7 @@ void unlock_global_random_seed(void)
   *(int *)0x46e3f0 = *(int *)0x46e3f0 - 1;
 }
 
-int *get_global_random_seed_address(void)
+__declspec(noinline) int *get_global_random_seed_address(void)
 {
   if (game_engine_running() && *(int *)0x46e3f0 != 0) {
     display_assert(
@@ -985,6 +1000,9 @@ float FUN_0010c390(float param_1, float param_2, uint8_t param_3)
  */
 float FUN_0010c510(float *v1, float *v2)
 {
+#if defined(_MSC_VER) && !defined(__clang__)
+  double acos(double x);
+#endif
   float product;
   float dot;
   float cos2theta;
@@ -1000,25 +1018,18 @@ float FUN_0010c510(float *v1, float *v2)
   /* dot(v1, v2) */
   dot = v1[2] * v2[2] + v1[1] * v2[1] + v1[0] * v2[0];
 
-  /* cos(2*theta) = 2*dot^2/product - 1, clamped to [-1, 1].
-   * The original stores dot and product to memory as 32-bit floats and
-   * reloads them (FSTP/FLD round-trip), truncating x87 80-bit excess
-   * precision. Match that by forcing intermediates through memory. */
-  {
-    volatile float dot_mem = dot;
-    volatile float prod_mem = product;
-    cos2theta = 2.0f * (dot_mem / prod_mem) * dot_mem - 1.0f;
-  }
-    if (cos2theta < -1.0f)
-        cos2theta = -1.0f;
-    else if (cos2theta > 1.0f)
-        cos2theta = 1.0f;
+  cos2theta = (dot / product) * dot * 2.0f - 1.0f;
+  if (cos2theta < -1.0f)
+    cos2theta = -1.0f;
+  else if (cos2theta > 1.0f)
+    cos2theta = 1.0f;
 
+#if defined(_MSC_VER) && !defined(__clang__)
+  half_angle = (float)acos((double)cos2theta) * 0.5f;
+#else
   half_angle = acosf(cos2theta) * 0.5f;
+#endif
 
-  if (half_angle != half_angle) {
-    half_angle = 0.0f;
-  }
   if (dot < 0.0f)
     return 3.1415927f - half_angle;
   return half_angle;
