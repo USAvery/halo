@@ -342,6 +342,10 @@ void game_allegiance_create(int16_t team_a, char is_player, int16_t team_b,
  * then removes it by swapping with the last entry and decrementing the count.
  * Returns true if an entry was found and removed.
  */
+struct allegiance_entry_raw {
+  char b[18];
+};
+
 bool game_allegiance_remove(int16_t team_a, int16_t team_b)
 {
   int16_t i;
@@ -358,18 +362,10 @@ bool game_allegiance_remove(int16_t team_a, int16_t team_b)
         (entry[1] == team_a && entry[0] == team_b)) {
       game_allegiance_set(entry, 1, 1);
       globals = (int16_t *)game_allegiance_globals;
-      globals[0] = count - 1;
+      globals[0]--;
       if (i < globals[0]) {
         int16_t *last = globals + 1 + globals[0] * 9;
-        entry[0] = last[0];
-        entry[1] = last[1];
-        entry[2] = last[2];
-        entry[3] = last[3];
-        entry[4] = last[4];
-        entry[5] = last[5];
-        entry[6] = last[6];
-        entry[7] = last[7];
-        entry[8] = last[8];
+        *(struct allegiance_entry_raw *)entry = *(struct allegiance_entry_raw *)last;
       }
       return true;
     }
@@ -398,37 +394,45 @@ bool game_allegiance_bump(int16_t team_a, int16_t team_b, int16_t action,
   globals = (int16_t *)game_allegiance_globals;
   count = globals[0];
   entry = globals + 1;
+  i = 0;
 
-  for (i = 0; i < count; i++) {
-    if ((entry[0] == team_a && entry[1] == team_b &&
-         *((char *)entry + 9) != 0) ||
-        (entry[1] == team_a && entry[0] == team_b &&
-         *((char *)entry + 8) != 0)) {
-      delta = 0;
-      if (action == 0) {
-        delta = 1;
-      } else if (action == 1) {
-        delta = 3;
-      } else if (action == 2) {
-        delta = -1;
-      }
-      entry[7] = entry[7] + delta;
-      if (entry[3] != -1) {
-        entry[8] = entry[3];
-      }
-      if (entry[2] == -1) {
-        return false;
-      }
-      if (entry[7] >= entry[2]) {
+  if (count > 0) {
+    do {
+      if ((entry[0] == team_a && entry[1] == team_b &&
+           *((char *)entry + 9) != 0) ||
+          (entry[1] == team_a && entry[0] == team_b &&
+           *((char *)entry + 8) != 0)) {
+        delta = 0;
+        switch (action) {
+        case 0:
+          delta = 1;
+          break;
+        case 1:
+          delta = 3;
+          break;
+        case 2:
+          delta = -1;
+          break;
+        }
+        entry[7] = entry[7] + delta;
+        if (entry[3] != -1) {
+          entry[8] = entry[3];
+        }
+        if (entry[2] == -1) {
+          return false;
+        }
+        if (entry[7] < entry[2]) {
+          return false;
+        }
         game_allegiance_set(entry, 1, 0);
         if (out_changed != NULL) {
           *out_changed = (*((char *)entry + 0xc) == 0);
         }
         return true;
       }
-      return false;
-    }
-    entry += 9;
+      i++;
+      entry += 9;
+    } while (i < count);
   }
   return false;
 }
