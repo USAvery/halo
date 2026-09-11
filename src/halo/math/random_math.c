@@ -37,6 +37,14 @@ __declspec(dllexport) void rng_trace_note(const void *seed, unsigned int kind,
   if ((uint32_t)seed != RNG_TRACE_GLOBAL_SEED_ADDR)
     return;
 
+#ifndef HALO_RNG_TRACE_DEEP
+  /* The live pause watcher only consumes this pair.  Keeping the default
+   * trace focused prevents the HMP reader from falling dozens of ticks behind. */
+  if (kind < RNG_TRACE_KIND_OBJECT_TRANSLATE_POS_XY ||
+      kind > RNG_TRACE_KIND_BIPED_QUERY_OUT_Z_HANDLE)
+    return;
+#endif
+
   if (halo_rng_trace.magic != RNG_TRACE_MAGIC) {
     halo_rng_trace.version = RNG_TRACE_VERSION;
     halo_rng_trace.capacity = RNG_TRACE_CAPACITY;

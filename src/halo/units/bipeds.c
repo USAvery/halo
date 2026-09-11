@@ -6,6 +6,7 @@
 
 #include "../../common.h"
 #include "../../x87_math.h"
+#include "halo/math/rng_trace.h"
 
 /* FUN_001a01d0 (0x1a01d0)
  *
@@ -2896,6 +2897,12 @@ void FUN_001a2f40(void *physics_arg /* @esi */)
   velocity = physics + 0xb; /* +0x2c */
   position = physics + 2; /* +0x08 */
 
+#ifdef HALO_RNG_TRACE
+  RNG_TRACE_EX(RNG_TRACE_KIND_BIPED_PHYSICS_ENTRY,
+               *(unsigned short *)((char *)physics + 4),
+               *(unsigned int *)physics);
+#endif
+
   gx = 0.0f; /* local_5c = 0.0 (prologue) */
   gy = 0.0f; /* local_60 = 0.0 (prologue) */
   material_local = (char)((*(unsigned short *)((char *)physics + 4) >> 9) & 1);
@@ -3191,6 +3198,10 @@ void FUN_001a2f40(void *physics_arg /* @esi */)
       z_delta = disp[2] - fdist; /* 0x1a366d: FSTP dword [ebp-0x28] */
       HALO_FLT_ROUNDTRIP(z_delta);
       physics[0x30] = z_delta + physics[0xd]; /* 0x1a3681 */
+#ifdef HALO_RNG_TRACE
+      RNG_TRACE_EX(RNG_TRACE_KIND_BIPED_PRE_QUERY_Y,
+                   RNG_TRACE_BITS(physics[0x2f]), *(unsigned int *)physics);
+#endif
       if ((*(unsigned char *)((char *)physics + 0xa0) & 2) == 0) {
         goto LAB_001a36a4;
       }
@@ -3226,10 +3237,26 @@ LAB_001a36a4:
      * 0x1a37ce..0x1a37f6 (last push = first C arg):
      *   draw_color, &pos_world, &new_pos, physics[0x15], physics[0x16],
      *   physics[0], &los_dir2, &los_dir, 0x10, results. */
+#ifdef HALO_RNG_TRACE
+    RNG_TRACE_EX(RNG_TRACE_KIND_BIPED_QUERY_POS_WORLD_XY,
+                 RNG_TRACE_BITS(pos_world[0]), RNG_TRACE_BITS(pos_world[1]));
+    RNG_TRACE_EX(RNG_TRACE_KIND_BIPED_QUERY_POS_WORLD_Z_NEW_POS_X,
+                 RNG_TRACE_BITS(pos_world[2]), RNG_TRACE_BITS(new_pos[0]));
+    RNG_TRACE_EX(RNG_TRACE_KIND_BIPED_QUERY_NEW_POS_YZ,
+                 RNG_TRACE_BITS(new_pos[1]), RNG_TRACE_BITS(new_pos[2]));
+#endif
     result_count = FUN_00150550((void *)draw_color, pos_world, new_pos,
                                 *(int *)&physics[0x15], *(int *)&physics[0x16],
                                 *(int *)&physics[0], &los_dir2[0], &los_dir[0],
                                 0x10, results);
+#ifdef HALO_RNG_TRACE
+    RNG_TRACE_EX(RNG_TRACE_KIND_BIPED_QUERY_OUT_Y,
+                 RNG_TRACE_BITS(los_dir2[1]), *(unsigned int *)physics);
+    RNG_TRACE_EX(RNG_TRACE_KIND_BIPED_QUERY_OUT_XY,
+                 RNG_TRACE_BITS(los_dir2[0]), RNG_TRACE_BITS(los_dir2[1]));
+    RNG_TRACE_EX(RNG_TRACE_KIND_BIPED_QUERY_OUT_Z_HANDLE,
+                 RNG_TRACE_BITS(los_dir2[2]), *(unsigned int *)physics);
+#endif
   } else {
     /* debug-draw line record (0x1a3721..0x1a37cc): no query runs, count stays
      * 1. Builds results[0] (point/normal/plane_d/handles) from the position
@@ -3754,6 +3781,10 @@ LAB_001a4062_done:
     *(int *)&physics[0x2e] = *(int *)&los_dir[0]; /* +0xb8 new_velocity */
     *(int *)&physics[0x2f] = *(int *)&los_dir[1];
     *(int *)&physics[0x30] = *(int *)&los_dir[2];
+#ifdef HALO_RNG_TRACE
+    RNG_TRACE_EX(RNG_TRACE_KIND_BIPED_WRITEBACK_Y,
+                 RNG_TRACE_BITS(physics[0x2c]), *(unsigned int *)physics);
+#endif
     /* 0x1a4194-0x1a41bf: (d2*d2 + d1*d1) + d0*d0 */
     physics[0x32] = sqrtf(d2 * d2 + d1 * d1 + d0 * d0); /* +0xc8 step */
   }

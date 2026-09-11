@@ -119,6 +119,52 @@
 #define RNG_TRACE_KIND_THROW_SEAT_Z_HANDLE 49u /* grenade release after unit_set_seat_state: value=seat z bits, caller2=unit handle  info */
 #define RNG_TRACE_KIND_THROW_FINAL_XY 50u /* grenade release before object_translate: value=target x bits, caller2=target y bits  info */
 #define RNG_TRACE_KIND_THROW_FINAL_Z_HANDLE 51u /* grenade release before object_translate: value=target z bits, caller2=unit handle  info */
+#define RNG_TRACE_KIND_RESPONSE_HIT_XY 52u /* FUN_000f90d0 entry: hit position x/y bits  info */
+#define RNG_TRACE_KIND_RESPONSE_HIT_Z_HANDLE 53u /* entry: hit position z bits/projectile handle  info */
+#define RNG_TRACE_KIND_RESPONSE_VEL_XY 54u /* entry: incoming velocity x/y bits  info */
+#define RNG_TRACE_KIND_RESPONSE_VEL_Z_TYPE 55u /* entry: incoming velocity z bits/collision type  info */
+#define RNG_TRACE_KIND_RESPONSE_NORMAL_XY 56u /* entry: collision normal x/y bits  info */
+#define RNG_TRACE_KIND_RESPONSE_NORMAL_Z_T 57u /* entry: collision normal z/hit fraction bits  info */
+#define RNG_TRACE_KIND_RESPONSE_OBJECT_META 58u /* entry: collided object handle/raw result +0x34  info */
+#define RNG_TRACE_KIND_TRY_PLACE_IN_POS_XY 59u /* object_try_place entry: object position x/y bits  info */
+#define RNG_TRACE_KIND_TRY_PLACE_IN_POS_Z_HANDLE 60u /* entry: object position z bits/object handle  info */
+#define RNG_TRACE_KIND_TRY_PLACE_TARGET_XY 61u /* entry: requested target x/y bits  info */
+#define RNG_TRACE_KIND_TRY_PLACE_TARGET_Z_HANDLE 62u /* entry: requested target z bits/object handle  info */
+#define RNG_TRACE_KIND_TRY_PLACE_OUT_POS_XY 63u /* object_try_place exit: object position x/y bits  info */
+#define RNG_TRACE_KIND_TRY_PLACE_OUT_POS_Z_RESULT 64u /* exit: object position z bits/result  info */
+#define RNG_TRACE_KIND_TRY_PLACE_COLLISION_TYPE_T 65u /* exit: collision type/hit fraction bits  info */
+#define RNG_TRACE_KIND_TRY_PLACE_COLLISION_OBJECT_SURFACE 66u /* exit: collided object handle/surface index  info */
+#define RNG_TRACE_KIND_LOCAL_RAY_ORIGIN_XY 67u
+#define RNG_TRACE_KIND_LOCAL_RAY_ORIGIN_Z_DIR_X 68u
+#define RNG_TRACE_KIND_LOCAL_RAY_DIR_YZ 69u
+#define RNG_TRACE_KIND_LOCAL_RAY_SOURCE_TRANSLATION_XY 70u
+#define RNG_TRACE_KIND_LOCAL_RAY_SOURCE_TRANSLATION_Z_SCALE 71u
+#define RNG_TRACE_KIND_LOCAL_RAY_INVERSE_TRANSLATION_XY 72u
+#define RNG_TRACE_KIND_LOCAL_RAY_INVERSE_TRANSLATION_Z_SCALE 73u
+#define RNG_TRACE_KIND_LOCAL_RAY_MATRIX_HASHES 74u
+#define RNG_TRACE_KIND_LOCAL_RAY_OBJECT_NODE 75u
+#define RNG_TRACE_KIND_LOCAL_RAY_ANIMATION_STATE 76u
+#define RNG_TRACE_KIND_LOCAL_RAY_ROOT_POSE_HASHES 77u
+#define RNG_TRACE_KIND_LOCAL_RAY_NODE7_POSE_QUATERNION_XY 78u
+#define RNG_TRACE_KIND_LOCAL_RAY_NODE7_POSE_QUATERNION_ZW 79u
+#define RNG_TRACE_KIND_LOCAL_RAY_NODE7_POSE_POSITION_XY 80u
+#define RNG_TRACE_KIND_LOCAL_RAY_NODE7_POSE_POSITION_Z_SCALE 81u
+#define RNG_TRACE_KIND_LOCAL_RAY_NODE7_MATRIX_HASH 82u
+#define RNG_TRACE_KIND_OBJECT_TRANSLATE_POS_XY 83u /* object_translate entry: requested position x/y bits  info */
+#define RNG_TRACE_KIND_OBJECT_TRANSLATE_POS_Z_HANDLE 84u /* entry: requested position z bits/object handle  info */
+#define RNG_TRACE_KIND_OBJECT_TRANSLATE_PRE_CONNECT_XY 85u
+#define RNG_TRACE_KIND_OBJECT_TRANSLATE_PRE_CONNECT_Z_HANDLE 86u
+#define RNG_TRACE_KIND_OBJECT_TRANSLATE_EXIT_XY 87u
+#define RNG_TRACE_KIND_OBJECT_TRANSLATE_EXIT_Z_HANDLE 88u
+#define RNG_TRACE_KIND_BIPED_PHYSICS_ENTRY 89u /* flags/object handle */
+#define RNG_TRACE_KIND_BIPED_PRE_QUERY_Y 90u /* new_velocity.y/object handle */
+#define RNG_TRACE_KIND_BIPED_QUERY_OUT_Y 91u /* los_dir2.y/object handle */
+#define RNG_TRACE_KIND_BIPED_WRITEBACK_Y 92u /* new_position.y/object handle */
+#define RNG_TRACE_KIND_BIPED_QUERY_POS_WORLD_XY 93u
+#define RNG_TRACE_KIND_BIPED_QUERY_POS_WORLD_Z_NEW_POS_X 94u
+#define RNG_TRACE_KIND_BIPED_QUERY_NEW_POS_YZ 95u
+#define RNG_TRACE_KIND_BIPED_QUERY_OUT_XY 96u
+#define RNG_TRACE_KIND_BIPED_QUERY_OUT_Z_HANDLE 97u
 
 /* 16 bytes. */
 typedef struct {
@@ -156,10 +202,20 @@ __declspec(dllexport) void rng_trace_note(const void *seed, unsigned int kind,
 
 /* Probe record from inside a game function: `value` is any 32-bit payload
  * (float bits via RNG_TRACE_BITS), `extra` lands in caller2. */
+#ifdef HALO_RNG_TRACE_DEEP
+#define RNG_TRACE_EX_KIND_ENABLED(kind) 1
+#else
+/* Kinds 67--82 are the retired high-volume local-ray experiment. */
+#define RNG_TRACE_EX_KIND_ENABLED(kind) ((kind) < 67u || (kind) > 82u)
+#endif
 #define RNG_TRACE_EX(kind, value, extra)                                   \
-  rng_trace_note((const void *)RNG_TRACE_GLOBAL_SEED_ADDR, (kind),         \
-                 (unsigned int)(value), __builtin_return_address(0),       \
-                 (void *)(extra))
+  do {                                                                     \
+    if (RNG_TRACE_EX_KIND_ENABLED(kind)) {                                 \
+      rng_trace_note((const void *)RNG_TRACE_GLOBAL_SEED_ADDR, (kind),     \
+                     (unsigned int)(value), __builtin_return_address(0),   \
+                     (void *)(extra));                                     \
+    }                                                                      \
+  } while (0)
 #define RNG_TRACE_BITS(float_lvalue) (*(const unsigned int *)&(float_lvalue))
 
 #endif /* HALO_MATH_RNG_TRACE_H */

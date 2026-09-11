@@ -12779,6 +12779,12 @@ void object_translate(int object_handle, float *position, void *location)
 {
   char *obj;
 
+#ifdef HALO_RNG_TRACE
+  RNG_TRACE_EX(RNG_TRACE_KIND_OBJECT_TRANSLATE_POS_XY,
+               RNG_TRACE_BITS(position[0]), RNG_TRACE_BITS(position[1]));
+  RNG_TRACE_EX(RNG_TRACE_KIND_OBJECT_TRANSLATE_POS_Z_HANDLE,
+               RNG_TRACE_BITS(position[2]), (unsigned int)object_handle);
+#endif
   obj = (char *)object_get_and_verify_type(object_handle, -1);
   if (!valid_real_point3d(position)) {
     char *msg;
@@ -12793,7 +12799,23 @@ void object_translate(int object_handle, float *position, void *location)
   *(float *)(obj + 0x0c) = position[0];
   *(float *)(obj + 0x10) = position[1];
   *(float *)(obj + 0x14) = position[2];
+#ifdef HALO_RNG_TRACE
+  RNG_TRACE_EX(RNG_TRACE_KIND_OBJECT_TRANSLATE_PRE_CONNECT_XY,
+               RNG_TRACE_BITS(*(float *)(obj + 0x0c)),
+               RNG_TRACE_BITS(*(float *)(obj + 0x10)));
+  RNG_TRACE_EX(RNG_TRACE_KIND_OBJECT_TRANSLATE_PRE_CONNECT_Z_HANDLE,
+               RNG_TRACE_BITS(*(float *)(obj + 0x14)),
+               (unsigned int)object_handle);
+#endif
   object_connect_to_map(object_handle, location);
+#ifdef HALO_RNG_TRACE
+  RNG_TRACE_EX(RNG_TRACE_KIND_OBJECT_TRANSLATE_EXIT_XY,
+               RNG_TRACE_BITS(*(float *)(obj + 0x0c)),
+               RNG_TRACE_BITS(*(float *)(obj + 0x10)));
+  RNG_TRACE_EX(RNG_TRACE_KIND_OBJECT_TRANSLATE_EXIT_Z_HANDLE,
+               RNG_TRACE_BITS(*(float *)(obj + 0x14)),
+               (unsigned int)object_handle);
+#endif
 }
 
 /*
@@ -13248,6 +13270,18 @@ bool object_try_place(int object_handle, float *position)
 
   zero_init = 0;
   obj = (char *)object_get_and_verify_type(object_handle, -1);
+#ifdef HALO_RNG_TRACE
+  RNG_TRACE_EX(RNG_TRACE_KIND_TRY_PLACE_IN_POS_XY,
+               RNG_TRACE_BITS(*(float *)(obj + 0x0c)),
+               RNG_TRACE_BITS(*(float *)(obj + 0x10)));
+  RNG_TRACE_EX(RNG_TRACE_KIND_TRY_PLACE_IN_POS_Z_HANDLE,
+               RNG_TRACE_BITS(*(float *)(obj + 0x14)),
+               (unsigned int)object_handle);
+  RNG_TRACE_EX(RNG_TRACE_KIND_TRY_PLACE_TARGET_XY,
+               RNG_TRACE_BITS(position[0]), RNG_TRACE_BITS(position[1]));
+  RNG_TRACE_EX(RNG_TRACE_KIND_TRY_PLACE_TARGET_Z_HANDLE,
+               RNG_TRACE_BITS(position[2]), (unsigned int)object_handle);
+#endif
   result = zero_init;
 
   /* Push collision user stack entry (user = 0x13). */
@@ -13293,6 +13327,20 @@ done:
   }
   *(volatile int16_t *)0x4761d8 -= 1;
 
+#ifdef HALO_RNG_TRACE
+  RNG_TRACE_EX(RNG_TRACE_KIND_TRY_PLACE_OUT_POS_XY,
+               RNG_TRACE_BITS(*(float *)(obj + 0x0c)),
+               RNG_TRACE_BITS(*(float *)(obj + 0x10)));
+  RNG_TRACE_EX(RNG_TRACE_KIND_TRY_PLACE_OUT_POS_Z_RESULT,
+               RNG_TRACE_BITS(*(float *)(obj + 0x14)),
+               (unsigned int)(unsigned char)result);
+  RNG_TRACE_EX(RNG_TRACE_KIND_TRY_PLACE_COLLISION_TYPE_T,
+               (unsigned int)(int)collision_result[0],
+               RNG_TRACE_BITS(*(float *)((char *)collision_result + 0x14)));
+  RNG_TRACE_EX(RNG_TRACE_KIND_TRY_PLACE_COLLISION_OBJECT_SURFACE,
+               *(unsigned int *)((char *)collision_result + 0x38),
+               (unsigned int)(unsigned short)*(int16_t *)((char *)collision_result + 0x34));
+#endif
   return result;
 }
 

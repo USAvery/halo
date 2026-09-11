@@ -257,6 +257,18 @@ char FUN_0014cb00(int param_1, void *param_2, void *param_3, void *param_4,
   int local_10;
   int local_c;
   char local_5;
+#ifdef HALO_RNG_TRACE
+  float *trace_node_matrix;
+  unsigned int trace_source_hash;
+  unsigned int trace_inverse_hash;
+  unsigned int trace_root_quaternion_hash;
+  unsigned int trace_root_position_scale_hash;
+  unsigned int trace_node7_matrix_hash;
+  char *trace_object;
+  float *trace_animation_data;
+  float *trace_node_animation_data;
+  int trace_i;
+#endif
 
   local_5 = 0;
   collision_log_add_call(3);
@@ -295,6 +307,59 @@ char FUN_0014cb00(int param_1, void *param_2, void *param_3, void *param_4,
               matrix_transform_point(local_5c, (float *)param_3, local_28);
               matrix_scale_transform_vector(local_5c, (float *)param_4,
                                             local_1c);
+#ifdef HALO_RNG_TRACE
+              trace_node_matrix =
+                (float *)(iVar6 * 0x34 + *(int *)(param_1 + 0xc));
+              trace_source_hash = 0;
+              trace_inverse_hash = 0;
+              for (trace_i = 0; trace_i < 13; trace_i++) {
+                trace_source_hash ^= RNG_TRACE_BITS(trace_node_matrix[trace_i]);
+                trace_inverse_hash ^= RNG_TRACE_BITS(local_5c[trace_i]);
+              }
+              RNG_TRACE_EX(RNG_TRACE_KIND_LOCAL_RAY_MATRIX_HASHES,
+                           trace_source_hash, trace_inverse_hash);
+              trace_object = (char *)*(int *)(param_1 + 8) - 0x130;
+              trace_animation_data =
+                (float *)(trace_object +
+                          *(int16_t *)(trace_object + 0x19e));
+              trace_root_quaternion_hash = 0;
+              trace_root_position_scale_hash = 0;
+              for (trace_i = 0; trace_i < 4; trace_i++) {
+                trace_root_quaternion_hash ^=
+                  RNG_TRACE_BITS(trace_animation_data[trace_i]);
+                trace_root_position_scale_hash ^=
+                  RNG_TRACE_BITS(trace_animation_data[trace_i + 4]);
+              }
+              RNG_TRACE_EX(RNG_TRACE_KIND_LOCAL_RAY_OBJECT_NODE,
+                           *(unsigned int *)param_1, (unsigned int)iVar6);
+              RNG_TRACE_EX(RNG_TRACE_KIND_LOCAL_RAY_ANIMATION_STATE,
+                           *(unsigned int *)(trace_object + 0x80),
+                           *(unsigned int *)(trace_object + 0x84));
+              RNG_TRACE_EX(RNG_TRACE_KIND_LOCAL_RAY_ROOT_POSE_HASHES,
+                           trace_root_quaternion_hash,
+                           trace_root_position_scale_hash);
+              trace_node_animation_data = trace_animation_data + 7 * 8;
+              RNG_TRACE_EX(RNG_TRACE_KIND_LOCAL_RAY_NODE7_POSE_QUATERNION_XY,
+                           RNG_TRACE_BITS(trace_node_animation_data[0]),
+                           RNG_TRACE_BITS(trace_node_animation_data[1]));
+              RNG_TRACE_EX(RNG_TRACE_KIND_LOCAL_RAY_NODE7_POSE_QUATERNION_ZW,
+                           RNG_TRACE_BITS(trace_node_animation_data[2]),
+                           RNG_TRACE_BITS(trace_node_animation_data[3]));
+              RNG_TRACE_EX(RNG_TRACE_KIND_LOCAL_RAY_NODE7_POSE_POSITION_XY,
+                           RNG_TRACE_BITS(trace_node_animation_data[4]),
+                           RNG_TRACE_BITS(trace_node_animation_data[5]));
+              RNG_TRACE_EX(RNG_TRACE_KIND_LOCAL_RAY_NODE7_POSE_POSITION_Z_SCALE,
+                           RNG_TRACE_BITS(trace_node_animation_data[6]),
+                           RNG_TRACE_BITS(trace_node_animation_data[7]));
+              trace_node7_matrix_hash = 0;
+              trace_node_matrix = (float *)(*(int *)(param_1 + 0xc) + 7 * 0x34);
+              for (trace_i = 0; trace_i < 13; trace_i++) {
+                trace_node7_matrix_hash ^=
+                  RNG_TRACE_BITS(trace_node_matrix[trace_i]);
+              }
+              RNG_TRACE_EX(RNG_TRACE_KIND_LOCAL_RAY_NODE7_MATRIX_HASH,
+                           trace_node7_matrix_hash, 0);
+#endif
               cVar2 = collision_bsp_test_vector(
                 (int)param_2, (int)piVar3, 0, 0, (int)local_28, (int)local_1c,
                 *(float *)(param_5 + 4), (float *)(param_5 + 4));
