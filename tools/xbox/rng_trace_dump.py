@@ -106,6 +106,21 @@ KINDS = {
     33: ("probe:los_result", "info"),
     34: ("probe:damage_origin", "info"),
     36: ("probe:sweep_pos", "info"),
+    37: ("probe:projectile_accel_x", "info"),
+    38: ("probe:projectile_accel_yz", "info"),
+    39: ("probe:sweep_new_y_handle", "info"),
+    40: ("probe:sweep_pos_xy", "info"),
+    41: ("probe:sweep_pos_z_vel_x", "info"),
+    42: ("probe:sweep_vel_yz", "info"),
+    43: ("probe:net_update_flags", "info"),
+    44: ("probe:net_update_buttons_01", "info"),
+    45: ("probe:net_update_buttons_23", "info"),
+    46: ("probe:throw_unit_xy", "info"),
+    47: ("probe:throw_unit_z_handle", "info"),
+    48: ("probe:throw_seat_xy", "info"),
+    49: ("probe:throw_seat_z_handle", "info"),
+    50: ("probe:throw_final_xy", "info"),
+    51: ("probe:throw_final_z_handle", "info"),
 }
 
 
@@ -447,7 +462,11 @@ def probes(path: str) -> int:
         val = f32(bits)
         flag = ""
         shown = f"{val!r:>16} (0x{bits:08x})"
-        if kind in ("probe:body_after", "probe:body_before"):
+        if kind == "probe:net_update_flags":
+            shown = f"flags=0x{bits:08x} players=0x{rec['caller2_addr']:08x}"
+        elif kind in ("probe:net_update_buttons_01", "probe:net_update_buttons_23"):
+            shown = f"buttons=0x{bits:08x} pair=0x{rec['caller2_addr']:08x}"
+        elif kind in ("probe:body_after", "probe:body_before"):
             if bits & 0x80000000 or bits == 0:
                 flag = "  <== DEAD (body <= 0)"
             elif ulps_from_zero(bits) < 0x33D6BF95:  # < 1e-7
@@ -478,6 +497,18 @@ def _key(rec: dict) -> tuple:
 
 def _fmt(rec: dict) -> str:
     if rec["kind"].startswith("probe:"):
+        if rec["kind"] == "probe:net_update_flags":
+            return ("  [{index:6d}] tick={tick:<8d} {kind:<28s} "
+                    "flags=0x{bits:08x} players={extra:d} {caller}+0x{off:x}").format(
+                index=rec["index"], tick=rec["tick"], kind=rec["kind"],
+                bits=rec["seed_before"], extra=rec["caller2_addr"],
+                caller=rec["caller"] or "?", off=rec["caller_offset"])
+        if rec["kind"] in ("probe:net_update_buttons_01", "probe:net_update_buttons_23"):
+            return ("  [{index:6d}] tick={tick:<8d} {kind:<28s} "
+                    "buttons=0x{bits:08x}/0x{extra:08x} {caller}+0x{off:x}").format(
+                index=rec["index"], tick=rec["tick"], kind=rec["kind"],
+                bits=rec["seed_before"], extra=rec["caller2_addr"],
+                caller=rec["caller"] or "?", off=rec["caller_offset"])
         import struct
         val = struct.unpack("<f", struct.pack("<I", rec["seed_before"]))[0]
         return ("  [{index:6d}] tick={tick:<8d} {kind:<28s} value={val!r} "

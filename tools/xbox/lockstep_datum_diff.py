@@ -10,6 +10,7 @@ Monitors (HMP, virtual `x` — do not `stop` either VM):
 """
 from __future__ import annotations
 
+import argparse
 import re
 import socket
 import struct
@@ -226,7 +227,15 @@ def print_diff(a, b):
 
 
 def main():
-    watch = "--watch" in sys.argv
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--watch", action="store_true")
+    parser.add_argument("--label", default="ds31",
+                        help="safe basename for RNG trace artifacts")
+    args = parser.parse_args()
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", args.label):
+        parser.error("--label must contain only letters, digits, underscore, or hyphen")
+    label = args.label
+    watch = args.watch
     hh = HMP(*HOST_HMP)
     ch = HMP(*CLIENT_HMP)
     try:
@@ -238,7 +247,7 @@ def main():
             armed = False
             saw_load = False
             mismatch_streak = 0
-            log_path = "artifacts/rng_trace/ds31_watch.jsonl"
+            log_path = "artifacts/rng_trace/%s_watch.jsonl" % label
             while time.monotonic() < deadline:
                 try:
                     a = snapshot_fast(hh)
@@ -250,10 +259,12 @@ def main():
                 ta, tb = a.get("tick") or 0, b.get("tick") or 0
                 na, nb = a.get("n_live") or 0, b.get("n_live") or 0
                 seed_ok = a.get("seed") == b.get("seed")
+                comparable = ta == tb
                 if (ta, tb) != last:
                     print("tick H=%s C=%s live %s/%s seed %s" % (
                         ta, tb, na, nb,
-                        "match" if seed_ok else "MISMATCH"))
+                        ("match" if seed_ok else "MISMATCH")
+                        if comparable else "unaligned"))
                     last = (ta, tb)
                     try:
                         with open(log_path, "a") as fh:
@@ -274,12 +285,12 @@ def main():
                 if in_game and seed_ok and not armed:
                     print("armed: seeds still match in gameplay")
                     armed = True
-                if in_game and seed_ok:
+                if in_game and comparable and seed_ok:
                     mismatch_streak = 0
-                if in_game and not seed_ok and not armed:
+                if in_game and comparable and not seed_ok and not armed:
                     time.sleep(0.15)
                     continue
-                if in_game and not seed_ok:
+                if in_game and comparable and not seed_ok:
                     mismatch_streak += 1
                     if mismatch_streak < 3:
                         time.sleep(0.15)
@@ -322,7 +333,7 @@ def main():
                     except Exception as exc:
                         print("biped dump failed:", exc)
                     try:
-                        with open("artifacts/rng_trace/ds31_hmp_done.txt", "w") as fh:
+                        with open("artifacts/rng_trace/%s_hmp_done.txt" % label, "w") as fh:
                             fh.write("tick H=%s C=%s seed H=%08x C=%08x\n" % (
                                 ta, tb,
                                 a.get("seed", 0) & 0xffffffff,
@@ -343,13 +354,13 @@ def main():
                     subprocess.call([
                         sys.executable, "tools/xbox/rng_trace_dump.py",
                         "--hmp-port", "4444",
-                        "--out", "artifacts/rng_trace/ds31_trace.json",
+                        "--out", "artifacts/rng_trace/%s_trace.json" % label,
                         "--timeout", "20",
                     ])
                     subprocess.call([
                         sys.executable, "tools/xbox/rng_trace_dump.py",
                         "--hmp-port", "4446",
-                        "--out", "artifacts/rng_trace/ds31_host_trace.json",
+                        "--out", "artifacts/rng_trace/%s_host_trace.json" % label,
                         "--timeout", "20",
                         "--pe", "artifacts/rng_trace/session_symbols.pe",
                     ])

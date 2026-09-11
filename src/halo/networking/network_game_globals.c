@@ -645,6 +645,17 @@ bool network_game_client_end_frame(void)
       msg_buf[0] = flags;
       csmemcpy((char *)msg_buf + 8, out_buf, 0x80);
       *(uint16_t *)((char *)msg_buf + 6) = (uint16_t)local_player_count();
+#ifdef HALO_RNG_TRACE
+      RNG_TRACE_EX(RNG_TRACE_KIND_NET_UPDATE_FLAGS, flags,
+                   (unsigned int)*(uint16_t *)((char *)msg_buf + 6));
+      RNG_TRACE_EX(RNG_TRACE_KIND_NET_UPDATE_BUTTONS_01,
+                   *(uint32_t *)(out_buf + 0x00),
+                   *(uint32_t *)(out_buf + 0x20));
+      RNG_TRACE_EX(RNG_TRACE_KIND_NET_UPDATE_BUTTONS_23,
+                   *(uint32_t *)(out_buf + 0x40),
+                   *(uint32_t *)(out_buf + 0x60));
+#endif
+
       msg = (uint16_t *)encode_network_game_message(0x19, msg_buf, 0x88);
 
       if (msg != NULL) {

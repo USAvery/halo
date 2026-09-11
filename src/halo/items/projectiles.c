@@ -1353,6 +1353,12 @@ void projectile_accelerate(int projectile_handle, float *acceleration)
   float magnitude; /* squared magnitude, then magnitude of acceleration vector */
   float scale; /* scatter scale: rand_real * magnitude * (PI/2) */
 
+#ifdef HALO_RNG_TRACE
+  RNG_TRACE_EX(RNG_TRACE_KIND_PROJECTILE_ACCEL_X,
+               (unsigned int)projectile_handle, RNG_TRACE_BITS(acceleration[0]));
+  RNG_TRACE_EX(RNG_TRACE_KIND_PROJECTILE_ACCEL_YZ,
+               RNG_TRACE_BITS(acceleration[1]), RNG_TRACE_BITS(acceleration[2]));
+#endif
   proj = (char *)object_get_and_verify_type(projectile_handle, 0x20);
   tag_get(0x70726f6a, *(int *)proj);
   if (!(bool)real_vector3d_valid(acceleration)) {

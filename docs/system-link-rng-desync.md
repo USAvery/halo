@@ -1,10 +1,146 @@
 # System-link lockstep desync: client/server random seed mismatch
 
-Status: **OPEN** (2026-09-06). A float-association root cause was proposed and
-then **REFUTED** by measurement -- see "Refuted: float addend association"
-below. The desync mechanism remains unproven. The September 5 continuation
-found and fixed a separate, exhaustive-test-confirmed RNG value discrepancy;
-see "Continuation: RNG reciprocal and runtime isolation" below.
+Status: **OPEN** (2026-09-11). The mixed-build system-link desync remains
+unfixed and its original cause is not proven. The current evidence points to a
+small pre-sweep projectile/placement divergence that can amplify into later
+animation RNG draw-count differences; it does **not** establish that animation
+code is the first cause. The historical run notes below are retained, but the
+older top-level claim that the issue reproduces without combat and therefore
+cannot involve projectile handling is superseded by the September 9--11
+captures.
+
+## September 11 current state and resume point
+
+### Confirmed
+
+- Test topology: two bridged xemu instances on the same interface. The client
+  is `10.0.0.21` (HMP `127.0.0.1:4444`); the host is now `10.0.0.25` (HMP
+  `127.0.0.1:4446`). Both VMs are currently paused after capture `ds53`.
+- The apparent host-side input bleed is not duplicated input slots. In `ds49`,
+  `network_game_client_end_frame` action probes (kinds 43--45) show two local
+  players but only slot 0 contains the grenade buttons (`0x3000`); the same
+  authoritative remote action is rendered on both peers. Packet parsing or an
+  input ACK failure is therefore not the leading hypothesis.
+- The RNG mismatch is a downstream symptom. In the current traces, the first
+  meaningful sequence difference is around tick 5276 in
+  `model_animation_choose_random`: the host makes three draws while the client
+  makes two, alongside client-only `0x00 -> 0x18` animation transitions. The
+  `FUN_001b1400` audit explains how a successful state call can skip a second
+  chooser draw, but does not identify the earlier cause.
+- `ds49`: at grenade release, acceleration is bit-identical, but the client’s
+  projectile position already differs before the first sweep by about
+  `0.026546955` on X. `FUN_000f8720` is consequently downstream of the initial
+  state difference in this capture.
+- `ds52`: paired thrower-position probes are bit-identical on both peers, as is
+  acceleration. The first sweep nevertheless differs by about `0.027083` on X;
+  the later `FUN_000f90d0` RNG draws occur after that divergence and are not its
+  source.
+- `ds53`: the raw unit position differs by only 1 ULP on X and 2 ULP on Y;
+  `unit_set_seat_state` and the final throw target preserve those small deltas.
+  The first sweep differs by about `0.00966358` on X. This makes amplification
+  after target construction, likely in `object_try_place` / `FUN_0014df70`, the
+  current actionable lead. `biped_estimate_position` mode 0 calls
+  `object_get_world_position` and only changes Z, so it cannot explain the X
+  divergence in this path.
+- The `ds51` run staying synchronized for a while is inconclusive: the watcher
+  waited long enough for the trace ring to wrap, so it is not evidence of a
+  fix.
+
+### Inferred
+
+- A one- to few-draw LCG distance is consistent with peers taking different
+  animation/transition branches after a floating-point or collision-placement
+  difference, rather than with a corrupted seed or a serializer failure.
+- The grenade path is currently the best reproducible trigger, but that does
+  not prove grenades are the only trigger or that collision placement is the
+  original divergence. A pre-sweep state difference still needs to be located.
+
+### Current accuracy work (not runtime validation)
+
+The retained source improvements include `network_game_client_end_frame`
+95.3%, `player_register_machine` 94.3%, `network_game_spawn_player` 98.0%,
+`unit_set_seat_state` 99.3% (150/152, operand 94.0%),
+`biped_estimate_position` 93.2% gate-safe (141/140, operand 89.7%),
+`object_translate` 100.0% (55/55, operand 96.4%),
+`FUN_000f90d0` 81.2% gate-safe (939/899, operand 58.7%),
+`unit_throw_grenade_release` 86.9% gate-safe (249/248, operand 76.1%),
+`object_try_place` 95.7% (operand 82.2%), and `FUN_0014df70` 92.8%
+(540/555, operand 66.3%). The `FUN_0014df70` gain came from four verified
+BSP/object timing/logging calls. The seat-state improvement retains the
+verified memcpy vector-copy shapes and signed int16 seat-index arguments; its
+remaining two instructions are a branch-layout difference, with no semantic,
+call, or offset mismatch. The biped-position improvement retains the verified
+12-byte `memcpy` of `estimated_body_position`; a 98.9% trial was rejected
+because it introduced two new FPU warnings. Mode 0 still only calls
+`object_get_world_position` and changes Z, so it cannot generate the observed
+X/Y divergence. These are VC71 instruction-match results, not proof of
+behavioral equivalence or a desync fix. `object_translate` is now an exact
+55/55 match after retaining one binary-backed 12-byte `memcpy` to `obj+0x0c`,
+matching the original integer dword copy; the whole `objects.c` gate rose
+4.6pp with no warnings or regressions. `FUN_000f90d0` retains the exact
+12-byte collision-position `memcpy`; its
+whole `projectiles.c` gate rose 0.2pp with no warning regression, and the
+hazard scan is clean apart from existing reviewed warnings. The remaining
+mismatch is broad local-frame/lifetime/register/x87 shape (candidate frame
+`0x114` versus reference `0xe4`), not a proven call-condition bug. Because
+this function is downstream, differing RNG counts can reflect differing
+incoming collision/tag state. The sequential Sol Medium accuracy campaign is
+still in progress; do not treat an intermediate score or an
+unbuilt candidate as deployed behavior. No coherent client RNG-trace XBE
+containing the latest accuracy changes has been deployed yet.
+
+The second-pass accuracy review classified the remaining candidates as follows:
+
+- `object_try_place` 95.7% / 82.2% is exhausted for now: no semantic, call,
+  or collision-buffer mismatch was found.
+- `FUN_000f9c40` 89.2% / 65.5% preserves the `collision_result+0x50` and
+  `FUN_000f8720`/`FUN_000f90d0` argument order and bounce increment; the
+  residual is frame/register/x87 shape.
+- `FUN_001b1400` 80.9% / 58.6% preserves the exact state `0x18` gate and
+  draw-suppression path; the residual is switch/control/register shape.
+- `FUN_000f8720` 69.3% / 58.1% preserves calls, flags, buffers, and cross
+  direction; the residual is x87 scheduling/interleaving/register allocation.
+
+No second-pass code change was retained for these functions. A low byte-match
+score alone should not redirect the runtime diagnosis without contradictory
+evidence. All score figures remain static accuracy evidence, not runtime
+validation of the desync fix.
+
+### Uncertain / superseded
+
+- The exact first writer of the projectile position discrepancy remains
+  unknown. The current placement/LOS lead is a hypothesis pending a probe at
+  the relevant call boundary.
+- Earlier sections that describe a combat-free reproduction, or that exclude
+  projectile handling solely from that observation, are historical observations
+  from earlier runs and are no longer a safe summary of the issue.
+- Raw RDCP access from WSL works for these Windows xemu instances, although the
+  repository helper has intermittently timed out. The xemu HDD `init.txt` files
+  were removed; future deployments should remain XBE-only and must not restore
+  them.
+
+### Resume procedure
+
+1. Let the sequential accuracy campaign finish and record its final gated
+   scores; keep only binary-backed, warning-free candidates.
+2. Build one coherent trace XBE from the resulting worktree:
+   `rtk wsl.exe bash -lc 'cd /mnt/g/dev/halo && /usr/bin/python3 tools/build/build.py -q --rng-trace --target patched_xbe'`.
+3. Deploy the client XBE only to `10.0.0.21`. Keep the original probe XBE on
+   `10.0.0.25` if its probes are unchanged; do not deploy `init.txt`.
+4. Reproduce the same one- or two-grenade sequence and arm the lockstep watcher
+   before input. Compare trace kinds 43--51, especially thrower/seat/final
+   positions and the first sweep result, using client ring VA `0x80ed54` and
+   host ring VA `0x7ff900`.
+5. If the first sweep still diverges, add narrowly scoped pre/post
+   `object_try_place` or `FUN_0014df70` outcome probes and repeat. Only after
+   locating that boundary should animation-state callers or safe ABI-aware
+   toggles be bisected.
+
+Relevant captures are under `artifacts/rng_trace/`: `ds49_action_slots_trace.json`,
+`ds49_action_slots_host_trace.json`, `ds50_throw_unit_pos_host_trace.json`,
+`ds51_throw_unit_both_trace.json`, `ds51_throw_unit_both_host_trace.json`,
+`ds52_two_grenades_trace.json`, `ds52_two_grenades_host_trace.json`,
+`ds53_seat_vs_final_trace.json`, and `ds53_seat_vs_final_host_trace.json`.
 
 ## September 6: animation-path accuracy audit
 
@@ -2215,3 +2351,95 @@ Reading run 13: the first tick where `sweep_pos` differs is where the input
 to the sweep first differs (throw setup or the previous tick's integration);
 a tick where `sweep_pos` matches but the flagged kind-33 result or `t` differs
 puts the mismatch inside `FUN_000f8720` / `FUN_0014df70`.
+
+## September 11 continuation: coherent grenade-chain runtime bisect
+
+The later ds63--ds68 mixed-build runs used client `10.0.0.21` with the RNG
+trace build and pristine host probe v7 on `10.0.0.25`. The watcher stopped
+both guests, then the rings were dumped while paused and aligned by RNG draw
+identity rather than by sampled tick.
+
+Confirmed exclusions:
+
+- ds63: `object_translate` plus `object_try_place` original did not prevent
+  the first sweep-position or later damage/RNG divergence.
+- ds64: `projectile_new` original did not prevent it.
+- ds65: `object_new` original did not prevent it.
+- ds66: `unit_throw_grenade_move_to_hand` original did not prevent it.
+- ds67: `object_attach_to_parent` original did not prevent it.
+- ds68: `unit_throw_grenade_release` original did not prevent it.
+
+These are outer-body exclusions only: an original function called at its XBE
+address still reaches any callees whose addresses are redirected to lifted
+implementations. Therefore the individual toggles do not exclude each complete
+subtree.
+
+In ds68 the first observed grenade sweep already differed in XY while Z and
+all velocity components were bit-identical. Client new position was
+`(-1.9115324, -0.5758146, 1.9720049)`; host was
+`(-1.9347463, -0.6052260, 1.9720049)`. The later RNG split was collision
+timing: the client entered `FUN_000f90d0` at tick 578 and the host at tick
+583. Damage/collision branching amplifies the position difference; it is not
+yet proven to be the first writer.
+
+### ds69 pristine/pristine control and watcher limitation
+
+Both sides ran the same cachebeta-derived probe v7. The watcher eventually
+paused them after observing different seeds in snapshots nominally two ticks
+apart. This was a watcher false positive, not an RNG sequence divergence:
+
+- event alignment found 1,187 identical shared RNG/caller events;
+- 16,296 shared throw, sweep, damage, radius, and LOS probe records were
+  bit-identical;
+- one ring merely contained one later RNG event.
+
+The watcher remains useful for stopping close to a suspected event, but its
+`seed mismatch` message is not proof unless the dumped rings differ after
+sequence alignment. This A/A control also proves that the mixed-build
+throw/sweep differences are not ordinary host/client role skew.
+
+### ds70 setup: coherent original grenade boundary
+
+The next client build disables the full currently identified grenade boundary
+as one diagnostic unit: `unit_throw_grenade_move_to_hand`,
+`unit_throw_grenade_release`, `unit_set_seat_state`,
+`object_get_markers_by_string_id`, `object_placement_data_new`,
+`object_new`, `projectile_new`, `object_attach_to_parent`,
+`object_detach_from_parent`, `object_translate`, `object_try_place`,
+`FUN_000f8720`, and `FUN_0014df70`. The toggles are build-only and are
+restored in `kb.json` after the diagnostic XBE is copied.
+
+Correction: this boundary omitted the per-tick projectile integrator
+`FUN_000f9c40` and motion/collision helper `FUN_0014f2c0`; therefore ds70
+cannot by itself place the first writer upstream of grenade creation.
+
+### ds70 result and ds71 corrected lifecycle setup
+
+ds70 still diverged. At tick 577 both sides shared five draws, then the client
+entered `projectile_accelerate` while the host made another
+`object_cause_damage` draw. The first recorded explosion origin differed:
+client `(-3.8918023, 2.0774932)`, host
+`(-3.8970609, 2.0403311)`. This confirms different projectile state at
+detonation, but not when it was first written because ds70 left the per-tick
+integrator active.
+
+ds71 adds `FUN_000f9c40` and `FUN_0014f2c0` to every ds70 deactivation, so
+construction, placement, flight integration, sweep, collision motion, and LOS
+all execute pristine bodies. If ds71 still diverges, inspect the initial
+throw/unit state. If it synchronizes, bisect the lifecycle boundary.
+
+### ds71 result and ds72 biped-writer setup
+
+ds71 still produced a true same-tick sequence divergence at tick 170. The
+client made additional `object_cause_damage` draws where the host entered
+`projectile_accelerate`, followed by different victim counts on both sides.
+The first explosion origin remained different despite the pristine grenade
+lifecycle: client `(-1.3148494, 1.6100744)`, host
+`(-1.3495448, 1.5957612)`. The grenade Z values observed by the radius query
+were `3.1916511` and `3.1987424`, respectively.
+
+This places the surviving input difference before or outside the disabled
+grenade lifecycle. ds72 retains every ds71 deactivation and additionally
+disables biped physics writer `FUN_001a2f40`. This closes the important gap
+in run 12: that run disabled the projectile and biped bodies together but left
+their shared collision-motion helper `FUN_0014f2c0` patched.
