@@ -832,7 +832,7 @@ bool FUN_000f8720(int projectile_handle, float *new_pos,
                   int16_t *collision_result)
 {
   char *proj;
-  void * volatile tag_def;
+  void *tag_def;
   float *proj_pos; /* &obj->position (float[3] at proj+0xc) */
   float *up_vec;
   float *fwd_vec;
@@ -859,6 +859,17 @@ bool FUN_000f8720(int projectile_handle, float *new_pos,
   proj = (char *)object_get_and_verify_type(projectile_handle, 0x20);
   tag_def = tag_get(0x70726f6a, *(int *)proj);
   proj_pos = (float *)(proj + 0xc);
+#ifdef HALO_RNG_TRACE
+  RNG_TRACE_EX(RNG_TRACE_KIND_SWEEP_NEW_Y_HANDLE, RNG_TRACE_BITS(new_pos[1]),
+               (unsigned int)projectile_handle);
+  RNG_TRACE_EX(RNG_TRACE_KIND_SWEEP_POS_XY, RNG_TRACE_BITS(proj_pos[0]),
+               RNG_TRACE_BITS(proj_pos[1]));
+  RNG_TRACE_EX(RNG_TRACE_KIND_SWEEP_POS_Z_VEL_X, RNG_TRACE_BITS(proj_pos[2]),
+               RNG_TRACE_BITS(*(float *)(proj + 0x18)));
+  RNG_TRACE_EX(RNG_TRACE_KIND_SWEEP_VEL_YZ,
+               RNG_TRACE_BITS(*(float *)(proj + 0x1c)),
+               RNG_TRACE_BITS(*(float *)(proj + 0x20)));
+#endif
 
   /* 1. Centre-line collision test (flags 0x1000e9). */
   origin1[0] = new_pos[0] - proj_pos[0];
@@ -869,60 +880,60 @@ bool FUN_000f8720(int projectile_handle, float *new_pos,
     /* Check sweep radius; if too small skip lateral tests. */
     if (*(float *)((char *)tag_def + 0x1a0) < *(float *)0x253f44) {
       return 0;
-    } else {
-      /* Compute cross direction: cross(delta, up_vec). */
-      up_vec = *(float **)0x31fc44;
-      dx = new_pos[0] - proj_pos[0];
-      dy = new_pos[1] - proj_pos[1];
-      dz = new_pos[2] - proj_pos[2];
+    }
 
-      dir1[0] = dy * up_vec[2] - dz * up_vec[1];
-      dir1[1] = dz * up_vec[0] - dx * up_vec[2];
-      dir1[2] = dx * up_vec[1] - dy * up_vec[0];
+    /* Compute cross direction: cross(delta, up_vec). */
+    up_vec = *(float **)0x31fc44;
+    dx = new_pos[0] - proj_pos[0];
+    dy = new_pos[1] - proj_pos[1];
+    dz = new_pos[2] - proj_pos[2];
 
-      if (normalize3d(dir1) == *(float *)0x2533c0) {
-        /* Degenerate (delta parallel to up): fall back to default forward. */
-        fwd_vec = *(float **)0x31fc40;
-        dir1[0] = fwd_vec[0];
-        dir1[1] = fwd_vec[1];
-        dir1[2] = fwd_vec[2];
-      }
+    dir1[0] = dy * up_vec[2] - dz * up_vec[1];
+    dir1[1] = dz * up_vec[0] - dx * up_vec[2];
+    dir1[2] = dx * up_vec[1] - dy * up_vec[0];
 
-      radius = *(float *)((char *)tag_def + 0x1a0);
+    if (normalize3d(dir1) == *(float *)0x2533c0) {
+      /* Degenerate (delta parallel to up): fall back to default forward. */
+      fwd_vec = *(float **)0x31fc40;
+      dir1[0] = fwd_vec[0];
+      dir1[1] = fwd_vec[1];
+      dir1[2] = fwd_vec[2];
+    }
 
-      /* Build positive-side origin: proj_pos + radius * cross_dir. */
-      origin1[0] = dir1[0] * radius + proj_pos[0];
-      origin1[1] = dir1[1] * radius + proj_pos[1];
-      origin1[2] = dir1[2] * radius + proj_pos[2];
+    radius = *(float *)((char *)tag_def + 0x1a0);
 
-      /* Build positive-side endpoint: new_pos + radius * cross_dir. */
-      pt_b1[0] = dir1[0] * radius + new_pos[0];
-      pt_b1[1] = dir1[1] * radius + new_pos[1];
-      pt_b1[2] = dir1[2] * radius + new_pos[2];
+    /* Build positive-side origin: proj_pos + radius * cross_dir. */
+    origin1[0] = dir1[0] * radius + proj_pos[0];
+    origin1[1] = dir1[1] * radius + proj_pos[1];
+    origin1[2] = dir1[2] * radius + proj_pos[2];
 
-      /* Build negative-side origin: proj_pos - radius * cross_dir. */
-      pt_a2[0] = dir1[0] * (-radius) + proj_pos[0];
-      pt_a2[1] = dir1[1] * (-radius) + proj_pos[1];
-      pt_a2[2] = dir1[2] * (-radius) + proj_pos[2];
+    /* Build positive-side endpoint: new_pos + radius * cross_dir. */
+    pt_b1[0] = dir1[0] * radius + new_pos[0];
+    pt_b1[1] = dir1[1] * radius + new_pos[1];
+    pt_b1[2] = dir1[2] * radius + new_pos[2];
 
-      /* Build negative-side endpoint: new_pos - radius * cross_dir. */
-      pt_b2[0] = dir1[0] * (-radius) + new_pos[0];
-      pt_b2[1] = dir1[1] * (-radius) + new_pos[1];
-      pt_b2[2] = dir1[2] * (-radius) + new_pos[2];
+    /* Build negative-side origin: proj_pos - radius * cross_dir. */
+    pt_a2[0] = dir1[0] * (-radius) + proj_pos[0];
+    pt_a2[1] = dir1[1] * (-radius) + proj_pos[1];
+    pt_a2[2] = dir1[2] * (-radius) + proj_pos[2];
 
-      /* Compute sweep direction for positive-side cast: pt_b1 - origin1. */
-      dir1[0] = pt_b1[0] - origin1[0];
-      dir1[1] = pt_b1[1] - origin1[1];
-      dir1[2] = pt_b1[2] - origin1[2];
+    /* Build negative-side endpoint: new_pos - radius * cross_dir. */
+    pt_b2[0] = dir1[0] * (-radius) + new_pos[0];
+    pt_b2[1] = dir1[1] * (-radius) + new_pos[1];
+    pt_b2[2] = dir1[2] * (-radius) + new_pos[2];
 
-      /* 2. Positive-side lateral collision test (flags 0x89). */
-      /* 3. Negative-side lateral collision test: segment pt_a2 -> pt_b2 (flags 0x89). */
-      if (SWEEP_LOS(FUN_0014df70(0x89, origin1, dir1, *(int *)(proj + 0x1e4),
-                       collision_result)) == 0 &&
-          FUN_000130d0(0x89, pt_a2, pt_b2, *(int *)(proj + 0x1e4),
-                       collision_result) == 0) {
-        return 0;
-      }
+    /* Compute sweep direction for positive-side cast: pt_b1 - origin1. */
+    dir1[0] = pt_b1[0] - origin1[0];
+    dir1[1] = pt_b1[1] - origin1[1];
+    dir1[2] = pt_b1[2] - origin1[2];
+
+    /* 2. Positive-side lateral collision test (flags 0x89). */
+    /* 3. Negative-side lateral collision test: segment pt_a2 -> pt_b2 (flags 0x89). */
+    if (SWEEP_LOS(FUN_0014df70(0x89, origin1, dir1, *(int *)(proj + 0x1e4),
+                     collision_result)) == 0 &&
+        FUN_000130d0(0x89, pt_a2, pt_b2, *(int *)(proj + 0x1e4),
+                     collision_result) == 0) {
+      return 0;
     }
   }
 
@@ -1548,6 +1559,26 @@ void FUN_000f90d0(int projectile_handle, float *hit_pos, float param_3,
 
   /* Velocity copy passed to normalize / normalised direction. */
   float vel_local[3];
+
+#ifdef HALO_RNG_TRACE
+  RNG_TRACE_EX(RNG_TRACE_KIND_RESPONSE_HIT_XY,
+               RNG_TRACE_BITS(hit_pos[0]), RNG_TRACE_BITS(hit_pos[1]));
+  RNG_TRACE_EX(RNG_TRACE_KIND_RESPONSE_HIT_Z_HANDLE,
+               RNG_TRACE_BITS(hit_pos[2]), (unsigned int)projectile_handle);
+  RNG_TRACE_EX(RNG_TRACE_KIND_RESPONSE_VEL_XY,
+               RNG_TRACE_BITS(in_velocity[0]), RNG_TRACE_BITS(in_velocity[1]));
+  RNG_TRACE_EX(RNG_TRACE_KIND_RESPONSE_VEL_Z_TYPE,
+               RNG_TRACE_BITS(in_velocity[2]), (unsigned int)(unsigned short)col_result[0]);
+  RNG_TRACE_EX(RNG_TRACE_KIND_RESPONSE_NORMAL_XY,
+               RNG_TRACE_BITS(*(float *)((char *)col_result + 0x24)),
+               RNG_TRACE_BITS(*(float *)((char *)col_result + 0x28)));
+  RNG_TRACE_EX(RNG_TRACE_KIND_RESPONSE_NORMAL_Z_T,
+               RNG_TRACE_BITS(*(float *)((char *)col_result + 0x2c)),
+               RNG_TRACE_BITS(*(float *)((char *)col_result + 0x14)));
+  RNG_TRACE_EX(RNG_TRACE_KIND_RESPONSE_OBJECT_META,
+               *(unsigned int *)((char *)col_result + 0x38),
+               *(unsigned int *)((char *)col_result + 0x34));
+#endif
 
   /* ------------------------------------------------------------------ */
   /* 1. Resolve object and tag.                                          */
