@@ -551,17 +551,17 @@ float *matrix_transform_point(float *matrix, float *in, float *out)
     z = z * *matrix;
   }
 
-  out[0] = x * *(float *)((char *)matrix + 0x04) +
+  out[0] = z * *(float *)((char *)matrix + 0x1c) +
            y * *(float *)((char *)matrix + 0x10) +
-           z * *(float *)((char *)matrix + 0x1c) +
+           x * *(float *)((char *)matrix + 0x04) +
            *(float *)((char *)matrix + 0x28);
-  out[1] = x * *(float *)((char *)matrix + 0x08) +
+  out[1] = z * *(float *)((char *)matrix + 0x20) +
            y * *(float *)((char *)matrix + 0x14) +
-           z * *(float *)((char *)matrix + 0x20) +
+           x * *(float *)((char *)matrix + 0x08) +
            *(float *)((char *)matrix + 0x2c);
-  out[2] = x * *(float *)((char *)matrix + 0x0c) +
+  out[2] = z * *(float *)((char *)matrix + 0x24) +
            y * *(float *)((char *)matrix + 0x18) +
-           z * *(float *)((char *)matrix + 0x24) +
+           x * *(float *)((char *)matrix + 0x0c) +
            *(float *)((char *)matrix + 0x30);
   return out;
 }

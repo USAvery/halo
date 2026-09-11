@@ -2885,6 +2885,8 @@ void FUN_001a2f40(void *physics_arg /* @esi */)
   int best_index; /* local_3c */
   int tval;
   float r, t, fdist;
+  float z_delta;
+  x87_wide_t planar_scale;
   void *obj;
   void *tag;
   float los_dir2[3]; /* local_18: second LOS out point */
@@ -3186,7 +3188,9 @@ void FUN_001a2f40(void *physics_arg /* @esi */)
         (unsigned short)(-(unsigned short)(curve_flag != 0) & 2); /* 0x1a364d */
       physics[0x2e] = (disp[0] - r) + velocity[0]; /* 0x1a3672 */
       physics[0x2f] = (disp[1] - t) + physics[0xc]; /* 0x1a3676 */
-      physics[0x30] = (disp[2] - fdist) + physics[0xd]; /* 0x1a3681 */
+      z_delta = disp[2] - fdist; /* 0x1a366d: FSTP dword [ebp-0x28] */
+      HALO_FLT_ROUNDTRIP(z_delta);
+      physics[0x30] = z_delta + physics[0xd]; /* 0x1a3681 */
       if ((*(unsigned char *)((char *)physics + 0xa0) & 2) == 0) {
         goto LAB_001a36a4;
       }
@@ -3468,9 +3472,9 @@ LAB_001a36a4:
   /* ---- planar-normal clamp (0x1a3d34..0x1a3d69) ---- */
   r = gx * gx + gy * gy;
   if (*(float *)0x2b5098 < r) {
-    r = (float)(*(double *)0x2573d8 / sqrtf(r));
-    gy = gy * r;
-    gx = r * gx;
+    planar_scale = *(double *)0x2573d8 / sqrtf(r);
+    gy = gy * planar_scale;
+    gx = planar_scale * gx;
   }
 
   /* ---- result-array refinement (0x1a3d69..) ---- */

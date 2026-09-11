@@ -6144,6 +6144,7 @@ void unit_throw_grenade_release(int unit_handle, char flag)
       velocity[2] = velocity[2] * ratio_val;
 
       ratio_val = 1.0f - ratio_val;
+      HALO_FLT_ROUNDTRIP(ratio_val);
       velocity[0] = rand_x * ratio_val + velocity[0];
       velocity[1] = cross2[1] * ratio_val + velocity[1];
       velocity[2] = cross2[2] * ratio_val + velocity[2];
