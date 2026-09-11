@@ -75391,16 +75391,16 @@
     "player_register_machine": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 76.9,
+      "abi_modeled_mnemonic_pct": 94.3,
       "addr": "0xba290",
       "end": "0xba2df",
       "kind": "auto",
       "n_r": 27,
-      "opnd_percent": 69.2,
-      "raw_mnemonic_pct": 76.9,
+      "opnd_percent": 86.8,
+      "raw_mnemonic_pct": 94.3,
       "ref": "synth",
       "ref_sha": "3b79c6be372e1acb",
-      "score": 76.9,
+      "score": 94.3,
       "source": "src/halo/game/players.c"
     },
     "player_reset_action_result": {
