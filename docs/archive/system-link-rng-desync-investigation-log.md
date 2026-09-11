@@ -1,0 +1,2453 @@
+# Archived system-link desync investigation log
+
+> Historical record only. This is the last committed notebook snapshot before
+> the ds72--ds92 continuation. It contains hypotheses and conclusions that
+> later captures superseded. Do not use it as the resume point. The
+> authoritative current state is
+> [`../system-link-rng-desync.md`](../system-link-rng-desync.md).
+
+# System-link lockstep desync: client/server random seed mismatch
+
+Status: **OPEN** (2026-09-11). The mixed-build system-link desync remains
+unfixed and its original cause is not proven. The current evidence points to a
+small pre-sweep projectile/placement divergence that can amplify into later
+animation RNG draw-count differences; it does **not** establish that animation
+code is the first cause. The historical run notes below are retained, but the
+older top-level claim that the issue reproduces without combat and therefore
+cannot involve projectile handling is superseded by the September 9--11
+captures.
+
+## September 11 current state and resume point
+
+### Confirmed
+
+- Test topology: two bridged xemu instances on the same interface. The client
+  is `10.0.0.21` (HMP `127.0.0.1:4444`); the host is now `10.0.0.25` (HMP
+  `127.0.0.1:4446`). Both VMs are currently paused after capture `ds53`.
+- The apparent host-side input bleed is not duplicated input slots. In `ds49`,
+  `network_game_client_end_frame` action probes (kinds 43--45) show two local
+  players but only slot 0 contains the grenade buttons (`0x3000`); the same
+  authoritative remote action is rendered on both peers. Packet parsing or an
+  input ACK failure is therefore not the leading hypothesis.
+- The RNG mismatch is a downstream symptom. In the current traces, the first
+  meaningful sequence difference is around tick 5276 in
+  `model_animation_choose_random`: the host makes three draws while the client
+  makes two, alongside client-only `0x00 -> 0x18` animation transitions. The
+  `FUN_001b1400` audit explains how a successful state call can skip a second
+  chooser draw, but does not identify the earlier cause.
+- `ds49`: at grenade release, acceleration is bit-identical, but the client’s
+  projectile position already differs before the first sweep by about
+  `0.026546955` on X. `FUN_000f8720` is consequently downstream of the initial
+  state difference in this capture.
+- `ds52`: paired thrower-position probes are bit-identical on both peers, as is
+  acceleration. The first sweep nevertheless differs by about `0.027083` on X;
+  the later `FUN_000f90d0` RNG draws occur after that divergence and are not its
+  source.
+- `ds53`: the raw unit position differs by only 1 ULP on X and 2 ULP on Y;
+  `unit_set_seat_state` and the final throw target preserve those small deltas.
+  The first sweep differs by about `0.00966358` on X. This makes amplification
+  after target construction, likely in `object_try_place` / `FUN_0014df70`, the
+  current actionable lead. `biped_estimate_position` mode 0 calls
+  `object_get_world_position` and only changes Z, so it cannot explain the X
+  divergence in this path.
+- The `ds51` run staying synchronized for a while is inconclusive: the watcher
+  waited long enough for the trace ring to wrap, so it is not evidence of a
+  fix.
+
+### Inferred
+
+- A one- to few-draw LCG distance is consistent with peers taking different
+  animation/transition branches after a floating-point or collision-placement
+  difference, rather than with a corrupted seed or a serializer failure.
+- The grenade path is currently the best reproducible trigger, but that does
+  not prove grenades are the only trigger or that collision placement is the
+  original divergence. A pre-sweep state difference still needs to be located.
+
+### Current accuracy work (not runtime validation)
+
+The retained source improvements include `network_game_client_end_frame`
+95.3%, `player_register_machine` 94.3%, `network_game_spawn_player` 98.0%,
+`unit_set_seat_state` 99.3% (150/152, operand 94.0%),
+`biped_estimate_position` 93.2% gate-safe (141/140, operand 89.7%),
+`object_translate` 100.0% (55/55, operand 96.4%),
+`FUN_000f90d0` 81.2% gate-safe (939/899, operand 58.7%),
+`unit_throw_grenade_release` 86.9% gate-safe (249/248, operand 76.1%),
+`object_try_place` 95.7% (operand 82.2%), and `FUN_0014df70` 92.8%
+(540/555, operand 66.3%). The `FUN_0014df70` gain came from four verified
+BSP/object timing/logging calls. The seat-state improvement retains the
+verified memcpy vector-copy shapes and signed int16 seat-index arguments; its
+remaining two instructions are a branch-layout difference, with no semantic,
+call, or offset mismatch. The biped-position improvement retains the verified
+12-byte `memcpy` of `estimated_body_position`; a 98.9% trial was rejected
+because it introduced two new FPU warnings. Mode 0 still only calls
+`object_get_world_position` and changes Z, so it cannot generate the observed
+X/Y divergence. These are VC71 instruction-match results, not proof of
+behavioral equivalence or a desync fix. `object_translate` is now an exact
+55/55 match after retaining one binary-backed 12-byte `memcpy` to `obj+0x0c`,
+matching the original integer dword copy; the whole `objects.c` gate rose
+4.6pp with no warnings or regressions. `FUN_000f90d0` retains the exact
+12-byte collision-position `memcpy`; its
+whole `projectiles.c` gate rose 0.2pp with no warning regression, and the
+hazard scan is clean apart from existing reviewed warnings. The remaining
+mismatch is broad local-frame/lifetime/register/x87 shape (candidate frame
+`0x114` versus reference `0xe4`), not a proven call-condition bug. Because
+this function is downstream, differing RNG counts can reflect differing
+incoming collision/tag state. The sequential Sol Medium accuracy campaign is
+still in progress; do not treat an intermediate score or an
+unbuilt candidate as deployed behavior. No coherent client RNG-trace XBE
+containing the latest accuracy changes has been deployed yet.
+
+The second-pass accuracy review classified the remaining candidates as follows:
+
+- `object_try_place` 95.7% / 82.2% is exhausted for now: no semantic, call,
+  or collision-buffer mismatch was found.
+- `FUN_000f9c40` 89.2% / 65.5% preserves the `collision_result+0x50` and
+  `FUN_000f8720`/`FUN_000f90d0` argument order and bounce increment; the
+  residual is frame/register/x87 shape.
+- `FUN_001b1400` 80.9% / 58.6% preserves the exact state `0x18` gate and
+  draw-suppression path; the residual is switch/control/register shape.
+- `FUN_000f8720` 69.3% / 58.1% preserves calls, flags, buffers, and cross
+  direction; the residual is x87 scheduling/interleaving/register allocation.
+
+No second-pass code change was retained for these functions. A low byte-match
+score alone should not redirect the runtime diagnosis without contradictory
+evidence. All score figures remain static accuracy evidence, not runtime
+validation of the desync fix.
+
+### Uncertain / superseded
+
+- The exact first writer of the projectile position discrepancy remains
+  unknown. The current placement/LOS lead is a hypothesis pending a probe at
+  the relevant call boundary.
+- Earlier sections that describe a combat-free reproduction, or that exclude
+  projectile handling solely from that observation, are historical observations
+  from earlier runs and are no longer a safe summary of the issue.
+- Raw RDCP access from WSL works for these Windows xemu instances, although the
+  repository helper has intermittently timed out. The xemu HDD `init.txt` files
+  were removed; future deployments should remain XBE-only and must not restore
+  them.
+
+### Resume procedure
+
+1. Let the sequential accuracy campaign finish and record its final gated
+   scores; keep only binary-backed, warning-free candidates.
+2. Build one coherent trace XBE from the resulting worktree:
+   `rtk wsl.exe bash -lc 'cd /mnt/g/dev/halo && /usr/bin/python3 tools/build/build.py -q --rng-trace --target patched_xbe'`.
+3. Deploy the client XBE only to `10.0.0.21`. Keep the original probe XBE on
+   `10.0.0.25` if its probes are unchanged; do not deploy `init.txt`.
+4. Reproduce the same one- or two-grenade sequence and arm the lockstep watcher
+   before input. Compare trace kinds 43--51, especially thrower/seat/final
+   positions and the first sweep result, using client ring VA `0x80ed54` and
+   host ring VA `0x7ff900`.
+5. If the first sweep still diverges, add narrowly scoped pre/post
+   `object_try_place` or `FUN_0014df70` outcome probes and repeat. Only after
+   locating that boundary should animation-state callers or safe ABI-aware
+   toggles be bisected.
+
+Relevant captures are under `artifacts/rng_trace/`: `ds49_action_slots_trace.json`,
+`ds49_action_slots_host_trace.json`, `ds50_throw_unit_pos_host_trace.json`,
+`ds51_throw_unit_both_trace.json`, `ds51_throw_unit_both_host_trace.json`,
+`ds52_two_grenades_trace.json`, `ds52_two_grenades_host_trace.json`,
+`ds53_seat_vs_final_trace.json`, and `ds53_seat_vs_final_host_trace.json`.
+
+## September 6: animation-path accuracy audit
+
+The paired trace's first extra draw is in `model_animation_choose_random`,
+following a client animation-state transition. This prioritizes
+`unit_animation_set_state`, `unit_update_animation`, their transition helper
+`FUN_001a86b0`, and the animation update/set wrappers. It does not establish
+which earlier state update caused the two machines to diverge.
+
+The VC71 comparison parser was truncating valid cold switch arms after an
+early return. Its whole-object path collected label positions but did not
+pass label names to the existing back-edge-aware trimming routine. This
+discarded 86 real instructions and eight calls in `unit_animation_set_state`.
+`tools/verify/compare_obj.py` now passes those names; four regression tests in
+`tools/verify/test_compare_obj_disassembly.py` cover cold arms, offset labels,
+real trailing tables, and neighboring functions. Existing self-tests pass.
+The historical 76.8% setter score below is therefore superseded by an
+**83.9506% corrected baseline**, before any source improvement.
+
+| Function | Corrected baseline | After source change | Binary-backed change |
+| --- | ---: | ---: | --- |
+| `model_animation_choose_random` | 98.2759% | 100.0000% | Return `int16_t`, matching `MOV AX, SI` at `0x120fc0`; all 14 direct callers checked. |
+| `unit_animation_set_state` | 83.9506% | 87.2629% | Reload the animation graph tag index at the original call sites instead of caching it across calls. |
+| `unit_update_animation` | 90.3790% | 92.8047% | Remove a redundant switch range guard and restore the nested matrix-call argument evaluation shape. |
+
+These are VC71 instruction-match scores, not raw byte identity or runtime
+equivalence. The chooser's final operand score is 96.5517%. Each kept source
+candidate passed its complete translation-unit regression gate (208 functions
+in `units.c`, 23 in `model_animations.c`) without missing functions, lowered
+neighbor scores, or increased warnings. The knowledge-base change is limited
+to the chooser's return type; parameter and register annotations are unchanged.
+
+Other inspected functions: `FUN_001a6350` 89.8596%, `FUN_001ab870` 96.7742%,
+`unit_set_animation` 95.5% with ABI modeling, and `FUN_001a86b0` 100%.
+No speculative source edits were made to these functions. In particular,
+the transition helper's perfect VC71 result does not cover its deployed clang
+EDX live-out mismatch described below. That mismatch invalidates some partial
+original/ported animation experiments, but has not been shown to cause the
+normal fully patched build's desync.
+
+Source accuracy improved; **the mixed-build desync remains open**. The next
+runtime comparison must use coherent builds and capture both animation probe
+histories at the first differing RNG draw, before the later disconnect.
+
+Final validation: the combined units and model gates pass after the return-type
+correction. The isolated `halo-rng-models` clang build with `HALO_RNG_TRACE=ON`
+completed `tools/build/build.py -q --rng-trace --target patched_xbe` successfully.
+The changed-file hazard scan has no new findings; the updater's duplicate
+arguments match the original's intentional in-place vector operations.
+The exhaustive RNG test still has zero binary32 and x87-result mismatches for
+all 65,536 outputs at both tested precision settings. Baselines, candidate
+ledgers, combined gates, and exact source hashes are retained under
+`artifacts/rng_trace/accuracy/`. The new XBE has not been deployed.
+
+## Symptom
+
+A system-link game between a pristine build-2276 host (`cachebeta.xbe`,
+xemu at 10.0.0.24) and our re-implemented client (`halo-patched/default.xbe`,
+xemu at 10.0.0.21) can desync at startup or later during active gameplay:
+
+    out of sync: client/server random seed mismatch, update= #N ... (#client/#server)
+
+Reproduces **without any combat** (no shots, no grenades, no explosions), so
+the divergence is not in the damage/projectile path. Reproduction matrix:
+
+| host       | client     | result |
+|------------|------------|--------|
+| cachebeta  | cachebeta  | in sync |
+| reimpl     | reimpl     | in sync |
+| cachebeta  | reimpl     | **desync** |
+
+The client's seed distance from the server is always a small number of draws
+(1 behind, 1 ahead, 2 behind), sometimes self-correcting a tick later. This is
+a draw-count drift, not a corrupted seed.
+
+## Mechanism
+
+Lockstep determinism depends on both machines drawing from the global seed
+(`0x46e3f4`, LCG `s*0x19660d+0x3c6ef35f`) the same number of times per tick.
+Every draw is traced by the `HALO_RNG_TRACE` ring (`docs/rng-trace.md`), plus
+"info" probes (kinds 15-18) that record animation state transitions without
+touching the seed.
+
+Trace analysis (`artifacts/rng_trace/a8_immediate.json`,
+`a9_animation.json`, decoded with `tools/xbox/rng_trace_dump.py --probes`):
+
+- Every seed mismatch coincides with an **animation** RNG draw:
+  `model_animation_choose_random` (0x120f20) called either from the original
+  `animation_update_internal` (0x121c30, unported) when an animation
+  completes and re-randomizes, or from `unit_animation_set_state` (0x1ad260)
+  when a unit changes animation state.
+- a8: tick 66 client one draw behind, catches up at tick 67.
+- a9: tick 97 unit `e2aa003b` transitions state 6 -> 0. Client draws twice
+  (main anim + weapon idle: `e43aa3da`, `30fc2171` -> `7298ac1c`); server sits
+  at `30fc2171`, one draw behind the client. Ticks 217-228 client two behind.
+- So one side reaches an animation completion or state change one tick
+  earlier than the other. The random draw itself is correct; its **timing**
+  differs.
+
+## Continuation: RNG reciprocal and runtime isolation
+
+The plane store/reload correction in `FUN_0010a1c0` is present in commit
+`e56821009`. A fresh traced build with that correction (XBE SHA-256 prefix
+`5e5918c93c87c078`) was deployed to `10.0.0.21` and its running build identity
+verified. Against the pristine host, it survived idle play, movement, and a
+kill, then desynced following grenades at tick **3842**. The client seed
+`143582d7` was four LCG steps behind the host's `ccf76ffb`. Therefore the plane
+correction is **not sufficient** to fix system-link determinism. The capture
+has no seed-continuity breaks:
+`artifacts/rng_trace/roundtrip_failure_20260905.json` and
+`roundtrip_client_pass_20260905.txt`.
+
+Temporary patcher overlays, without changing `kb.json`, gave these results:
+
+| Original implementations selected on client | XBE SHA-256 prefix | First mismatch |
+|---|---|---|
+| `unit_update_animation`, `unit_animation_set_state`, `FUN_001ab870`, `unit_set_animation`, `model_animation_choose_random`, `FUN_001a6350` | `71e43043639337ed` | tick 3 |
+| `unit_update_animation`, `unit_animation_set_state`, `FUN_001a6350` | `2c823d7f7ea0cc91` | tick 3 |
+| `unit_animation_set_state` only | `ade116bad2eaaf83` | tick 1840, following grenades |
+
+Original entry bytes and implementation deactivation redirects were verified
+over XBDM, with the still-patched plane function as a positive control. The
+standard QMP gate was unavailable. The immediate-failure variants repeatedly
+selected animation `-1` once per player per tick; this is a different failure
+pattern and **does not rule out** the animation callers or their remaining
+ported dependencies. Restoring the original state setter alone did not fix
+the grenade reproduction. Captures are named `animation_original_20260905`,
+`animation_three_20260905`, and `animation_setter_20260905` under
+`artifacts/rng_trace/`.
+
+### Confirmed numeric bug in `random_math_real` (0x10b240)
+
+The original instruction at **0x10b268** is
+`fmul dword ptr [0x2647f4]`. That constant is binary32 **0x37800080**,
+approximately `1.5259021893143654e-5`. The lifted C divided by `65535.0f`, and
+the shipping clang object emitted `fdiv`, so it computed a different value
+despite advancing the seed correctly. The correction is:
+
+```c
+return (float)(s >> 16) * *(float *)0x2647f4;
+```
+
+`tools/verify/rng_real_native.py` compiles complete translation units with and
+without the correction, extracts their actual function instructions, and runs
+them beside the pristine instructions in a freestanding Linux i386 process.
+Only absolute constant addresses are relocated for that test. It exhausts
+all **65,536 possible upper-16-bit outputs**, validates seed updates, and
+compares both the rounded binary32 result and the returned x87 value:
+
+| Precision | Before: binary32 differences | Before: x87 differences | After: either representation |
+|---|---:|---:|---:|
+| PC=11 (64 bits) | 512 | 65,535 | 0 |
+| PC=10 (53 bits) | 512 | 65,535 | 0 |
+
+Example: upper bits `257` produce `0x3b808081` with the old division, versus
+the original's `0x3b808080`. This is a measured **numeric** difference, unlike
+the earlier symbolic association finding. The neighboring `random_real_range`
+already uses the correct reciprocal and its arithmetic was checked against
+the original instructions.
+
+Validation: native exhaustive comparison passes; VC71 is 100% instruction
+match (16/16, operand score 87.5%); changed-file hazard scan is clean. This
+proves the RNG value fix, **not yet its responsibility for the desync**.
+All six diagnostic animation toggles were removed for the runtime test of
+the reciprocal correction (XBE prefix `03dfe393601605d9`), and their live
+redirects were verified. That build still desynced at tick **1705**, with
+client/host seeds `416f5584`/`9867bb02`; the user reported **no grenades** in
+this reproduction. The numeric fix is therefore also **not sufficient**.
+Capture: `artifacts/rng_trace/rng_reciprocal_20260905_trace.json`, with no
+continuity breaks. `kb.json` is unchanged.
+
+### Paired traces and the partial-toggle ABI confound (September 6)
+
+The normal client above was compared with a separately named host diagnostic:
+original behavior except `random_math.obj` and the trace baseline's 15 retained
+functions. The host diagnostic SHA-256 is
+`a2a004b653cda20e795cfc2f06884921da0b463764b06ff297bf817a2caba59d`.
+Idle play and then movement alone remained synchronized for several minutes.
+The later reproduction disconnected at tick **18949**, seeds
+`956ab6d3`/`e8460c39`. Both rings have no continuity breaks.
+
+The first differing draw is earlier, at **18883**: client
+`model_animation_choose_random` consumes seed `d67e8b5d`; the host consumes
+that seed at **18886**. The client also draws at 18886 and 18889, leaving it
+two draws ahead. Client probes identify unit `e4c70035`: after spawn-selection
+draws at 18881, it changes animation state `0x15 -> 0` at 18882, then
+`0 -> 2` at 18883. Thus disconnect time is delayed relative to the first
+observed RNG divergence; it is not evidence of a fixed elapsed-time trigger.
+The host capture lacks corresponding animation probes, so the earlier
+unit-state divergence is still unlocalized.
+
+Evidence: `artifacts/rng_trace/paired_original_20260905_{trace,host_trace}.json`,
+`compare_pair.py paired_original_20260905`, and its comparison JSON.
+
+The earlier immediate failures with original `unit_update_animation` have a
+confirmed ABI confound. Original `FUN_001a86b0` preserves EDX. At `0x1b120c`,
+the original caller calls this helper, then at `0x1b1215` pushes EDX as the
+desired state without reloading it. The deployed reverse thunk at `0x9091aa`
+and C implementation at `0x6eefd0` overwrite EDX. A machine-code comparison
+over all 256 old-state bytes and 44 requested states finds identical AL
+returns in all 11264 cases, but EDX differs in 11220. For old state 1 and
+requested state 0, original EDX is 0 and candidate EDX is `ffffffff`.
+Therefore toggling the original caller without also restoring this helper
+is not a valid isolated comparison. This does **not** yet attribute the
+normal-build desync to that helper; the compiled C caller keeps its requested
+state separately. Evidence: `check_transition_liveout.py` and
+`transition_liveout_evidence.json` in `artifacts/rng_trace`.
+
+For the next paired capture, the host now has probes inserted directly around
+the original main-animation update and desired-state transition calls.
+The diagnostic preserves all registers and flags and performs no x87 work.
+The stolen calls execute once with their original arguments. Eighteen
+machine-code tests cover register/flag preservation, argument and unit-write
+equivalence, state packing, and ring wrap. Both detours and original helpers
+were verified in live host memory. Diagnostic SHA-256:
+`fa079c608c6c350f2e0cb0b017b129f48dff7c24b8298d1fb9853fbfa8e72556`.
+Scripts: `build_original_probes.py`, `test_original_probes.py`,
+`verify_original_probes.py`. The host's original executable remains at
+`E:\GAMES\halo-patched\cachebeta.xbe`; `host_diagnostic.py restore` relaunches
+its recorded path. No `kb.json` toggles were changed.
+
+Another build replaced the shared `build/halo` symbol file during capture.
+The deployed symbols were recovered from the saved diagnostic XBE as
+`artifacts/rng_trace/session_symbols.pe`; subsequent captures explicitly use
+that file. Its function bodies include host deactivation stubs, so it is a
+symbolization artifact, **not an unmodified compiler output for rebuilding**.
+
+## Previously audited paths (not blanket exclusions)
+
+Audited semantically against the pristine XBE (Capstone on
+`halo-patched/cachebeta.xbe`; Ghidra MCP was intermittently down):
+
+- Grenade/damage path, all clean: `object_find_in_radius`,
+  `collision_bsp_test_vector`, `FUN_00148780`, `FUN_00148240`,
+  `object_find_in_cluster`, `structure_find_in_cluster`,
+  `object_cause_damage` (only diff: missing debug store to `0x46f070`),
+  `FUN_00136f40`, `FUN_0009dcf0`, `FUN_00138e30`, `damage_data_new`,
+  `FUN_0009d2d0`, `object_new`, `object_placement_data_new`,
+  `unit_throw_grenade`, `FUN_000f9c40`, `FUN_000f7e40`, `FUN_000f8920`,
+  `FUN_000f7e60`, `FUN_000f90d0`. Moot anyway: desync reproduces with no
+  combat.
+- `unit_animation_set_state` (0x1ad260; historical VC71 score corrected above): weapon-idle draw guard
+  (`was_none || FUN_001a88b0(new) != FUN_001a88b0(old)`) matches the XBE;
+  a 6 -> 0 transition must draw twice on both sides.
+- `unit_update_animation` (0x1b0d90): clean vs XBE after byte-accuracy edits
+  (dword `global_seat` load, signed `+0x256` switch, `anim_status_wide`).
+- `FUN_001ab870` (0x1ab870) wrapper around the original
+  `animation_update_internal`: probes show the frame counter (`state[1]`)
+  and anim index (`state[0]`) going in, result coming out.
+
+## Refuted: float addend association
+
+**This section proposed a root cause that measurement later killed. Kept as a
+record of a dead end, not as a finding.**
+
+The refutation: reassociating a 3-term float dot product can only change the
+result if the x87 is truncating intermediates to 24-bit single precision. At
+53-bit or 64-bit it is exactly inert, because a float x float product needs only
+48 mantissa bits and sums of three such products stay exact. Measured over
+1,000,000 plausible inputs for `plane3d_distance_to_point`:
+
+    intermediate precision   general-case   near-cancellation
+      24-bit (PC=00)           31.075%          39.835%
+      53-bit (PC=10)            0.000%           0.000%
+      64-bit (PC=11)            0.000%           0.000%
+
+Halo runs at 64-bit. Game code (0x11000-0x1d0000) contains **zero** `fldcw`
+instructions; every one in the binary is in the CRT (`_controlfp`, and `_ftol`
+setting rounding-control, not precision-control), and `fninit` at 0x1db4de
+leaves the default 0x037F (PC=11, 64-bit extended). Nothing in the engine
+narrows FPU precision, so addend order cannot produce a ULP difference.
+
+`tools/audit/check_fpu_association.py` compares symbolic expression trees. It
+proves a *structural* difference in how our clang binary accumulates, which is
+necessary but **not** sufficient for an observable numeric difference. Treating
+its output as a numeric result was the error here.
+
+The original hypothesis follows, for the record.
+
+## Superseded hypothesis: dot-product association
+
+`FUN_00013070` (0x13070, the 3D dot product) accumulated its three terms in the
+opposite order from the original.
+
+Ours (as lifted):
+
+    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];   /* ((x + y) + z) */
+
+The original at 0x13070:
+
+    fld [eax+8]; fmul [ecx+8]    ; z
+    fld [eax+4]; fmul [ecx+4]    ; y
+    faddp st(1)                  ; (z + y)
+    fld [eax];   fmul [ecx]      ; x
+    faddp st(1)                  ; ((z + y) + x)
+
+Floating-point addition is commutative but not associative, so `((x+y)+z)` and
+`((z+y)+x)` differ by a ULP. `FUN_00013070` has 22 call sites and feeds AI
+facing (`actions.c`, `actor_looking.c`), biped orientation (`bipeds.c`),
+physics (`collision_usage.c`) and structure queries — so every 3D dot in the
+engine was off by a ULP on our client and exact on the host.
+
+That is enough to desync lockstep. The animation state byte comes from
+`state_pair`, written by the **unported** originals `FUN_001a4c50` (turning) and
+`FUN_001a5300` (moving). Those originals read our ported floats and compare them
+against thresholds (`FUN_001a5300` at 0x1a5531 gates moving-vs-idle on the
+throttle vector at `unit+0x228` being nonzero). A ULP flips such a threshold a
+tick early or late, which moves an animation state change by a tick, which moves
+the RNG draw by a tick. Symptom fit is exact: drift in both directions,
+self-correcting, no combat needed, and reimpl-vs-reimpl stays in sync because
+both sides are wrong the same way.
+
+### Why every gate passed
+
+VC71 scores `FUN_00013070` at 100.0% (14/14 insns, opnd 100.0%) both before and
+after the fix. VC71 compiles our C with **cl.exe (MSVC 7.1)**, which reassociates
+the expression back to the original's order. The binary we ship is built by
+**clang**, which honours C's left-associativity. Any float-association
+difference cl.exe normalises away is invisible to the byte-match lane by
+construction. See `docs/lift-learnings.md` section 57.
+
+Two-term reductions are safe (`a+b == b+a` is exact in IEEE); only chains of
+three or more terms can diverge.
+
+### Change applied anyway
+
+    /* src/halo/math/vector_math.c */
+    return a[2] * b[2] + a[1] * b[1] + a[0] * b[0];
+
+Harmless and marginally more faithful to the original, but **not a fix for the
+desync** -- see the refutation above. VC71 remains 100.0%.
+
+`FUN_00012f60` (2D dot, 0x12f60) loads its terms in the other order too, but
+with only two terms the result is bit-identical. Not a bug; left alone.
+
+## Sweep: 16 more functions in the same class
+
+`tools/audit/check_fpu_association.py` (new) symbolically executes the x87
+stream of our clang objects and of the original XBE, builds an expression tree
+for each, canonicalises the differences that carry no numeric content, and
+reports the rest. Canonicalisation covers: commutative two-term nodes (`a+b ==
+b+a` is exact), negation placement inside mul/div chains (`-(a/b) == (-a)/b`),
+`.rdata` float literals versus `FLDZ`/`FLD1`, and a uniform parameter-index
+shift. Register-to-parameter binding is flow-sensitive, because the original
+reuses one register for two different parameters (e.g. "ECX switches from
+param_1 to param_2" in `FUN_001057c0`). Anything outside pure-FPU straight-line
+code is reported SKIP rather than guessed at.
+
+Run: **736 compared, 31 mismatches across 16 functions** (plus `FUN_00013070`,
+now fixed). Full report in `artifacts/fpu_assoc/sweep_20260905.txt`.
+
+| function | object |
+|----------|--------|
+| `distance_squared3d` | `math/vector_math.c` |
+| `FUN_0001ad60`, `FUN_0010a1c0` | `math/real_math.c` |
+| `matrix_transform_point`, `matrix_transform_vector` | `math/real_math.c` |
+| `real_matrix3x3_transform_vector`, `real_matrix4x3_transform_point` | `math/real_math.c` |
+| `FUN_0010c340`, `FUN_0010c8e0` | `math/random_math.c` |
+| `FUN_001057f0` | `structures/structures.c` |
+| `FUN_00193b80` | `structures/structure_detail_objects.c` |
+| `FUN_0018d670` | `scenario/scenario.c` |
+| `midpoint3d` | `ai/actor_moving.c` |
+| `plane3d_distance_to_point`, `triple_product3d` | `effects/decals.c` |
+| `real_rgb_color_brightness` | `bitmaps/bitmap_utilities.c` |
+
+Every one is the same shape as `FUN_00013070`: our clang code accumulates
+`((x+y)+z)` where the original accumulates `((z+y)+x)`. None of them are fixed
+yet — see "Confirming the fix" for why.
+
+## Superseded hypothesis
+
+Some **ported state writer upstream of the animation update** produces the
+unit's animation state byte (`unit+0x253`), movement byte (`unit+0x256`), or
+frame timing input one tick off from the original. Candidates, in order:
+
+1. `unit_update_animation` (0x1b0d90) or the callee chain under it
+   (`unit_animation_set_state`, `FUN_001ab870`).
+2. The `state_pair` writers in the biped update `FUN_001a6350` (0x1a6350,
+   89.9%): `FUN_001a4c50` (turning), `FUN_001a5300` (moving),
+   `FUN_001a6280` (dying, 86.4%), `FUN_001a2900`, `FUN_001a2a60`.
+3. The dead flag at `unit+0xb6` bit 2/4 and other `unit_update_animation`
+   callers (`0x1b300a`, `0x1b9735`).
+
+## Toggle-bisect: abandoned
+
+`ported: false` is per-function, so deactivating `unit_update_animation`
+(0x1b0d90) leaves its separately-ported callees (`unit_animation_set_state`,
+`FUN_001ab870`, `unit_set_animation`, `model_animation_choose_random`) still
+redirected to our C. "Desync persists therefore the callees are ruled out" would
+have been an invalid inference. The experiment was dropped once the dot-product
+divergence was found; the diagnostic `ported: false` has been reverted.
+
+## Confirming the fix
+
+The remaining step is an in-game repro: rebuild, deploy to 10.0.0.21, and run a
+system-link match against the pristine host on 10.0.0.24 using the procedure
+below.
+
+- (Obsolete: the float-association theory is refuted; the repro below no longer
+  tests anything about it.)
+- Desync gone: `FUN_00013070` was the cause; work through the sweep list next.
+- Desync persists: `FUN_00013070` was a real but separate latent bug; resume from
+  the trace evidence, starting with `distance_squared3d` and
+  `plane3d_distance_to_point`, which are on the same movement path.
+
+Fix exactly one thing before the repro. The other 15 are deliberately left
+unfixed: changing 16 reduction orders at once makes a negative result
+un-attributable.
+
+Authoritative build path for the deploy is `/mnt/g/dev/halo/build`. A concurrent
+build in the `/mnt/g/dev/halo-bugs` worktree runs on this box; do not deploy
+from it.
+
+## Procedure (bridged xemu from WSL)
+
+Guests are reachable from Linux only; Windows Python times out
+(`WinError 10060`).
+
+    # build (about 5 min) and push to the patched client through WSL-native XBDM
+    rtk ./tools/xbox/build_deploy_run.sh --xemu-bridged --xbox 10.0.0.21 -- -q --rng-trace
+    # after reproduction, while still in game (ring is lost on return to dashboard)
+    HALO_WINDOWS_REEXEC=1 python3 tools/xbox/rng_trace_dump.py --host 10.0.0.21 --out artifacts/rng_trace/aN.json
+    python3 tools/xbox/rng_trace_dump.py --probes artifacts/rng_trace/aN.json
+    HALO_WINDOWS_REEXEC=1 python3 tools/xbox/xbdm_debug_txt.py --host 10.0.0.21 --lines 200 --output artifacts/rng_trace/debug_client_aN.txt --timeout 30
+    HALO_WINDOWS_REEXEC=1 python3 tools/xbox/xbdm_debug_txt.py --host 10.0.0.24 --lines 200 --output artifacts/rng_trace/debug_host_aN.txt --timeout 30
+
+The build-and-push command trips the skill-router gate once; rerun it unchanged.
+`debug.txt` on both boxes carries the `out of sync` line with the tick and
+both seeds; correlate its tick with the trace records.
+
+## Uncommitted work tied to this investigation
+
+- Probes: `src/halo/math/rng_trace.h` kinds 15-18; `units.c`
+  (`unit_animation_set_state` kind 16, `FUN_001ab870` kinds 17/18);
+  decoder in `tools/xbox/rng_trace_dump.py`. All under `#ifdef HALO_RNG_TRACE`
+  with `#line` restores.
+- Byte-accuracy edits in `units.c` (`unit_animation_state_allows_impulse`,
+  `unit_update_running_blind`, `unit_update_animation`, `FUN_001b1400`) and
+  `damage.c` (`object_cause_damage`).
+- `kb.json`: 0x120670 decl `build_damage_animation_index`; diagnostic
+  `ported=false` on 0x1b0d90.
+- `tools/xbox/deploy_xbox.py`: `HALO_NATIVE_XBDM=1` uses Linux Python for
+  XBDM upload.
+
+## Latent issues found along the way (not the desync)
+
+- `0x9dcf0` missing `@eax/@edx/@ecx/@esi` annotations.
+- `FUN_000f7e60` missing `@esi/@edi/@eax/@edx/@ecx`.
+- `FUN_00148eb0` param_3 declared int, is float.
+- `object_cause_damage` lacks the original's debug store to `0x46f070`.
+- Sub-90% VC71 on the path: `unit_animation_set_state` 87.3 after the audit above,
+  `FUN_000f7e60` 72.2, `FUN_000f9c40` 89.1, `FUN_001a6350` 89.9,
+  `FUN_001a6280` 86.4.
+
+## Paired capture 2026-09-06 (shoot-only): divergence localized
+
+First paired capture with animation probes live on BOTH sides. Client
+`10.0.0.21` ran the traced build (rev `25e26a513`, `RNGT` ring present); host
+`10.0.0.24` ran `rng_probe.xbe` (SHA `fa079c60...`, detours re-verified in live
+memory after a CI incident). Artifacts:
+`artifacts/rng_trace/shoot_only_20260906{,_host}.json`,
+`shoot_only_20260906_host.bin` (raw ring), and
+`debug_{client,host}_shoot_only.txt`.
+
+Desync reported by the client at update #1121
+(`#5e9321ab`/`#8719cf51`); the host declared client machine #1 out of sync at
+game tick #1249.
+
+### Alignment
+
+Both sides reseed to `000040b2` at the match start (host ring index 119496,
+client 119262). Frame numbering is IDENTICAL on the two sides -- an assumed
+one-tick offset scores 41.9% agreement on `anim_update_in` values versus 87.3%
+at offset 0, so offset 0 is the alignment. Do not assume a tick skew.
+
+### First divergence
+
+1217 consecutive seed-consuming draws match exactly. Draw ordinal 1218, with
+seed `cc6b2274` still identical on both sides:
+
+    HOST    tick 996  random_direction3d   caller 0x1aba66
+    CLIENT  tick 995  random_math_real     caller model_animation_choose_random+78
+
+The client consumes a draw the original never consumes. Its cause is one frame
+earlier, on unit handle `0xe3170037`, at the state-request site
+(`unit_update_animation+862`, original `0x1b1215`, which IS instrumented on both
+sides):
+
+    frame 993   anim_state=0x15 old=0xff    host YES   client YES
+    frame 994   anim_state=0x00 old=0x15    host YES   client YES
+    frame 995   anim_state=0x03 old=0x00    host NO    client YES  <-- extra
+
+The extra transition calls `unit_animation_set_state+779`, which calls
+`model_animation_choose_random`, which draws. From frame 996 the unit's state
+byte is `0xbd` on the client versus `0xa8` on the host and never reconverges.
+
+### What is NOT the cause
+
+- **Not an extra animation-update call.** Site-matched (client `+484` only,
+  the site corresponding to the host's sole `anim_update_in` probe at
+  `0x1b0f58`), call counts are (1,1) on all 7757 comparable frames.
+  An earlier "client calls 2-3x, host never double-calls" reading was an
+  INSTRUMENTATION ARTIFACT: `unit_update_animation` has FOUR call sites to
+  `FUN_001ab870` (+413, +456, +997, +1071) and only +456 carries a host probe,
+  while our build probes four sites (+436, +484, +682, +765). Any future
+  cross-side count comparison must filter to the site the host actually probes.
+- **Not `state[1]`.** The second half of the pair is a frame counter that
+  increments in lockstep on both sides.
+
+### The remaining question
+
+At `0x1b11f9` the original loads the CURRENT state into CX and takes either of
+two skips before transitioning:
+
+    001b1201  cmp   dx, cx
+    001b1204  je    0x1b121f        ; skip 1: desired == current
+    001b120c  call  0x1a86b0        ; gate; preserves EDX
+    001b1211  test  al, al
+    001b1213  je    0x1b121f        ; skip 2: gate returned 0
+    001b1215  push  edx             ; EDX reused WITHOUT reload
+    001b1217  call  0x1ad260        ; unit_animation_set_state
+
+Current state was `0x00` and our desired state was `0x03`, so skip 1 cannot
+have fired for us. Either the original's desired state (EDX) was `0x00` at that
+moment and it took skip 1, or its gate `FUN_001a86b0` returned 0 and it took
+skip 2. Distinguishing these two is the next step, and it decides the fix:
+
+- If EDX differed, the bug is UPSTREAM in whatever computes the desired state.
+- If the gate differed, the bug is in `FUN_001a86b0` -- note its AL return was
+  previously verified identical across all 11264 (old_state, requested_state)
+  machine-code cases, but it takes a POINTER (`lea ecx,[edi+0x248]`) and reads
+  `[ecx+0xb]`, so its result depends on struct contents that sweep did not vary.
+
+A third probe recording EDX and the gate's AL at `0x1b1211` on both sides would
+settle it in one capture.
+
+## Static resolution of the frame-995 fork (2026-09-06, no new capture)
+
+The previous section ended by proposing a third probe on EDX and the gate's AL
+at `0x1b1211`. That capture is NOT needed: both branches of the fork resolve
+statically, and one of them also closes an instrumentation gap that would have
+invalidated the whole section.
+
+### Instrumentation gap check (this had to pass first)
+
+The `FUN_001ab870` episode taught that a single host probe on a multi-site
+callee manufactures fake findings. So before trusting "host took no transition
+at frame 995", count the call sites to the transition callee:
+
+    call 0x1ad260 (unit_animation_set_state) inside unit_update_animation
+      0x1b1217  (+1159)   <-- the probed site (host patch at 0x1b1215)
+      TOTAL: 1 site
+
+One site, and it is the probed one. The claim holds: the host really did not
+transition at frame 995.
+
+### The gate `FUN_001a86b0` is exonerated analytically
+
+Its entire input domain is two values -- `byte [ecx+0xb]` and DX:
+
+    001a86b0  movsx ecx, byte ptr [ecx + 0xb]
+    001a86b4  add   ecx, -2
+    001a86b7  cmp   ecx, 0x27
+    001a86ba  mov   al, 1
+    001a86bc  ja    0x1a86ec          ; -> ret with AL=1
+    001a86be  movzx ecx, byte ptr [ecx + 0x1a8704]
+    001a86c5  jmp   dword ptr [ecx*4 + 0x1a86f0]
+
+All five jump-table arms (`0x1a86cc/d5/e5/ea/ec`) read only DX. Nothing else is
+loaded, so the earlier 11264-case (old_state, requested_state) sweep WAS
+exhaustive -- the doc's earlier note that "struct contents the sweep did not
+vary" could matter is wrong, and is corrected here.
+
+Stronger still, for this exact frame: the caller does
+`lea ecx,[edi+0x248]`, so `[ecx+0xb]` is `[edi+0x253]` -- the *same* current-state
+byte the caller loads into CX. Current state was 0x00, so `ecx = 0 - 2 =
+0xFFFFFFFE`, which is `ja 0x27`, so the gate returns **AL=1 unconditionally**.
+Skip 2 cannot have fired on either side.
+
+### There is a THIRD path to the call, not two
+
+    001b11ee  mov   al, byte ptr [ebp - 1]
+    001b11f1  test  al, al
+    001b11f3  mov   edx, dword ptr [ebp - 0xc]
+    001b11f7  jne   0x1b1215            ; force: bypasses BOTH skips
+    001b11f9  movsx cx, byte ptr [edi + 0x253]
+    001b1201  cmp   dx, cx
+    001b1204  je    0x1b121f            ; skip 1
+    001b1206  lea   ecx, [edi + 0x248]
+    001b120c  call  0x1a86b0
+    001b1211  test  al, al
+    001b1213  je    0x1b121f            ; skip 2 (proven inert here)
+    001b1215  push  edx
+    001b1216  push  esi
+    001b1217  call  0x1ad260
+
+`[ebp-1]` is a force flag, set at `0x1b115a` when `FUN_001a8790` returns 0.
+With skip 2 inert, the host not transitioning means the host had force==0 AND
+desired state == current state == 0. Ours pushed 3.
+
+### The desired state is an input PARAMETER, so the bug is in the caller
+
+`[ebp-0xc]` has exactly two writes in the whole function:
+
+    001b0dcd (+61)   mov dword ptr [ebp - 0xc], eax    ; eax = movsx ax, byte [ebp+0xc]
+    001b0fe3 (+595)  mov dword ptr [ebp - 0xc], 0x28
+
+`[ebp+0xc]` is param_2. So `unit_update_animation(unit_handle, char *anim_state)`
+does not compute the desired state -- it receives it, and 0x28 != 3, so ours came
+straight from `*param_2`. Nothing inside this function is at fault.
+
+(Note for whoever edits this: at `0x1b0db8` the load is `movsx ax, ...`, a 16-bit
+movsx that writes only AX, so the dword stored at `[ebp-0xc]` carries a stale
+upper half from the preceding `tag_get` return. Harmless here because every
+consumer uses DX, but do not "clean it up" into a 32-bit movsx.)
+
+### Caller narrowed to three ported functions
+
+`unit_update_animation` has no direct `call` site in the image; ours is
+`src/halo/units/units.c:1186`, passing `state_pair`, initialized to 0 and then
+filled by five callees (`units.c:1119-1138`):
+
+    FUN_001a4c50   ported: null   <- runs ORIGINAL code, cannot diverge
+    FUN_001a5300   ported: null   <- runs ORIGINAL code, cannot diverge
+    FUN_001a2900   ported: true       writes 0x28 / 0x14
+    FUN_001a2a60   ported: true       writes 0x15 / 0x16
+    FUN_001a6280   ported: true       writes 0x18 / 0x19
+
+No ported code anywhere in `src/` writes 3 into that byte (`rg '\*state(_out)? = 3'`
+is empty; the only state writes in bipeds.c/units.c are the six values above).
+
+So the value 3 is written by original code, and our divergence is that original
+code *chose* to write it -- i.e. some input it reads differed, or a ported callee
+it dispatches to returned differently. `FUN_001a5300` and `FUN_001a4c50` are
+step dispatchers that call ported step functions (`FUN_001a2b90`'s header
+comment names `FUN_001a5300` as its dispatcher), so a ported step corrupting
+biped state upstream is the live hypothesis.
+
+Next step is therefore NOT another probe on `0x1b1211` -- it is to find which
+store in `FUN_001a4c50` / `FUN_001a5300` writes 3, and which ported callee feeds
+its predicate.
+
+### Negative result worth recording
+
+The captured client build INCLUDED the `FUN_0010a5e0` x87-narrowing fix, and the
+desync still reproduced with the same `model_animation_choose_random` signature.
+That closes the x87-narrowing lane as a cause of this desync. The fix remains a
+genuine correctness fix (see docs/lift-learnings.md and
+tools/audit/check_x87_narrowing.py); it is simply not this bug.
+
+## The fork is a float comparison (2026-09-06, same session)
+
+The section above ended by saying the next step was to find which store in
+`FUN_001a4c50` / `FUN_001a5300` writes state 3. It is `FUN_001a4c50` at
+`0x1a5183`, and the answer changes the shape of the investigation.
+
+### The writer
+
+Neither dispatcher stores a literal 3; both write the state byte through a
+register. In `FUN_001a4c50`:
+
+    001a5160  fld   dword ptr [eax + 0x4c8]   ; per-tag threshold
+    001a5166  fld   dword ptr [ebp - 0xc]     ; computed value
+    001a5169  fcomp st(1)
+    001a516b  fnstsw ax
+    001a516f  test  ah, 5
+    001a5172  jp    0x1a5193                  ; skip the write entirely
+    ...
+    001a5183  mov   cl, byte ptr [ebp - 1]
+    001a5186  mov   eax, dword ptr [ebp + 0xc]
+    001a5189  test  cl, cl
+    001a518b  setne dl
+    001a518e  add   dl, 2                     ; dl = 2 or 3
+    001a5191  mov   byte ptr [eax], dl        ; <-- the desired state
+
+So the state is 2 or 3 depending on the `[ebp-1]` flag, and it is written at
+all only on one side of an x87 compare. `2` and `3` are the two turn-in-place
+directions.
+
+### What the compared value is
+
+From the aligned disassembly at `0x1a5061` (a jump target, so a safe boundary
+-- disassembling from an arbitrary address here decodes garbage and invents
+operands, which cost one wrong reading before this):
+
+    001a5061  lea   eax, [esi + 0x1d4]        ; desired facing
+    ...       copy to [ebp-0x20..], force z = 0
+    001a5083  call  0x12f10                   ; magnitude
+    001a5088  fcomp dword ptr [0x2533c0]      ; degenerate? then fall back to
+    001a5098  lea   edx, [esi + 0x24]         ;   the current facing
+    ...
+    001a50ac  fld   dword ptr [ebp - 0x20]    ; cross_z = a.x*b.y - a.y*b.x
+    001a50b2  fmul  dword ptr [edi + 4]       ;   -> sign selects [ebp-1],
+    001a50ba  fsubp st(1)                     ;      i.e. which way to turn
+    001a50bc  fld   dword ptr [ebp - 0x1c]    ; dot = a.x*b.x + a.y*b.y
+    001a50cb  faddp st(1)
+    001a50cd  fstp  dword ptr [ebp - 0xc]     ; <-- the compared value
+
+`[ebp-0xc]` is the **cosine of the angle between the biped's desired facing
+(`+0x1d4`) and its current facing (`+0x24`)**, and `[ebp-1]` is the sign of
+their cross product. The fork at `0x1a5172` is therefore "is the biped turned
+far enough from where it wants to face to play a turn-in-place animation", and
+our biped answered yes where the original answered no.
+
+**Struck 2026-09-06.** This paragraph previously claimed the same signature as
+"the open a10 report of a biped that rotates without translating". That report
+is not open -- it was fixed long ago -- so the cross-reference was wrong and
+carried no evidence either way. Nothing else in this document depends on it.
+
+### This REOPENS the float-precision lane
+
+The previous section recorded, correctly, that the captured build already had
+the `FUN_0010a5e0` x87-narrowing fix and still desynced. That remains true, but
+the conclusion drawn from it -- "closes the x87-narrowing lane as a cause" -- was
+too strong and is **withdrawn here**. It only rules out that one function. The
+fork is decided by a single `fcomp` of a computed cosine against a threshold, so
+a sub-ULP difference in the facing vectors flips it. Float precision upstream is
+now the PRIME suspect, not a closed lane.
+
+### Where it is not
+
+Checked and clean (not flagged by tools/audit/check_x87_narrowing.py):
+`normalize3d`, `magnitude3d`, the dot/cross helpers, and `FUN_001b0630` (the
+ported aiming-vector update called from inside `FUN_001a4c50` itself). Our
+ported normalization of `+0x1d4` (`src/halo/units/units.c:1058-1065`) is a
+faithful in-place normalize with the z component zeroed and a world-forward
+fallback.
+
+### Where to look next
+
+The full detector run is 5891 functions compared, 207 flagged (the earlier
+"397 compared, 29 flagged" figure was a partial run; use the 207). Ranked
+candidates that feed biped facing, worst first:
+
+    FUN_0002bd80            src/halo/ai/actor_moving.c   ours 4,  xbe 15  (-11)
+    FUN_001a2f40            src/halo/units/bipeds.c      ours 14, xbe 21  (-7)
+    actor_destination_update src/halo/ai/actor_moving.c  ours 0,  xbe 4   (-4)
+    FUN_0002b020            src/halo/ai/actor_moving.c   ours 0,  xbe 4   (-4)
+    FUN_001a2160            src/halo/units/bipeds.c      ours 1,  xbe 3   (-2)
+    FUN_001a1a10            src/halo/units/bipeds.c      ours 1,  xbe 3   (-2)
+    actor_move_update       src/halo/ai/actor_moving.c   ours 3,  xbe 4   (-1)
+
+`FUN_001a2f40` is notable because the unported dispatcher `FUN_001a5300` calls
+it directly on the same tick, and it is the worst offender in the units/bipeds
+group.
+
+Note the whole chain runs through UNPORTED code (`FUN_001a4c50`,
+`FUN_001a5300`), so the bug cannot be in the decision logic itself -- only in
+the float inputs that ported code hands it. That is what makes the narrowing
+detector the right instrument here rather than another capture.
+
+## Candidate list corrected by intersection with the fork's inputs (2026-09-06)
+
+The previous section ranked x87-narrowing candidates by raw delta. That was the
+wrong instrument: a narrowing delta only matters if the function touches one of
+the two vectors the `fcomp` at `0x1a5183` actually compares — the biped's
+desired facing (`+0x1d4`) and its current facing (`+0x24`). Intersecting the
+flagged set with the writers and readers of those two vectors reorders it and
+drops one entry entirely.
+
+| function | delta | touches the fork's inputs? | verdict |
+|---|---|---|---|
+| `FUN_0002bd80` (`actor_moving.c`) | -11 | reads `obj+0x24`, and its callers at `actor_moving.c:3717` take its `slerp`/`weight` outputs into the desired-facing path | **top candidate** |
+| `FUN_001a2160` (`bipeds.c`) | -2 | it *is* the per-tick writer of current facing `+0x24` | second, but see below |
+| `FUN_001a2f40` (`bipeds.c`) | -7 | 956 lines, no access to `+0x1d4`, `+0x24`, `+0x28`, `+0x2c` or `+0x30` anywhere in its body | **drop — noise for this bug** |
+
+### `FUN_001a2160` site-level result
+
+Per-site comparison (not just counts) narrows what its -2 means. The XBE
+narrows three cross-product temporaries at `ebp-0x20/-0x1c/-0x18`
+(`fstp dword` then `fld dword`, `0x1a21ef`..`0x1a2236`); our build keeps two of
+the three live in ST at 64-bit. Those temporaries feed **only the up vector**
+(`unit+0x30`). They reach the forward vector — the one the fork compares —
+through exactly one edge: the degenerate test at `0x1a2248`,
+
+    call 0x13010            ; normalize3d(up_ptr)
+    fcomp dword ptr [0x2533c0]
+    test  ah, 0x44
+    jp    0x1a2283          ; skip the reset
+    ...                     ; else fwd(+0x24) = global forward, up = global up
+
+so a precision difference here only propagates when the rebuilt up vector is
+near-degenerate. Real coupling, narrow band.
+
+`cos_a`/`sin_a` are **not** a divergence here even though clang stores them as
+`fstp tbyte [ebp-0x24]` / `[ebp-0x3c]`. Both are reloaded and narrowed with
+`fstp dword ptr [esp+0xc]` / `[esp+0x8]` at the call boundary, so each value is
+rounded to float32 exactly once, the same as the XBE's `fstp dword [ebp-8]`
+straight after `fcos`. An 80-bit spill is only a finding when nothing narrows
+the value before it is consumed.
+
+### Two checks that must come before any more candidate grinding
+
+The "it is an `fcomp`, therefore precision" step skips two questions, and two of
+the three possible answers make the narrowing list the wrong tool entirely:
+
+1. **Did the original even reach `0x1a5160`?** `FUN_001a4c50` has earlier
+   integer exits — `je 0x1a52f9` at `0x1a4f65` when `[esi+0x257] == 0`, and the
+   `and eax,0x40 / je 0x1a5061` split at `0x1a4f73`. If the host bailed before
+   the compare, the divergence is in an integer or flag upstream and no float
+   work touches it.
+2. **How far apart were the cosine and the threshold?** A sub-ULP difference
+   flips a compare *only when the operands are within an ULP of each other*.
+   If `|cos - threshold|` is appreciable, the desired-facing vector is
+   substantively wrong and this is a logic bug, not a precision one.
+
+One probe at `0x1a5169` recording (reached-flag, ST0, ST1, unit handle)
+discriminates all three outcomes in a single capture. Census its call sites
+first, the same way `0x1ad260` was censused above.
+
+Because of this, the earlier sentence "a sub-ULP difference in either facing
+vector flips it" should be read as **only when the two operands are near-equal**.
+
+### Tooling note
+
+Do not name a scratch analysis script `/tmp/dis.py`. Python's `inspect` imports
+the stdlib `dis` module, so a shadowing script in the CWD produces a confusing
+circular-import traceback (and breaks `apport`'s excepthook) even though the
+script's own output is correct.
+
+## Paired capture 2026-09-06 (repro B): the divergence is TWO records
+
+Second reproduction, both guests instrumented (client `10.0.0.21` trace build,
+host `10.0.0.24` running `host_rng_probe.xbe`, ring at `0x7ff900` — dump it
+with `--pe artifacts/rng_trace/session_symbols.pe`, the default cachebeta
+symbol lookup finds the wrong VA and reports a magic mismatch).
+
+Client ticks 0..6763, host 425..6847, first `out of sync` at tick **6635**.
+Diffing every `probe:unit_state` record by (tick, unit, state) over the whole
+overlap gives exactly two client-only records and **zero** host-only:
+
+    t=6627  handle=0xe3c20037  new=3  old=0
+    t=6633  handle=0xe3c20037  new=0  old=3
+
+Everything else in ~6,800 ticks matches. The unit enters animation state 3 on
+our build, sits there six ticks, and leaves; the original never enters it. The
+exit at 6633 draws from the global seed via `model_animation_choose_random`
+(three draws at t=6633/6634), and the seeds mismatch two ticks later. That
+closes the mechanism: **an animation transition is a seed draw, so one extra
+transition is one extra draw.**
+
+### The recorded state value was always in the capture
+
+`probe:unit_state` has no `value` field; the packed `(new<<8)|old` state is
+carried in **`seed_before`**. Reading `r.get("value", 0)` yields a histogram of
+all zeros and looks like "the probe records no state". It does. This also
+retroactively confirms the earlier *inference* that the spurious state is 3 —
+it is now measured, not deduced from `setne dl; add dl,2`.
+
+### Corrections to the previous section
+
+- Ranking client-only transitions without the paired host capture suggested a
+  burst at 6625/6626/6627 and therefore a gross, repeating error. Wrong: 6625
+  and 6626 occur on **both** sides. Only 6627 and 6633 are ours alone.
+- One transient excursion in 6,800 ticks that self-corrects after six ticks is
+  the knife-edge signature, not the gross-error one. The precision hypothesis
+  is back in first place, and `FUN_0002bd80` / `FUN_001a2160` are live again.
+
+### The fork has three gates, only one of which is float
+
+    0x1a5142  eax = [esi+0x1b8]
+    0x1a5148  test ah,1   / jne 0x1a52f9        ; gate 1 — integer flag, exits
+    0x1a5151  test al,0x20 / je  0x1a515d       ; threshold select
+    0x1a5155    fld dword [0x28ace8]            ;   A: constant
+    0x1a515d    fld dword [eax+0x4c8]           ;   B: from tag data
+    0x1a5166  fld dword [ebp-0xc]               ; the facing cosine
+    0x1a5169  fcomp st(1)                       ; gate 2 — FLOAT
+    0x1a516f  test ah,5   / jp  0x1a5193        ;   skip if not below
+    0x1a5177  test [ecx+0x17c], 0x100000
+    0x1a5181  jne 0x1a5193                      ; gate 3 — integer flag
+    0x1a5183  setne dl; add dl,2 -> state 2 or 3
+
+`setne`/`add dl,2` can only produce 2 or 3, never 0. The host wrote no
+transition at all, so the original did not reach `0x1a5183` — it failed gate 1,
+2 or 3. Gates 1 and 3 are integer flag tests; a wrong flag bit would normally
+diverge persistently rather than for six ticks, which is why gate 2 (the
+`fcomp`) remains the leading candidate. But gates 1 and 3 are now explicit
+alternatives that must be ruled out rather than assumed away.
+
+Next probe, if one is needed, should record at `0x1a5169`: the two `fcomp`
+operands, plus `[esi+0x1b8]` and `[ecx+0x17c]`, which distinguishes all three
+gates in one capture. Note the host probe framework already supports a value
+payload — `log(at, kind, value_code, caller)` in
+`artifacts/rng_trace/build_original_probes.py`.
+
+## Causality proven: the seed streams are one stream, shifted two draws (2026-09-06)
+
+The previous section established a *temporal* correlation -- two client-only
+animation transitions at ticks 6627 and 6633, first `out of sync` at 6635 --
+and inferred causality from the mechanism (a transition calls
+`model_animation_choose_random`, which draws). That inference is now a
+measurement.
+
+Diffing the seed-consuming draws in the paired repro-B capture, keyed by tick:
+
+    385 of 385 shared draw ticks (591..6633) agree on seed_before exactly
+    first divergent seed value:  tick 6634
+    client-only draw ticks:      6627, 6633, 6751
+    host-only draw ticks:        6685
+
+The raw sequence around the excursion shows what actually happened. These are
+the same seed values on both sides, consumed at different ticks:
+
+    tick   CLIENT                          HOST
+    6626   2615001737                      2615001737
+    6627   2174052948   <- extra draw      (no draw)
+    6633   3147223459   <- extra draw      (no draw)
+    6634   1401522854                      2174052948
+    6634   3521061325                      3147223459
+    6642    423647432                      1401522854
+
+Both machines walk the identical LCG sequence. The client simply reaches each
+value two draws earlier, because it burned two extra draws -- one entering the
+animation state at 6627, one leaving it at 6633 -- and those are exactly the two
+client-only `probe:unit_state` records. This is not "a different random
+stream"; it is the same stream, phase-shifted by two.
+
+It also answers a loose end: the state *entry* at 6627 does consume a draw
+immediately. The mismatch is not logged until 6635 only because the next draw
+the host performs after 6626 is at 6634.
+
+`seed_before` carrying the packed state is likewise no longer an inference:
+`tools/xbox/rng_trace_dump.py` documents kind 16 as
+`seed_before = (anim_state << 8) | old_state`.
+
+### Gate 3 and the threshold are read-only tag data -- eliminated
+
+`FUN_001a4c50`'s prologue resolves what `[ebp-8]` is:
+
+    0x1a4c69  push 0x62697064        ; 'bipd'
+    0x1a4c6e  call 0x1ba140          ; tag_get(group, index)
+    0x1a4c73  mov  edx, eax
+    0x1a4c81  mov  dword ptr [ebp-8], edx
+
+`[ebp-8]` is the **biped tag definition pointer** -- map content, byte-identical
+on both machines, written once at once at load. There is exactly one write to
+the slot in the whole function. Therefore:
+
+- Gate 3, `test dword ptr [ecx+0x17c], 0x100000` with `ecx = [ebp-8]`, **cannot
+  differ between the two machines. Eliminated.**
+- The gate-2 threshold, `fld dword ptr [eax+0x4c8]` with `eax = [ebp-8]`, is
+  also identical. So is the alternative `fld dword ptr [0x28ace8]`, a constant.
+  Only the *other* `fcomp` operand -- the facing cosine at `[ebp-0xc]`, which
+  ported code computes -- can differ.
+- `test bl,1` at `0x1a5117` reads `[edx+0x2f4]`, tag flags from the same
+  pointer. Also identical, also eliminated.
+
+### The gate list was incomplete -- corrected from a clean boundary
+
+Disassembling from the jump target `0x1a5061` (starting at `0x1a5130` decoded
+mid-instruction and invented operands -- the same trap recorded earlier in this
+document) shows more runtime gates than previously published:
+
+    0x1a5109  al = [esi+0x42a];  cmp al,1;  je  0x1a51aa      RUNTIME
+    0x1a5117  test bl,1          -> 0x1a51aa                  tag, eliminated
+    0x1a5120  test al,al         -> exit 0x1a52f9             RUNTIME (+0x42a)
+    0x1a5128  al = [ebp-2];      test al,al -> exit           RUNTIME (local)
+    0x1a5133  eax = [esi+0x1b4]; test ah,0x40 -> exit         RUNTIME
+    0x1a5142  eax = [esi+0x1b8]; test ah,1    -> exit         RUNTIME
+    0x1a5151  test al,0x20       threshold select             (both operands tag)
+    0x1a5169  fcomp st(1)  + test ah,5 + jp                   FLOAT
+    0x1a5177  test [ecx+0x17c],0x100000                       tag, eliminated
+    0x1a5183  setne dl; add dl,2 -> writes state 2 or 3
+
+`esi` is the unit object. The surviving runtime integer gates are `+0x42a`,
+`+0x1b4` bit 0x4000, `+0x1b8` bit 0x100, and the local `[ebp-2]`.
+
+### The immediate caller is ported and writes one of the gates
+
+`FUN_001a6350` (`src/halo/units/units.c`) is the per-tick biped dispatcher and
+the direct caller of `FUN_001a4c50`. It is ported, and in the same block it
+
+- normalizes the desired-facing vector at `+0x1d4` (`units.c:1053-1063`) -- one
+  of the two vectors whose cosine gate 2 compares, and
+- writes `+0x42a` from the animation state at `+0x253` (`units.c:1068-1083`) --
+  a surviving runtime gate.
+
+The x87-narrowing detector does **not** flag `FUN_001a6350`, nor `normalize3d`.
+Of the fork's upstream chain only two functions are flagged:
+
+    FUN_0002bd80  src/halo/ai/actor_moving.c   ours  4, xbe 15  (-11)
+    FUN_001a2160  src/halo/units/bipeds.c      ours  1, xbe  3   (-2)
+
+which is the ranking already recorded above, now with the caller ruled out.
+
+### Detector fix: unported thunks were 30% of the findings
+
+`check_x87_narrowing.py` was comparing `unported_thunks.c` entries -- JMP-only
+stubs containing no FPU code at all -- against real XBE functions, so every
+unported function scored "ours 0" and sorted to the top. 63 of the 207 reported
+findings were this artifact. With `unported_thunks.c.obj` skipped the run is
+**5375 compared, 144 MISSING-NARROWING**. Quote 144, not 207.
+
+### The `+0x42a` gates are eliminated too -- by measurement plus a table check
+
+`+0x42a` is written *only* by the ported `FUN_001a6350` switch, as a pure
+function of the animation state at `+0x253`. Two independent facts close it.
+
+**The switch is correct.** The XBE compiles it as a jump table:
+
+    0x1a64b8  movsx eax, byte ptr [esi+0x253]
+    0x1a64bf  cmp   eax, 7
+    0x1a64c2  ja    0x1a64e4                 ; unsigned -- negatives take default
+    0x1a64c4  movzx ecx, byte ptr [eax + 0x1a67a4]
+    0x1a64cb  jmp   dword ptr [ecx*4 + 0x1a6798]
+
+    index table @0x1a67a4 : [0, 2, 0, 0, 1, 1, 1, 1]
+    jump targets @0x1a6798: 0x1a64db -> +0x42a = 0
+                            0x1a64d2 -> +0x42a = 1
+                            0x1a64e4 -> +0x42a = 2  (also the `ja` default)
+
+So the original maps `0,2,3 -> 0`, `4..7 -> 1`, `1 and everything else -> 2`.
+Our C (`units.c:1068-1083`) is `case 0,2,3 -> 0`, `case 4,5,6,7 -> 1`,
+`default -> 2`, with `anim_state` declared `signed char`. State 1 falls to our
+`default` and to their index-2 arm, both giving 2. **Identical, including the
+negative-state case.** No bug here.
+
+**`+0x253` was identical at 6627.** The kind-16 probe payload decodes as
+
+    0f b7 c2                movzx eax, dx                 ; new state
+    c1 e0 08                shl   eax, 8
+    0f b6 8f 53 02 00 00    movzx ecx, byte ptr [edi+0x253]   ; OLD state
+    09 c8                   or    eax, ecx
+
+so the low byte of `seed_before` is `+0x253` read live at each call. Comparing
+the full `(tick, unit, new, old)` tuple across the paired capture: 171 client
+records, 169 host, **zero host-only**, and the two client-only records are the
+excursion itself. For the excursion unit `0xe3c20037`:
+
+    CLIENT  (6625, 21<-255)  (6626, 0<-21)  (6627, 3<-0)  (6633, 0<-3)
+    HOST    (6625, 21<-255)  (6626, 0<-21)
+
+Both machines set `+0x253 = 0` at tick 6626 and neither writes it again before
+6627. State 0 maps to `+0x42a = 0` on both. Therefore at the fork:
+
+    0x1a5109  cmp al,1   -> not taken on either machine
+    0x1a5120  test al,al -> not taken on either machine
+
+**Both `+0x42a` gates passed identically. Eliminated.**
+
+### `[ebp-2]` traced
+
+    0x1a4f59  al = [esi+0x257]
+    0x1a4f5f  test al,al
+    0x1a4f61  [ebp-2] = 0
+    0x1a4f65  je 0x1a52f9        ; +0x257 == 0 -> exit
+    0x1a4f6b  cmp al,5
+    0x1a4f6f  [ebp-2] = 1        ; only when +0x257 == 5
+
+`[ebp-2]` is not independent state: it is `(+0x257 == 5)`.
+
+### Where that leaves the fork
+
+Eliminated: gate 3, the gate-2 threshold, `test bl,1` (all tag data); both
+`+0x42a` gates (measured identical). Still unaccounted for, all runtime unit
+fields nobody has captured:
+
+    +0x257                (via [ebp-2], and the 0x1a4f65 early exit)
+    +0x1b4 bit 0x4000
+    +0x1b8 bit 0x100
+    the fcomp at 0x1a5169 -- facing cosine vs tag threshold
+
+The float gate is now the *largest* surviving candidate rather than the only
+one, and it is the only one whose input ported code computes through the FPU.
+
+**Probe placement, corrected:** a probe at `0x1a5169` only fires if the original
+reaches it, so on the host it would record nothing and name no gate. Probe the
+top of the chain at `0x1a5109` instead, logging `+0x42a`, `+0x257`, `+0x1b4`,
+`+0x1b8` in one payload -- it fires unconditionally on both machines and the
+diff names the gate directly. A second probe at `0x1a5169` then supplies the
+two `fcomp` operands when the chain is reached.
+
+### Scope of the seed-stream proof
+
+The wide tick-keyed comparison was `385 / 397` agreeing, where the 12
+disagreements are all at ticks >= 6634 and the comparison used only the *first*
+draw of each tick. The one-for-one value alignment above comes from the
+6600-6645 zoom, which covers the high-volume ticks in full. The whole proof is
+scoped to ticks >= 591 because the 65536-record ring had wrapped on both sides.
+
+## Gate capture, 2026-09-06: all four remaining integer gates agree; the float does not
+
+Both machines ran with the new probes (client `c3768a1c3`, host
+`host_rng_probe.xbe` with binary probes at `0x1a5109` and `0x1a5142`). The
+desync reproduced. Scoped to the desynced game:
+
+    shared draw ticks           293  (0 .. 1596)
+    agree                       282
+    first divergent seed tick   1478
+    transitions before 1478     client-only: (1474, 0xe33a0035, new=2 old=0)
+                                host-only:   none
+    gate snapshots compared     5579
+    gate snapshots differing    0
+
+**Zero.** Every time both machines reach the fork for the same unit on the same
+tick, all four surviving runtime gate inputs are identical. At the causing tick:
+
+    t=1474  CLIENT  +0x42a=0  +0x257=2  +0x1b4&0x4000=0  +0x1b8&0x100=0
+    t=1474  HOST    +0x42a=0  +0x257=2  +0x1b4&0x4000=0  +0x1b8&0x100=0
+
+So the integer gates are exonerated by measurement, not by argument. **The
+`fcomp` at `0x1a5169` is the only remaining difference.**
+
+### And the float gap is gross, not sub-ULP
+
+The host probe recorded the compared operand. For that unit, on every tick from
+1474 onward:
+
+    probe:turn_cosine  bits=0x3f800000  = 1.0   (exactly)
+
+The threshold is `0.99` (`0x3f7d70a4` at `0x28ace8`), i.e. the cosine of about
+8.1 degrees. Working the branch:
+
+    fld dword [ebp-0xc]     ; ST(0) = cosine
+    fcomp st(1)             ; vs threshold
+    fnstsw ax               ; C0 -> ah bit 0, C2 -> ah bit 2
+    test ah,5               ; C0|C2
+    jp 0x1a5193             ; PF=1 (C0=0, cosine > threshold) -> SKIP the turn
+
+The host's biped was facing **exactly** where it wanted to face, so it correctly
+skipped the turn-in-place animation. Our client took the transition, so our
+cosine was **below 0.99** -- more than eight degrees of facing error against the
+original's zero.
+
+**This retires the sub-ULP precision hypothesis for this site.** A last-bit
+rounding difference cannot move a cosine from 1.0 to below 0.99. Our biped's
+current facing (`+0x24`) and desired facing (`+0x1d4`) genuinely diverge, by a
+visible angle, where the original holds them identical. The x87-narrowing lane
+is not the explanation here; something in the ported facing update is wrong by
+a wide margin, and the knife-edge reading of the six-tick excursion was the
+wrong model.
+
+Two caveats on this run:
+
+- The threshold is selected by `test al,0x20` on `+0x1b8` (`0x1a5151`). Bit 0x20
+  set uses the `0.99` constant; clear uses the tag value at `+0x4c8`. The gate
+  probe records bit 0x100, not bit 0x20, so which threshold applied is not yet
+  captured. It does not change the conclusion: the host was at exactly 1.0 and
+  did not fire.
+- Only the host records `probe:turn_cosine`. `[ebp-0xc]` lives inside the
+  unported fork, so the client needs its own binary probe, or an equivalent
+  value computed in the ported caller, to state our cosine as a number rather
+  than as an inequality.
+
+Note the transition state was **2** this run and **3** in repro B. `setne dl;
+add dl,2` selects on `[ebp-1]`, the turn direction, so that difference is which
+way the biped turned, not a different fault.
+
+## RETRACTED: "our build desyncs against itself"
+
+**Struck 2026-09-06, same day.** The user later reported the opposite: the same
+patched build on both machines does **not** desync. The section below is kept
+for the record but its conclusion is wrong.
+
+Most likely reconciliation, consistent with every observation: the earlier
+patched-against-patched test ran two patched builds at *different revisions*.
+Different code desyncs. Identical code does not.
+
+    pristine    vs pristine    -> no desync
+    patched X   vs patched X   -> no desync   (measured, clean-run baseline below)
+    patched     vs pristine    -> desync      (all captures in this document)
+    patched X   vs patched Y   -> desync      (the misread test)
+
+So the simulation is deterministic and the original framing holds: our code
+computes a different value than the original. The non-determinism hypotheses
+below (uninitialized stack, pointer values, timing) are not supported and are
+not being pursued. The clean-run baseline that follows this section is still
+valid and still useful -- it shows the probes agree bit for bit when both
+machines run identical code, which is the control the instrument needed.
+
+## Superseded reframe: our build desyncs against ITSELF
+
+User report, and it changes the target of the whole investigation:
+
+- pristine `cachebeta` against pristine `cachebeta` -- **no desync**
+- our patched build against our patched build -- **desyncs, either machine hosting**
+- our patched build against pristine -- desyncs (all captures above)
+
+Two *identical* binaries cannot diverge in a lockstep simulation unless the
+simulation is non-deterministic. So the framing used up to this point -- "our
+code computes a different value than the original" -- was wrong, or at least
+incomplete. The defect is that our code computes a different value **than
+another copy of itself**.
+
+That narrows the mechanism class sharply. A deterministic difference from the
+original would reproduce identically on both of our machines and could not
+desync them against each other. What can differ between two machines running
+the same image:
+
+1. **A read of uninitialized stack memory.** The two machines run different
+   non-simulation code between ticks (rendering, audio, input, network), so
+   stale stack contents differ. This is the classic cause.
+2. **A read of uninitialized pool or heap memory** -- a struct field the
+   original initializes and we do not. A `pad_` field that turns out to be read
+   is exactly this bug.
+3. **A pointer value used in arithmetic.** Addresses need not match.
+4. **Dependence on wall-clock or frame timing rather than tick count.**
+
+The facing evidence still stands and becomes more useful: with both machines
+running our build, both log the reconstructed cosine (kind 21) and the forward
+z (kind 22) from source. No binary patch is needed, and any difference between
+the two is by definition our own non-determinism.
+
+### Uninitialized-read sweep: 51 warnings, top candidates are false positives
+
+    clang -Wconditional-uninitialized -Wuninitialized   (full tree, gnu90)
+    -> 51 warnings; artifacts/scratch/uninit.txt
+
+Concentrations: `encounters.c` 9, `units.c` 7, `objects.c` 7,
+`breakable_surfaces.c` 6, `model_animations.c` 3.
+
+The animation-path hits looked promising and are **not** bugs. Both
+`units.c:247/277/298` (`has_rotation`, `has_translation`, `has_scale`) and
+`model_animations.c:1385/1404/1429` (`local_14`, `local_1c`, `local_20`) load
+inside `if ((node_idx & 0x1f) == 0)` in a loop whose index starts at zero, so
+the first iteration always initializes them. clang cannot prove the loop runs
+at least once with index 0. The remaining 45 are unreviewed.
+
+This sweep is worth keeping as a standing check, but it did not find the fault.
+
+### Clean-run baseline, and the `f.z` hypothesis is refuted
+
+Both machines on our build, one full game, no desync. Scoped to that game:
+
+    tick range              2417 .. 4589 on both
+    seed ticks compared     418, all agreeing
+    probe:turn_cos_c        7454 compared, 0 differing
+    probe:turn_fwd_z        7454 compared, 0 differing
+    probe:turn_gates        7454 compared, 0 differing
+
+So when the game does not desync, the two machines agree bit for bit on every
+value this fork reads. The instrument is sound and any difference in a
+desyncing run is real.
+
+**`f.z` is always exactly zero in our build** -- 7454 of 7454 samples, min and
+max both 0. The hypothesis that a non-zero forward z was dragging the 2D dot
+below the threshold is therefore **wrong**. Our cosine falls below 0.99 because
+the biped genuinely is turning in the XY plane, which is the normal case: 1292
+of 7454 samples sit below the threshold in an ordinary game.
+
+What remains is unchanged: get a desyncing run with these probes on both
+machines. The first differing `probe:turn_cos_c` names the tick and unit, and
+from there the question is which input to the facing update went wrong.
+
+## The caller-side cosine reconstruction is INVALID: the fork updates `+0x24` first
+
+Kind 21 samples `+0x1d4` and `+0x24` in the ported caller, immediately before
+`FUN_001a4c50`. That is not equivalent to what the fork compares, because the
+fork **writes the current facing in place** before computing the cosine:
+
+    0x1a4dd5  lea ecx, [esi + 0x24]          ; ecx = current facing
+    ...                                       ; (no reassignment of ecx)
+    0x1a4f08  mov eax, [ebp-0x20]
+    0x1a4f0b  mov edx, [ebp-0x1c]
+    0x1a4f0e  mov [ecx],   eax               ; <-- turns the biped
+    0x1a4f13  mov [ecx+4], edx
+    0x1a4f16  mov [ecx+8], eax
+    ...
+    0x1a5061  lea eax, [esi + 0x1d4]         ; only now is the cosine built
+    0x1a50cd  fstp dword ptr [ebp-0xc]
+
+So kind 21 reads the facing one update too early. It is correct only for a
+biped that is not turning, where the write is a no-op.
+
+The paired capture shows exactly that signature, and it is the reason the
+control failed:
+
+    unit 0xe2710002   128 samples   128 identical   every value exactly 1.0
+    unit 0xe2740005   128 samples   128 identical   every value exactly 1.0
+    unit 0xe27a000b   128 samples   128 identical   every value exactly 1.0
+    unit 0xe2770008   128 samples     0 identical   the only unit that moves
+
+**All 384 agreeing samples are the constant 1.0 from stationary bipeds.** This
+is the vacuous-agreement trap: a control that passes only where the quantity
+under test is constant proves nothing. The one moving unit disagreed on every
+sample, and that disagreement is the probe's error, not a simulation
+divergence. No conclusion about our simulation can be drawn from this capture.
+
+Kinds 23 to 27 (the raw components) have the same defect and are equally
+invalid; they sample the same pre-update values.
+
+**Correct fix:** the client needs the same *binary* probe the host has, at
+`0x1a5142`, reading `[ebp-0xc]`. `FUN_001a4c50` is unported in our build too,
+so the identical patch applies at the identical address. The obstacle is cave
+space: `build_original_probes.py` hides its caves inside
+`unit_update_animation`'s body, which is dead in the baseline build but live in
+ours. Our build needs a dedicated reserved buffer instead.
+
+## MEASURED 2026-09-06: our desired facing never leaves the current facing
+
+First capture with a binary probe on BOTH machines at the same instruction
+(client `tools/xbox/patch_fork_probes.py`, host
+`artifacts/rng_trace/build_original_probes.py`), kind 20 = `[ebp-0xc]` at
+0x1a5142, the operand of the fork's `fcomp`.
+
+    client: 2 distinct cosine values in the whole game
+              0x3f800000 (1.0)          384 samples
+              0x3f7fffff (0.99999994)   128 samples
+    host:  19 distinct values, a real sweep -0.986 .. +0.998 .. -0.99
+
+    shared (tick,unit) cosine keys 511, DIFFERING 127
+    unit 0xe2770008, ticks 2..22: client 1.0 flat, host swings through a
+    full turn (-0.986 -> +0.998 -> +0.924)
+
+Each of the four units is pinned to ONE bit-exact value for all 130 ticks.
+A cosine that never moves off 1.0 by even an ulp means the fork is dotting a
+vector with itself.
+
+The gates are NOT the difference. Same capture, same probe pair:
+
+    shared gate keys 520, DIFFERING 2 (t=1 and t=5, one unit, one-tick phase)
+    every sample: +0x257=2, +0x1b4&0x4000=0, +0x1b8&0x100=0
+
+### Why 1.0 is the self-dot signature
+
+Disassembly of the fork at 0x1a5061..0x1a50cd:
+
+    0x1a5061 copy (+0x1d4,+0x1d8,+0x1dc) to [ebp-0x20], force z = 0
+    0x1a5083 call 0x12f10 (normalize3d), returns length in ST0
+    0x1a5088 fcomp [0x2533c0] ; test ah,0x44 ; jp 0x1a50ac
+             -> length == that constant falls through to the FALLBACK
+    0x1a5098 fallback: copy the CURRENT facing (+0x24) over [ebp-0x20]
+    0x1a50ac cross-z  = d.x*f.y - d.y*f.x            -> [ebp-1] turn direction
+    0x1a50bc cosine   = d.x*f.x + d.y*f.y            -> [ebp-0xc] COMPARED
+    0x1a50e4 fcomp [0x2568c0] ; test ah,5 ; jp 0x1a5109
+
+With d = f the cosine is f.x^2 + f.y^2, which is 1.0 for a normalized facing
+with f.z = 0 (and 0x3f7fffff for one that is an ulp short). So on our build the
+desired facing either normalizes to zero, or already equals the current facing.
+
+### The producer chain, traced to one field
+
+Every instruction in .text that references offset 0x1d4 was decoded (50 sites)
+and mapped to its kb.json function. The per-tick writer is `unit_set_control`
+(0x1af990, ported), at 0x1afcfb:
+
+    unit+0x1d4 <- control+0x1c        (facing_vector)
+    unit+0x1e0 <- control+0x28        (aiming_vector)
+    unit+0x204 <- control+0x34        (looking_vector)
+
+Our C at units.c:10273 matches the original store-for-store. The fault is
+upstream of it. Two producers fill that control block:
+
+    AI     actors.c:7652   control+0x1c <- actor->output_facing_vector (+0x718)
+    player players.c:3074  control+0x1c <- unit+0x1d4 (a self-copy, input off)
+
+and `output_facing_vector` has exactly one writer, actor_looking.c:9303, which
+stores `actor->control_desired_facing_vector` (+0x5a4). That field is written
+by actor_moving.c in three places:
+
+    3686  = actor->input_facing_vector (+0x174)   <- THE DEFAULT, self-facing
+    3837  = normalized (actor+0x12c - actor+0x6a8), guarded by normalize3d != 0
+    3924  = -vec_scratch, vehicle-stuck arm
+
+Line 3686 is the default assignment at the top of the function: desired facing
+:= input facing. Our measurement is exactly what that default produces if no
+later branch overwrites it. `FUN_0002bd80` (actor_moving) was already suspect
+number 1 from the x87-narrowing ranking, reached independently.
+
+### Open, and the next measurement
+
+Which link breaks is NOT yet measured. Three candidates, in order:
+
+1. actor_moving never leaves the 3686 default (a branch condition is wrong).
+2. actor_look_update overwrites +0x5a4 or fails to propagate it.
+3. the units are player bipeds, not actors, and players.c takes the
+   input-disabled arm at 3063 -- which self-copies the facing and would also
+   pin the cosine. Settle this first: it changes which file to read.
+
+A CLIENT-ONLY probe answers 1 and 2 -- no host run needed, because the host's
+behaviour is already measured. Record, per tick and unit: actor+0x5a4,
+actor+0x174, actor+0x718, and unit+0x1d4. If +0x5a4 == +0x174 always, the break
+is in actor_moving. If +0x5a4 moves but unit+0x1d4 does not, it is downstream.
+
+Captures: artifacts/rng_trace/cos_{c,h}.json, dbg2{1,4}_cos.txt.
+Scripts: artifacts/scratch/{cos_cmp,gate_cmp,find_1d4}.py.
+
+## MEASURED 2026-09-06 (evening): the facing pinning does NOT reproduce solo
+
+Client-only capture, build `7b0dd1fcd` + `patch_fork_probes.py`, campaign c40,
+single console, no host, no desync required.  Probes 28/29/30 record
+`unit+0x1d4`, `unit+0x24` and the full `unit+0x1b4` flag word immediately before
+the `FUN_001a4c50` call in `FUN_001a6350`.  Capture:
+`artifacts/rng_trace/solo_facing.json` (43643 records, 2794 samples per probe).
+
+    unit                 n    eq  uniq_desired  uniq_current
+    handle=0xe52c00ce  163     1           129            81
+    handle=0xe52f00d1  163     2            92            72
+    handle=0xe53200d4  163     1           108            72
+    handle=0xe53500d7  163     2           116            93
+    (5 further units held one value for all 162 samples -- stationary)
+
+    probe:turn_cosine  128 samples, 68 distinct, range 0.309026 .. 1.000000
+
+Four bipeds sweep a real turn.  Compare the system-link capture from the same
+day: the client held 2 distinct cosine values for the whole game and each of its
+four units was pinned to ONE bit-exact value for all 128 samples.
+
+**Conclusion: our engine turns bipeds correctly.  The pinning is specific to the
+system-link game, not a local defect.**  That removes the AI path
+(`actor_moving.c` 3686/3837/3924) as the suspect for the pinning: c40 exercises
+it and it sweeps.
+
+The desync capture ran on `levels\test\prisoner\prisoner`, a multiplayer map with
+no AI actors, so its four units were PLAYER bipeds, which take the `players.c`
+path instead.  Its input-disabled arm (`players.c:3043-3089`, gated on
+`players_globals+0x29 != 0`) copies `unit+0x1d4..0x1dc` into the control it then
+feeds to `unit_set_control`, which writes them straight back to `unit+0x1d4`.
+That freezes the desired facing.  A biped whose desired facing already equals its
+current facing then never turns, so both stay frozen -- exactly the measured
+symptom.
+
+`players_globals+0x29` has exactly one writer, `player_input_enable`
+(`players.c:299`), called from `cinematics.c:35/261` and from the script host in
+`hs.c`.  A multiplayer game runs no cutscene, so the byte should be 0.
+
+NOT YET MEASURED, and the next step: probe `players_globals+0x29` and which arm
+`players.c` takes, per player per tick, then capture one system-link game.  Until
+that runs, "our client takes the input-disabled arm in MP" is a hypothesis built
+on a chain of inference, not a measurement.
+
+## CORRECTION 2026-09-06 (late): the section above overstates its evidence
+
+The section above says the solo capture showed four bipeds sweeping the turn
+cosine.  That is wrong.  Those four handles came from probe kinds 28/29
+(`desired_x` / `current_x`), not from `probe:turn_cosine`.  Re-reading
+`artifacts/rng_trace/solo_facing.json` by kind gives a different picture:
+
+    solo       gates=2924  cosine=128   one unit only, 0xe45f01f0
+               0xe45f01f0  128 samples, 68 distinct, 0.309026 .. 1.000000
+
+One unit sweeps solo, not four.  The claim "our engine turns bipeds correctly"
+was therefore built on the wrong column.  What the solo run does still prove is
+narrower and still useful: our build CAN produce a non-1.0 cosine.
+
+The section above also asserts the four pinned MP units "were PLAYER bipeds".
+That was never checked.  The handle indices support it but do not prove it: the
+four MP units are 0xe271**0002**, 0xe274**0005**, 0xe277**0008**, 0xe27a**000b**
+-- object indices 2, 5, 8, 11, evenly spaced by 3, allocated first.  The two
+others, 0xe45f0**1f0** and 0xe52c0**2b0** (indices 496 and 688), are a different
+family and appear in the solo capture too.  Treat "player biped" as a strong
+lead, not a fact.
+
+## MEASURED 2026-09-06 (late): the client never produces a non-1.0 cosine
+
+Re-reading the paired MP capture (`artifacts/rng_trace/cos_c.json`,
+`cos_h.json`) by kind and by unit:
+
+    mp_client  847 cosine samples over 6 units -- every one exactly 1.0
+    mp_host   1848 cosine samples over 6 units -- two units vary:
+               0xe2770008  17 distinct, -0.986069 .. 0.998360
+               0xe45f01f0  14 distinct,  0.976600 .. 1.000000
+
+A cosine pinned at exactly 1.0 is the self-dot signature: `unit+0x1d4` equals
+`unit+0x24`.  On our client that holds for every unit, every tick, with no
+exception in 847 samples.
+
+Two gate findings, both of which REMOVE suspects rather than adding one:
+
+1. `f257` (`unit+0x257`, bits 8-15 of kind 19) explains the units that never
+   reach the cosine at all.  Every unit with `f257 == 3` reaches it 0% of the
+   time, on the client, on the host, and solo.  That early exit is shared.  It
+   is not the divergence.
+
+2. The apparent "client reaches the cosine 29% of the time, host 99%" is an
+   artifact of mixing two probes.  The client emits kind 19 from BOTH the
+   source-level probe in the ported caller (`object_update+242`) and the binary
+   probe in the fork (`FUN_001a4c50+1209`); the pristine host has only the
+   second.  Counting the fork probe alone, both machines reach the cosine on
+   ~99% of fork entries.  There is no gate divergence.
+
+3. There is no per-tick call-count difference either.  An earlier draft of this
+   section reported the host entering the fork twice per tick against the
+   client's once.  That was a segmentation error.  Both rings wrapped
+   (write_index 71991 and 73943 against capacity 65536), the tick counter
+   resets at every `game_initialize_for_new_map`, and grouping by `tick` alone
+   merged several map instances.  The host's retained window holds the SAME
+   instance twice: segments `[58235:61873]` and `[61898:65536]` produce
+   identical per-unit counts and identical cosine histograms.  Split at the
+   markers, both machines enter the fork once per tick.  Always segment these
+   captures at `game_initialize_for_new_map` before counting anything.
+
+## The divergence, measured within one map instance
+
+Client segment `[62585:65511]`, ticks 0..129, against host segment
+`[58235:61873]`, ticks 0..213.  Same four unit handles, so the same game
+instance and the same objects.  One fork entry per tick on both sides.
+
+    unit          client distinct cos      host distinct cos
+    0xe2710002    1  (1.000000 x128)       1  (1.000000 x212)
+    0xe2740005    1  (1.000000 x128)       1  (1.000000 x212)
+    0xe2770008    1  (1.000000 x128)      17  (0.924332 x144, -0.986069 x2, ...)
+    0xe27a000b    1  (1.000000 x128)       1  (1.000000 x162)
+
+And in the earlier instance, client `[43722:62559]` against host
+`[41770:58209]`:
+
+    0xe45f01f0    1  (1.000000 x167)      14  (1.000000 x180, 0.979389 x1, ...)
+    0xe52c02b0    1  (1.000000 x168)       1  (1.000000 x159)
+
+Three of the four units in the later instance agree at 1.0 on both machines, so
+1.0 is a normal value: it is what a biped that is not turning produces.  The
+divergence is that for 0xe2770008, and for 0xe45f01f0 in the earlier instance,
+the host produces a varying cosine over a sustained run of ticks while our
+client produces exactly 1.0 and never anything else.  0xe2770008's host value
+sits at 0.924332 for 144 of its 164 ticks, so any overlap with the client's
+130-tick window should have shown it.
+
+This also disposes of the host-extra-pass alternative, and it does so without
+having to assume which pass corresponds to the client's entry.  There is only
+one pass per tick on each machine.  The host varies within that single pass and
+the client does not.
+
+Across the whole capture our client emitted 847 cosine samples over six units
+and every one of them was exactly 1.0.  A cosine of exactly 1.0 is the self-dot
+signature: `unit+0x1d4` equals `unit+0x24`.  On our client that holds without a
+single exception.
+
+## What is still not excluded
+
+These two captures still differ in two variables, not one: patched build AND
+client role, against pristine build AND host role.  The pinning could be stock
+client behavior for a unit the client does not simulate authoritatively.
+
+The control that separates them is
+`artifacts/rng_trace/host_rng_baseline.xbe`, a build with every ported function
+deactivated except the ring-logger keep-list -- original game code carrying our
+trace ring.  Deploy it to the CLIENT slot (10.0.0.21), let 10.0.0.24 host, and
+capture one game.
+
+- If that baseline client also pins every cosine at 1.0, the pinning is stock
+  client behavior and the cosine lead dies.
+- If the baseline client varies where ours does not, the pinning is ours, and
+  the writer of `unit+0x1d4` on the client path is the target.
+
+The `players.c` input-disabled-arm hypothesis in the section above is NOT
+supported by anything measured here.  Its two supports both failed: the four MP
+units are only inferred to be player bipeds from their handle indices, and the
+solo "four sweeping bipeds" that motivated eliminating the AI path was the wrong
+probe column.  Treat it as unranked until the control run says the pinning is
+ours at all.
+
+## VERIFIED 2026-09-06: the host capture really did run original code
+
+The control-run plan assumed `cos_h.json` came from a build with our ports
+deactivated.  That assumption was never checked.  It is now, and it holds.
+
+`rng_trace_dump.py` records a `caller_space` field per record: `"xbe"` when the
+return address falls in the original image, `"impl"` when it falls in our
+appended code.  Every host record is `"xbe"`:
+
+    cos_h.json  probe:anim_update_in   unit_update_animation  0x1b0f5d  xbe
+                probe:unit_state       unit_update_animation  0x1b121c  xbe
+                probe:turn_gates       FUN_001a4c50           0x1a5109  xbe
+                probe:turn_cosine      FUN_001a4c50           0x1a5142  xbe
+                random_math_real       FUN_0010a830           0x10a85d  xbe
+
+    cos_c.json  probe:anim_update_in   unit_update_animation  0x6ecc14  impl
+                probe:unit_state       unit_update_animation  0x6ecd8e  impl
+                probe:turn_gates       object_update          0x785742  impl
+                probe:turn_gates       FUN_001a4c50           0x1a5109  xbe
+                random_math_real       FUN_0010a830           0x725563  impl
+
+The host's kinds 16-18 are binary probes patched at original addresses, not
+source-level probes in ported wrappers.  So the host ran original game code and
+the client ran ours.  The measured cosine divergence is not an artifact of both
+machines running the same build.
+
+This also explains why `xbeinfo running` on 10.0.0.24 now reports a patched
+`default.xbe`: `host_diagnostic.py probes` magicboots `rng_probe.xbe` for the
+capture, and any power cycle returns the console to `default.xbe`.  The host
+needs that magicboot again before the control run.  It does not mean the earlier
+capture was taken from the wrong image.
+
+## CONTROL RUN 2026-09-06: the cosine pinning belongs to our build
+
+Configuration: 10.0.0.24 hosted `rng_probe.xbe` (original code, binary probes).
+10.0.0.21 joined on `rng_baseline.xbe` (our build, 5439 ports deactivated, the
+same binary fork probes, `random_math.obj` kept so the ring still records).
+Only one variable changed against the earlier capture: the CLIENT now ran
+original game code.
+
+Provenance self-check passed.  On the client, `probe:turn_gates` came only from
+`FUN_001a4c50` in `xbe` space.  The source-level `object_update` probe of the
+ported build did not appear, so the baseline image really was the running title.
+
+**The game did not desync.**
+
+The baseline client produces non-1.0 cosines, and the two machines agree:
+
+    ctrl_c seg[58439:64822]              ctrl_h seg[34115:63629]
+    0xe2ad003e  9 distinct  1.0 x925     0xe2ad003e  9 distinct  1.0 x1506
+    0xe2a40035  1.0 x303, 0.998661 x1    0xe2a40035  1.0 x303, 0.998661 x1
+    0xe2a70038  1.0 x265                 0xe2a70038  1.0 x265
+    0xe2ee006e  1.0 x113                 0xe2ee006e  1.0 x113
+    0xe2aa003b 14 distinct               0xe2aa003b 15 distinct
+    earlier segment, client only:
+    0xe3ee0037  1.0 x689, 0.959091 x259
+    0xe44e0039  0.974928 x499, 0.819021 x86, 0.034873 x1
+
+Same handles, same values, same counts.  That is lockstep.
+
+Compare the ported client: 847 cosine samples over six units, every one exactly
+1.0.  The pinning is therefore NOT stock client behavior and NOT a role effect.
+It is produced by our lifted code.
+
+A cosine of exactly 1.0 is the self-dot signature, so on our build `unit+0x1d4`
+equals `unit+0x24`.  The target is the writer of `unit+0x1d4` on the client
+path.  Three candidates were named earlier: `unit_set_control`'s producer,
+`FUN_001b3690`'s static arm, and `players.c`'s input-disabled arm.
+
+Captures: `artifacts/rng_trace/ctrl_c.json`, `artifacts/rng_trace/ctrl_h.json`.
+
+### Capturing from a baseline image
+
+`build/halo` is normally a non-trace build, so `rng_trace_dump.py` cannot find
+`halo_rng_trace` and the ring VA must be supplied.  For `baseline_client.xbe`
+the ring sits at 0x803d04, read out of the `rng_trace_note` prologue in the XBE
+rather than from a PE export:
+
+    python3 tools/xbox/rng_trace_dump.py --host 10.0.0.21 \
+        --pe artifacts/rng_trace/session_symbols.pe \
+        --runtime-base 0x646404 --out artifacts/rng_trace/ctrl_c.json
+
+0x646404 = 0x642000 + (0x803d04 - 0x7ff900).  The offset shifts impl-space
+symbol names by the same amount, which is harmless for a baseline capture
+because almost every caller is in `xbe` space.  The host ring stays at
+0x7ff900 and needs only `--pe`.
+
+### The paired rate, which is the number that matters
+
+Per-unit tables understate this.  The right comparison is the non-1.0 cosine
+rate inside one game, client against host:
+
+    run                        client non-1.0        host non-1.0
+    ported   cos_c / cos_h     0/512    0.00%        162/748   21.66%
+    baseline ctrl_c / ctrl_h   30/2136  1.40%        54/3520    1.53%
+
+The baseline pair agrees to 0.13 percentage points.  The ported pair differs by
+21.7 points.  The absolute rate differs between the two games only because the
+players moved differently, so only the within-pair agreement is meaningful.
+
+Zero out of 512 against an expected 21.66% is not a sampling accident.  Our
+ported client does not produce a non-1.0 turn cosine in an MP client role.
+
+### Our build turns correctly in SOLO
+
+`solo_facing.json` carries kinds 28/29/30 from the ported build.  For four AI
+units, `unit+0x1b4` bit 0 is set on every sample and `unit+0x1d4` differs from
+`unit+0x24`:
+
+    0xe52c00ce  n=297  differ 295  equal 2   bit0=1 always
+    0xe52f00d1  n=297  differ 293  equal 4   bit0=1 always
+    0xe53200d4  n=297  differ 294  equal 3   bit0=1 always
+    0xe53500d7  n=297  differ 294  equal 3   bit0=1 always
+    0xe45c01ed  n=296  differ   0  equal 296 bit0=1 always
+    0xe45001e1  n=295  differ   0  equal 295 bit0=1 always
+
+So the static arm is not firing, and our facing pipeline works outside a network
+client role.  The defect is specific to the MP client path.
+
+### `unit_update`'s two arms are a faithful lift, so they are not the defect
+
+Disassembly of 0x1b3690, against `units.c` `FUN_001b3690`:
+
+    1b3741  mov  eax, [ebx+0x1b4]
+    1b3747  test eax, 0x2000000      -> running-blind arm  (matches our C)
+    1b374c  je   0x1b37b1
+    1b37b1  test al, 1               -> static arm when bit 0 is CLEAR
+    1b37b3  jne  0x1b3820
+    1b37ea  lea  ecx, [ebx+0x1d4]    -> writes desired facing from +0x24
+
+Our `else if ((unit[0x6d] & 1) == 0)` reproduces `test al,1 / jne`.  Combined
+with the solo measurement (bit 0 set on every sample), the static arm is not the
+writer that pins the cosine.
+
+Remaining writer of `unit+0x1d4` on a client: `unit_set_control`, which copies
+control data `cd+0x1c` into the unit.  That is the next target.
+
+## The divergence is ONE unit, and three units match bit-for-bit
+
+Raw cosine bits from the paired capture, same map instance:
+
+    unit         cos_h (pristine host)          cos_c (our client)
+    0xe2710002   0x3f7fffff x212                0x3f7fffff x128
+    0xe2740005   0x3f800000 x212                0x3f800000 x128
+    0xe27a000b   0x3f800000 x162                0x3f800000 x128
+    0xe2770008   0x3f6ca109 x144 + 17 others    0x3f800000 x128
+
+Three units agree to the bit, including the one-ULP value 0x3f7fffff.  Our
+cosine arithmetic is therefore exact.  Only `0xe2770008` diverges: the host
+holds 0.924332, a steady 22.4 degree offset between desired facing and body
+forward, while our client holds exactly 1.0.
+
+The earlier "our client pins every cosine at 1.0" framing was too broad.  Three
+of the four units are at 1.0 on BOTH machines because those bipeds are not
+turning.  The finding is one unit, not four.
+
+### Restricting the host to the client's tick window confirms it
+
+Both segments belong to one map instance, so ticks are comparable.  Host ticks
+0..129 against the client's full 130 ticks, `probe:anim_update_in` state[0]:
+
+    unit         host ticks 0..129        client ticks 0..129
+    0xe2710002   0xa8 x128, 0xaa x1       0xa8 x128, 0xaa x1
+    0xe2740005   0xa8 x128, 0xaa x1       0xa8 x128, 0xaa x1
+    0xe27a000b   0xa8 x128, 0xaa x1       0xa8 x128, 0xaa x1
+    0xe2770008   0xa8 x113, 0xbd x15,     0xa8 x128, 0xaa x1
+                 0xaa x1
+
+Same tick range, same unit, same three controls.  The host plays animation 0xbd
+on unit 8 for 15 ticks.  Our client never leaves 0xa8.
+
+The fork gates are identical on both machines for all four units (`+0x42a` mode
+0, `+0x257` = 2, bits 16 and 17 clear), so the fork takes the same path.  The
+difference enters upstream: on our client `unit+0x1d4` never differs from
+`unit+0x24` for unit 8, so no turn is requested and animation 0xbd never starts.
+
+### Leading hypothesis
+
+During that window the player at unit 8 was turning.  The four handles are
+object indices 2, 5, 8 and 11.  If that player sat at the host console, then our
+client is failing to apply a REMOTE player's facing.  That points at the code
+that fills `action_buf` for remote players in `players_update_before_game`
+(`player_control_get_current_actions`, then `player_build_action_update`), not
+at `unit_set_control`, which copies `cd+0x1c` into `unit+0x1d4` faithfully.
+
+`unit_set_actively_controlled` (0x1adf10) was checked against disassembly and is
+a faithful lift, so it is not the source of a cleared bit 0.
+
+Next measurement: a `--rng-trace` build with the existing kind 28/29/30 probes
+at the fork call site in `units.c`, which report `unit+0x1d4`, `unit+0x24` and
+`unit+0x1b4` directly for every unit each tick.
+
+## ROOT CAUSE LOCATED 2026-09-06: unit 0xe2740005 turns one tick late, into the wrong state
+
+Capture: `artifacts/rng_trace/ds_c.json` (our full ported build, `--rng-trace`,
+fork probes) against `artifacts/rng_trace/ds_h.json` (original code, binary
+probes).  Tool: `tools/xbox/rng_first_divergence.py`, which segments both rings
+by map instance before comparing.  `rng_trace_dump.py --diff` cannot do this: it
+aligns at record 0 and reports a false divergence when the rings hold different
+numbers of map instances.
+
+    first diverging tick: 2
+      tick 2
+           unit 0xe2710002  A state 0x0300   B state 0x0300
+        !! unit 0xe2740005  A state -        B state 0x0300
+           unit 0xe27a000b  A state 0x0300   B state 0x0300
+           draw  random_math_real model_animation_choose_random 0x53a5f8a3 | same
+           draw  random_math_real model_animation_choose_random 0xe4d885a6 | same
+        !! draw  -                            | random_math_real ... 0x2de3e0cd
+      tick 3
+        !! unit 0xe2740005  A state 0x0200   B state -
+        !! draw  random_math_real ... 0x2de3e0cd | -
+
+The seed VALUES are identical.  0x53a5f8a3, 0xe4d885a6 and 0x2de3e0cd appear on
+both machines in that order.  The LCG is not the problem.  The draw happens on
+the WRONG TICK, which is enough to fail the per-tick lockstep seed check.
+
+Two of the four units, 0xe2710002 and 0xe27a000b, take state 3 at tick 2 on both
+machines.  Only 0xe2740005 differs, and it differs twice over:
+
+    host    tick 2  animation state 3, animation 0xbd
+    client  tick 3  animation state 2, animation 0xbc
+
+State 2 against state 3 is the turn-in-place direction that `FUN_001a4c50`
+selects.  So the unit turns the other way, one tick late.
+
+### Why: the desired facing arrives one tick late for that unit
+
+Kinds 28/29 read `unit+0x1d4` and `unit+0x24` in the fork's caller:
+
+    client tick 2  0xe2740005  desired 0x3f800000  current 0x3f800000  equal
+    client tick 3  0xe2740005  desired 0x3b6ef322  current 0x3f800000  differ
+
+At tick 2 our client still holds the old desired facing, so no turn is
+requested.  The value arrives at tick 3, by which time the true turn delta has
+changed sign and the fork picks state 2 instead of 3.
+
+The other two turning units get their desired facing on time, so the control
+path works in general.  `unit+0x1b4` is 0x41 for every unit on every sample, so
+bit 0 is set and `unit_update`'s static arm is not involved.  That kills the
+static-arm hypothesis from the previous section for good.
+
+### What this retires
+
+The turn cosine was a symptom, not the defect.  Chasing the cosine writer was
+looking one step downstream of the real event, which is the tick on which
+`unit_set_control` receives the new facing for one specific unit.
+
+The next question is why unit 0xe2740005 alone is late.  The four handles are
+object indices 2, 5, 8 and 11.  Whether index 5 is the client's own local player
+or a remote one decides between a local-prediction ordering bug and a network
+decode ordering bug.
+
+## CORRECTION 2026-09-07: not a timing error -- unit 0xe2740005 spawned at a different point
+
+The "one tick late" reading above is wrong. Re-reading the same captures with
+`rng_first_divergence.py` restricted to the last segment (the ring had wrapped,
+which is why the first dumps broke at the tick-264 marker record):
+
+- Unit 2's desired-facing update lands at tick 3 on BOTH machines. There is no
+  offset between host and client in when control reaches a unit.
+- At tick 2 the host's unit 5 already faces yaw ~89.8 degrees (cos 0.0036); the
+  client's unit 5 faces (1, 0, 0). Same seeds, same inputs, different pose one
+  tick after the unit exists: the two machines placed unit 5 at different spawn
+  points. Unit 5 is the host's second local player; its controller yaw was
+  seeded from its (correctly placed) unit by player_control_new_unit.
+
+The spawn choice is `find_best_starting_location_index`: argmax over
+`pow(random, 0.5) * rating`. The random draws are identical on both machines,
+so the rating must differ. Two functions in the rating chain were mis-lifted
+in `src/halo/game/game_engine.c`:
+
+1. `game_engine_get_distance_rating_for_spawn` (0xad9b0) dropped the FSQRT at
+   0xada4d. It compared distance SQUARED against the 0.25 / 1.0 / 2.0 / 5.0
+   thresholds and fed it into the `(dist - 2.0) * rating * 0.3333` ramp.
+2. `FUN_000adb20` (same-team proximity) computed `fmod(dist, 1.9)` where the
+   original does `pow(1.0 - (dist - 1.0) * 0.2, 0.6)` via _CIpow (0x26c6b0 is
+   the double 0.6; 0x26b678 is an unrelated double), and used `dist < 6.0` for
+   the `FCOMP / TEST AH,0x41 / JP` guard that means `dist <= 6.0`.
+
+Both also lacked the float32 narrowing of `dist` (`FSTP dword [ebp-8]`), which
+`tools/audit/check_x87_narrowing.py` flagged for exactly these two functions.
+
+Why it is intermittent: the ratings only leave 1.0 when another unit is alive
+within ~5 (enemy) or 6 (teammate) world units of a spawn point, and a wrong
+rating only flips the argmax when the random factors of the top candidates are
+close. The RNG draw COUNT is unchanged by the ratings, so nothing shows until a
+flipped spawn moves a unit and that unit's animation choices consume RNG
+differently. That is why the first visible divergence is an animation draw at
+tick 2, not a spawn.
+
+Fix: both functions rewritten against the disassembly, with
+`HALO_FLT_ROUNDTRIP(dist)` after the sqrt. VC71 shape after the fix:
+`FUN_000adb20` 81.1 -> 95.5, `game_engine_get_distance_rating_for_spawn`
+87.5 -> 95.0 (120/120 insns, FPU-WARN and FCOM-WARN cleared). No other function
+in the TU moved.
+
+Not yet confirmed at runtime. Repro needs two xemu instances in a lobby:
+
+    rtk ./tools/xbox/build_deploy_run.sh --xemu-bridged --xbox 10.0.0.21 -- -q --rng-trace
+
+then re-capture ds_h.json / ds_c.json and run `tools/xbox/rng_first_divergence.py`.
+
+## RUN 2 2026-09-07 (after the spawn-rating fix): tick 2 is clean, next divergence at tick 315
+
+Captures: `artifacts/rng_trace/ds2_h.json` (host 10.0.0.24, `host_rng_probe.xbe`,
+ring 0x7ff900) and `ds2_c.json` (client 10.0.0.21, commit 49bce6e75 `--rng-trace`);
+`debug_ds2_21.txt` / `debug_ds2_24.txt`.  `rng_first_divergence.py ds2_h ds2_c`:
+
+- Ticks 0..314 identical, every draw and every unit_state / anim_update probe.
+  The spawn desync at tick 2 is gone.  (The client shows extra `anim_update_in`
+  records from a second call site in `unit_update_animation`, 0x6ecd7a; the
+  host detour only covers the 0x1b0f57 site.  Probe coverage, not a divergence.)
+- Tick 315: `FUN_0009cb90` (effect event) -> `effect_update` -> `object_cause_damage`
+  on both.  Then the HOST damages three more objects, one of them a projectile
+  (`projectile_accelerate` via the damage.c type switch case 5, two draws), the
+  CLIENT damages one more object and stops.  Client damage probes at 315 name
+  only units 0xe2770008 and 0xe2740005, both with damage_scale 0.
+- After 315 the seed streams are the same sequence offset by those four draws
+  until tick 328, where the client's shot kills a unit (`unit_detach_weapon`,
+  `FUN_000460e0`) and the host's does not.  So the whole desync is "an area
+  damage effect at tick 315 found 4 candidate objects on the host and 2 on the
+  client".  Positions or the candidate query differ silently; nothing in the
+  ring shows which objects the host touched.
+
+New probe, kind 31 `probe:damage_target` (value = damage effect tag index
+`damage_params[0]`, caller2 = object handle) at `object_cause_damage` entry on
+both builds: client `src/halo/objects/damage.c` under `HALO_RNG_TRACE`, host
+binary detour at 0x137d20 built by `artifacts/rng_trace/build_original_probes_v2.py`
+on top of the v1 image (`host_rng_probe_v1.xbe`, sha eac7fbae...; the v1 input
+`host_rng_baseline.xbe` was rebuilt for the control run and no longer matches
+sha a2a004b6...).  Unicorn check: registers, flags and every byte at or above
+ESP identical to the original prologue path; record = kind 31, tick, jpt tag,
+handle.  Host image sha 3a838b03..., deployed with `host_diagnostic.py probes`.
+Next capture will list the candidate set on both sides.
+
+## RUN 3 2026-09-07: grenade lands one tick late -- lost float32 narrowing in projectiles.c
+
+Captures `ds3_h.json` / `ds3_c.json` (both builds carry the kind-31 damage probe).
+Identical through tick 1008.  Tick 996: grenade throw (`projectile_accelerate`
+from units.c, same two scatter draws on both).  Host: impact handler
+`FUN_000f90d0` draws at tick 1009; client: the same two draws (same seeds) at
+tick 1010.  The grenade flew a slightly different path.
+
+`check_x87_narrowing.py src/halo/items/projectiles.c` flagged
+`projectile_accelerate` (ours 0 narrowed slots, xbe 3): the original FSTPs the
+squared scatter magnitude before the FSQRT (0xf9001) and the dir[1]/dir[2]
+scatter components (0xf9032/0xf903a) while dir[0]*scale is added wide.  Fixed
+in 0b211d249 together with `FUN_000f7fa0`.  The remaining three flagged
+functions (`FUN_000f9c40` projectile update, `FUN_000f90d0` impact handler,
+`projectile_aim_ballistic`) were aligned site by site in 9e0ddb9cb; the TU now
+reports 0 MISSING-NARROWING and no VC71 score moved.
+
+Checker gap found on the way: `narrowing_slots()` only recognises a reload as
+`fld dword [slot]`; a slot consumed by `fsub/fdiv/fmul/fcomp dword [slot]` is
+invisible, so the reported deltas understate the real gap (four such slots in
+`projectile_aim_ballistic` alone: t_min, two_a, b, V).  Follow-up: extend the
+checker, then re-run it over every TU that touches simulation state.
+
+Run 2's tick-315 case (area damage candidate set 4 vs 2) is most likely the
+same class -- an explosion position that differs in the low bits -- and has
+not been reproduced since the kind-31 probe went in; the next capture that
+shows it will name the objects on both sides.
+
+## RUN 4 (2026-09-07) — first divergence tick 330, area-damage candidate set again
+
+Same class as run 2, now named by the kind-31 `damage_target` probe. A grenade thrown
+at tick 319 detonated at 330. Per damage effect, the set of objects that reached
+`object_cause_damage`:
+
+| effect       | host (pristine)                              | client (ours) |
+|--------------|----------------------------------------------|---------------|
+| `0xe3780204` | `..05`, `..02`, `0xe29c002c` (the projectile) | `..05`        |
+| `0xe37a0206` | `..2b`, `0xe29c002c`                          | `..2b`        |
+
+Missing on the client: `0xe2710002` and `0xe29c002c`. Two candidate causes, both
+inside the ported `FUN_00138e30` area-damage path:
+
+1. the ported radius query (`object_find_in_radius` → `structure_find_in_cluster` /
+   `object_find_in_cluster`) returned fewer candidates (x87 narrowing checks on those
+   are clean, so if it is this, it is something else);
+2. the unported applier `FUN_00138900` rejected the candidates, most likely via the
+   ported LOS test `FUN_0014df70`.
+
+**Instrumentation added (both sides):** kind 32 `radius_hit`, recorded at the accept
+branch of `object_find_in_radius` (client: `objects.c` before
+`out_handles[found_count] = handle`; host: detour 6 at 0x141793, cave impl+0x460,
+unicorn-verified register/flag/stack-preserving). Record: value = `found_count`,
+caller2 = accepted object handle. Comparing the kind-32 sets at the divergent tick
+decides between (1) and (2). Host image sha256 73efbe99…, 6 patches. Client commit
+adcc6dc30.
+
+## RUN 5 (2026-09-07) — tick 1099, radius query is NOT the cause
+
+Kind-32 `radius_hit` sets at tick 1099 are identical on both sides (29 objects,
+same order except a 4-entry cluster-list permutation at slots 0xd..0x10). The
+grenade `0xe2cf0004` is in both lists, yet only the host applies damage to it
+(both effects). So the reject happens inside the unported applier `FUN_00138900`:
+for a projectile (not biped/vehicle) the only reject before `object_cause_damage`
+is the LOS test `FUN_0014df70` (ported, VC71 84.9%) returning "hit". Static review
+of `FUN_0014dce0` and `object_get_root_parent` matched the binary; the candidate
+set inside the LOS chain (BSP test, `FUN_0014cb00`, sphere test, zone tracking) is
+too large to read, so both sides got a kind-33 `los_result` probe at the LOS exit:
+value = `(result<<16) | collision_result.type`, caller2 = hit-t float bits,
+guarded to calls returning into `FUN_00138900` (the render path calls the LOS test
+thousands of times per frame and flooded the ring in run 6).
+
+Host detour lessons: the second epilogue is entered mid-way by three `JE 0x14e62b`
+branches, so a 6-byte detour at 0x14e628 crashed the host (EIP 0x14e62c, landed
+inside the JMP). Fix: redirect the first epilogue into the second and detour once
+at 0x14e62b (stolen POP EDI/ESI/EBX; MOV ESP,EBP). Always scan for branches that
+land inside the stolen range before installing a detour.
+
+Run 6 host data was lost (host rebooted by a redeploy before the dump).
+Host image sha256 ca16e603…, 8 patches. Client commits 12990c7d1, 2e7d0e1fb.
+
+## RUN 7 / RUN 8 (2026-09-07) — LOS reject flips both ways; origin identical
+
+Run 7 (tick 966) and run 8 (tick 751) are the same event with opposite outcomes:
+the LOS test for one projectile candidate (`0xe2ae0039` / `0xe2bb0039`) returns
+"hit at t=0, structure BSP" on one box and "miss" on the other. Run 7: host miss,
+client hit. Run 8: host hit, client miss. The kind-34 `damage_origin` probe shows
+the explosion origin (x, y) bit-identical on both sides in run 8, and the
+`radius_hit` candidate sets and order are identical.
+
+Everything downstream of the origin is either original code on both boxes
+(`FUN_00138900`, the bsp3d traversal `FUN_00148eb0`) or a ported leaf verified
+against the binary and against our clang codegen: `collision_bsp_test_vector`
+(same data struct init and t clamp), `FUN_00148780` (point = t*dir+origin
+narrowed to float exactly like the original), `FUN_00146d40` (2D BSP point test,
+no spills on either side), `FUN_00061df0` (dword copies). So with an identical
+origin the remaining input is the ray direction = target position - origin. A
+start point lying on a floor plane makes the "t=0 hit" decision depend on the
+sign of dot(direction, normal), which flips with a one-ulp change in the target's
+position. The target is a projectile, so the suspect is the projectile/object
+physics position update on the client (`FUN_0014f2c0` in collision_usage.c is
+flagged by the narrowing checker with two missing float32 stores).
+
+Probe change: `radius_hit` now logs the accepted object's position z bits
+(obj+0x58) instead of found_count (host detour 6 reads [ESI+0x58]). Next run
+compares the z of the rejected projectile on both sides.
+
+## RUN 9 (2026-09-07) — grenade position drift; FUN_0014f2c0 narrowing fixed
+
+Tick 261, same class: the LOS test for grenade `0xe29b002c` returned hit-at-t=0
+on the host (reject) and miss on the client (damage, projectile_accelerate draws).
+This time the kind-34 origin differed too (host x/y `c103f26e/40c8735a`, client
+`c103d821/40c9c2fd`, about 0.04 world units) and the new radius_hit z showed the
+grenade itself at `bed53017` vs `becf0592`. Walking back through the ring, the
+same grenade was already 0.009 off in z at tick 187 when an earlier explosion
+kicked it (identical RNG draws on both sides). The drift is in the projectile's
+flight/bounce physics, not in any RNG-consuming code.
+
+Static walk of the physics step (`FUN_0014f2c0`, collision_usage.c) against
+the XBE showed three narrowing mismatches, all invisible to VC71 (cl.exe narrows
+by itself):
+
+1. `old_vel_copy[i] *= (1 - t)` — the original stores each product to a float
+   slot every clip iteration (FSTP dword [ebp-0x34..-0x2c] at 0x14f60a..33);
+   clang kept the three components as 64-bit doubles (`fst qword [ebp-0x80..-0x70]`)
+   for the whole loop. Fixed with `HALO_FLT_ROUNDTRIP` after the scaling, and
+   also after every velocity/position projection store.
+2. Under register pressure clang spilled the *partial* dot product
+   `plane[0]*v[0] + plane[1]*v[1]` as a dword (`fstp dword [ebp-0x58]`) — a
+   24-bit rounding the original never does (it keeps `dot`, `factor`,
+   `pos_dot`, `len_sq`, `dot2`, `scale` in ST(i)). Fixed by typing those
+   temporaries `x87_wide_t` (double under clang, float on the VC71 lane) and
+   promoting the products that feed them; clang now spills them as qwords.
+3. `collision_log_end_time` inlined into the loop: the original narrows only the
+   quotient `t` (FSTP dword [ebp+8] at 0x14eefb); inlined clang narrowed the
+   numerator and kept `t` wide. Fixed the same way plus `HALO_FLT_ROUNDTRIP(t)`.
+
+`check_x87_narrowing.py` now reports 0 MISSING for collision_usage.c; VC71
+unchanged (FUN_0014f2c0 88.9%, collision_log_end_time 69.6%). Note the checker's
+count is a net: an extra clang narrowing can hide behind a missing one (the
+pre-fix count was 7 vs 9 while ours had one *extra* rounding), so a "0 MISSING"
+result does not prove parity — inspect the computed dword stores directly.
+
+None of the 22 other functions the checker flags in real_math.c / collision_bsp.c
+/ objects.c are in the static callee closure of `FUN_0014f2c0` (183 functions).
+Run 10 pending.
+
+## RUN 9 follow-up (2026-09-07) — narrowing audit of the physics/projectile TUs
+
+Three read-only audits walked the remaining flagged functions in real_math.c,
+collision_bsp.c, objects.c (simulation path only) and projectiles.c against the
+XBE, slot by slot. Findings applied (all VC71-neutral unless noted):
+
+- **real_math.c `vector_intersects_pill3d`**: real bug, not just precision.
+  The closest points were six scalars (`closest_a_x, closest_a_y, ...`) and
+  `&closest_a_x` was passed to `fast_vector_intersects_sphere`, which reads
+  three floats through the pointer. Clang dead-stripped the y/z scalars, so the
+  callee read garbage. Now `float closest_a[3], closest_b[3]`. Also matched the
+  reference's narrowing map (`nx/nz/cross_sq/t/inv/d0_d1/d0_sq/d1_sq/diff_*`
+  wide; `ny/nxi/nyi/s/s_start/s_end/t_start/t_end/delta_*` narrowed) and its
+  addend orders. VC71 80.5% -> 82.2%.
+- **real_math.c `FUN_001093b0`** (quaternion to matrix): norm/s/sq0/xx/xy/xz/zz
+  stay wide, sq1/sq2/xw/yw/zw/yy/zy narrow; norm accumulates q0-first.
+  Introducing a named `sq0` temporary cost 27pp of VC71 (cl.exe spills it), so
+  the products are written `s * q[0] * q[3]` as before. 88.7% unchanged.
+- **real_math.c `rotate_vector3d_by_sincos`**: `k` and `cy` wide, `cz` narrowed.
+  100% unchanged.
+- **collision_bsp.c** `bsp3d_test_sphere_recursive` (plane distance `t` wide),
+  `FUN_00148370` (`q` and `radius` round-tripped). 93.5% / 89.5% unchanged.
+- **objects.c** `object_compute_child_marker_position` (cross-product
+  temporaries wide), `object_compute_node_matrices` (row 4..6 products wide),
+  `object_compute_function_values` (eleven round-trips plus a wide additive
+  stage). 92.4% / 80.2% / 95.3% unchanged.
+- **projectiles.c** `projectile_aim_linear` (`dist` round-tripped after
+  normalize3d), `projectile_aim_ballistic` (`inv_t` never stored; `t_min`, `V`
+  round-tripped; `b` split into wide/narrow copies for the 0xf81ad FST-no-pop
+  shape), `FUN_000f8720` (`dx/dy/dz` and the `dir1[i]*radius` products wide,
+  `pt_b1z` never narrowed), `FUN_000f9c40` (`dz` FST-no-pop square, addend order
+  dz,dy,dx). 98.5% / 93.3% / 66.7% unchanged, FUN_000f9c40 89.1% -> 89.0%.
+
+Two rules learned about the VC71 lane, both now encoded in `src/x87_math.h`:
+
+1. cl.exe honours an explicit `(float)` cast on a float expression as a forced
+   store/reload. Narrowing casts in shared source must go through
+   `HALO_NARROW(e)`, which is `(float)(e)` under clang and `(e)` under cl.exe.
+2. A named temporary for a value the reference keeps in ST(i) makes cl.exe spill
+   it. Promote the expression in place (`(x87_wide_t)a * b + ...`) instead of
+   introducing a variable.
+
+Checker caveats confirmed by the audits: `fstp st(k)` / `fst` leak the
+"computed" flag (false EXTRA counts on exact copies), and reloads through
+`fmul/fsub/fadd dword [slot]` are invisible, so the EXTRA-NARROWING counts on
+these functions are mostly qword (53-bit) spills of the promoted temporaries
+and exact float copies, not 24-bit roundings.
+
+Client redeployed with all of the above; host image unchanged. Run 10/11 pending.
+
+## RUN 10 (2026-09-07) — per-tick drift in the free-flight integration
+
+Tick 1184, the LOS-flip class again: projectile `e2b80007` got hit-at-t=0 on
+the host and miss on the client, its radius_hit z already 0.018 apart
+(`404bf27e` vs `404d1060`). Walking the whole ring instead of the divergent
+tick showed the real picture:
+
+- **Every** grenade detonation origin (kind 34) differed between host and
+  client from the earliest surviving explosion at tick 810: 4-11 ulp in x/y
+  for grenades that never bounced, thousands of ulp after a bounce.
+- An **airborne biped** (`e2780009`, a jumping player, ticks 992-1003) was
+  ~2e-5 off in z with the gap growing slowly per tick, while every grounded
+  biped stayed bit-identical.
+
+So this is not a collision-branch flip but a rounding mismatch inside the
+per-tick flight integration itself, shared by projectiles and airborne units.
+Two instruction-level audits (projectile update `FUN_000f9c40`, biped physics
+step `FUN_001a2f40`) plus a callgraph check found:
+
+1. **`FUN_000f9c40` air-drag arm** (projectiles.c ~2544): the original does
+   `FSTP dword` on each scaled velocity component (0xfa270/78/7e) and reloads
+   the narrowed slot for `avg_vel` (0xfa281/8f/9e). clang emitted `FST`
+   (no-pop) and averaged the 80-bit product. `avg_vel` feeds `new_pos`
+   directly, so the position accumulated a sub-ulp error every tick — the
+   observed ramp. Same shape in the split-tick arm (0xfa1fa..0xfa24a) and on
+   the bounce path (`time_remaining`, `vel[2]` at 0xfa589/0xfa595). Fixed with
+   `HALO_FLT_ROUNDTRIP`.
+2. **`FUN_000f9c40` split-tick arm used the wrong variable**: the lift reused
+   `decel_frac` for both the "fraction of the tick before the speed floor"
+   (0xfa1bb, live in ST(2) through 0xfa210) and `dist_at_hit/speed_prev`,
+   so `avg_vel` was scaled by the wrong ratio on the tick a grenade reached
+   terminal speed. Now a separate `split_frac`.
+3. **`FUN_001a2f40` airborne branch** (bipeds.c ~2996): the original narrows
+   `damp*c0` (0x1a31c5 FSTP, 0x1a31ce reload) but keeps `damp*c1` wide; we
+   kept both wide. `raw0` feeds the new x velocity, hence position, hence the
+   next tick's collision query. Fixed with a narrowed `dc0` temporary (a
+   named temporary is right here because cl.exe spills it exactly as the
+   reference does). Three addend orders in the same function corrected.
+4. **SSE1 inlined in the reference**: `FUN_00147ed0` (collision_bsp.c, the
+   leaf of the biped sphere walk) computes the vertex distance with
+   `subps/mulps/addss`, i.e. every operation rounded to float32 and summed
+   x, y, z. Our port called the x87 `distance_squared3d` (64-bit accumulate,
+   wide compare). Rewritten with per-op round trips. A scan of every ported
+   function's reference body finds only one other SSE user (0x109850,
+   already handled with an asm block), so this class is closed. The x87
+   narrowing checker is blind to it by construction.
+
+Checker change: `check_x87_narrowing.py` now counts reloads through
+`fadd/fsub/fsubr/fmul/fdiv/fdivr/fcom/fcomp dword [slot]`, not only `fld`.
+That was the blind spot that hid `t_min/V/b` in `projectile_aim_ballistic`
+earlier; it exposes 26 more MISSING functions in units/bipeds/real_math/
+objects, none on the free-flight path (callgraph-checked). Counts remain a
+NET, so a "0 MISSING" on a large function still needs a slot-level pass.
+
+VC71: FUN_000f9c40 89.0 -> 89.2, FUN_001a2f40 77.0 -> 77.2, FUN_00147ed0
+91.1 -> 89.0 (cl.exe cannot emit the SSE sequence; accepted).
+
+Next suspect if the airborne drift survives run 11: `FUN_0014f2c0`
+(collision_usage.c) slot-by-slot with the `HALO_FLT_ROUNDTRIP` barriers
+excluded from the metric — its net +21 EXTRA masks whatever is left.
+
+Client redeployed; host image unchanged. Run 11 pending.
+
+## RUN 11 (2026-09-07) — drift smaller, not gone; toggle bisect deployed
+
+With all run-10 fixes in the client (build 15:27), the first RNG divergence
+moved to tick 788/789: a grenade bounce (`FUN_000f90d0` draws) landed one tick
+late on the client, the run-3 class. Position data:
+
+- detonation origin at tick 713: 1 ulp off in x, 19 ulp in y (run 10: 4-11
+  ulp before any bounce, thousands after);
+- airborne biped `e2780009`: bit-identical for 36 ticks, then diverges;
+- grounded biped `e2770008`: 1 ulp off in z from tick 328 after 994
+  identical ticks.
+
+The instruction-level audits keep finding partial causes, so the next run is
+a **toggle bisect**: the client on 10.0.0.21 (build 15:40) runs with
+`FUN_000f9c40` (projectile update) and `FUN_001a2f40` (biped physics step) set
+`ported=false` in kb.json — the original bodies execute, still calling our
+ported callees. This kb.json change is deliberately NOT committed.
+
+Reading run 12: if the detonation origins (kind 34) become bit-identical, the
+remaining projectile mismatch is inside `FUN_000f9c40`'s body; if they still
+differ, it is in a callee (`FUN_000f8720`, aim, `object_translate`) or in the
+throw setup (unit/weapon code that seeds the initial velocity). Same logic for
+the biped drift versus `FUN_001a2f40` / `FUN_0014f2c0`.
+
+Fallback if the bisect is inconclusive: capture a client state snapshot with a
+grenade in flight and run `unicorn_diff.py --state-snapshot` on
+`FUN_000f9c40` original vs ours with a memory trace, which pinpoints the first
+differing store without further static guessing.
+
+## RUN 12 — toggle bisect: the projectile and biped bodies are excluded (2026-09-07)
+
+Run 12 used the bisect client (`FUN_000f9c40` and `FUN_001a2f40` running as
+original code, every callee still ours). Rings: `artifacts/rng_trace/ds12_h.json`
+/ `ds12_c.json`.
+
+- The bounce is still one tick late: host draws at tick 612, client at 613.
+- Detonation origins still differ: host tick 627 `c11a2aa9`/`409a6958`,
+  client tick 628 `c11a4032`/`409a3cce`.
+- Grounded bipeds still show 1-ulp z differences (`e2770008` from tick 273,
+  `e2750006` from tick 609).
+
+So the remaining mismatch is not in either body. What is left for the
+projectile is the sweep `FUN_000f8720` and its collision test `FUN_0014df70`
+(plus the `collision_bsp` leaves), or the throw setup (initial velocity and
+marker position: `object_compute_node_matrices` and the unit/weapon code that
+seeds the projectile). For bipeds it is `FUN_0014f2c0` or the same
+collision leaves.
+
+### Run 13 setup: per-tick position probes
+
+Rather than audit those by hand, the next run logs the grenade position every
+tick on both sides:
+
+- **kind 36 `sweep_pos`**: `FUN_000f8720` entry, value = `new_pos.x` bits,
+  caller2 = `new_pos.z` bits. Host detour at `0xf8720` (6-byte prologue
+  replayed, cave `impl+0x10` = 0x6eca00, inside the deactivated
+  `unit_update_animation` body); client `RNG_TRACE_EX` at the top of our
+  `FUN_000f8720`.
+- **kind 33 widened**: the LOS-exit detour now also logs calls returning into
+  `0xf8720..0xf8920`, with value bit 31 set to separate them from the
+  area-damage callers. The cave at `impl+0x268` was rewritten in place
+  (147 bytes, still below `impl+0x300`). Client mirror: `SWEEP_LOS()` in
+  `projectiles.c` wraps both `FUN_0014df70` calls and logs kind 33 with bit 31.
+
+Host image v3 (`build_original_probes_v3.py`, sha `ad146cd8...`, 10 patches)
+deployed to 10.0.0.24 after the run-12 ring was dumped. The client keeps the
+two `ported=false` toggles (still uncommitted) so any position difference is
+attributable to the sweep, the collision test, or the throw setup.
+
+Reading run 13: the first tick where `sweep_pos` differs is where the input
+to the sweep first differs (throw setup or the previous tick's integration);
+a tick where `sweep_pos` matches but the flagged kind-33 result or `t` differs
+puts the mismatch inside `FUN_000f8720` / `FUN_0014df70`.
+
+## September 11 continuation: coherent grenade-chain runtime bisect
+
+The later ds63--ds68 mixed-build runs used client `10.0.0.21` with the RNG
+trace build and pristine host probe v7 on `10.0.0.25`. The watcher stopped
+both guests, then the rings were dumped while paused and aligned by RNG draw
+identity rather than by sampled tick.
+
+Confirmed exclusions:
+
+- ds63: `object_translate` plus `object_try_place` original did not prevent
+  the first sweep-position or later damage/RNG divergence.
+- ds64: `projectile_new` original did not prevent it.
+- ds65: `object_new` original did not prevent it.
+- ds66: `unit_throw_grenade_move_to_hand` original did not prevent it.
+- ds67: `object_attach_to_parent` original did not prevent it.
+- ds68: `unit_throw_grenade_release` original did not prevent it.
+
+These are outer-body exclusions only: an original function called at its XBE
+address still reaches any callees whose addresses are redirected to lifted
+implementations. Therefore the individual toggles do not exclude each complete
+subtree.
+
+In ds68 the first observed grenade sweep already differed in XY while Z and
+all velocity components were bit-identical. Client new position was
+`(-1.9115324, -0.5758146, 1.9720049)`; host was
+`(-1.9347463, -0.6052260, 1.9720049)`. The later RNG split was collision
+timing: the client entered `FUN_000f90d0` at tick 578 and the host at tick
+583. Damage/collision branching amplifies the position difference; it is not
+yet proven to be the first writer.
+
+### ds69 pristine/pristine control and watcher limitation
+
+Both sides ran the same cachebeta-derived probe v7. The watcher eventually
+paused them after observing different seeds in snapshots nominally two ticks
+apart. This was a watcher false positive, not an RNG sequence divergence:
+
+- event alignment found 1,187 identical shared RNG/caller events;
+- 16,296 shared throw, sweep, damage, radius, and LOS probe records were
+  bit-identical;
+- one ring merely contained one later RNG event.
+
+The watcher remains useful for stopping close to a suspected event, but its
+`seed mismatch` message is not proof unless the dumped rings differ after
+sequence alignment. This A/A control also proves that the mixed-build
+throw/sweep differences are not ordinary host/client role skew.
+
+### ds70 setup: coherent original grenade boundary
+
+The next client build disables the full currently identified grenade boundary
+as one diagnostic unit: `unit_throw_grenade_move_to_hand`,
+`unit_throw_grenade_release`, `unit_set_seat_state`,
+`object_get_markers_by_string_id`, `object_placement_data_new`,
+`object_new`, `projectile_new`, `object_attach_to_parent`,
+`object_detach_from_parent`, `object_translate`, `object_try_place`,
+`FUN_000f8720`, and `FUN_0014df70`. The toggles are build-only and are
+restored in `kb.json` after the diagnostic XBE is copied.
+
+Correction: this boundary omitted the per-tick projectile integrator
+`FUN_000f9c40` and motion/collision helper `FUN_0014f2c0`; therefore ds70
+cannot by itself place the first writer upstream of grenade creation.
+
+### ds70 result and ds71 corrected lifecycle setup
+
+ds70 still diverged. At tick 577 both sides shared five draws, then the client
+entered `projectile_accelerate` while the host made another
+`object_cause_damage` draw. The first recorded explosion origin differed:
+client `(-3.8918023, 2.0774932)`, host
+`(-3.8970609, 2.0403311)`. This confirms different projectile state at
+detonation, but not when it was first written because ds70 left the per-tick
+integrator active.
+
+ds71 adds `FUN_000f9c40` and `FUN_0014f2c0` to every ds70 deactivation, so
+construction, placement, flight integration, sweep, collision motion, and LOS
+all execute pristine bodies. If ds71 still diverges, inspect the initial
+throw/unit state. If it synchronizes, bisect the lifecycle boundary.
+
+### ds71 result and ds72 biped-writer setup
+
+ds71 still produced a true same-tick sequence divergence at tick 170. The
+client made additional `object_cause_damage` draws where the host entered
+`projectile_accelerate`, followed by different victim counts on both sides.
+The first explosion origin remained different despite the pristine grenade
+lifecycle: client `(-1.3148494, 1.6100744)`, host
+`(-1.3495448, 1.5957612)`. The grenade Z values observed by the radius query
+were `3.1916511` and `3.1987424`, respectively.
+
+This places the surviving input difference before or outside the disabled
+grenade lifecycle. ds72 retains every ds71 deactivation and additionally
+disables biped physics writer `FUN_001a2f40`. This closes the important gap
+in run 12: that run disabled the projectile and biped bodies together but left
+their shared collision-motion helper `FUN_0014f2c0` patched.

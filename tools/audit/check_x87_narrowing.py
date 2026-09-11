@@ -37,6 +37,7 @@ import argparse
 import json
 import re
 import struct
+import subprocess
 import sys
 from pathlib import Path
 
@@ -66,7 +67,7 @@ ARITH = ("fadd", "fsub", "fmul", "fdiv", "fsqrt", "fprem", "fscale", "frndint",
          "fiadd", "fisub")
 
 
-def narrowing_slots(insns):
+def narrowing_sites(insns):
     """Slots holding a *computed* value narrowed by a dword store/reload.
 
     A round trip only re-rounds when the stored value carries more than 24
@@ -75,7 +76,7 @@ def narrowing_slots(insns):
     register-allocation difference as a numeric one.
     """
     computed = False
-    stored, roundtripped = set(), set()
+    stored, roundtripped = {}, {}
     for ins in insns:
         if not ins.mnemonic.startswith("f"):
             continue
@@ -86,11 +87,11 @@ def narrowing_slots(insns):
                 continue
             if ins.mnemonic == "fld":
                 if slot in stored:
-                    roundtripped.add(slot)
+                    roundtripped[slot] = (stored[slot], ins.address)
                 computed = False
             else:
                 if computed:
-                    stored.add(slot)
+                    stored[slot] = ins.address
                 computed = ins.mnemonic == "fst"
             continue
         if ins.mnemonic in ("fxch", "fchs", "fabs"):
@@ -102,9 +103,23 @@ def narrowing_slots(insns):
         if ins.mnemonic in RELOAD_OPS:
             slot = _slot(ins.op_str)
             if slot is not None and slot in stored:
-                roundtripped.add(slot)
+                roundtripped[slot] = (stored[slot], ins.address)
         computed = ins.mnemonic.startswith(ARITH)
     return roundtripped
+
+
+def narrowing_slots(insns):
+    return set(narrowing_sites(insns))
+
+
+def source_locations(obj, sites):
+    addresses = [address for pair in sites.values() for address in pair]
+    if not addresses:
+        return {}
+    command = ["llvm-addr2line", "-e", str(obj)]
+    command.extend("0x%x" % address for address in addresses)
+    lines = subprocess.check_output(command, text=True).splitlines()
+    return dict(zip(addresses, lines))
 
 
 def main():
@@ -114,6 +129,11 @@ def main():
     ap.add_argument("--function", action="append", default=[])
     ap.add_argument("--min-delta", type=int, default=1,
                     help="only report when the original has this many more")
+    ap.add_argument("--show-sites", action="store_true",
+                    help="print store/reload addresses for compared functions")
+    ap.add_argument("--context-address", action="append", default=[],
+                    type=lambda value: int(value, 0),
+                    help="print shipped-object instructions around this address")
     args = ap.parse_args()
 
     if not XBE.exists():
@@ -149,8 +169,32 @@ def main():
             if name not in by_name:
                 continue
             start, end = by_name[name]
-            ours = narrowing_slots(insns)
-            theirs = narrowing_slots(disasm_xbe(raw, sections, start, end))
+            ours_sites = narrowing_sites(insns)
+            theirs_sites = narrowing_sites(disasm_xbe(raw, sections, start, end))
+            ours = set(ours_sites)
+            theirs = set(theirs_sites)
+            if args.show_sites:
+                locations = source_locations(obj, ours_sites)
+                print("[X87-SITES] %s ours %s" % (
+                    name, ", ".join("%s@0x%x(%s)->0x%x(%s)" %
+                                    (slot, pair[0], locations.get(pair[0], "?"),
+                                     pair[1], locations.get(pair[1], "?"))
+                                    for slot, pair in sorted(ours_sites.items(),
+                                                             key=lambda item: item[1]))))
+                print("[X87-SITES] %s xbe  %s" % (
+                    name, ", ".join("%s@0x%x->0x%x" %
+                                    (slot, pair[0], pair[1])
+                                    for slot, pair in sorted(theirs_sites.items(),
+                                                             key=lambda item: item[1]))))
+            for address in args.context_address:
+                indexes = [index for index, ins in enumerate(insns)
+                           if ins.address == address]
+                if indexes:
+                    index = indexes[0]
+                    print("[X87-CONTEXT] %s 0x%x" % (name, address))
+                    for ins in insns[max(0, index - 8):index + 9]:
+                        print("  0x%x: %-8s %s" %
+                              (ins.address, ins.mnemonic, ins.op_str))
             checked += 1
             delta = len(theirs) - len(ours)
             if delta >= args.min_delta:
