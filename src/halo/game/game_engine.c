@@ -1143,12 +1143,12 @@ char game_engine_display_team_indicators(void)
  *
  * Returns true (1) if the game engine is inactive or player_index is NONE.
  * Otherwise returns bit 3 of the engine flags (0x456b18), inverted. */
-char game_engine_has_shield(int param_1)
+char game_engine_has_shield(int player_index)
 {
   char result;
 
   result = 1;
-  if (*(int *)0x456b60 != 0 && param_1 != -1) {
+  if (*(int *)0x456b60 != 0 && player_index != -1) {
     result = (~(*(unsigned int *)0x456b18 >> 3)) & 1;
   }
   return result;

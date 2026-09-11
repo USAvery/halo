@@ -3041,9 +3041,9 @@ void FUN_001a2f40(void *physics_arg /* @esi */)
     float vecA[3]; /* local_30/2c/28 */
     float vecB[3]; /* local_24/20/1c */
     float d[3]; /* local_18/14/10: must be contiguous for normalize3d(&d[0]) */
-    float curve_scale; /* fVar1: slope-response result */
-    float damp2;
-    char curve_flag; /* local_1: secondary state byte */
+      float curve_scale; /* fVar1: slope-response result */
+      float damp2;
+      char curve_flag; /* local_1: secondary state byte */
     float *gp; /* EDI = physics + 0x20 ground-plane normal */
 
     magnitude =

@@ -587,18 +587,25 @@ float normalize3d(float *v)
   return 0.0f;
 }
 
-/* FUN_00013070 (0x13070) — Dot product of two 3D vectors.
- * Confirmed: cdecl, 2 pointer args. Pure FPU leaf.
- * Confirmed: computes a.z*b.z + a.y*b.y + a.x*b.x (accumulation order). */
+/* FUN_00013070 (0x13070) — Calculate the dot product of two 3D vectors.
+ * Confirmed: cdecl calling convention with two pointer arguments.
+ * Confirmed: FPU leaf function.
+ * The calculation order is a.z*b.z + a.y*b.y + a.x*b.x. */
 float FUN_00013070(float *a, float *b)
 {
-  /* Addend association is load-bearing for lockstep determinism, not style.
-     The original (0x13070) accumulates ((z*z' + y*y') + x*x'): FLD z/FMUL,
-     FLD y/FMUL, FADDP, FLD x/FMUL, FADDP.  Written as x+y+z, clang emits
-     ((x+y)+z), which rounds differently and drifts every dot product in the
-     engine by a ULP -- enough to flip movement/facing threshold branches a
-     tick early and desync a system-link game.  cl.exe reassociates to match
-     the original, so the VC71 lane cannot see this; clang is what ships. */
+  /* Keep this calculation order. It is necessary for lockstep determinism.
+     The original function at 0x13070 calculates ((z*z' + y*y') + x*x').
+     The instruction sequence is: FLD z, FMUL, FLD y, FMUL, FADDP,
+     FLD x, FMUL, FADDP.
+
+     Do not write the expression as x+y+z. Clang can then calculate
+     ((x+y)+z). This can produce a different floating-point rounding result.
+     A difference of one ULP can change a movement or facing threshold on a
+     different tick. This can cause a system-link game to lose synchronization.
+
+     cl.exe reassociates the expression and matches the original instruction
+     order. Therefore, this problem is not visible in the VC71 build.
+     The shipped build uses Clang, so the explicit order is necessary. */
   return a[2] * b[2] + a[1] * b[1] + a[0] * b[0];
 }
 
