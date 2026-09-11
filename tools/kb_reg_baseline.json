@@ -9420,6 +9420,7 @@
     "0xb46b0": "void race_update_team_score(int player_handle@<eax>, int flag_index);",
     "0xb4e20": "void find_next_target(int player_index@<edi>);",
     "0xb54e0": "float game_globals_difficulty_scale(int16_t value_type@<bx>, int16_t difficulty@<di>);",
+    "0xb5d60": "void game_time_statistics_frame(int16_t a@<si>, int16_t b@<di>, int16_t c@<bx>);",
     "0xb6bd0": "void FUN_000b6bd0(char *input_state@<esi>);",
     "0xb70b0": "void get_local_player_input_blob(void *action@<ebx>, short local_player_index, real delta_time);",
     "0xb7f90": "void player_control_update_desired_angles(int16_t local_player_index@<eax>, float yaw_delta, float pitch_delta);",
