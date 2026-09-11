@@ -87406,16 +87406,16 @@
     "unit_estimate_position": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 94.2,
+      "abi_modeled_mnemonic_pct": 95.2,
       "addr": "0x1a93e0",
       "end": "0x1a9514",
       "kind": "auto",
       "n_r": 114,
-      "opnd_percent": 93.3,
-      "raw_mnemonic_pct": 94.2,
+      "opnd_percent": 92.5,
+      "raw_mnemonic_pct": 95.2,
       "ref": "synth",
       "ref_sha": "d4ce3e4c8bee3a72",
-      "score": 94.2,
+      "score": 95.2,
       "source": "src/halo/units/units.c"
     },
     "unit_exit_seat_end": {
@@ -88576,16 +88576,16 @@
     "unit_set_seat_state": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 93.4,
+      "abi_modeled_mnemonic_pct": 99.3,
       "addr": "0x1a9240",
       "end": "0x1a93de",
       "kind": "auto",
       "n_r": 152,
-      "opnd_percent": 68.2,
-      "raw_mnemonic_pct": 93.4,
+      "opnd_percent": 94.0,
+      "raw_mnemonic_pct": 99.3,
       "ref": "synth",
       "ref_sha": "7bf7f78f587941f1",
-      "score": 93.4,
+      "score": 99.3,
       "source": "src/halo/units/units.c"
     },
     "unit_set_user_animation": {
@@ -88771,16 +88771,16 @@
     "unit_throw_grenade_release": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 83.3,
+      "abi_modeled_mnemonic_pct": 95.8,
       "addr": "0x1ab110",
       "end": "0x1ab409",
       "kind": "auto",
       "n_r": 248,
-      "opnd_percent": 70.2,
-      "raw_mnemonic_pct": 83.3,
+      "opnd_percent": 79.3,
+      "raw_mnemonic_pct": 95.8,
       "ref": "synth",
       "ref_sha": "b1052a238d9fba4f",
-      "score": 83.3,
+      "score": 95.8,
       "source": "src/halo/units/units.c"
     },
     "unit_try_add_grenade": {

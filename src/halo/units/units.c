@@ -388,8 +388,8 @@ void FUN_00122e50(int animation, float *blend_params, float direction,
   unsigned int has_translation;
   unsigned int has_rotation;
   int translation_counter;
-  float dir_complement;
-  float thr_complement;
+  volatile float dir_complement;
+  volatile float thr_complement;
   float rot_00[4];
   float rot_10[4];
   float rot_01[4];
@@ -435,7 +435,11 @@ void FUN_00122e50(int animation, float *blend_params, float direction,
   }
 
   dir_frame = (int)ratio;
+  /* 0x122ed8: ratio is narrowed before fmod and frame conversion. */
+  HALO_FLT_ROUNDTRIP(ratio);
   dir_frac = (float)x87_fmod(ratio, 1.0);
+  /* 0x122ef5 stores before the negative check; later uses reload float32. */
+  HALO_FLT_ROUNDTRIP(dir_frac);
   if (dir_frac < *(float *)0x2533c0) {
     dir_frame = dir_frame - 1;
     dir_frac = dir_frac + *(float *)0x2533c8;
@@ -477,7 +481,11 @@ void FUN_00122e50(int animation, float *blend_params, float direction,
   }
 
   thr_frame = (int)ratio;
+  /* 0x122ff0: ratio is narrowed before fmod and frame conversion. */
+  HALO_FLT_ROUNDTRIP(ratio);
   thr_frac = (float)x87_fmod(ratio, 1.0);
+  /* 0x12300e stores before the negative check; later uses reload float32. */
+  HALO_FLT_ROUNDTRIP(thr_frac);
   if (thr_frac < *(float *)0x2533c0) {
     thr_frame = thr_frame - 1;
     thr_frac = thr_frac + *(float *)0x2533c8;
@@ -583,7 +591,9 @@ void FUN_00122e50(int animation, float *blend_params, float direction,
 
       if ((has_translation & 1) != 0) {
         dir_complement = *(float *)0x2533c8 - dir_frac;
+        /* 0x1232d0: blend weight is reloaded after a float32 store. */
         thr_complement = *(float *)0x2533c8 - thr_frac;
+        /* 0x1232dc: blend weight is reloaded after a float32 store. */
 
         if (is_compressed != '\0') {
           temp_int = (int)(short)frame_00;
@@ -2424,7 +2434,7 @@ void FUN_001a7b50(int datum_handle, float body_damage, float shield_damage)
 {
   float shield_ratio;
   char *obj;
-  float body_ratio;
+  volatile float body_ratio;
 
   if (datum_handle == -1) {
     return;
@@ -2940,6 +2950,7 @@ char FUN_001a8550(void *plan, float delta_time, float position,
   float current_velocity;
   float time;
   float remaining_time;
+  volatile float acceleration_delta;
 
   result = *(char *)plan;
   current_position = position;
@@ -2959,9 +2970,11 @@ char FUN_001a8550(void *plan, float delta_time, float position,
       time = *(float *)((char *)plan + 0x10);
     else
       time = remaining_time;
+    /* 0x1a85b2: retain the narrowed acceleration delta for both uses. */
+    acceleration_delta = time * *(float *)((char *)plan + 0xc);
     current_position +=
-      (time * *(float *)((char *)plan + 0xc) * 0.5f + current_velocity) * time;
-    current_velocity += time * *(float *)((char *)plan + 0xc);
+      (acceleration_delta * 0.5f + current_velocity) * time;
+    current_velocity += acceleration_delta;
     remaining_time -= time;
   }
 
@@ -3940,7 +3953,6 @@ void unit_set_seat_state(int unit_handle, float *position)
   char *seat_object;
   char *parent_unit;
   char *seat_def;
-  int16_t seat_def_index;
   uint8_t seat_type;
   uint32_t type_mask;
   char marker_buf[0x6c];
@@ -3965,22 +3977,18 @@ void unit_set_seat_state(int unit_handle, float *position)
       /* No related unit — find "head" marker on this unit */
       object_get_markers_by_string_id(unit_handle, (void *)0x2909e4, marker_buf,
                                       1);
-      position[0] = *(float *)(marker_buf + 0x60);
-      position[1] = *(float *)(marker_buf + 0x64);
-      position[2] = *(float *)(marker_buf + 0x68);
+      memcpy(position, marker_buf + 0x60, 3 * sizeof(float));
       return;
     }
 
     /* Related unit exists — get its seat definition */
     parent_unit = (char *)object_get_and_verify_type(*(int *)(unit + 0x2d8), 3);
-    seat_def_index = *(int16_t *)(parent_unit + 0x2a0);
     seat_def = (char *)tag_block_get_element(unit_tag + 0x2e4,
-                                             (int)seat_def_index, 0x11c);
+                                             (int)*(int16_t *)(parent_unit + 0x2a0),
+                                             0x11c);
     object_get_markers_by_string_id(unit_handle, seat_def + 0x24, marker_buf,
                                     1);
-    position[0] = *(float *)(marker_buf + 0x60);
-    position[1] = *(float *)(marker_buf + 0x64);
-    position[2] = *(float *)(marker_buf + 0x68);
+    memcpy(position, marker_buf + 0x60, 3 * sizeof(float));
     return;
   }
 
@@ -3988,9 +3996,7 @@ void unit_set_seat_state(int unit_handle, float *position)
   seat_object = (char *)object_get_and_verify_type(seat_index, -1);
 
   /* Copy seat object's world position */
-  position[0] = *(float *)(seat_object + 0x0c);
-  position[1] = *(float *)(seat_object + 0x10);
-  position[2] = *(float *)(seat_object + 0x14);
+  memcpy(position, seat_object + 0x0c, 3 * sizeof(float));
 
   /* Check if seat type is biped (0) or vehicle (1) */
   seat_type = *(uint8_t *)(seat_object + 0x64);
@@ -4004,9 +4010,9 @@ void unit_set_seat_state(int unit_handle, float *position)
 
   /* Get the seat definition from the parent's unit tag */
   unit_tag = (char *)tag_get(0x756e6974, *(int *)seat_object);
-  seat_def_index = *(int16_t *)(unit + 0x2a0);
   seat_def =
-    (char *)tag_block_get_element(unit_tag + 0x2e4, (int)seat_def_index, 0x11c);
+    (char *)tag_block_get_element(unit_tag + 0x2e4,
+                                  (int)*(int16_t *)(unit + 0x2a0), 0x11c);
 
   /* For seat type 1 (vehicle), skip if marker name at +0x84 is empty */
   if (*(int16_t *)(seat_object + 0x64) == 1) {
@@ -6021,16 +6027,21 @@ void unit_throw_grenade_release(int unit_handle, char flag)
   float cross2[3];
   float velocity[3];
   float seat_pos[3];
+  char *grenade_data;
   float ratio_val;
   float throw_speed;
   float rand_val;
   float rand_x;
-  float rand_y;
-  float rand_z;
-  float one_minus;
-  char *grenade_data;
 
   unit = (char *)object_get_and_verify_type(unit_handle, 3);
+#ifdef HALO_RNG_TRACE
+  RNG_TRACE_EX(RNG_TRACE_KIND_THROW_UNIT_XY,
+               RNG_TRACE_BITS(*(float *)(unit + 0x0c)),
+               RNG_TRACE_BITS(*(float *)(unit + 0x10)));
+  RNG_TRACE_EX(RNG_TRACE_KIND_THROW_UNIT_Z_HANDLE,
+               RNG_TRACE_BITS(*(float *)(unit + 0x14)),
+               (unsigned int)unit_handle);
+#endif
   unit_tag = (char *)tag_get(0x756e6974, *(int *)unit);
 
   if (*(uint8_t *)(unit + 0x23d) != 2) {
@@ -6053,25 +6064,19 @@ void unit_throw_grenade_release(int unit_handle, char flag)
   } else {
     if (*(int *)(unit + 0x1c8) != ebx) {
       /* Player-controlled with weapon: compute velocity from marker */
-      char *globals;
-      globals = (char *)game_globals_get();
-      throw_params = (char *)tag_block_get_element(globals + 0x170, 0, 0xf4);
+      throw_params = (char *)tag_block_get_element(
+        (char *)game_globals_get() + 0x170, 0, 0xf4);
 
       /* Get unit's forward vector */
-      forward[0] = *(float *)(unit + 0x1ec);
-      forward[1] = *(float *)(unit + 0x1f0);
-      forward[2] = *(float *)(unit + 0x1f4);
+      memcpy(forward, unit + 0x1ec, sizeof(forward));
 
-      {
-        float *up_ptr = *(float **)0x31fc44;
-        float mag;
-        cross_product3d(up_ptr, forward, cross_fwd);
-        mag = normalize3d(cross_fwd);
-        if (mag == 0.0f) {
-          cross_fwd[0] = up_ptr[0];
-          cross_fwd[1] = up_ptr[1];
-          cross_fwd[2] = up_ptr[2];
-        }
+      cross_product3d(*(float **)0x31fc44, forward, cross_fwd);
+      if (normalize3d(cross_fwd) == 0.0f) {
+        float *up;
+        up = *(float **)0x31fc44;
+        cross_fwd[0] = up[0];
+        cross_fwd[1] = up[1];
+        cross_fwd[2] = up[2];
       }
 
       cross_product3d(forward, cross_fwd, cross2);
@@ -6079,21 +6084,38 @@ void unit_throw_grenade_release(int unit_handle, char flag)
 
       /* Get the unit's seat/marker position */
       unit_set_seat_state(unit_handle, seat_pos);
+#ifdef HALO_RNG_TRACE
+      RNG_TRACE_EX(RNG_TRACE_KIND_THROW_SEAT_XY, RNG_TRACE_BITS(seat_pos[0]),
+                   RNG_TRACE_BITS(seat_pos[1]));
+      RNG_TRACE_EX(RNG_TRACE_KIND_THROW_SEAT_Z_HANDLE,
+                   RNG_TRACE_BITS(seat_pos[2]), (unsigned int)unit_handle);
+#endif
 
-      /* Apply throw direction offsets from throw params */
+      /* Apply throw direction offsets from throw params.
+       * One scale temp, assigned per axis group, so VC71 does
+       * FLD scale / FMUL ST(1) x3 / FSTP / next — not preload-all. */
       {
-        float fwd_s = *(float *)(throw_params + 0x68);
-        float right_s = *(float *)(throw_params + 0x6c);
-        float up_s = *(float *)(throw_params + 0x70);
-
-        seat_pos[0] +=
-          forward[0] * fwd_s + cross_fwd[0] * right_s + cross2[0] * up_s;
-        seat_pos[1] +=
-          forward[1] * fwd_s + cross_fwd[1] * right_s + cross2[1] * up_s;
-        seat_pos[2] +=
-          forward[2] * fwd_s + cross_fwd[2] * right_s + cross2[2] * up_s;
+        float s;
+        s = *(float *)(throw_params + 0x68);
+        seat_pos[0] += forward[0] * s;
+        seat_pos[1] += forward[1] * s;
+        seat_pos[2] += forward[2] * s;
+        s = *(float *)(throw_params + 0x6c);
+        seat_pos[0] += cross_fwd[0] * s;
+        seat_pos[1] += cross_fwd[1] * s;
+        seat_pos[2] += cross_fwd[2] * s;
+        s = *(float *)(throw_params + 0x70);
+        seat_pos[0] += cross2[0] * s;
+        seat_pos[1] += cross2[1] * s;
+        seat_pos[2] += cross2[2] * s;
       }
 
+#ifdef HALO_RNG_TRACE
+      RNG_TRACE_EX(RNG_TRACE_KIND_THROW_FINAL_XY, RNG_TRACE_BITS(seat_pos[0]),
+                   RNG_TRACE_BITS(seat_pos[1]));
+      RNG_TRACE_EX(RNG_TRACE_KIND_THROW_FINAL_Z_HANDLE,
+                   RNG_TRACE_BITS(seat_pos[2]), (unsigned int)unit_handle);
+#endif
       object_translate(grenade_handle, seat_pos, 0);
       ebx = -1;
     }
@@ -6112,27 +6134,30 @@ void unit_throw_grenade_release(int unit_handle, char flag)
     ratio_val = (float)throw_timer / (float)throw_total;
     if (ratio_val < 1.0f) {
       rand_val =
-        random_real_range(get_global_random_seed_address(), 0.02f, 0.046666667f);
+        random_real_range(get_global_random_seed_address(), 0.020000001f, 0.046666667f);
       rand_x = rand_val * *(float *)(unit + 0x1ec);
-      rand_y = rand_val * *(float *)(unit + 0x1f0);
-      rand_z = rand_val * *(float *)(unit + 0x1f4);
+      cross2[1] = rand_val * *(float *)(unit + 0x1f0);
+      cross2[2] = rand_val * *(float *)(unit + 0x1f4);
 
       velocity[0] = velocity[0] * ratio_val;
       velocity[1] = velocity[1] * ratio_val;
       velocity[2] = velocity[2] * ratio_val;
 
-      one_minus = 1.0f - ratio_val;
-      velocity[0] = rand_x * one_minus + velocity[0];
-      velocity[1] = rand_y * one_minus + velocity[1];
-      velocity[2] = rand_z * one_minus + velocity[2];
+      ratio_val = 1.0f - ratio_val;
+      velocity[0] = rand_x * ratio_val + velocity[0];
+      velocity[1] = cross2[1] * ratio_val + velocity[1];
+      velocity[2] = cross2[2] * ratio_val + velocity[2];
     }
   }
 
   /* Subtract grenade's current world position to get relative velocity */
   grenade_data = (char *)object_get_and_verify_type(grenade_handle, ebx);
-  velocity[0] -= *(float *)(grenade_data + 0x18);
-  velocity[1] -= *(float *)(grenade_data + 0x1c);
-  velocity[2] -= *(float *)(grenade_data + 0x20);
+  {
+    float *gv = (float *)(grenade_data + 0x18);
+    velocity[0] -= gv[0];
+    velocity[1] -= gv[1];
+    velocity[2] -= gv[2];
+  }
 
   projectile_accelerate(grenade_handle, velocity);
 
@@ -7310,6 +7335,9 @@ void unit_adjust_plan_overlap(void *plan_a_ptr, void *plan_b_ptr, int dummy,
             *(float *)(plan_a + 0x10);
   total_b = *(float *)(plan_b + 0x1c) + *(float *)(plan_b + 0x14) +
             *(float *)(plan_b + 0x10);
+  /* Original 0x1acb94/0x1acba0 stores and 0x1acbb3/0x1acbb6 reloads. */
+  HALO_FLT_ROUNDTRIP(total_a);
+  HALO_FLT_ROUNDTRIP(total_b);
 
   /* Determine which plan to adjust */
   if (*(float *)(plan_a + 0x10) > 0.0f && total_b > total_a) {
@@ -8218,8 +8246,8 @@ uint16_t unit_find_best_enter_seat(int unit_handle, int target_unit_handle,
   int best_seat;
   uint16_t best_state;
   float best_distance;
-  float distance;
-  float distance2;
+  volatile float distance;
+  volatile float distance2;
   float pos_a[3];
   float pos_b[3];
   uint8_t found_flag;
@@ -9437,6 +9465,7 @@ void unit_cause_player_melee_damage(int unit_handle)
   int globals;
   char *globals_element_ptr;
   float dot_product;
+  x87_wide_t dot_product_wide;
   float melee_scale;
   float kick_vec[3];
   int16_t hit_material;
@@ -9622,12 +9651,16 @@ got_damage_effect:
 
       dot_product = 0.0f;
       if (0.0f < *(float *)(globals_element_ptr + 0x34)) {
-        dot_product = (*(float *)&unit[9] * *(float *)&unit[6] +
-                       *(float *)&unit[10] * *(float *)&unit[7] +
-                       *(float *)&unit[0xb] * *(float *)&unit[8]) *
-                      30.0f;
-        dot_product = dot_product / *(float *)(globals_element_ptr + 0x34);
-        if (dot_product < 0.0f) {
+        dot_product_wide =
+          ((x87_wide_t)*(float *)&unit[9] * *(float *)&unit[6] +
+           (x87_wide_t)*(float *)&unit[10] * *(float *)&unit[7] +
+           (x87_wide_t)*(float *)&unit[0xb] * *(float *)&unit[8]) * 30.0f;
+        dot_product_wide =
+          dot_product_wide / *(float *)(globals_element_ptr + 0x34);
+        /* 0x1aef85 keeps the quotient wide for the zero comparison while
+         * storing a float32 copy reloaded at 0x1aef9e for the one comparison. */
+        dot_product = HALO_NARROW(dot_product_wide);
+        if (dot_product_wide < 0.0f) {
           dot_product = 0.0f;
         } else if (dot_product > 1.0f) {
           dot_product = 1.0f;
