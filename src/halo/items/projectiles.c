@@ -1590,14 +1590,14 @@ void FUN_000f90d0(int projectile_handle, float *hit_pos, float param_3,
   /* local_8 = word [ESI+0x34] (current detonation-result index).       */
   tag_idx = (int)(int16_t)(col_result[0x1a]);
 
+  /* Ref 0xf9116/0xf911d: scale_a/scale_b stored before normalize3d so mag
+   * stays ST-resident for the FCOMS == 0 test and the det_frac FSUB. */
   vel_local[0] = in_velocity[0];
-  vel_local[1] = in_velocity[1];
-  vel_local[2] = in_velocity[2];
-  mag = normalize3d(vel_local); /* single call; magnitude in mag */
-
-  /* Ref 0xf9166/f916d: 1.0f -> -0x1c, 0.0f -> -0x14 (scale_a/scale_b). */
   scale_a = 1.0f;
   scale_b = 0.0f;
+  vel_local[1] = in_velocity[1];
+  vel_local[2] = in_velocity[2];
+  mag = normalize3d(vel_local);
 
   /* If velocity is zero, replace direction with the global up vector.
    * Also update vel_local so marker_forwards[3..11] are valid unit vectors. */
@@ -1688,7 +1688,7 @@ void FUN_000f90d0(int projectile_handle, float *hit_pos, float param_3,
   /* ------------------------------------------------------------------ */
   /* 5. Select tag element (detonation result block).                    */
   /* ------------------------------------------------------------------ */
-  if (sTemp < 0 || *(int *)(proj_tag + 0x240) <= (int)sTemp) {
+  if (sTemp < 0 || (int)sTemp >= *(int *)(proj_tag + 0x240)) {
     tag_elem = (char *)0x31ed08; /* sentinel / null record */
   } else {
     tag_elem = (char *)tag_block_get_element((void *)(proj_tag + 0x240),
@@ -1742,18 +1742,14 @@ void FUN_000f90d0(int projectile_handle, float *hit_pos, float param_3,
       /* Check angular-displacement ranges. */
       if (*(float *)((char *)tag_elem + 0x30) != *(float *)0x2533c0) {
         if (deflect_dot < *(float *)((char *)tag_elem + 0x2c) ||
-            (deflect_dot < *(float *)((char *)tag_elem + 0x30)) ==
-              (deflect_dot ==
-               *(float *)((char *)tag_elem + 0x30))) { /* buf-alias-ok */
+            deflect_dot > *(float *)((char *)tag_elem + 0x30)) {
           use_alt = 1;
         }
       }
       if (!use_alt &&
           *(float *)((char *)tag_elem + 0x38) != *(float *)0x2533c0) {
         if (ang_dot < *(float *)((char *)tag_elem + 0x34) ||
-            (ang_dot < *(float *)((char *)tag_elem + 0x38)) ==
-              (ang_dot ==
-               *(float *)((char *)tag_elem + 0x38))) { /* buf-alias-ok */
+            ang_dot > *(float *)((char *)tag_elem + 0x38)) {
           use_alt = 1;
         }
       }
@@ -1820,7 +1816,7 @@ void FUN_000f90d0(int projectile_handle, float *hit_pos, float param_3,
     /* Resolve bounce pass tag element (result unused; matches original code).
      */
     sTemp = col_result[0x1a];
-    if (sTemp < 0 || *(int *)(proj_tag + 0x240) <= (int)sTemp) {
+    if (sTemp < 0 || (int)sTemp >= *(int *)(proj_tag + 0x240)) {
       dtag_elem = (char *)0x31ed08;
     } else {
       dtag_elem = (char *)tag_block_get_element((void *)(proj_tag + 0x240),
@@ -1833,16 +1829,14 @@ void FUN_000f90d0(int projectile_handle, float *hit_pos, float param_3,
     /* Cluster/leaf from collision result */
     *(int *)(damage_params + 0x14) = *(int *)((char *)col_result + 0x0c);
     *(int *)(damage_params + 0x18) = *(int *)((char *)col_result + 0x10);
-    FUN_00146a90((int)(uint32_t)(*(uint8_t *)((char *)col_result + 0x4d)),
+    FUN_00146a90((uint16_t)*(uint8_t *)((char *)col_result + 0x4d),
                  damage_params, *(int *)((char *)col_result + 0x44));
   }
 
   /* ------------------------------------------------------------------ */
   /* 7. Write collision position back to hit_pos (param_2).             */
   /* ------------------------------------------------------------------ */
-  hit_pos[0] = *(float *)((char *)col_result + 0x18);
-  hit_pos[1] = *(float *)((char *)col_result + 0x1c);
-  hit_pos[2] = *(float *)((char *)col_result + 0x20); /* buf-alias-ok */
+  memcpy(hit_pos, (char *)col_result + 0x18, 3 * sizeof(float));
 
   /* ------------------------------------------------------------------ */
   /* 8. Apply detonation result.                                         */
@@ -2014,32 +2008,25 @@ clamp_scale_b:
       float scale_f = *(float *)0x255e94;
       float *up_ptr = *(float **)0x31fc50;
 
-      /* [0] "normal" — collision surface normal */
+      /* Ref 0xf9892..0xf9925 store order: incident/neg-incident, gravity,
+       * normal, then FUN_0010c8e0 into reflection. */
+      marker_forwards[3] = vel_local[0] * scale_f;
+      marker_forwards[6] = vel_local[0];
+      marker_forwards[4] = vel_local[1] * scale_f;
+      marker_forwards[7] = vel_local[1];
+      marker_forwards[5] = vel_local[2] * scale_f;
+      marker_forwards[8] = vel_local[2];
+      marker_forwards[12] = up_ptr[0];
+      marker_forwards[13] = up_ptr[1];
+      marker_forwards[14] = up_ptr[2];
       marker_forwards[0] =
         *(float *)((char *)col_result + 0x24); /* buf-alias-ok */
       marker_forwards[1] =
         *(float *)((char *)col_result + 0x28); /* buf-alias-ok */
       marker_forwards[2] =
         *(float *)((char *)col_result + 0x2c); /* buf-alias-ok */
-
-      /* [1] "incident" — scaled normalised velocity */
-      marker_forwards[3] = vel_local[0] * scale_f;
-      marker_forwards[4] = vel_local[1] * scale_f;
-      marker_forwards[5] = vel_local[2] * scale_f;
-
-      /* [2] "negative incident" — normalised velocity */
-      marker_forwards[6] = vel_local[0];
-      marker_forwards[7] = vel_local[1];
-      marker_forwards[8] = vel_local[2];
-
-      /* [3] "reflection" — cross product of velocity and surface normal */
       FUN_0010c8e0(vel_local, (float *)((char *)col_result + 0x24),
                    marker_forwards + 9);
-
-      /* [4] "gravity" — global up vector */
-      marker_forwards[12] = up_ptr[0];
-      marker_forwards[13] = up_ptr[1];
-      marker_forwards[14] = up_ptr[2];
     }
 
     /* Fill 5 marker_points entries with col_result position. */
