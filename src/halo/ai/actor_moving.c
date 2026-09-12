@@ -105,7 +105,7 @@ char actor_test_destination(int actor_handle)
     dx = ((actor_t *)actor)->field_488 - ((actor_t *)actor)->field_12c;
     dy = ((actor_t *)actor)->field_48c - ((actor_t *)actor)->field_130;
     dz = ((actor_t *)actor)->field_490 - ((actor_t *)actor)->field_134;
-    if (dx * dx + dy * dy + dz * dz < tol * tol) {
+    if ((dx * dx + dz * dz) + dy * dy < tol * tol) {
       ((actor_t *)actor)->field_484 = 1;
     }
   }
@@ -365,7 +365,7 @@ char actor_move_try_evasion_vector(int actor_handle, float *evasion_vector,
       if (fVar1 > scale * *(float *)0x253398) {
         found = 0;
       } else if (param_4 != *(float *)0x2533c0 ||
-                 fVar1 >= scale * *(float *)0x255964) {
+                 !(fVar1 < scale * *(float *)0x255964)) {
         goto done;
       } else {
         found = 0;
@@ -626,7 +626,6 @@ void FUN_0002ade0(int actor_handle)
   int16_t found;
   int16_t i;
   int j;
-  float radius;
   float obj_radius;
   float maxdist;
   float scale_term;
@@ -648,11 +647,10 @@ void FUN_0002ade0(int actor_handle)
   } else {
     kbase = *(float *)0x255778;
   }
-  radius = kbase * *(float *)(actor_handle + 0x6044);
-
   found = object_find_in_radius(1, 0xc2, (char *)obj + 0x48,
-                                (float *)(actor_handle + 0xc), radius, handles,
-                                0x800);
+                                (float *)(actor_handle + 0xc),
+                                kbase * *(float *)(actor_handle + 0x6044),
+                                handles, 0x800);
   *(int16_t *)(actor_handle + 0x3c) = 0;
 
   for (i = 0; i < found; i++) {
@@ -719,7 +717,8 @@ void FUN_0002ade0(int actor_handle)
       scale_term = (obj_radius + obj_radius) - (maxdist + maxdist);
       /* disasm 0x2afe4: FLD [0x2533c0]; FCOMP scale_term; JNZ keeps
        * scale_term — i.e. max(const, scale_term). */
-      if (*(float *)0x2533c0 > scale_term) {
+      if (scale_term > *(float *)0x2533c0) {
+      } else {
         scale_term = *(float *)0x2533c0;
       }
       *(float *)(record + 0x50) = scale_term;
@@ -1020,13 +1019,11 @@ void actor_move_transform_avoidance_vector(int matrix, float *in_vec,
 void actor_move_get_avoidance_vector(int matrix, float dir_index,
                                      float *out_vec)
 {
-  const float *angles = (const float *)0x2557f4;
   short sector;
-  int idx;
   float base;
   float next_angle;
   float frac;
-  float angle;
+  volatile float angle;
   float vec[3];
 
   /* Clamp the index into the valid [0, 8) range. */
@@ -1035,43 +1032,31 @@ void actor_move_get_avoidance_vector(int matrix, float dir_index,
     dir_index = 0.0f;
   }
 
-  sector = 0;
-  do {
-    if ((float)(int)sector + *(const float *)0x2533c8 > dir_index) {
-      idx = (int)sector;
-      frac = dir_index - (float)idx;
-      base = angles[idx];
-      if (sector == 7) {
-        next_angle = *(const float *)0x2557f4;
-      } else {
-        next_angle = ((const float *)0x2557f8)[idx];
-      }
+  for (sector = 0; sector < 8; sector++) {
+    if ((float)sector + *(const float *)0x2533c8 > dir_index) {
+      frac = dir_index - (float)sector;
+      base = ((const float *)0x2557f4)[sector];
+      next_angle = (sector == 7) ? *(const float *)0x2557f4 : ((const float *)0x2557f8)[sector];
       angle = (*(const float *)0x2533c8 - frac) * base + next_angle * frac;
-      if (*(const float *)0x2548fc != angle) {
-        goto range_check;
-      }
-      goto not_found;
+      break;
     }
-    sector = sector + 1;
-  } while (sector < 8);
-
-not_found:
-  angle = 0.0f;
-  error(2,
-        "warning: actor_move_get_avoidance_vector couldn't find out-of-bounds "
-        "direction %.4f",
-        (double)dir_index);
-  goto build_vector;
-
-range_check:
-  if (!(angle >= *(const float *)0x2533c0 &&
-        angle < *(const float *)0x255a54)) {
-    display_assert("(angle >= 0.0f) && (angle < _full_circle)",
-                   "c:\\halo\\SOURCE\\ai\\actor_moving.c", 0xab7, 1);
-    system_exit(-1);
   }
 
-build_vector:
+  if (sector == 8 || angle == *(const float *)0x2548fc) {
+    angle = 0.0f;
+    error(2,
+          "warning: actor_move_get_avoidance_vector couldn't find out-of-bounds "
+          "direction %.4f",
+          (double)dir_index);
+  } else {
+    if (!(angle >= *(const float *)0x2533c0 &&
+          angle < *(const float *)0x255a54)) {
+      display_assert("(angle >= 0.0f) && (angle < _full_circle)",
+                     "c:\\halo\\SOURCE\\ai\\actor_moving.c", 0xab7, 1);
+      system_exit(-1);
+    }
+  }
+
   vec[0] = 0.0f;
   vec[1] = x87_fcos(angle);
   vec[2] = x87_fsin(angle);
@@ -2392,7 +2377,7 @@ LAB_check_dest:
      */
     dist_sq_saved =
       (float)distance_squared3d(saved_pos, (float *)(actor + 0x488));
-    if (dist_sq_saved <= *(float *)0x255d1c) {
+    if (!(dist_sq_saved > *(float *)0x255d1c)) {
       goto LAB_path_ok;
     }
     /* Destination changed significantly: fall through to full pathfinding. */
@@ -2590,6 +2575,7 @@ void actor_destination_update(int actor_handle)
   char *path_ctl;
   char exhausted;
   char step_idx;
+  bool is_facing;
   int step_cnt;
   float *cur;
   float *nxt;
@@ -2869,15 +2855,10 @@ void actor_destination_update(int actor_handle)
      *     if actor[0x5ec]<=0.9: AL=0,DL=1 → EDX=1
      *   FILD [EBP-0x8] (=EDX); FMUL [0x254644]=3.0f  => sign * 3.0
      */
+    is_facing = *(float *)(actor + 0x5ec) > *(const float *)0x2555d0;
     ((actor_t *)actor)->field_504 = '\x01';
     ((actor_t *)actor)->field_506 = '\0';
-
-    /* FCOMP test: if actor[0x5ec] <= 0.9f → sign=+1, else sign=-1 */
-    if (*(float *)(actor + 0x5ec) > *(const float *)0x2555d0) {
-      sign_val = -1;
-    } else {
-      sign_val = 1;
-    }
+    sign_val = !is_facing ? 1 : -1;
 
     step = (float)sign_val * 3.0f;
 
@@ -2961,7 +2942,9 @@ char actor_move_to_point(int actor_handle, float *destination, int param_3,
     dx = *(float *)(actor + 0x470) - destination[0];
     dy = *(float *)(actor + 0x474) - destination[1];
     dz = *(float *)(actor + 0x478) - destination[2];
-    dist_sq = dx * dx + dy * dy + dz * dz;
+    dist_sq = dx * dx;
+    dist_sq += dy * dy;
+    dist_sq += dz * dz;
     if (dist_sq <= *(float *)0x255d1c) {
       if ((((actor_t *)actor)->field_04c != '\0') &&
           (((actor_t *)actor)->field_4a4 == '\0')) {
