@@ -26518,7 +26518,8 @@
     },
     {
      "addr": "0x82310",
-     "decl": "int create_endpoint_set(int count);"
+     "decl": "int create_endpoint_set(int count);",
+     "ported": true
     },
     {
      "addr": "0x82410",
