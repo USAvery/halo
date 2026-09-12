@@ -91,6 +91,7 @@ void FUN_00098b20(float *sprite_bounds, void *definition,
   float x_scale;
   float y_scale;
 
+  ratio = 1.0f;
   if (definition == NULL) {
     display_assert("definition", "c:\\halo\\SOURCE\\effects\\decals.c", 0x107,
                    true);
@@ -124,7 +125,6 @@ void FUN_00098b20(float *sprite_bounds, void *definition,
   sprite_bounds[2] = *(float *)(sprite + 8);
   sprite_bounds[3] = *(float *)(sprite + 10);
 
-  ratio = 1.0f;
   if ((definition_data[1] & 1) != 0) {
     ratio = ((float)(int)*(int16_t *)(bitmap + 6) /
              (float)(int)*(int16_t *)(bitmap + 4)) *
@@ -320,7 +320,7 @@ void project_point2d(float *point_2d, float *plane, int16_t projection,
   out_point[(int)axis_a] = point_2d[0];
   out_point[(int)axis_b] = point_2d[1];
 
-  if (fabsf(plane[proj_i]) < (float)*(double *)0x2533d0) {
+  if (x87_fabs(plane[proj_i]) < *(double *)0x2533d0) {
     out_point[proj_i] = *(float *)0x2533c0;
     return;
   }
@@ -357,19 +357,17 @@ float triple_product3d(float *p, float *q, float *r)
  */
 float *plane2d_from_points(float *out_line, float *point_a, float *point_b)
 {
-  float dx;
   float length;
   float inv_length;
   float norm_a;
   float norm_b;
 
   out_line[0] = point_b[1] - point_a[1];
-  dx = point_a[0] - point_b[0];
-  out_line[1] = dx;
+  out_line[1] = point_a[0] - point_b[0];
 
-  length = sqrtf(dx * dx + out_line[0] * out_line[0]);
+  length = x87_sqrt(out_line[0] * out_line[0] + out_line[1] * out_line[1]);
 
-  if ((float)*(double *)0x2533d0 <= fabsf(length)) {
+  if (!(x87_fabs(length) < *(double *)0x2533d0)) {
     inv_length = *(float *)0x2533c8 / length;
     norm_a = inv_length * out_line[0];
     out_line[0] = norm_a;
@@ -639,8 +637,6 @@ int FUN_000998b0(int new_index_hint, int16_t cluster_index, int16_t layer,
   int previous_decal;
   int existing_decal;
   uint32_t random_scaled;
-  uint32_t random_value;
-  uint32_t *local_seed;
   int unlock_passes;
   data_iter_t iter;
   char *candidate;
@@ -668,11 +664,11 @@ int FUN_000998b0(int new_index_hint, int16_t cluster_index, int16_t layer,
 
   decal = (int)datum_get(global_decal_data, decal_index);
 
-  if (!randomize) {
-    local_seed = random_math_get_local_seed_address();
-    random_value = *local_seed * 0x19660d + 0x3c6ef35f;
-    *local_seed = random_value;
-    random_scaled = (random_value >> 16) * 100;
+  if (randomize) {
+    *(int16_t *)(decal + 2) = 2;
+    *(int *)(decal_globals + 0x2808) += 1;
+  } else {
+    random_scaled = (uint32_t)random_seed_step(random_math_get_local_seed_address()) * 100;
 
     if (random_scaled < 0x9fff6) {
       *(int16_t *)(decal + 2) = 1;
@@ -692,10 +688,7 @@ int FUN_000998b0(int new_index_hint, int16_t cluster_index, int16_t layer,
               return -1;
             }
           } else if ((*(uint8_t *)(candidate + 2) & 1) != 0) {
-            local_seed = random_math_get_local_seed_address();
-            random_value = *local_seed * 0x19660d + 0x3c6ef35f;
-            *local_seed = random_value;
-            random_scaled = (random_value >> 16) * 100;
+            random_scaled = (uint32_t)random_seed_step(random_math_get_local_seed_address()) * 100;
 
             if (random_scaled < 0x28ffd7 || *(int16_t *)(candidate + 4) == -1) {
               *(uint8_t *)(candidate + 2) &= 0xfe;
@@ -715,9 +708,6 @@ int FUN_000998b0(int new_index_hint, int16_t cluster_index, int16_t layer,
     } else {
       *(int16_t *)(decal + 2) = 0;
     }
-  } else {
-    *(int16_t *)(decal + 2) = 2;
-    *(int *)(decal_globals + 0x2808) += 1;
   }
 
   if (old_index != -1) {
@@ -1127,10 +1117,7 @@ void decal_delete(int decal_index)
 
 void FUN_0009a300(float *bounds, float *projection, float *basis)
 {
-  int16_t plane_basis;
-  uint8_t plane_axis;
   float projected[3];
-  int i;
 
   if (basis == NULL) {
     display_assert("basis", "c:\\halo\\SOURCE\\effects\\decals.c", 0x410, true);
@@ -1143,9 +1130,7 @@ void FUN_0009a300(float *bounds, float *projection, float *basis)
     system_exit(-1);
   }
 
-  for (i = 0; i < 13; ++i) {
-    projection[i] = basis[i];
-  }
+  qmemcpy(projection, basis, 13 * sizeof(float));
 
   projection[0xd] = bounds[0];
   projection[0xe] = bounds[1];
@@ -1155,40 +1140,45 @@ void FUN_0009a300(float *bounds, float *projection, float *basis)
   projection[0x11] = basis[7];
   projection[0x12] = basis[8];
   projection[0x13] = basis[9];
-  projection[0x14] = projection[0x11] * basis[10] +
+  projection[0x14] = projection[0x13] * basis[12] +
                      projection[0x12] * basis[11] +
-                     projection[0x13] * basis[12];
+                     projection[0x11] * basis[10];
 
-  if (fabsf(projection[0x13]) >= fabsf(projection[0x12]) &&
-      fabsf(projection[0x13]) >= fabsf(projection[0x11])) {
-    plane_basis = 2;
+  if (x87_fabs(projection[0x13]) >= x87_fabs(projection[0x12]) &&
+      x87_fabs(projection[0x13]) >= x87_fabs(projection[0x11])) {
+    *(int16_t *)((char *)projection + 0x54) = 2;
+  } else if (x87_fabs(projection[0x12]) >= x87_fabs(projection[0x11])) {
+    *(int16_t *)((char *)projection + 0x54) = 1;
   } else {
-    plane_basis = fabsf(projection[0x12]) >= fabsf(projection[0x11]) ? 1 : 0;
+    *(int16_t *)((char *)projection + 0x54) = 0;
   }
 
-  *(int16_t *)(projection + 0x15) = plane_basis;
-  plane_axis = (uint8_t)FUN_00099270(projection + 0x11, plane_basis);
-  *(uint8_t *)((char *)projection + 0x56) = plane_axis;
+  *(uint8_t *)((char *)projection + 0x56) = (uint8_t)FUN_00099270(
+      projection + 0x11, *(int16_t *)((char *)projection + 0x54));
 
   projected[0] = bounds[0] * basis[1] + bounds[2] * basis[4] + basis[10];
-  projected[1] = bounds[0] * basis[2] + bounds[2] * basis[5] + basis[11];
-  projected[2] = bounds[0] * basis[3] + bounds[2] * basis[6] + basis[12];
-  FUN_00061df0(projected, plane_basis, plane_axis, projection + 0x16);
+  projected[1] = bounds[2] * basis[5] + bounds[0] * basis[2] + basis[11];
+  projected[2] = bounds[2] * basis[6] + bounds[0] * basis[3] + basis[12];
+  FUN_00061df0(projected, *(int16_t *)((char *)projection + 0x54),
+               *(uint8_t *)((char *)projection + 0x56), projection + 0x16);
 
   projected[0] = bounds[1] * basis[1] + bounds[2] * basis[4] + basis[10];
-  projected[1] = bounds[1] * basis[2] + bounds[2] * basis[5] + basis[11];
-  projected[2] = bounds[1] * basis[3] + bounds[2] * basis[6] + basis[12];
-  FUN_00061df0(projected, plane_basis, plane_axis, projection + 0x18);
+  projected[1] = bounds[2] * basis[5] + bounds[1] * basis[2] + basis[11];
+  projected[2] = bounds[2] * basis[6] + bounds[1] * basis[3] + basis[12];
+  FUN_00061df0(projected, *(int16_t *)((char *)projection + 0x54),
+               *(uint8_t *)((char *)projection + 0x56), projection + 0x18);
 
   projected[0] = bounds[1] * basis[1] + bounds[3] * basis[4] + basis[10];
-  projected[1] = bounds[1] * basis[2] + bounds[3] * basis[5] + basis[11];
+  projected[1] = bounds[3] * basis[5] + bounds[1] * basis[2] + basis[11];
   projected[2] = bounds[1] * basis[3] + bounds[3] * basis[6] + basis[12];
-  FUN_00061df0(projected, plane_basis, plane_axis, projection + 0x1a);
+  FUN_00061df0(projected, *(int16_t *)((char *)projection + 0x54),
+               *(uint8_t *)((char *)projection + 0x56), projection + 0x1a);
 
-  projected[0] = bounds[0] * basis[1] + bounds[3] * basis[4] + basis[10];
-  projected[1] = bounds[0] * basis[2] + bounds[3] * basis[5] + basis[11];
-  projected[2] = bounds[0] * basis[3] + bounds[3] * basis[6] + basis[12];
-  FUN_00061df0(projected, plane_basis, plane_axis, projection + 0x1c);
+  projected[0] = bounds[3] * basis[4] + bounds[0] * basis[1] + basis[10];
+  projected[1] = bounds[3] * basis[5] + bounds[0] * basis[2] + basis[11];
+  projected[2] = bounds[3] * basis[6] + bounds[0] * basis[3] + basis[12];
+  FUN_00061df0(projected, *(int16_t *)((char *)projection + 0x54),
+               *(uint8_t *)((char *)projection + 0x56), projection + 0x1c);
 
   projection[0x1e] = projection[0x18] - projection[0x16];
   projection[0x1f] = projection[0x19] - projection[0x17];
