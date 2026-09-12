@@ -2929,3 +2929,53 @@ and 0x147ed0). Run it after lifting anything in real_math/collision; a new
 Related: §57 (association divergence). The x87 narrowing checker now also
 counts reloads through `fadd/fsub/fmul/fdiv/fcom dword [slot]`, closing the
 blind spot that hid `t_min/V/b` in `projectile_aim_ballistic`.
+
+---
+
+## 59. A Width-Guessed Temporary Truncates a Comparison — the Loading Screen Froze at 0.4319
+
+**Symptom.** The loading bar animated back and forth but never advanced past
+~43%, and the loading glow rendered with corrupted colors. Nothing crashed,
+nothing asserted, no gate failed: the lifts built, byte-matched, and passed the
+hazard scan.
+
+**Cause.** Two independent implicit narrowings, both introduced by transcribing
+Ghidra's temporaries at Ghidra's guessed width rather than the reference's
+actual operand width.
+
+1. `FUN_001ba9d0` (cache slot lookup, `src/halo/cache/tags.c`). The reference
+   comparison is 16-bit — `MOV BX,[EBP+0xc]` at 0x1ba9d4, then
+   `CMP WORD PTR [ESI+EDX*2+0xa78],BX` at 0x1ba9e3 — but the lift staged the
+   `short key` parameter through a `char new_var`. Live evidence from the stuck
+   box: the eight slot ids at `cache_file_globals+0xa78` are 0x0080..0x0087 and
+   the key at +0xaba is 0x0080. `(char)0x80` promotes to -128 and never equals
+   +128, so the lookup returned NULL for *every* slot,
+   `simple_cache_copy_thread` stored 0 to +0xaac, took the 0x1bbe91 failure
+   branch, and `map_load_progress` stopped advancing.
+
+2. `progress_bar_decode_texture` (0xe24e0). `MOVZX EAX,CL` at 0xe2527
+   zero-extends the RLE source byte before the signed-modulo sequence
+   (`AND 0x8000000f` / `JNS` / `DEC` / `OR` / `INC`), so the modulo operand is
+   an *unsigned* char promoted to int. The lift declared it `char`; every byte
+   >= 0x80 produced a negative index and the wrong palette entry.
+
+**Why every gate passed.** A narrowing copy is invisible to byte-match scoring
+— MSVC and clang both emit the same `MOVSX`/`MOVZX`-and-compare shape, and the
+candidate scores as well with the wrong width as with the right one. The defect
+only exists at runtime, only for values above the narrow type's range, and the
+loading screen's 0x0080 slot ids sit exactly one above `char`'s positive range.
+
+**Rule.** A temporary's width comes from the *reference operand*, never from
+Ghidra's rendering. `CMP WORD PTR` means a 16-bit compare: compare the `short`
+parameter directly rather than staging a copy. `MOVZX` means unsigned: declare
+`unsigned char` and promote explicitly (`(int)byte_val % 16`). When Ghidra
+inserts a staging temporary at all, prefer deleting it over widening it — the
+original usually had no copy.
+
+**Automation:** `check_narrowing_assignment` in
+`tools/audit/check_lift_hazards.py` flags any implicit (uncast) assignment or
+initialiser whose right-hand side is a bare identifier of a wider integer type
+than the destination, for parameters and locals alike. It reproduces the
+`char new_var = key` hit on the pre-fix `tags.c`. An explicit cast is read as
+intent and never flagged; suppress a verified-faithful narrowing with
+`/* hazard-ok: narrowing-assign */` on the line.

@@ -2479,6 +2479,174 @@ def check_pointer_slot_arg_form(filepath, content, lines):
     return errors
 
 
+# ---------------------------------------------------------------------------
+# §59: Implicit narrowing assignment from a wider parameter or local (WARN)
+# ---------------------------------------------------------------------------
+# Ghidra stages values through width-inaccurate temporaries: it renders a
+# 16-bit `CMP WORD PTR [...],BX` against a `char new_var` copy, or a
+# `MOVZX EAX,CL` zero-extension as a signed `char`.  Transcribed literally the
+# copy TRUNCATES: `char new_var = key;` on a `short key` of 0x0080 yields -128
+# and the comparison never matches (lift-learnings §59 — the loading screen
+# hung at 0.4319 for weeks on exactly this).  Every gate passes: the lift
+# builds, byte-matches, and only the running game shows the defect.
+#
+# Flags an implicit (uncast) assignment or initialiser whose right-hand side is
+# a bare identifier of a WIDER integer type than the destination.  An explicit
+# cast is taken as intent and never flagged.
+# Suppress with /* hazard-ok: narrowing-assign */ on the same line.
+_NARROW_WIDTH = {
+    'char': 1, 'signed char': 1, 'unsigned char': 1,
+    'uint8_t': 1, 'int8_t': 1, 'bool': 1,
+    'short': 2, 'unsigned short': 2, 'signed short': 2,
+    'uint16_t': 2, 'int16_t': 2, '__int16': 2,
+    'int': 4, 'unsigned int': 4, 'signed int': 4, 'unsigned': 4,
+    'uint32_t': 4, 'int32_t': 4, 'long': 4, 'unsigned long': 4,
+    'size_t': 4, '__int32': 4,
+}
+
+_NARROW_FN_START = re.compile(r'^[A-Za-z_][\w *]*?\**\s*(\w+)\s*\(')
+_NARROW_DECL = re.compile(
+    r'^\s*((?:unsigned |signed )?[A-Za-z_]\w*)\s+(\w+)\s*'
+    r'(?:=\s*([^;]+?))?\s*;\s*$')
+_NARROW_ASSIGN = re.compile(r'^\s*(\w+)\s*=\s*([^;]+?)\s*;\s*$')
+_NARROW_REGARG = re.compile(r'@<\w+>')
+_NARROW_COMMENT = re.compile(r'/\*.*?\*/')
+
+
+def _narrow_type(text):
+    """Normalise a declaration's type text, or return None if not a scalar int."""
+    cleaned = ' '.join(text.replace('const', '').split())
+    return cleaned if cleaned in _NARROW_WIDTH else None
+
+
+def _narrow_scalar_params(signature):
+    """Map parameter name -> normalised integer type for one signature.
+
+    Pointer and array parameters are skipped; they cannot be truncated by an
+    assignment to a narrower scalar.
+    """
+    try:
+        inner = signature[signature.index('(') + 1:signature.rindex(')')]
+    except ValueError:
+        return {}
+
+    parts, depth, current = [], 0, ''
+    for ch in inner:
+        if ch in '([':
+            depth += 1
+        if ch in ')]':
+            depth -= 1
+        if ch == ',' and depth == 0:
+            parts.append(current)
+            current = ''
+        else:
+            current += ch
+    if current.strip():
+        parts.append(current)
+
+    params = {}
+    for part in parts:
+        part = _NARROW_COMMENT.sub('', part)
+        part = _NARROW_REGARG.sub('', part).strip()
+        if part in ('void', ''):
+            continue
+        if '*' in part or '[' in part:
+            continue
+        m = re.match(r'^(.*?)\b(\w+)$', part)
+        if not m:
+            continue
+        ptype = _narrow_type(m.group(1))
+        if ptype:
+            params[m.group(2)] = ptype
+    return params
+
+
+def check_narrowing_assignment(filepath, content, lines):
+    """Flag implicit narrowing copies of a wider integer param or local."""
+    errors = []
+    relpath = os.path.relpath(filepath, ROOT_DIR)
+    i = 0
+
+    while i < len(lines):
+        line = lines[i]
+        if not line or line[0] in ' \t#/*}':
+            i += 1
+            continue
+        m = _NARROW_FN_START.match(line)
+        if not m:
+            i += 1
+            continue
+
+        # Join a signature that wraps across lines.
+        signature, j = line, i
+        while signature.count('(') > signature.count(')') and j + 1 < len(lines):
+            j += 1
+            signature += ' ' + lines[j].strip()
+        if j + 1 >= len(lines) or not lines[j + 1].startswith('{'):
+            i = j + 1
+            continue
+
+        func_name = m.group(1)
+        widths = _narrow_scalar_params(signature)
+
+        depth, k, body = 0, j + 1, []
+        while k < len(lines):
+            depth += lines[k].count('{') - lines[k].count('}')
+            body.append((k + 1, lines[k]))
+            if depth == 0 and k > j + 1:
+                break
+            k += 1
+
+        # Pass 1: record local widths, flag narrowing initialisers.
+        for lineno, text in body:
+            dm = _NARROW_DECL.match(text)
+            if not dm:
+                continue
+            dtype = _narrow_type(dm.group(1))
+            if not dtype:
+                continue
+            var, init = dm.group(2), dm.group(3)
+            widths[var] = dtype
+            if not init:
+                continue
+            source = init.strip()
+            if source not in widths:
+                continue
+            if _NARROW_WIDTH[widths[source]] <= _NARROW_WIDTH[dtype]:
+                continue
+            if 'hazard-ok' in text:
+                continue
+            errors.append(
+                f'  {relpath}:{lineno}: {func_name}: '
+                f'{dtype} {var} = {source} truncates a '
+                f'{widths[source]} — verify the reference operand width '
+                f'(see lift-learnings §59; suppress with hazard-ok comment)'
+            )
+
+        # Pass 2: plain assignments between already-declared names.
+        for lineno, text in body:
+            am = _NARROW_ASSIGN.match(text)
+            if not am:
+                continue
+            lhs, rhs = am.group(1), am.group(2).strip()
+            if lhs not in widths or rhs not in widths:
+                continue
+            if _NARROW_WIDTH[widths[rhs]] <= _NARROW_WIDTH[widths[lhs]]:
+                continue
+            if 'hazard-ok' in text:
+                continue
+            errors.append(
+                f'  {relpath}:{lineno}: {func_name}: '
+                f'{lhs} = {rhs} truncates a {widths[rhs]} into a '
+                f'{widths[lhs]} — verify the reference operand width '
+                f'(see lift-learnings §59; suppress with hazard-ok comment)'
+            )
+
+        i = k + 1
+
+    return errors
+
+
 def main():
     frame_audit = '--frame-size-audit' in sys.argv
     quiet = '-q' in sys.argv or '--quiet' in sys.argv or os.environ.get('LOG_LEVEL') == 'WARNING'
@@ -2530,6 +2698,7 @@ def main():
     all_vendored_errors = []
     all_static_buf_errors = []
     all_slot_form_errors = []
+    all_narrowing_errors = []
 
     for fpath in c_files:
         with open(fpath, 'r', errors='replace') as f:
@@ -2561,6 +2730,7 @@ def main():
         all_vendored_errors.extend(check_vendored_source(fpath, content, lines))
         all_static_buf_errors.extend(check_static_local_buffers(fpath, content, lines))
         all_slot_form_errors.extend(check_pointer_slot_arg_form(fpath, content, lines))
+        all_narrowing_errors.extend(check_narrowing_assignment(fpath, content, lines))
         if frame_audit:
             all_frame_errors.extend(check_frame_sizes(fpath, content, lines))
 
@@ -2592,7 +2762,8 @@ def main():
             f'range_gate: {len(all_range_gate_errors)}, '
             f'fnptr_conv: {len(all_fnptr_conv_errors)}, '
             f'vendored_src: {len(all_vendored_errors)}, '
-            f'slot_form: {len(all_slot_form_errors)}'
+            f'slot_form: {len(all_slot_form_errors)}, '
+            f'narrowing_assign: {len(all_narrowing_errors)}'
         )
         if frame_audit:
             counts += f', frame_sizes: {len(all_frame_errors)}'
@@ -2612,7 +2783,8 @@ def main():
                  len(all_discard_result_errors) + len(all_inplace_mut_errors) +
                  len(all_contiguity_errors) + len(all_nan_guard_errors) +
                  len(all_range_gate_errors) + len(all_fnptr_conv_errors) +
-                 len(all_vendored_errors) + len(all_slot_form_errors))
+                 len(all_vendored_errors) + len(all_slot_form_errors) +
+                 len(all_narrowing_errors))
         if total:
             print(counts, file=sys.stderr)
     else:
@@ -2966,6 +3138,23 @@ def main():
                 file=sys.stderr,
             )
             for e in all_slot_form_errors:
+                print(e, file=sys.stderr)
+            print(file=sys.stderr)
+
+        if all_narrowing_errors:
+            print(
+                'WARNING: implicit narrowing copy of a wider integer value.\n'
+                'Ghidra stages comparisons and arithmetic through temporaries\n'
+                'whose width it guesses: a 16-bit CMP WORD PTR [...],BX shows\n'
+                'up as a `char` copy, and a MOVZX zero-extension as a signed\n'
+                '`char`. Transcribed literally the copy TRUNCATES and the test\n'
+                'silently never matches (lift-learnings §59 — `char new_var =\n'
+                'key;` on a short key of 0x0080 gave -128, the cache slot\n'
+                'lookup returned NULL for every slot and the loading screen\n'
+                'froze at 0.4319). Check the reference operand width:\n',
+                file=sys.stderr,
+            )
+            for e in all_narrowing_errors:
                 print(e, file=sys.stderr)
             print(file=sys.stderr)
 
