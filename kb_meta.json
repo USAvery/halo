@@ -14710,6 +14710,13 @@
         "cone is declared double because the original never spills the FCOS result to memory (it lives in ST1 across FXCH/FSUB/FSUB at 0x16a05e-0x16a06a); a float declaration would introduce a narrowing the binary does not perform, but a double still narrows 80-bit to 64-bit."
       ]
     },
+    "0x16bed0": {
+      "kind": "function",
+      "status": "unknown",
+      "inferred": [
+        "Cull-plane dot product in the C source is written as (0x5a5dc8-term + 0x5a5dcc-term + 0x5a5dd0-term) left-to-right, but the disassembly computes it as (0x5a5dd0-term + 0x5a5dcc-term) first, then + 0x5a5dc8-term (FLD 0x5a5dd0 first). Verified the FCOMP/FNSTSW/TEST AH,0x5/JP branch sense is still correct (matches binary exactly) despite the differing floating-point summation order; this is an FP-association deviation only, not a logic bug, and does not affect the visual-regression investigation (this dot product feeds a boolean cull flag DAT_0047e003, not a color)."
+      ]
+    },
     "0x16f500": {
       "kind": "function",
       "status": "unknown",
