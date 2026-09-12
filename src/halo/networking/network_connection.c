@@ -1,5 +1,10 @@
 #include "network_connection.h"
 
+#if defined(_MSC_VER) && !defined(__clang__)
+extern void *__cdecl memset(void *, int, unsigned int);
+#pragma intrinsic(memset)
+#endif
+
 /* Halo CE Xbox — network connection helpers.
  * c:\halo\SOURCE\networking\network_connection.c
  *
@@ -337,7 +342,11 @@ void network_connection_notify_traffic_event(int event, int enable,
       csmemset(addr_buf, 0, 0x18);
       ((struct transport_address *)addr_buf)->address_length = 4;
     }
+#if defined(_MSC_VER) && !defined(__clang__)
+    memset(name_buf, 0, sizeof(name_buf));
+#else
     csmemset(name_buf, 0, sizeof(name_buf));
+#endif
     addr_str = transport_address_to_string(addr_buf);
     csstrcpy(name_buf, addr_str);
     for (i = 0; name_buf[i] != '\0'; i++) {

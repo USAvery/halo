@@ -2165,7 +2165,12 @@ def main():
     # game TUs.  Verified: FUN_0013c030 56.1% (/Ob2) -> 100.0% (/Ob1);
     # game_engine.c mean 84.9 -> 86.4 with 22 functions gaining >5pp vs
     # 4 dropping <7pp.
-    _OB1_TUS = ("game/game_engine.c", "objects/objects.c", "units/units.c")
+    _OB1_TUS = (
+        "game/game_engine.c",
+        "objects/objects.c",
+        "units/units.c",
+        "game/player_queues_new.c",
+    )
     if args.opt == "/O2" and any(str(source).replace("\\", "/").endswith(t) for t in _OB1_TUS):
         args.opt = "/O2 /Ob1"
         if not args.quiet:

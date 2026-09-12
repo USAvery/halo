@@ -278,8 +278,14 @@ bool FUN_00130270(void *server, void *buffer, int size, void *addr)
     system_exit(-1);
   }
   category = (unsigned char)(msg[0] >> 2) & 3;
-  if ((msg[0] & 3) == 0) {
-    switch (category) {
+  if ((msg[0] & 3) != 0) {
+    network_game_log("server received a datagram with invalid flags; sender= "
+                     "'%s'",
+                     transport_address_to_string(addr));
+    return 1;
+  }
+
+  switch (category) {
     case 3:
       packet_version = 1;
       packet_type = *((char *)msg + (short)(unsigned short)size - 1);
@@ -364,11 +370,6 @@ bool FUN_00130270(void *server, void *buffer, int size, void *addr)
                        category, transport_address_to_string(addr));
       break;
     }
-  } else {
-    network_game_log("server received a datagram with invalid flags; sender= "
-                     "'%s'",
-                     transport_address_to_string(addr));
-  }
   return 1;
 }
 
@@ -380,7 +381,7 @@ bool FUN_00130580(void *server, void *machine, void *buffer, int size)
 {
   unsigned short *msg;
   unsigned char category;
-  char packet_type;
+  unsigned char packet_type;
 
   msg = (unsigned short *)buffer;
   if (server == (void *)0 || machine == (void *)0 ||

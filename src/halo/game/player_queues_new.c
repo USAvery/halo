@@ -96,16 +96,7 @@ void update_client_add_player(int handle)
 
 void update_client_queue(void *data)
 {
-  int i;
-  int *dst;
-  int *src;
-  dst = (int *)(0x45b1dc + *(int *)0x45b25c * 0x20);
-  src = (int *)data;
-  for (i = 8; i != 0; i--) {
-    *dst = *src;
-    dst++;
-    src++;
-  }
+  qmemcpy((void *)(0x45b1dc + *(int *)0x45b25c * 0x20), data, 0x20);
   *(int *)0x45b25c = *(int *)0x45b25c + 1;
 }
 
@@ -289,11 +280,12 @@ void update_server_get_update(int machine_index, void *update_buf,
       system_exit(-1);
     }
     datum_ptr = datum_get(*(data_t **)0x4570c8, machine_index);
-    if (*(int *)((char *)datum_ptr + 4) >= *(int *)0x4570c4) {
+    if (*(int *)((char *)datum_ptr + 4) < *(int *)0x4570c4) {
+      *update_number = *(int *)((char *)datum_ptr + 4);
+    } else {
       *update_number = -1;
       return;
     }
-    *update_number = *(int *)((char *)datum_ptr + 4);
   }
 
   if (*update_number != -1) {
@@ -492,38 +484,34 @@ int update_get_game_time(void)
   int first;
   int last;
   int tick;
-  int slot_addr;
+  uintptr_t slot_addr;
   uint16_t action_count;
 
   first = *(int *)0x45b1d4;
   last = *(int *)0x45b1d8;
   tick = first;
 
-  if (first > last)
-    goto done;
+  if (first <= last) {
+    do {
+      if (tick < first)
+        break;
+      if (tick >= first + 0x80)
+        break;
 
-  for (;;) {
-    if (tick < first)
-      break;
-    if (tick >= first + 0x80)
-      break;
+      slot_addr = (tick & 0x7f) * 0x208 + 0x45b264;
+      if (slot_addr == 0)
+        break;
 
-    slot_addr = (tick & 0x7f) * 0x208 + 0x45b264;
-    if (slot_addr == 0)
-      break;
+      action_count = *(uint16_t *)(slot_addr + 4);
+      if (action_count <= 0)
+        break;
+      if (action_count > 16)
+        break;
 
-    action_count = *(uint16_t *)(slot_addr + 4);
-    if (action_count == 0)
-      break;
-    if (action_count > 16)
-      break;
-
-    tick++;
-    if (tick > last)
-      break;
+      tick++;
+    } while (tick <= last);
   }
 
-done:
   return tick;
 }
 
@@ -569,30 +557,28 @@ void update_server_apply_actions(int16_t machine_index, void *actions)
       next_src = src + 0x20;
 
       /* REP MOVSD: copy 8 dwords (0x20 bytes) from src to datum+8 */
-      csmemcpy(datum_ptr + 8, src, 0x20);
+      qmemcpy(datum_ptr + 8, src, 0x20);
       src = next_src;
 
       /* assert_valid_real on desired_facing.pitch (datum+0x10) */
       pitch_bits = *(uint32_t *)(datum_ptr + 0x10);
       if ((pitch_bits & 0x7f800000u) == 0x7f800000u) {
-        char *msg =
+        display_assert(
           csprintf((char *)0x5ab100, "%s: assert_valid_real(0x%08X %f)",
                    "queue->current_action.desired_facing.pitch", pitch_bits,
-                   (double)*(float *)(datum_ptr + 0x10));
-        display_assert(msg, "c:\\halo\\SOURCE\\game\\player_queues_new.c",
-                       0x238, 1);
+                   (double)*(float *)(datum_ptr + 0x10)),
+          "c:\\halo\\SOURCE\\game\\player_queues_new.c", 0x238, 1);
         system_exit(-1);
       }
 
       /* assert_valid_real on desired_facing.yaw (datum+0x0c) */
       yaw_bits = *(uint32_t *)(datum_ptr + 0x0c);
       if ((yaw_bits & 0x7f800000u) == 0x7f800000u) {
-        char *msg =
+        display_assert(
           csprintf((char *)0x5ab100, "%s: assert_valid_real(0x%08X %f)",
                    "queue->current_action.desired_facing.yaw", yaw_bits,
-                   (double)*(float *)(datum_ptr + 0x0c));
-        display_assert(msg, "c:\\halo\\SOURCE\\game\\player_queues_new.c",
-                       0x239, 1);
+                   (double)*(float *)(datum_ptr + 0x0c)),
+          "c:\\halo\\SOURCE\\game\\player_queues_new.c", 0x239, 1);
         system_exit(-1);
       }
     }
@@ -691,14 +677,15 @@ void update_server_create_snapshot(void)
   data_t *queue;
   char *datum_data;
 
+  old_index = *(int *)0x4570c4;
+
   if (*(uint8_t *)0x4570c0 == 0) {
     display_assert("update_server_globals.initialized",
                    "c:\\halo\\SOURCE\\game\\player_queues_new.c", 0xfa, 1);
     system_exit(-1);
   }
 
-  old_index = *(int *)0x4570c4;
-  *(int *)0x4570c4 = *(int *)0x4570c4 + 1;
+  *(int *)0x4570c4 = old_index + 1;
 
   /* Look up the circular update buffer entry for old_index. */
   entry = update_get_buffer_entry(old_index);
