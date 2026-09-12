@@ -319,5 +319,21 @@ This looks a bit weird on a normal screen.
 
 ---
 
+### `rasterizer_wireframe` corrupts the HUD / UI (wireframe fill mode leaks into 2D passes)
+
+**Description:** The debug console command `rasterizer_wireframe 1` breaks the HUD and UI rendering — HUD elements, reticles, and menu text render as broken triangle outlines instead of filled quads. This is an **original-engine bug, not a regression in our reimplementation** (verified 2026-09-12: identical corruption on the unpatched `cachebeta.xbe` and our patched build).
+
+**Engine cause (binary-confirmed):** `rasterizer_wireframe` is a HaloScript external global — descriptor at 0x2f23a0 `{name, type=5 (bool), ptr=0x3256be}`; the console `set` path (`hs_console_evaluate` → `FUN_000cb7b0` case 5) writes it byte-accurately. Its *only* consumer in the entire binary is the scene render-begin `FUN_00158df0` (assert line 0x547 in `c:\halo\SOURCE\rasterizer\xbox\rasterizer_xbox.c`), which at 0x158f70 sets the device-wide fill mode from the flag:
+
+```c
+D3DDevice_SetRenderState_FillMode((*(unsigned char *)0x3256be != 0) ? 0x1b01 /*WIREFRAME*/ : 0x1b02 /*SOLID*/);
+```
+
+Nothing ever resets the fill mode to SOLID for the subsequent 2D passes — the only `push 0x1b02` in the game is this same ternary, `_rasterizer_hud_begin` (0x160940) is only a profiler section marker, and `D3DDevice_ApplyStateBlock` (whose captured state blocks hold SOLID defaults) is only called from D3D8/XDK library internals, never from game HUD code. The wireframe fill mode set once at frame start therefore persists into the HUD/UI quad passes and rasterizes them as outlines. Evidently a dev-only diagnostic toggle that Bungie never made HUD-aware.
+
+**Reproduction:** Debug console: `rasterizer_wireframe 1`. HUD/UI renders as wireframe triangles. `rasterizer_wireframe 0` restores normal rendering.
+
+---
+
 *Sources: Halopedia (halopedia.org), Halo Alpha / Halo Fandom (halo.fandom.com), StrategyWiki (strategywiki.org), GameFAQs, SuperCheats community reports, and original Xbox community testing. All glitches verified as present on the original 2001 Xbox NTSC retail release.*
 
