@@ -6,19 +6,30 @@
  *
  * Re-implemented functions (by XBE address, ascending):
  *   0xe19c0  tgaLoad
+ *   0xe1a10  FUN_000e1a10
  *   0xe1c70  progress_bar_initialize
  *   0xe1c80  progress_bar_dispose
  *   0xe1c90  progress_bar_begin
  *   0xe1cc0  progress_bar_end
  *   0xe1ce0  ui_automation_is_active
+ *   0xe1d00  FUN_000e1d00
  *   0xe1db0  progress_bar_compute_screen_rect
  *   0xe1f00  FUN_000e1f00
  *   0xe1f20  FUN_000e1f20
  *   0xe2040  progress_bar_draw_fullscreen_overlay
+ *   0xe2170  FUN_000e2170
+ *   0xe21b0  FUN_000e21b0
+ *   0xe21e0  progress_bar_set_quad_texcoords
+ *   0xe2220  SetRenderStateSmart
  *   0xe2470  SetTextureStageStateSmart
  *   0xe24e0  progress_bar_decode_texture
  *   0xe2580  progress_bar_generate_gradient_texture
+ *   0xe2650  FUN_000e2650
+ *   0xe2680  FUN_000e2680
  *   0xe26c0  progress_bar_draw_loading_bar
+ *   0xe2820  FUN_000e2820
+ *   0xe2880  FUN_000e2880
+ *   0xe28e0  progress_bar_eachframe
  *   0xe29a0  progress_bar_screen_initialize
  *   0xe2e50  progress_bar_render
  *   0xe3300  progress_bar_display
@@ -53,6 +64,24 @@ static char *progress_bar_rendering_enabled(void)
 }
 
 /*
+ * d3d_render_state_registers — NV2A pushbuffer register token for each of the
+ * 0x52 "simple" render states, indexed by state token (table at 0x282b90).
+ */
+static const uint32_t *d3d_render_state_registers(void)
+{
+  return (const uint32_t *)0x282b90;
+}
+
+/*
+ * d3d_render_state_values — last value written for each simple render state,
+ * parallel to d3d_render_state_registers (0x52 dwords at 0x1fb698).
+ */
+static uint32_t *d3d_render_state_values(void)
+{
+  return (uint32_t *)0x1fb698;
+}
+
+/*
  * tgaLoad @ 0xe19c0 — dead D3D8 inline-wrapper instantiation of
  * IDirect3DDevice8::CreateTexture: format/pool/ppTexture arrive in
  * EDX/ECX/EAX, the device argument (s1) is ignored, width/height/levels/
@@ -70,6 +99,31 @@ void tgaLoad(int r1, int r2, int r3, int s1, int s2, int s3, int s4, int s5)
 {
   (void)s1;
   D3DDevice_CreateTexture(s2, s3, s4, s5, r3, r2, (void *)r1);
+}
+
+/*
+ * FUN_000e1a10 @ 0xe1a10 — dead D3D8 inline-wrapper instantiation of
+ * IDirect3DDevice8::Clear, same template family as tgaLoad (0xe19c0) and
+ * FUN_000e1f20 (0xe1f20): the device argument ([ebp+8]) is never read,
+ * RET 0x14 (five stack dwords) makes it __stdcall, and XOR EAX,EAX before
+ * the epilogue is a real `return 0`. No callers found (xrefs_to empty).
+ *
+ * Push sequence at 0xe1a16-0xe1a24, last pushed is the first argument:
+ *   PUSH EAX_in, PUSH [ebp+0x18], PUSH EDX_in, PUSH [ebp+0x14],
+ *   PUSH [ebp+0x10], PUSH [ebp+0xc]
+ * against D3DDevice_Clear(count, rects, flags, color, z, stencil) gives
+ * count=[ebp+0xc], rects=[ebp+0x10], flags=[ebp+0x14], color=EDX_in,
+ * z=[ebp+0x18], stencil=EAX_in. EDX and EAX are never written in the
+ * function body, so both are implicit register inputs (@<edx> / @<eax> in
+ * kb.json), not stack slots.
+ */
+/* 0xe1a10 */
+int FUN_000e1a10(void *device, uint32_t count, void *rects, uint32_t flags,
+                 float z, uint32_t color, uint32_t stencil)
+{
+  (void)device;
+  D3DDevice_Clear(count, rects, flags, color, z, stencil);
+  return 0;
 }
 
 /* progress_bar_initialize — no-op stub. */
@@ -122,6 +176,37 @@ void progress_bar_end(void)
 bool ui_automation_is_active(void)
 {
   return *progress_bar_active();
+}
+
+/*
+ * FUN_000e1d00 @ 0xe1d00 — project a 3D point through the progress-bar
+ * perspective matrix and write its perspective-divided screen x/y.
+ *
+ * Confirmed: SUB ESP,0x20 covers vec[4] at [ebp-0x10] and result[4] at
+ * [ebp-0x20]; MOV [ebp-4],0x3f800000 is vec[3] = 1.0f.
+ * Confirmed: mat4x4_transform_vec4(result, vec, 0x46c2d8) — the same
+ * perspective matrix progress_bar_compute_screen_rect projects through.
+ * Confirmed: 0x2533c8 = 1.0f, and FDIV [ebp-0x14] divides it by result[3].
+ * Confirmed: FMUL ST(1) keeps the reciprocal live across both stores, so
+ * one division serves both outputs; FSTP [EDX] targets [ebp+0x14] (out_x)
+ * and FSTP [EAX] targets [ebp+0x18] (out_y).
+ * No callers found (xrefs_to empty).
+ */
+/* 0xe1d00 */
+void FUN_000e1d00(float x, float y, float z, float *out_x, float *out_y)
+{
+  float vec[4];
+  float result[4];
+  float scale;
+
+  vec[0] = x;
+  vec[1] = y;
+  vec[2] = z;
+  vec[3] = 1.0f;
+  mat4x4_transform_vec4(result, vec, (float *)0x46c2d8);
+  scale = *(float *)0x2533c8 / result[3];
+  *out_x = result[0] * scale;
+  *out_y = scale * result[1];
 }
 
 /*
@@ -316,6 +401,19 @@ void progress_bar_draw_fullscreen_overlay(float x, float y, float alpha)
 }
 
 /*
+ * FUN_000e2170 @ 0xe2170 — set the progress-bar rendering-enabled flag.
+ *
+ * Confirmed: MOV AL,[ebp+8] / MOV byte ptr [0x30f030],AL / RET — a single
+ * byte store to the flag progress_bar_render tests before drawing.
+ * No callers found (xrefs_to empty).
+ */
+/* 0xe2170 */
+void FUN_000e2170(char enabled)
+{
+  *progress_bar_rendering_enabled() = enabled;
+}
+
+/*
  * FUN_000e21b0 — thin register-arg forwarding wrapper for D3DTexture_LockRect.
  *
  * Sibling of the (untracked) EAX/ECX/EDX-forwarding wrapper at 0xe21a0 that
@@ -368,6 +466,152 @@ float *D3DXMatrixIdentity(float *pout)
   pout[0] = pout[5] = pout[10] = pout[15] = 1.0f;
 
   return pout;
+}
+
+/*
+ * SetRenderStateSmart — dispatches a D3DRENDERSTATETYPE token to the matching
+ * per-state wrapper instead of one opaque SetRenderState call, mirroring
+ * SetTextureStageStateSmart (0xe2470) for render states.
+ *
+ * Disassembly (0xe2220-0xe2462), verified branch by branch:
+ *   CMP ESI,0x52 ; JGE — states below 0x52 are "simple" NV2A registers: the
+ *     pushbuffer token is looked up in the table at 0x282b90 (MOV ECX,
+ *     [ESI*4+0x282b90]) and passed with the value in EDX to
+ *     D3DDevice_SetRenderState_Simple (@<ecx>/@<edx>), then the value is
+ *     cached at [ESI*4+0x1fb698]. There is no read-back compare — the cache
+ *     is written, never tested, in this function.
+ *   CMP ESI,0x74 ; JGE — states in [0x52,0x74) tail-JMP into
+ *     D3DDevice_SetRenderState_Deferred(state@<ecx>, value@<edx>).
+ *   The remaining states are an exact CMP/JNE chain, each pushing the value
+ *   as a single __stdcall stack argument. The chain order is taken verbatim
+ *   from the binary, including the 0x7f-before-0x7e inversion at
+ *   0xe2301/0xe2312, which is not sorted.
+ *   The last comparison (0x8f) has no branch after it, so it falls through
+ *   to the shared epilogue.
+ */
+/* 0xe2220 */
+void SetRenderStateSmart(int state, int value)
+{
+  if (state < 0x52) {
+    D3DDevice_SetRenderState_Simple(d3d_render_state_registers()[state], value);
+    d3d_render_state_values()[state] = value;
+    return;
+  }
+  if (state < 0x74) {
+    D3DDevice_SetRenderState_Deferred(state, value);
+    return;
+  }
+  if (state == 0x74) {
+    D3DDevice_SetRenderState_PSTextureModes(value);
+    return;
+  }
+  if (state == 0x75) {
+    D3DDevice_SetRenderState_VertexBlend(value);
+    return;
+  }
+  if (state == 0x76) {
+    D3DDevice_SetRenderState_FogColor(value);
+    return;
+  }
+  if (state == 0x77) {
+    D3DDevice_SetRenderState_FillMode(value);
+    return;
+  }
+  if (state == 0x78) {
+    D3DDevice_SetRenderState_BackFillMode(value);
+    return;
+  }
+  if (state == 0x79) {
+    D3DDevice_SetRenderState_TwoSidedLighting(value);
+    return;
+  }
+  if (state == 0x7a) {
+    D3DDevice_SetRenderState_NormalizeNormals(value);
+    return;
+  }
+  if (state == 0x7b) {
+    D3DDevice_SetRenderState_ZEnable(value);
+    return;
+  }
+  if (state == 0x7c) {
+    D3DDevice_SetRenderState_StencilEnable(value);
+    return;
+  }
+  if (state == 0x7d) {
+    D3DDevice_SetRenderState_StencilFail(value);
+    return;
+  }
+  if (state == 0x7f) {
+    D3DDevice_SetRenderState_CullMode(value);
+    return;
+  }
+  if (state == 0x7e) {
+    D3DDevice_SetRenderState_FrontFace(value);
+    return;
+  }
+  if (state == 0x80) {
+    D3DDevice_SetRenderState_TextureFactor(value);
+    return;
+  }
+  if (state == 0x81) {
+    D3DDevice_SetRenderState_ZBias(value);
+    return;
+  }
+  if (state == 0x82) {
+    D3DDevice_SetRenderState_LogicOp(value);
+    return;
+  }
+  if (state == 0x83) {
+    D3DDevice_SetRenderState_EdgeAntiAlias(value);
+    return;
+  }
+  if (state == 0x84) {
+    D3DDevice_SetRenderState_MultiSampleAntiAlias(value);
+    return;
+  }
+  if (state == 0x85) {
+    D3DDevice_SetRenderState_MultiSampleMask(value);
+    return;
+  }
+  if (state == 0x86) {
+    D3DDevice_SetRenderState_MultiSampleType(value);
+    return;
+  }
+  if (state == 0x87) {
+    D3DDevice_SetRenderState_ShadowFunc(value);
+    return;
+  }
+  if (state == 0x88) {
+    D3DDevice_SetRenderState_LineWidth(value);
+    return;
+  }
+  if (state == 0x89) {
+    D3DDevice_SetRenderState_Dxt1NoiseEnable(value);
+    return;
+  }
+  if (state == 0x8a) {
+    D3DDevice_SetRenderState_YuvEnable(value);
+    return;
+  }
+  if (state == 0x8b) {
+    D3DDevice_SetRenderState_OcclusionCullEnable(value);
+    return;
+  }
+  if (state == 0x8c) {
+    D3DDevice_SetRenderState_StencilCullEnable(value);
+    return;
+  }
+  if (state == 0x8d) {
+    D3DDevice_SetRenderState_RopZCmpAlwaysRead(value);
+    return;
+  }
+  if (state == 0x8e) {
+    D3DDevice_SetRenderState_RopZRead(value);
+    return;
+  }
+  if (state == 0x8f) {
+    D3DDevice_SetRenderState_DoNotCullUncompressed(value);
+  }
 }
 
 /*
@@ -552,6 +796,38 @@ void progress_bar_generate_gradient_texture(void)
 }
 
 /*
+ * FUN_000e2650 @ 0xe2650 — emit one texture coordinate into D3D vertex
+ * register 0xa (the loading bar's scroll stage).
+ *
+ * Confirmed: 0x254cd0 = 20.0f, 0x282d3c = 32.0f.
+ * Confirmed: the [esp+4] slot (second callee argument) is b * 20.0f and the
+ * [esp] slot (first) is a * 32.0f + c; PUSH 0xa supplies the register index.
+ * No callers found (xrefs_to empty).
+ */
+/* 0xe2650 */
+void FUN_000e2650(float a, float b, float c)
+{
+  D3DDevice_SetVertexData2f(0xa, a * 32.0f + c, b * 20.0f);
+}
+
+/*
+ * FUN_000e2680 @ 0xe2680 — emit one scrolled texture coordinate into D3D
+ * vertex register 0xa, using the same scroll expression as
+ * progress_bar_draw_loading_bar (progress * 768 - 64 - 64) subtracted from a.
+ *
+ * Confirmed: 0x2546a4 = 0x3d088889 (1/30), 0x282d40 = 768.0f,
+ * 0x254df8 = 64.0f, subtracted twice as two separate FSUBs.
+ * Confirmed: FSUBR [ebp+8] computes a - scroll, not scroll - a.
+ * No callers found (xrefs_to empty).
+ */
+/* 0xe2680 */
+void FUN_000e2680(float a, float b, float c)
+{
+  D3DDevice_SetVertexData2f(0xa, a - (c * 768.0f - 64.0f - 64.0f),
+                            b * 0.03333333507180214f);
+}
+
+/*
  * progress_bar_draw_loading_bar — draw the textured loading bar quad.
  *
  * Transforms the input screen rect through the perspective projection matrix
@@ -625,6 +901,156 @@ void progress_bar_draw_loading_bar(float *rect, float *color, float alpha,
                             1.0f);
 
   D3DDevice_End();
+}
+
+/*
+ * FUN_000e2820 @ 0xe2820 — draw the loading bar across a fullscreen rect.
+ *
+ * SUB ESP,0x1c allocates a single 7-float rect descriptor at [ebp-0x1c], not
+ * seven independent locals: LEA EAX,[ebp-0x1c] is passed as the rect@<eax>
+ * argument of progress_bar_draw_loading_bar, which reads rect[0]/rect[1]
+ * itself and forwards the same pointer to progress_bar_compute_screen_rect,
+ * which reads +0x08..+0x18 (rect[2]..rect[6]). So [ebp-0xc], [ebp-8] and
+ * [ebp-4] are rect[4], rect[5] and rect[6].
+ *
+ * Confirmed: rect[0] = 0x44200000 = 640.0f, rect[1] = 0x43f00000 = 480.0f,
+ * rect[2] = rect[3] = 0.
+ * Confirmed: rect[4] and rect[5] come from FLD QWORD [0x282d50] / [0x282d48]
+ * followed by FABS and a narrowing FSTP DWORD — the constants are the
+ * doubles 320.0 and 240.0, so the original source takes fabs() of a double
+ * expression the compiler did not fold.
+ * Confirmed push order into progress_bar_draw_loading_bar(rect@<eax>,
+ * color@<ecx>, alpha, progress): PUSH [ebp+0x14] then PUSH [ebp+0xc], and
+ * last-pushed is the first stack argument, so alpha=[ebp+0xc] and
+ * progress=[ebp+0x14]; ECX is loaded from [ebp+0x10] (color).
+ * No callers found (xrefs_to empty).
+ */
+/* 0xe2820 */
+void FUN_000e2820(float depth, float alpha, float *color, float progress)
+{
+  float rect[7];
+
+  rect[0] = 640.0f;
+  rect[1] = 480.0f;
+  rect[2] = 0.0f;
+  rect[3] = 0.0f;
+  rect[4] = (float)fabs(320.0);
+  rect[5] = (float)fabs(240.0);
+  rect[6] = depth;
+  progress_bar_draw_loading_bar(rect, color, alpha, progress);
+}
+
+/*
+ * FUN_000e2880 @ 0xe2880 — fully-opaque, zero-depth variant of FUN_000e2820.
+ *
+ * Same 7-float rect descriptor at [ebp-0x1c] (see FUN_000e2820), with
+ * rect[6] stored as an immediate 0 and alpha pushed as the immediate
+ * 0x3f800000 = 1.0f. ECX is never written anywhere in the function, so the
+ * color pointer is an implicit register input passed straight through to
+ * progress_bar_draw_loading_bar's color@<ecx> slot — @<ecx> in kb.json.
+ * The single stack argument [ebp+8] is pushed first and is therefore the
+ * progress value; it is declared before the register parameter so that its
+ * stack home stays at [ebp+8] (a leading @<ecx> parameter would push it to
+ * [ebp+0xc] and diverge from the reference).
+ *
+ * VC71 ceiling 81.6%: progress_bar_draw_loading_bar takes rect in EAX and
+ * color in ECX, but the verify lane can only pass those by push, so the
+ * candidate carries three extra instructions (LEA+PUSH for rect, PUSH for
+ * color) and the two genuine pushes get pinned next to them instead of
+ * floating up among the rect stores the way the original's do. Permuter run
+ * (600 attempts) produced only semantically broken candidates -- every
+ * "improvement" moved a rect[] store past the call, leaving the callee to
+ * read an uninitialised field. Do not re-chase.
+ * No callers found (xrefs_to empty).
+ */
+/* 0xe2880 */
+void FUN_000e2880(float progress, float *color)
+{
+  float rect[7];
+
+  rect[0] = 640.0f;
+  rect[1] = 480.0f;
+  rect[2] = 0.0f;
+  rect[3] = 0.0f;
+  rect[4] = (float)fabs(320.0);
+  rect[5] = (float)fabs(240.0);
+  rect[6] = 0.0f;
+  progress_bar_draw_loading_bar(rect, color, 1.0f, progress);
+}
+
+/*
+ * progress_bar_eachframe @ 0xe28e0 — idle-timeout teardown of the loading
+ * screen resources.
+ *
+ * Samples the millisecond timer (0x1d0581) once on entry. If the restart
+ * flag at 0x31a010 is set, it is consumed: the timer is re-sampled into
+ * 0x46c210 (the last-activity stamp), the flag is cleared and 0x46c3e8 is
+ * set to 1. When more than 0x3e8 ms (1 s) have elapsed since that stamp,
+ * the loading screen's D3D and DirectSound resources are released.
+ *
+ * Confirmed: the elapsed compare is JBE, i.e. unsigned, so wraparound of the
+ * tick counter is handled by the subtraction, not a signed compare.
+ * Confirmed: 0x46c3fc (the smoothed-progress accumulator written by
+ * progress_bar_render) is zeroed before any release.
+ * Confirmed: three D3DResource_Release blocks in binary order — 0x46c3f0
+ * (bar texture), 0x46c3f4 (gradient texture), then 0x46c3f0 again. EAX is
+ * reloaded from 0x46c3f0 inside the second block (0xe294a), and the first
+ * block already stored NULL there, so the third block cannot fire once the
+ * first has; it is transcribed as written to preserve the original shape.
+ * bar_texture aliases 0x46c3f0 so both stores to it go through one base
+ * pointer; without it VC71 hoists a zero into EBX and compares against it
+ * instead of emitting the original's TEST/immediate-store pairs (75.5% ->
+ * 99.0%). Keep the alias.
+ *
+ * Confirmed: the DirectSound loop walks ESI from 0x46c3d8 up to (not
+ * including) 0x46c3e8 in dword steps — the four buffers
+ * progress_bar_screen_initialize creates — calling IDirectSoundBuffer_Stop
+ * then IDirectSoundBuffer_Release on each non-NULL slot and clearing it.
+ */
+/* 0xe28e0 */
+void progress_bar_eachframe(void)
+{
+  uint32_t now;
+  void *texture;
+  void *gradient;
+  void **bar_texture;
+  int slot;
+
+  now = FUN_001d0581();
+  if (*(char *)0x31a010) {
+    *(uint32_t *)0x46c210 = FUN_001d0581();
+    *(char *)0x31a010 = 0;
+    *(uint32_t *)0x46c3e8 = 1;
+  }
+  if (now - *(uint32_t *)0x46c210 <= 0x3e8)
+    return;
+
+  texture = *(void **)0x46c3f0;
+  bar_texture = (void **)0x46c3f0;
+  *(float *)0x46c3fc = 0.0f;
+  if (texture) {
+    D3DResource_Release(texture);
+    texture = 0;
+    *bar_texture = texture;
+  }
+  gradient = *(void **)0x46c3f4;
+  if (gradient) {
+    D3DResource_Release(gradient);
+    texture = *(void **)0x46c3f0;
+    *(void **)0x46c3f4 = 0;
+  }
+  if (texture) {
+    D3DResource_Release(texture);
+    *bar_texture = 0;
+  }
+
+  for (slot = 0x46c3d8; slot < 0x46c3e8; slot += 4) {
+    if (*(void **)slot != 0) {
+      IDirectSoundBuffer_Stop(*(void **)slot);
+      IDirectSoundBuffer_Release(*(void **)slot);
+      *(void **)slot = 0;
+    }
+  }
 }
 
 /*

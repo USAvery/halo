@@ -3,6 +3,8 @@
  * XBE source: c:\halo\SOURCE\interface\terminal.c
  *
  * Re-implemented functions (by XBE address, ascending):
+ *   0xe33a0  FUN_000e33a0
+ *   0xe33e0  FUN_000e33e0
  *   0xe3410  terminal_remove_line
  *   0xe34a0  terminal_show
  *   0xe34e0  terminal_open
@@ -14,6 +16,78 @@
  *   0xe3a10  terminal_output
  *   0xe3690  terminal_draw
  */
+
+/* FUN_000e33a0 (0xe33a0) — allocate the terminal's line pool and reset the
+ * line list.
+ *
+ * This function and FUN_000e33e0 sit immediately above terminal_remove_line
+ * in the binary and kb.json currently lists them under progress_bar.obj, but
+ * they belong to terminal.c: the pool name string at 0x282db4 is
+ * "terminal output" and sits inside terminal.c's .rdata cluster (it is
+ * directly followed by "state", "c:\halo\SOURCE\interface\terminal.c" and
+ * "new_line_index!=NONE"), while progress_bar.c's .rdata ends at 0x282dac
+ * with its "(progress>=0.f) && (progress<=1.f)" assert string. Every global
+ * touched here (0x46c404, 0x46c408, 0x46c40c, 0x46c410, 0x46c414) is a
+ * terminal.c global.
+ *
+ * Confirmed: PUSH 0x124 / PUSH 0x20 / PUSH 0x282db4 / CALL 0x1194d0 —
+ * last pushed is the first argument, so data_new("terminal output",
+ * maximum_count=0x20, size=0x124).
+ * Confirmed: MOV [0x46c408],EAX (pool) and MOV byte ptr [0x46c404],1
+ * happen before the data_delete_all call, matching the store order.
+ * Confirmed: OR EAX,0xffffffff sets -1 (NONE), stored to both the head
+ * (0x46c40c) and tail (0x46c410) link; 0x46c414 is cleared to 0.
+ * Confirmed: ADD ESP,0x10 cleans the three data_new arguments plus the one
+ * data_delete_all argument in a single deferred adjust.
+ *
+ * VC71 ceiling 85.7%: all 14 mnemonics match the reference; the only gap is
+ * scheduling -- the original pushes the data_delete_all argument before
+ * storing the pool to 0x46c408 and places the ADD ESP before the 0x46c414
+ * store. Permuter (600 attempts) found nothing; assigning through the global
+ * instead of the local drops to 82.8% and aliasing the link globals through
+ * one base pointer drops to 78.6%.
+ */
+/* 0xe33a0 */
+void FUN_000e33a0(void)
+{
+  data_t *pool;
+
+  pool = data_new("terminal output", 0x20, 0x124);
+  *(data_t **)0x46c408 = pool;
+  *(char *)0x46c404 = 1;
+  data_delete_all(pool);
+  *(int *)0x46c414 = 0;
+  *(int *)0x46c40c = -1;
+  *(int *)0x46c410 = -1;
+}
+
+/* FUN_000e33e0 (0xe33e0) — release the terminal's line pool.
+ *
+ * Belongs to terminal.c for the same reasons as FUN_000e33a0 above.
+ *
+ * Confirmed: MOV CL,[EAX+0x24] / TEST CL,CL gates the data_make_invalid
+ * call (0x119550) on a byte flag inside the pool header; the pool pointer
+ * is then reloaded from 0x46c408 because data_make_invalid may replace it.
+ * Confirmed: data_dispose (0x119520) runs for any non-NULL pool, whether or
+ * not the flag was set.
+ * Confirmed: MOV byte ptr [0x46c404],0 runs unconditionally, outside the
+ * NULL check.
+ */
+/* 0xe33e0 */
+void FUN_000e33e0(void)
+{
+  data_t *pool;
+
+  pool = *(data_t **)0x46c408;
+  if (pool != 0) {
+    if (*((char *)pool + 0x24) != 0) {
+      data_make_invalid(pool);
+      pool = *(data_t **)0x46c408;
+    }
+    data_dispose(pool);
+  }
+  *(char *)0x46c404 = 0;
+}
 
 /* terminal_remove_line — unlink and free a single terminal line datum.
  *
@@ -170,7 +244,8 @@ bool terminal_process_input(void)
   while (input_get_buffered_key(&key)) {
     /* Store in the key array if there is room (max 32 entries). */
     if (*(int16_t *)*(char **)0x46c414 < 0x20) {
-      *(int *)(*(char **)0x46c414 + 2 + (int)*(int16_t *)*(char **)0x46c414 * 4) = key;
+      *(int *)(*(char **)0x46c414 + 2 +
+               (int)*(int16_t *)*(char **)0x46c414 * 4) = key;
       (*(int16_t *)*(char **)0x46c414)++;
     }
 

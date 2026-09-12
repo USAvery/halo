@@ -20114,11 +20114,15 @@
     },
     {
      "addr": "0xe1a10",
-     "decl": "void FUN_000e1a10(void);"
+     "decl": "int __stdcall FUN_000e1a10(void *device, uint32_t count, void *rects, uint32_t flags, float z, uint32_t color@<edx>, uint32_t stencil@<eax>);",
+     "ported": true,
+     "source_path": "src/halo/interface/progress_bar.c"
     },
     {
      "addr": "0xe1d00",
-     "decl": "void FUN_000e1d00(void);"
+     "decl": "void FUN_000e1d00(float x, float y, float z, float *out_x, float *out_y);",
+     "ported": true,
+     "source_path": "src/halo/interface/progress_bar.c"
     },
     {
      "addr": "0xe1f00",
@@ -20134,7 +20138,9 @@
     },
     {
      "addr": "0xe2170",
-     "decl": "void FUN_000e2170(void);"
+     "decl": "void FUN_000e2170(char enabled);",
+     "ported": true,
+     "source_path": "src/halo/interface/progress_bar.c"
     },
     {
      "addr": "0xe21b0",
@@ -20148,7 +20154,9 @@
     },
     {
      "addr": "0xe2220",
-     "decl": "void SetRenderStateSmart(int state, int value);"
+     "decl": "void SetRenderStateSmart(int state, int value);",
+     "ported": true,
+     "source_path": "src/halo/interface/progress_bar.c"
     },
     {
      "addr": "0xe2470",
@@ -20157,31 +20165,33 @@
     },
     {
      "addr": "0xe2650",
-     "decl": "void FUN_000e2650(void);"
+     "decl": "void FUN_000e2650(float a, float b, float c);",
+     "ported": true,
+     "source_path": "src/halo/interface/progress_bar.c"
     },
     {
      "addr": "0xe2680",
-     "decl": "void FUN_000e2680(void);"
+     "decl": "void FUN_000e2680(float a, float b, float c);",
+     "ported": true,
+     "source_path": "src/halo/interface/progress_bar.c"
     },
     {
      "addr": "0xe2820",
-     "decl": "void FUN_000e2820(void);"
+     "decl": "void FUN_000e2820(float depth, float alpha, float *color, float progress);",
+     "ported": true,
+     "source_path": "src/halo/interface/progress_bar.c"
     },
     {
      "addr": "0xe2880",
-     "decl": "void FUN_000e2880(void);"
+     "decl": "void FUN_000e2880(float progress, float *color@<ecx>);",
+     "ported": true,
+     "source_path": "src/halo/interface/progress_bar.c"
     },
     {
      "addr": "0xe28e0",
-     "decl": "void progress_bar_eachframe(void);"
-    },
-    {
-     "addr": "0xe33a0",
-     "decl": "void FUN_000e33a0(void);"
-    },
-    {
-     "addr": "0xe33e0",
-     "decl": "void FUN_000e33e0(void);"
+     "decl": "void progress_bar_eachframe(void);",
+     "ported": true,
+     "source_path": "src/halo/interface/progress_bar.c"
     }
    ],
    "name": "progress_bar.obj",
@@ -26219,6 +26229,23 @@
   {
    "functions": [
     {
+     "addr": "0xe33a0",
+     "decl": "void FUN_000e33a0(void);",
+     "ported": true,
+     "source_path": "src/halo/interface/terminal.c"
+    },
+    {
+     "addr": "0xe33e0",
+     "decl": "void FUN_000e33e0(void);",
+     "ported": true,
+     "source_path": "src/halo/interface/terminal.c"
+    },
+    {
+     "addr": "0xe3410",
+     "decl": "void terminal_remove_line(int line_handle@<edi>);",
+     "ported": true
+    },
+    {
      "addr": "0xe34a0",
      "decl": "void terminal_show(void);",
      "ported": true
@@ -26234,11 +26261,6 @@
      "ported": true
     },
     {
-     "addr": "0xe3410",
-     "decl": "void terminal_remove_line(int line_handle@<edi>);",
-     "ported": true
-    },
-    {
      "addr": "0xe3580",
      "decl": "bool terminal_process_input(void);",
      "ported": true
@@ -26246,6 +26268,11 @@
     {
      "addr": "0xe3640",
      "decl": "void terminal_age_lines(void);",
+     "ported": true
+    },
+    {
+     "addr": "0xe3690",
+     "decl": "void terminal_draw(void);",
      "ported": true
     },
     {
@@ -26261,11 +26288,6 @@
     {
      "addr": "0xe3a10",
      "decl": "void terminal_output(void *color, const char *format, const char *text);",
-     "ported": true
-    },
-    {
-     "addr": "0xe3690",
-     "decl": "void terminal_draw(void);",
      "ported": true
     }
    ],
@@ -40556,7 +40578,7 @@
     },
     {
      "addr": "0x00203897",
-     "decl": "void IDirectSoundBuffer_Release(void);"
+     "decl": "int __stdcall IDirectSoundBuffer_Release(void *buffer);"
     },
     {
      "addr": "0x002038d9",
@@ -41188,7 +41210,7 @@
     },
     {
      "addr": "0x00205b67",
-     "decl": "void IDirectSoundBuffer_Stop(void);"
+     "decl": "int __stdcall IDirectSoundBuffer_Stop(void *buffer);"
     },
     {
      "addr": "0x00205b9f",
