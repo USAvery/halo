@@ -72,7 +72,7 @@ void telnet_console_initialize(void)
       uint16_t address_length;
       uint16_t port;
       uint32_t pad;
-    } addr = {0};
+    } addr = { 0 };
 
     addr.address_length = 4;
     addr.port = 0x0017;
@@ -803,5 +803,246 @@ void antenna_debug_data_update_all(float delta_time)
         antenna_debug_data_simulate_rope(rec, tag_def, clamped_dt);
       }
     }
+  }
+}
+
+/*
+ * FUN_00131840 (0x131840) -- validate a flag coordinate and return its
+ * 24-byte cell at flag+0x1c+(x*definition->height+y)*24.
+ * Definition offsets +0xc/+0xe are binary-observed int16_t width/height.
+ */
+void *FUN_00131840(void *flag, void *definition, int16_t x, int16_t y)
+{
+  int index;
+
+  if (flag == NULL || definition == NULL) {
+    display_assert("flag && definition",
+                   "c:\\halo\\SOURCE\\objects\\widgets\\flags.c", 0x60, true);
+    system_exit(-1);
+  }
+
+  if (x < 0 || x >= *(int16_t *)((char *)definition + 0xc)) {
+    display_assert("x>=0 && x<definition->width",
+                   "c:\\halo\\SOURCE\\objects\\widgets\\flags.c", 0x61, true);
+    system_exit(-1);
+  }
+
+  if (y < 0 || y >= *(int16_t *)((char *)definition + 0xe)) {
+    display_assert("y>=0 && y<definition->height",
+                   "c:\\halo\\SOURCE\\objects\\widgets\\flags.c", 0x62, true);
+    system_exit(-1);
+  }
+
+  index = (int)x * (int)*(int16_t *)((char *)definition + 0xe) + (int)y;
+  return (char *)flag + index * 24 + 0x1c;
+}
+
+/*
+ * telnet_console_print (0x1318f0) -- validate an interior flag coordinate
+ * and return its int16_t cell at flag+0x1534+(x*(height-1)+y)*2.
+ * Definition offsets +0xc/+0xe are binary-observed signed int16_t values.
+ */
+int16_t *telnet_console_print(void *flag, void *definition, int16_t x,
+                              int16_t y)
+{
+  int index;
+
+  if (flag == NULL || definition == NULL) {
+    display_assert("flag && definition",
+                   "c:\\halo\\SOURCE\\objects\\widgets\\flags.c", 0x6d, true);
+    system_exit(-1);
+  }
+
+  if (x < 0 || x >= *(int16_t *)((char *)definition + 0xc) - 1) {
+    display_assert("x>=0 && x<definition->width-1",
+                   "c:\\halo\\SOURCE\\objects\\widgets\\flags.c", 0x6e, true);
+    system_exit(-1);
+  }
+
+  if (y < 0 || y >= *(int16_t *)((char *)definition + 0xe) - 1) {
+    display_assert("y>=0 && y<definition->height-1",
+                   "c:\\halo\\SOURCE\\objects\\widgets\\flags.c", 0x6f, true);
+    system_exit(-1);
+  }
+
+  index = (int)x * ((int)*(int16_t *)((char *)definition + 0xe) - 1) + (int)y;
+  return (int16_t *)((char *)flag + index * 2 + 0x1534);
+}
+
+/*
+ * FUN_001319b0 (0x1319b0) -- allocate the flag globals data pool.
+ * The allocation failure path preserves the failed EAX value as error's
+ * first argument; it is necessarily zero after the TEST/JNZ guard.
+ */
+void FUN_001319b0(void)
+{
+  *(data_t **)0x5a90d0 = game_state_data_new("flag", 2, 0x16bc);
+  if (*(data_t **)0x5a90d0 == NULL) {
+    error(0, "couldn't allocate flag globals");
+  }
+}
+
+/*
+ * FUN_001319e0 (0x1319e0) -- delete every flag globals data-pool element.
+ */
+void FUN_001319e0(void)
+{
+  data_delete_all(*(data_t **)0x5a90d0);
+}
+
+/*
+ * FUN_001319f0 (0x1319f0) -- mark every flag globals datum invalid.
+ */
+void FUN_001319f0(void)
+{
+  data_make_invalid(*(data_t **)0x5a90d0);
+}
+
+/*
+ * FUN_00131a00 (0x131a00) -- clear the flag globals data-pool pointer.
+ */
+void FUN_00131a00(void)
+{
+  if (*(data_t **)0x5a90d0 != NULL) {
+    *(data_t **)0x5a90d0 = NULL;
+  }
+}
+
+/* FUN_00131b40 (0x131b40) -- delete an antenna debug-data datum. */
+void FUN_00131b40(int datum_handle)
+{
+  datum_delete(g_antenna_data, datum_handle);
+}
+
+/* FUN_00131ed0 (0x131ed0) -- initialize edge flag cells. */
+void FUN_00131ed0(void *definition, void *flag)
+{
+  int16_t type;
+  int16_t extent;
+  int index;
+
+  type = *(int16_t *)((char *)definition + 4);
+  if (type == 0) {
+    return;
+  }
+
+  if (type == 3 || type == 4) {
+    extent = *(int16_t *)((char *)definition + 0xe) - 1;
+  } else {
+    extent = *(int16_t *)((char *)definition + 0xe) >> 1;
+  }
+
+  index = (int)*(int16_t *)((char *)definition + 6) +
+          (int)*(int16_t *)((char *)definition + 0xc) - (int)extent - 1;
+  if (index < 0) {
+    index = 0;
+  }
+
+  if (type == 3) {
+    FUN_00131a20(definition, flag, index, 0, extent, 3);
+    return;
+  }
+  if (type == 4) {
+    FUN_00131a20(definition, flag, index, 0, extent, 2);
+    return;
+  }
+  if (type == 1) {
+    FUN_00131a20(definition, flag, index, 0, extent, 2);
+    FUN_00131a20(definition, flag, index, extent, extent, 3);
+    return;
+  }
+  if (type == 2) {
+    FUN_00131a20(definition, flag, index, 0, extent, 3);
+    FUN_00131a20(definition, flag, index, extent, extent, 2);
+  }
+}
+
+/*
+ * FUN_00132ca0 (0x132ca0) -- create and initialize a flag globals datum for
+ * a scenario flag definition. Definition offsets +0xc/+0xe/+0x50 and datum
+ * offsets +0x02..+0x18 are binary-observed.
+ */
+void FUN_00132ca0(int flag_definition_index)
+{
+  void *definition;
+  void *flag;
+  void *cell;
+  int datum_handle;
+  int x;
+  int y;
+  int16_t *interior_cell;
+
+  global_scenario_get();
+  if (flag_definition_index == -1) {
+    return;
+  }
+
+  definition = tag_get(0x666c6167, flag_definition_index);
+  datum_handle = data_new_at_index(*(data_t **)0x5a90d0);
+  if (datum_handle == -1) {
+    return;
+  }
+
+  flag = datum_get(*(data_t **)0x5a90d0, datum_handle);
+  if ((int)*(int16_t *)((char *)definition + 0xe) *
+          (int)*(int16_t *)((char *)definition + 0xc) >=
+        0xe1 ||
+      *(int16_t *)((char *)definition + 0xc) >= 0x28 ||
+      *(int *)((char *)definition + 0x50) == -1) {
+    *((char *)flag + 2) = 1;
+    return;
+  }
+
+  *((char *)flag + 2) = 0;
+  *((char *)flag + 3) = 0;
+  *(int *)((char *)flag + 8) = -1;
+  *(int *)((char *)flag + 0xc) = flag_definition_index;
+  *(int *)((char *)flag + 0x10) = 0;
+  *(int *)((char *)flag + 0x14) = 0;
+  *(int *)((char *)flag + 0x18) = 0;
+
+  for (x = 0; x < *(int16_t *)((char *)definition + 0xc); x++) {
+    for (y = 0; y < *(int16_t *)((char *)definition + 0xe); y++) {
+      cell = FUN_00131840(flag, definition, (int16_t)x, (int16_t)y);
+      *(int *)cell = *(int *)*(void **)0x31fc1c;
+      *(int *)((char *)cell + 4) = *(int *)((char *)*(void **)0x31fc1c + 4);
+      *(int *)((char *)cell + 8) = *(int *)((char *)*(void **)0x31fc1c + 8);
+      *(int *)((char *)cell + 0xc) = *(int *)*(void **)0x31fc38;
+      *(int *)((char *)cell + 0x10) = *(int *)((char *)*(void **)0x31fc38 + 4);
+      *(int *)((char *)cell + 0x14) = *(int *)((char *)*(void **)0x31fc38 + 8);
+
+      if (x < *(int16_t *)((char *)definition + 0xc) - 1 &&
+          y < *(int16_t *)((char *)definition + 0xe) - 1) {
+        interior_cell =
+          telnet_console_print(flag, definition, (int16_t)x, (int16_t)y);
+        *interior_cell = 0;
+      }
+    }
+  }
+
+  FUN_00131e00(definition, flag);
+  FUN_00131ed0(definition, flag);
+}
+
+/* FUN_00132e20 (0x132e20) -- update one flag datum and render it when valid. */
+void FUN_00132e20(int object_handle, int flag_datum_handle, int param_3,
+                  int param_4)
+{
+  void *flag;
+  void *definition;
+
+  object_get_and_verify_type(object_handle, -1);
+  flag = datum_get(*(data_t **)0x5a90d0, flag_datum_handle);
+  definition = tag_get(0x666c6167, *(int *)((char *)flag + 0xc));
+  *(int *)((char *)flag + 8) = object_handle;
+
+  if (*(int16_t *)((char *)flag + 6) > 5 || *((char *)flag + 3) == 0) {
+    FUN_00131fc0(flag, definition, 5.0f);
+    *((char *)flag + 3) = 1;
+  }
+
+  *(int16_t *)((char *)flag + 6) = 0;
+  if (*((char *)flag + 2) == 0) {
+    flag_render_proper(flag, definition, param_3, param_4);
   }
 }

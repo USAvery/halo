@@ -3100,8 +3100,8 @@
     },
     "0xb5d60": {
       "name": "game_time_statistics_frame",
-      "declared_stack": 3,
-      "verdict": "OVER-DECLARED",
+      "declared_stack": 0,
+      "verdict": "UNDER-DECLARED",
       "observed": {
         "1": 1
       }

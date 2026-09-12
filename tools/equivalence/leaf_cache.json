@@ -26991,6 +26991,16 @@
     "class": "leaf",
     "z3_proven": true
   },
+  "0x131e00": {
+    "class": "non_leaf",
+    "confidence": "weak",
+    "coverage_pct": 27.0
+  },
+  "0x132ca0": {
+    "class": "non_leaf",
+    "confidence": "moderate",
+    "coverage_pct": 55.8
+  },
   "0x134070": {
     "class": "non_leaf",
     "confidence": "moderate",
@@ -28093,6 +28103,16 @@
     "class": "non_leaf",
     "confidence": "moderate",
     "coverage_pct": 100.0
+  },
+  "0x1931e0": {
+    "class": "non_leaf",
+    "confidence": "none",
+    "coverage_pct": 0.0
+  },
+  "0x1932d0": {
+    "class": "non_leaf",
+    "confidence": "weak",
+    "coverage_pct": 15.7
   },
   "0x1937d0": {
     "class": "non_leaf",

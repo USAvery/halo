@@ -38,12 +38,12 @@ int interface_get_tag_index(int interface_tag_index)
   char *element;
   int16_t index = (int16_t)interface_tag_index;
 
-  assert_halt(index >= 0 &&
-              index < NUMBER_OF_INTERFACE_TAGS);
+  assert_halt(index >= 0 && index < NUMBER_OF_INTERFACE_TAGS);
 
   globals = (char *)game_globals_get();
   if (*(int *)(globals + 0x140) != 0) {
-    element = (char *)tag_block_get_element((char *)game_globals_get() + 0x140, 0, 0x130);
+    element = (char *)tag_block_get_element((char *)game_globals_get() + 0x140,
+                                            0, 0x130);
     return *(int *)(element + index * 0x10 + 0xc);
   }
 
@@ -102,6 +102,23 @@ void interface_draw_text(int font_index, int style, int justify, int flags,
   tag_index = interface_get_tag_index(font_index);
   interface_get_color(color_tag_index, color_index, color);
   draw_string_set_font(tag_index, style, justify, flags, color);
+}
+
+/* 0xdf350 */
+void profile_graph_toggle(const char *value_name)
+{
+  int16_t index;
+  char *entry;
+
+  index = 0;
+  while (index < *(int16_t *)0x306d20) {
+    entry = (char *)0x306d28 + (int)index * 0x20c;
+    if (crt_stricmp(entry, value_name) == 0 ||
+        crt_stricmp(entry + 0x100, value_name) == 0) {
+      entry[0x209] = entry[0x209] == 0;
+    }
+    ++index;
+  }
 }
 
 /* Draw black divider bars between split-screen viewports.
@@ -177,10 +194,21 @@ void interface_initialize_for_new_map(void)
 
   globals = (char *)game_globals_get();
   if (*(int *)(globals + 0x140) != 0) {
-    element = (char *)tag_block_get_element((char *)game_globals_get() + 0x140, 0, 0x130);
+    element = (char *)tag_block_get_element((char *)game_globals_get() + 0x140,
+                                            0, 0x130);
   } else {
     element = 0;
   }
 
   draw_string_set_font(*(int *)(element + 0x1c), -1, 0, 0, *(void **)0x2ee6c4);
+}
+
+void interface_draw_fullscreen_overlays(void)
+{
+  cinematic_render();
+  interface_draw_splitscreen_dividers();
+  hud_render_timer();
+  terminal_draw();
+  main_framerate_render();
+  FUN_000df4e0();
 }
