@@ -562,6 +562,88 @@ bool ui_widget_start_server_if_none_advertised(void *widget, void *event_data,
   return false;
 }
 
+/* unjoin network-game player (0x0f0250) — scans the local client's 16
+ * player records at machine-index base +0x226 (stride 0x20) for records on
+ * the local machine matching event_data+2. Requests removal of that matching
+ * record, clears its local-player autojoin flag, and, when exactly one local
+ * record was found, tears down or pauses the server before copying autojoin
+ * flags to the next multiplayer game. */
+bool ui_widget_network_game_unjoin_player(void *widget, void *event_data,
+                                          bool *widget_deleted)
+{
+  void *client;
+  char *record;
+  char *matched_record;
+  short local_machine_index;
+  int local_record_count;
+  int i;
+  void *server;
+
+  (void)widget;
+  (void)widget_deleted;
+
+  client = network_game_client_get();
+  if (client == NULL) {
+    return true;
+  }
+
+  matched_record = NULL;
+  local_machine_index = network_game_client_get_local_machine_index();
+  record = (char *)network_game_client_get_machine_index(client) + 0x226;
+  local_record_count = 0;
+  i = 16;
+  do {
+    if (network_player_is_valid(record) &&
+        *(signed char *)(record + 0x1c) == local_machine_index) {
+      local_record_count = local_record_count + 1;
+      if (*(signed char *)(record + 0x1d) ==
+          *(short *)((char *)event_data + 2)) {
+        if (matched_record != NULL) {
+          display_assert(
+            "duplicate player registered in game",
+            "c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c",
+            0x1226, 1);
+          system_exit(-1);
+        }
+        matched_record = record;
+      }
+    }
+    record = record + 0x20;
+    i = i - 1;
+  } while (i != 0);
+
+  if (local_record_count <= 0) {
+    return true;
+  }
+
+  if (matched_record != NULL) {
+    if (!network_game_client_request_remove_player(client, matched_record)) {
+      error(2, "failed to request player removal");
+    }
+    player_ui_clear_multiplayer_autojoin_for_local_player(
+      *(signed char *)(matched_record + 0x1d));
+  }
+
+  if (local_record_count == 1) {
+    server = network_game_server_get();
+    if (server == NULL || !network_game_accept_remote_connections()) {
+      dispose_global_network_game_server();
+      dispose_global_network_game_client();
+    } else {
+      server = network_game_server_get();
+      if (server != NULL) {
+        network_game_server_pause_countdown(server, 1);
+        player_ui_autojoin_players_to_next_multiplayer_game();
+        return true;
+      }
+    }
+    player_ui_autojoin_players_to_next_multiplayer_game();
+    return true;
+  }
+
+  return false;
+}
+
 /* FUN_000f03d0 (0xf03d0, table xref 0x31e2d0) — closes the widget's last
  * child when neither an in-progress player profile edit nor an in-progress
  * playlist profile edit is active ("no saved game file being edited"
@@ -617,6 +699,60 @@ bool ui_widget_new_campaign_chosen(void *widget, void *event_data,
   }
 
   return true;
+}
+
+/* virtual-keyboard completion handler for the new campaign name
+ * (0xf04c0). The virtual-keyboard done flag gates campaign profile creation;
+ * its pending controller index and editable name are held in the global UI
+ * state initialized by ui_widget_new_campaign_chosen. */
+void FUN_000f04c0(void)
+{
+  wchar_t player_profile[24];
+  int profile_index;
+  const char *message;
+  bool profile_created;
+
+  if (*(short *)0x31e4fc != -1) {
+    if (FUN_000f5650()) {
+      if (*(wchar_t *)0x46ccd0 != L'\0') {
+        player_ui_set_single_player_local_player_controller(0,
+                                                            *(short *)0x31e4fc);
+        profile_index = FUN_001c1720(*(short *)0x31e4fc, (wchar_t *)0x46ccd0);
+        if (profile_index == -1) {
+          saved_game_file_get_useable_untitled_profile_name(player_profile);
+          ustrncpy((wchar_t *)0x46ccd0, player_profile, 0xb);
+          *(wchar_t *)0x46cce6 = L'\0';
+          profile_index = FUN_001c1720(*(short *)0x31e4fc, (wchar_t *)0x46ccd0);
+          if (profile_index == -1) {
+            message = "failed to create new player profile";
+            error(2, message);
+            main_goto_main_menu();
+            display_error_deferred(0x25, -1, true, false);
+            ui_play_audio_feedback_sound(4);
+            *(short *)0x31e4fc = -1;
+            return;
+          }
+        }
+        profile_created = player_profile_new(profile_index, player_profile);
+        if (profile_created) {
+          player_ui_set_active_player_profile(0, profile_index, player_profile);
+          main_set_map_name(*(const char **)0x31e498);
+          main_defer_map_map_change();
+          *(short *)0x31e4fc = -1;
+          return;
+        }
+        message = "failed to retrieve newly created player profile";
+        error(2, message);
+        main_goto_main_menu();
+        display_error_deferred(0x25, -1, true, false);
+        ui_play_audio_feedback_sound(4);
+      } else {
+        error(2, "can't create a new profile with an empty name");
+        ui_play_audio_feedback_sound(4);
+      }
+    }
+    *(short *)0x31e4fc = -1;
+  }
 }
 
 /* pop history stack once (event handler table index 98, 0x0f0620) — pops one
@@ -1062,6 +1198,81 @@ void ui_widget_game_data_build_version(int widget)
   }
 }
 
+/* player-profile three-column list update (0x0f2560). Validates the column
+ * list and extended-description text widget, then stores the selected list
+ * item's spinner setting into the text widget. */
+void player_profile_3wide_list_update(void *widget)
+{
+  void *text_widget;
+  void *child;
+  void *spinner;
+  void *widget_definition;
+  int spinner_value;
+  short list_value;
+
+  if (*(short *)((char *)widget + 0xe) != 3) {
+    display_assert(
+      "expected column list for multiplayer game options list",
+      "c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+      0x8f5, 1);
+    system_exit(-1);
+  }
+
+  text_widget = *(void **)((char *)widget + 0x48);
+  if (text_widget == NULL || *(short *)((char *)text_widget + 0xe) != 1) {
+    display_assert(
+      "expected a text box for multiplayer game options list extended "
+      "description",
+      "c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+      0x8f8, 1);
+    system_exit(-1);
+  }
+
+  widget_definition = tag_get(0x44654c61 /* 'DeLa' */, *(int *)widget);
+  if (*(int *)((char *)widget_definition + 0x3e0) < 1) {
+    display_assert(
+      "expected some list items for multiplayer game settings list",
+      "c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+      0x8fe, 1);
+    system_exit(-1);
+  }
+
+  if (*(void **)((char *)widget + 0x38) == NULL) {
+    *(short *)((char *)text_widget + 0x40) = (short)(uintptr_t)widget;
+    return;
+  }
+
+  child = *(void **)((char *)widget + 0x34);
+  list_value = 0;
+  if (child != NULL) {
+    do {
+      spinner = *(void **)((char *)child + 0x34);
+      while (spinner != NULL && *(short *)((char *)spinner + 0xe) != 2) {
+        spinner = *(void **)((char *)spinner + 0x2c);
+      }
+      if (spinner == NULL) {
+        display_assert(
+          "expected a spinner list somewhere in the multiplayer game options "
+          "settings list item makeup",
+          "c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+          0x90c, 1);
+        system_exit(-1);
+      }
+
+      if (child == *(void **)((char *)widget + 0x38)) {
+        list_value = (short)(list_value + *(short *)((char *)spinner + 0x3c));
+        break;
+      }
+
+      spinner_value = *(unsigned short *)((char *)spinner + 0x44);
+      list_value = (short)(list_value + spinner_value);
+      child = *(void **)((char *)child + 0x2c);
+    } while (child != NULL);
+  }
+
+  *(short *)((char *)text_widget + 0x40) = list_value;
+}
+
 /* FUN_000f2690 (0xf2690)
  * "objective text" data-driven text box widget update. Fetches the current
  * hud objective string (empty if hud_messaging_get_objective() returns NULL
@@ -1101,6 +1312,85 @@ void FUN_000f2690(void *widget)
                           len * 2) = 0;
     }
   }
+}
+
+/* FUN_000f2720 (0xf2720) — validates a three-column game-options list and
+ * its extended-description picture container, then sums each preceding
+ * spinner's item count and the selected spinner's selected-item index into
+ * the picture widget's +0x50 word. */
+void FUN_000f2720(void *widget)
+{
+  void *picture_widget;
+  void *list_item;
+  void *spinner;
+  void *widget_definition;
+  short list_value;
+
+  if (*(short *)((char *)widget + 0xe) != 3) {
+    display_assert(
+      "expected column list for game options list",
+      "c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+      0x980, 1);
+    system_exit(-1);
+  }
+
+  picture_widget = *(void **)((char *)widget + 0x48);
+  if (picture_widget == NULL || *(short *)((char *)picture_widget + 0xe) != 0) {
+    display_assert(
+      "expected a picture (container) for game options list extended "
+      "description",
+      "c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+      0x983, 1);
+    system_exit(-1);
+  }
+
+  widget_definition = tag_get(0x44654c61 /* 'DeLa' */, *(int *)widget);
+  if (*(int *)((char *)widget_definition + 0x3e0) < 1) {
+    display_assert(
+      "expected some list items for game settings list",
+      "c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+      0x988, 1);
+    system_exit(-1);
+  }
+
+  if (*(void **)((char *)widget + 0x38) == NULL) {
+    *(short *)((char *)picture_widget + 0x50) = (short)(uintptr_t)widget;
+    return;
+  }
+
+  list_item = *(void **)((char *)widget + 0x34);
+  list_value = 0;
+  if (list_item != NULL) {
+    while (1) {
+      spinner = *(void **)((char *)list_item + 0x34);
+      while (spinner != NULL && *(short *)((char *)spinner + 0xe) != 2) {
+        spinner = *(void **)((char *)spinner + 0x2c);
+      }
+      if (spinner == NULL) {
+        display_assert(
+          "expected a spinner list somewhere in the multiplayer game options "
+          "settings list item makeup",
+          "c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+          0x996, 1);
+        system_exit(-1);
+      }
+
+      if (list_item == *(void **)((char *)widget + 0x38)) {
+        list_value = (short)(list_value + *(short *)((char *)spinner + 0x3c));
+        break;
+      }
+
+      list_item = *(void **)((char *)list_item + 0x2c);
+      list_value =
+        (short)(list_value + *(unsigned short *)((char *)spinner + 0x44));
+      if (list_item == NULL) {
+        *(short *)((char *)picture_widget + 0x50) = list_value;
+        return;
+      }
+    }
+  }
+
+  *(short *)((char *)picture_widget + 0x50) = list_value;
 }
 
 /* FUN_000f28e0 (0xf28e0)
@@ -1148,6 +1438,80 @@ void FUN_000f28e0(void *widget)
     ustrncpy(new_buf, (wchar_t *)profile, 0xb);
     *(unsigned short *)((char *)new_buf + 0x16) = 0;
   }
+}
+
+/* FUN_000f2b90 (0xf2b90) — maps the active multiplayer map name to its
+ * legacy game-settings text index. */
+void FUN_000f2b90(void *widget)
+{
+  char *map_name;
+
+  if (*(short *)((char *)widget + 0xe) != 1) {
+    display_assert(
+      "expected text box widget for mp game settings text",
+      "c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+      0xa39, 1);
+    system_exit(-1);
+  }
+
+  map_name = (char *)network_game_get_game();
+  if (map_name == NULL) {
+    error(2, "no network game");
+    return;
+  }
+  map_name = map_name + 0x24;
+
+  if (crt_strstr(map_name, "beavercreek") != NULL) {
+    *(unsigned short *)((char *)widget + 0x40) = 0;
+    return;
+  }
+  if (crt_strstr(map_name, "sidewinder") != NULL) {
+    *(unsigned short *)((char *)widget + 0x40) = 1;
+    return;
+  }
+  if (crt_strstr(map_name, "damnation") != NULL) {
+    *(unsigned short *)((char *)widget + 0x40) = 2;
+    return;
+  }
+  if (crt_strstr(map_name, "ratrace") != NULL) {
+    *(unsigned short *)((char *)widget + 0x40) = 3;
+    return;
+  }
+  if (crt_strstr(map_name, "prisoner") != NULL) {
+    *(unsigned short *)((char *)widget + 0x40) = 4;
+    return;
+  }
+  if (crt_strstr(map_name, "hangemhigh") != NULL) {
+    *(unsigned short *)((char *)widget + 0x40) = 5;
+    return;
+  }
+  if (crt_strstr(map_name, "chillout") != NULL) {
+    *(unsigned short *)((char *)widget + 0x40) = 6;
+    return;
+  }
+  if (crt_strstr(map_name, "carousel") != NULL) {
+    *(unsigned short *)((char *)widget + 0x40) = 7;
+    return;
+  }
+  if (crt_strstr(map_name, "boardingaction") != NULL) {
+    *(unsigned short *)((char *)widget + 0x40) = 8;
+    return;
+  }
+  if (crt_strstr(map_name, "bloodgulch") != NULL) {
+    *(unsigned short *)((char *)widget + 0x40) = 9;
+    return;
+  }
+  if (crt_strstr(map_name, "wizard") != NULL) {
+    *(unsigned short *)((char *)widget + 0x40) = 10;
+    return;
+  }
+  if (crt_strstr(map_name, "putput") != NULL) {
+    *(unsigned short *)((char *)widget + 0x40) = 0xb;
+    return;
+  }
+
+  *(unsigned short *)((char *)widget + 0x40) =
+    (unsigned short)(0xd - (crt_strstr(map_name, "longest") != NULL));
 }
 
 /* FUN_000f2e60 (0xf2e60)

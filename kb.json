@@ -10035,7 +10035,7 @@
     },
     {
      "addr": "0x1c18f0",
-     "decl": "void player_profile_new(void);"
+     "decl": "bool player_profile_new(int profile_index, wchar_t *name);"
     },
     {
      "addr": "0x1c1950",
@@ -27382,7 +27382,8 @@
     },
     {
      "addr": "0xf0250",
-     "decl": "bool ui_widget_network_game_unjoin_player(void *widget, void *event_data, bool *widget_deleted);"
+     "decl": "bool ui_widget_network_game_unjoin_player(void *widget, void *event_data, bool *widget_deleted);",
+     "ported": true
     },
     {
      "addr": "0xf03d0",
@@ -27396,7 +27397,8 @@
     },
     {
      "addr": "0xf04c0",
-     "decl": "void FUN_000f04c0(void);"
+     "decl": "void FUN_000f04c0(void);",
+     "ported": true
     },
     {
      "addr": "0xf0620",
@@ -27473,8 +27475,9 @@
     },
     {
      "addr": "0xf2560",
-     "decl": "void player_profile_3wide_list_update(void);",
-     "comment": "[NAME: player_profile_3wide_list_update — CEA PDB line-containment (probable), cea-deferred 2026-09-03]"
+     "decl": "void player_profile_3wide_list_update(void *widget);",
+     "comment": "[NAME: player_profile_3wide_list_update — CEA PDB line-containment (probable), cea-deferred 2026-09-03]",
+     "ported": true
     },
     {
      "addr": "0xf2690",
@@ -27483,7 +27486,8 @@
     },
     {
      "addr": "0xf2720",
-     "decl": "void FUN_000f2720(void);"
+     "decl": "void FUN_000f2720(void *widget);",
+     "ported": true
     },
     {
      "addr": "0xf2850",
@@ -27508,7 +27512,8 @@
     },
     {
      "addr": "0xf2b90",
-     "decl": "void FUN_000f2b90(void);"
+     "decl": "void FUN_000f2b90(void *widget);",
+     "ported": true
     },
     {
      "addr": "0xf2d50",
