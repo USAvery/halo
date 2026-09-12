@@ -51601,17 +51601,17 @@
     "ai_conversation_unit_died": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 6.0,
+      "abi_modeled_mnemonic_pct": 92.7,
       "addr": "0x44660",
       "end": "0x447c5",
       "kind": "auto",
       "n_r": 128,
-      "opnd_percent": 4.5,
-      "raw_mnemonic_pct": 6.0,
+      "opnd_percent": 64.4,
+      "raw_mnemonic_pct": 92.7,
       "ref": "synth",
       "ref_sha": "2d6e9fd1d06a087f",
-      "score": 6.0,
-      "source": "src/halo/unported_thunks.c"
+      "score": 92.7,
+      "source": "src/halo/ai/ai_communication.c"
     },
     "ai_conversation_update": {
       "abi_model": "raw",

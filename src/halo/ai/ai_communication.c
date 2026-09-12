@@ -673,6 +673,94 @@ short ai_communication_consider_speech(int *sound_definition_index_reference,
   return play_type;
 }
 
+/* ai_conversation_unit_died (0x44660).
+ *
+ * Confirmed from disassembly:
+ *   - Iterates the conversation data pool and resolves each conversation's
+ *     scenario definition from scenario+0x468 with element size 0x74.
+ *   - Clears matching unit handles at conversation offsets +0x54, +0x58,
+ *     and +0x10; a +0x54 match also sets byte +0x63.
+ *   - When param_2 is nonzero, clears matching actor fields at +0xa8 and
+ *     +0x1e0 when actor word +0x6c is 0xc.
+ *   - Finishes and returns on a match, logging the fixed string when the
+ *     trace byte at 0x5aca5f is nonzero.
+ *
+ * Record offsets remain raw because their semantic field names are not
+ * established by this function. */
+void ai_conversation_unit_died(int unit_handle, char param_2)
+{
+  data_iter_t iterator;
+  char *conversation;
+  char *definition;
+  char *actor;
+  int conversation_index;
+  int actor_handle;
+  char unit_matches;
+
+  data_iterator_new(&iterator, *(data_t **)0x6324ec);
+  conversation = (char *)data_iterator_next(&iterator);
+  if (conversation != (char *)0) {
+    do {
+      definition = (char *)tag_block_get_element(
+        (char *)global_scenario_get() + 0x468,
+        (int)*(int16_t *)(conversation + 0x02), 0x74);
+
+      unit_matches = 0;
+      if (*(int32_t *)(conversation + 0x54) == unit_handle) {
+        unit_matches = 1;
+        *(uint8_t *)(conversation + 0x63) = 1;
+        *(int32_t *)(conversation + 0x54) = -1;
+      }
+      if (*(int32_t *)(conversation + 0x58) == unit_handle) {
+        unit_matches = 1;
+        *(int32_t *)(conversation + 0x58) = -1;
+      }
+      if (*(int32_t *)(conversation + 0x10) == unit_handle) {
+        unit_matches = 1;
+        *(int32_t *)(conversation + 0x10) = -1;
+      }
+
+      if (param_2 != 0 || (*(uint8_t *)(definition + 0x20) & 1) != 0) {
+        conversation_index = 0;
+        if (*(int32_t *)(definition + 0x50) > 0) {
+          do {
+            if ((*(uint32_t *)(conversation + 0x14) &
+                 (1u << conversation_index)) != 0) {
+              actor_handle =
+                *(int32_t *)(conversation + 0x28 + conversation_index * 4);
+              if (actor_handle != -1) {
+                actor = (char *)datum_get(*(data_t **)0x6325a4, actor_handle);
+                if (*(int32_t *)(actor + 0x18) == unit_handle) {
+                  unit_matches = 1;
+                }
+                if (param_2 != 0) {
+                  if (*(int16_t *)(actor + 0x6c) == 0xc &&
+                      *(int32_t *)(actor + 0xa8) == unit_handle) {
+                    *(int32_t *)(actor + 0xa8) = -1;
+                  }
+                  if (*(int32_t *)(actor + 0x1e0) == unit_handle) {
+                    *(int32_t *)(actor + 0x1e0) = -1;
+                  }
+                }
+              }
+            }
+            conversation_index = conversation_index + 1;
+          } while ((int16_t)conversation_index <
+                   *(int32_t *)(definition + 0x50));
+        }
+        if (unit_matches != 0) {
+          if (*(uint8_t *)0x5aca5f != 0) {
+            console_printf(0, "%s: unit died, aborting", definition);
+          }
+          ai_conversation_finish(iterator.datum_handle, 0, 0);
+          return;
+        }
+      }
+      conversation = (char *)data_iterator_next(&iterator);
+    } while (conversation != (char *)0);
+  }
+}
+
 /* actor_communication_team (0x43270) — classify an actor's communication
  * team from its actor-type definition flags. Confirmed via disasm
  * 0x43270-0x432ac: datum_get(actor_data, actor_handle) resolves the actor
