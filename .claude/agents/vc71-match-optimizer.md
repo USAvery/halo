@@ -10,7 +10,7 @@ description: >
   readability/naming/refactor work (score/byte-accuracy content only —
   route readability/source-recovery work to halo-source-recovery instead).
 mode: subagent
-model: opus
+model: sonnet
 color: info
 memory: project
 ---

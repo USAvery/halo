@@ -1,7 +1,7 @@
 ---
 name: auto-lift-analyst
 description: Memoryless analyst for fingerprinted automated Halo lift attempts.
-model: opus
+model: sonnet
 color: yellow
 ---
 

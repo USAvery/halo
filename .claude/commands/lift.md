@@ -1,6 +1,6 @@
 ---
 description: Two-phase lift — RE analysis then build + verify pipeline
-model: opus
+model: sonnet
 ---
 
 Use `halo-lift` for doctrine and evidence rules, `halo-lift` for the

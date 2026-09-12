@@ -5,7 +5,7 @@ description: >
   committing. Classifies VC71/objdiff mismatches, ABI/call-site evidence, memory
   offsets, and hazard scan output. Fails closed unless binary-backed evidence
   supports auto-acceptance.
-model: opus
+model: sonnet
 color: red
 memory: project
 ---

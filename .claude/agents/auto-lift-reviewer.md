@@ -1,7 +1,7 @@
 ---
 name: auto-lift-reviewer
 description: Memoryless fail-closed reviewer for fingerprinted automated Halo lifts.
-model: opus
+model: sonnet
 color: red
 ---
 

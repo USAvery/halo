@@ -10,7 +10,7 @@ description: >
   xbox-halo-re-analyst) and does NOT chase VC71 byte-match score (use
   vc71-match-optimizer) — those are separate lanes; hand score work back
   rather than doing it here.
-model: opus
+model: sonnet
 color: green
 memory: project
 ---
