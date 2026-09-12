@@ -56941,17 +56941,17 @@
     "create_endpoint_set": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 10.7,
+      "abi_modeled_mnemonic_pct": 92.2,
       "addr": "0x82310",
       "end": "0x82405",
       "kind": "auto",
       "n_r": 70,
-      "opnd_percent": 8.0,
-      "raw_mnemonic_pct": 10.7,
+      "opnd_percent": 82.3,
+      "raw_mnemonic_pct": 92.2,
       "ref": "synth",
       "ref_sha": "49f71c0f162a0588",
-      "score": 10.7,
-      "source": "src/halo/unported_thunks.c"
+      "score": 92.2,
+      "source": "src/halo/bungie_net/network/transport_endpoint_set_winsock.c"
     },
     "create_initial_device_groups": {
       "abi_model": "raw",

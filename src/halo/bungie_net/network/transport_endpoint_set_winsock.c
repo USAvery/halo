@@ -351,6 +351,67 @@ bool transport_network_available(void)
   return XNetGetEthernetLinkStatus() & 1;
 }
 
+/* Create an endpoint set with room for max_endpoints entries (0x82310).
+ * The set owns a fixed 0x118-byte header and a separately allocated endpoint
+ * pointer array at +0x104. */
+int create_endpoint_set(int count)
+{
+  char *set;
+  void *endpoint_array;
+  short max_endpoints;
+  int free_line;
+
+  if (*(uint8_t *)0x335090 == 0) {
+    display_assert(
+      "transport_initialized",
+      "c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_set_winsock.c",
+      0x196, 1);
+    system_exit(-1);
+  }
+
+  max_endpoints = (short)count;
+  if (max_endpoints <= 0) {
+    display_assert(
+      "max_endpoints > 0",
+      "c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_set_winsock.c",
+      0x197, 1);
+    system_exit(-1);
+  }
+
+  set = (char *)debug_malloc(
+    0x118, false,
+    "c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_set_winsock.c",
+    0x199);
+  if (set == NULL) {
+    return 0;
+  }
+
+  if (max_endpoints > 0x40) {
+    free_line = 0x1b0;
+  } else {
+    *(int *)(set + 0x114) = 0;
+    *(int *)set = 0;
+    endpoint_array = debug_malloc(
+      (unsigned int)max_endpoints * 4, true,
+      "c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_set_winsock.c",
+      0x1a2);
+    *(void **)(set + 0x104) = endpoint_array;
+    if (endpoint_array != NULL) {
+      *(int *)(set + 0x108) = (int)max_endpoints;
+      *(int *)(set + 0x10c) = -1;
+      *(int *)(set + 0x110) = 0;
+      return (int)set;
+    }
+    free_line = 0x1aa;
+  }
+
+  debug_free(
+    set,
+    "c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_set_winsock.c",
+    free_line);
+  return 0;
+}
+
 /* Destroy an endpoint set: free its endpoint array, then the set itself.
  *
  * Asserts the set and its endpoint-array pointer are both non-NULL (one
