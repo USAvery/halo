@@ -9694,6 +9694,10 @@
       "kind": "function",
       "status": "ported"
     },
+    "0xe2220": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0xe2470": {
       "kind": "function",
       "status": "ported"
@@ -9714,6 +9718,10 @@
       "status": "ported"
     },
     "0xe26c0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0xe28e0": {
       "kind": "function",
       "status": "ported"
     },
