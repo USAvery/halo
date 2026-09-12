@@ -39,6 +39,21 @@ typedef struct debug_primitive {
 typedef char
   debug_primitive_size_check[sizeof(debug_primitive) == 0x38 ? 1 : -1];
 
+/* Payload copy shapes used by the cache writer (0x188ec0). The reference codes
+ * every 3- and 4-float payload store as a whole-aggregate assignment -- it
+ * materializes the destination with `lea <off>(<rec>), <reg>` and then stores
+ * at 0/4/8(/0xc) of that register. Element-wise float stores instead compile to
+ * direct-displacement stores off the record base, so the payload copies are
+ * written as aggregate assignments here. 1- and 2-dword payloads stay scalar;
+ * the reference keeps those in direct-displacement form too. */
+typedef struct debug_float3 {
+  float v[3];
+} debug_float3;
+
+typedef struct debug_float4 {
+  float v[4];
+} debug_float4;
+
 #define debug_primitives ((debug_primitive *)0x4d1220)
 #define debug_primitive_count (*(short *)0x4d8224)
 #define debug_primitive_frame (*(short *)0x4d8220)
@@ -405,10 +420,7 @@ void FUN_00188ec0(int type, ...)
   switch (type) {
   case 0:
     p1 = va_arg(ap, float *);
-    *(float *)(rec + 0x04) = p1[0];
-    *(float *)(rec + 0x08) = p1[1];
-    *(float *)(rec + 0x0c) = p1[2];
-    *(float *)(rec + 0x10) = p1[3];
+    *(debug_float4 *)(rec + 0x04) = *(debug_float4 *)p1;
     ival = va_arg(ap, int);
     *(short *)(rec + 0x14) = (short)ival;
     ival = va_arg(ap, int);
@@ -419,75 +431,46 @@ void FUN_00188ec0(int type, ...)
     dval = va_arg(ap, double);
     *(float *)(rec + 0x20) = (float)dval;
     color = va_arg(ap, float *);
-    *(float *)(rec + 0x24) = color[0];
-    *(float *)(rec + 0x28) = color[1];
-    *(float *)(rec + 0x2c) = color[2];
-    *(float *)(rec + 0x30) = color[3];
+    *(debug_float4 *)(rec + 0x24) = *(debug_float4 *)color;
     dval = va_arg(ap, double); /* past the real args; see comment above */
     *(float *)(rec + 0x34) = (float)dval;
     break;
   case 1:
   case 3:
     p1 = va_arg(ap, float *);
-    *(float *)(rec + 0x04) = p1[0];
-    *(float *)(rec + 0x08) = p1[1];
-    *(float *)(rec + 0x0c) = p1[2];
+    *(debug_float3 *)(rec + 0x04) = *(debug_float3 *)p1;
     dval = va_arg(ap, double);
     *(float *)(rec + 0x10) = (float)dval;
     color = va_arg(ap, float *);
-    *(float *)(rec + 0x14) = color[0];
-    *(float *)(rec + 0x18) = color[1];
-    *(float *)(rec + 0x1c) = color[2];
-    *(float *)(rec + 0x20) = color[3];
+    *(debug_float4 *)(rec + 0x14) = *(debug_float4 *)color;
     break;
   case 2:
     p1 = va_arg(ap, float *);
-    *(float *)(rec + 0x04) = p1[0];
-    *(float *)(rec + 0x08) = p1[1];
-    *(float *)(rec + 0x0c) = p1[2];
+    *(debug_float3 *)(rec + 0x04) = *(debug_float3 *)p1;
     p2 = va_arg(ap, float *);
-    *(float *)(rec + 0x10) = p2[0];
-    *(float *)(rec + 0x14) = p2[1];
-    *(float *)(rec + 0x18) = p2[2];
+    *(debug_float3 *)(rec + 0x10) = *(debug_float3 *)p2;
     color = va_arg(ap, float *);
-    *(float *)(rec + 0x1c) = color[0];
-    *(float *)(rec + 0x20) = color[1];
-    *(float *)(rec + 0x24) = color[2];
-    *(float *)(rec + 0x28) = color[3];
+    *(debug_float4 *)(rec + 0x1c) = *(debug_float4 *)color;
     break;
   case 4:
     p1 = va_arg(ap, float *);
-    *(float *)(rec + 0x04) = p1[0];
-    *(float *)(rec + 0x08) = p1[1];
-    *(float *)(rec + 0x0c) = p1[2];
+    *(debug_float3 *)(rec + 0x04) = *(debug_float3 *)p1;
     p2 = va_arg(ap, float *);
-    *(float *)(rec + 0x10) = p2[0];
-    *(float *)(rec + 0x14) = p2[1];
+    *(debug_float3 *)(rec + 0x10) = *(debug_float3 *)p2;
     dval = va_arg(ap, double);
     *(float *)(rec + 0x1c) = (float)dval;
-    *(float *)(rec + 0x18) = p2[2];
     color = va_arg(ap, float *);
-    *(float *)(rec + 0x20) = color[0];
-    *(float *)(rec + 0x24) = color[1];
-    *(float *)(rec + 0x28) = color[2];
-    *(float *)(rec + 0x2c) = color[3];
+    *(debug_float4 *)(rec + 0x20) = *(debug_float4 *)color;
     break;
   case 5:
     p1 = va_arg(ap, float *);
-    *(float *)(rec + 0x04) = p1[0];
-    *(float *)(rec + 0x08) = p1[1];
-    *(float *)(rec + 0x0c) = p1[2];
+    *(debug_float3 *)(rec + 0x04) = *(debug_float3 *)p1;
     p2 = va_arg(ap, float *);
-    *(float *)(rec + 0x10) = p2[0];
-    *(float *)(rec + 0x14) = p2[1];
+    *(debug_float3 *)(rec + 0x10) = *(debug_float3 *)p2;
     dval = va_arg(ap, double);
     *(float *)(rec + 0x1c) = (float)dval;
-    *(float *)(rec + 0x18) = p2[2];
     color = va_arg(ap, float *);
-    *(float *)(rec + 0x20) = color[0];
-    *(float *)(rec + 0x24) = color[1];
-    *(float *)(rec + 0x28) = color[2];
-    *(float *)(rec + 0x2c) = color[3];
+    *(debug_float4 *)(rec + 0x20) = *(debug_float4 *)color;
     break;
   case 6:
   case 7:
@@ -496,10 +479,7 @@ void FUN_00188ec0(int type, ...)
       *(float *)(rec + 0x04 + i * 4) = p1[i];
     }
     color = va_arg(ap, float *);
-    *(float *)(rec + 0x1c) = color[0];
-    *(float *)(rec + 0x20) = color[1];
-    *(float *)(rec + 0x24) = color[2];
-    *(float *)(rec + 0x28) = color[3];
+    *(debug_float4 *)(rec + 0x1c) = *(debug_float4 *)color;
     break;
   case 8:
     interned = FUN_00188b20(va_arg(ap, char *));
@@ -517,14 +497,9 @@ void FUN_00188ec0(int type, ...)
     }
     *(char **)(rec + 0x04) = interned;
     p1 = va_arg(ap, float *);
-    *(float *)(rec + 0x08) = p1[0];
-    *(float *)(rec + 0x0c) = p1[1];
-    *(float *)(rec + 0x10) = p1[2];
+    *(debug_float3 *)(rec + 0x08) = *(debug_float3 *)p1;
     color = va_arg(ap, float *);
-    *(float *)(rec + 0x14) = color[0];
-    *(float *)(rec + 0x18) = color[1];
-    *(float *)(rec + 0x1c) = color[2];
-    *(float *)(rec + 0x20) = color[3];
+    *(debug_float4 *)(rec + 0x14) = *(debug_float4 *)color;
     break;
   default:
     break;
@@ -592,7 +567,7 @@ void FUN_00189150(char flag, float *position, float scale, void *color)
 /* Draw or cache a debug line (0x189270). type 2. With flag set, render the line
  * segment point_a->point_b immediately; otherwise submit a type-2 primitive
  * (point_a, point_b, color) to the per-frame cache. */
-void FUN_00189270(char flag, float *point_a, float *point_b, void *color)
+__declspec(noinline) void FUN_00189270(char flag, float *point_a, float *point_b, void *color)
 {
   if (point_a == 0) {
     display_assert("point0", "c:\\halo\\SOURCE\\render\\render_debug.c", 0x16b,
@@ -777,6 +752,8 @@ void FUN_001896d0(char flag, void *center, void *height_vec, float radius,
 {
   float buffers[102]; /* buf1 = [0..50], buf2 = [51..101]; 17 vertices each */
   int i;
+  float *p1;
+  float *p2;
 
   if (center == 0) {
     display_assert("base", "c:\\halo\\SOURCE\\render\\render_debug.c", 0x285,
@@ -798,16 +775,31 @@ void FUN_001896d0(char flag, void *center, void *height_vec, float radius,
     return;
   }
   FUN_00188d00(buffers, buffers + 51, center, height_vec, radius, 0, 0, 0, 0);
-  for (i = 0; i < 16; i++) {
-    FUN_0017eb10(&buffers[i * 3], &buffers[i * 3 + 3], (int)color);
-    FUN_0017eb10(&buffers[i * 3 + 51], &buffers[i * 3 + 54], (int)color);
+
+  p1 = buffers;
+  p2 = buffers + 51;
+  for (i = 16; i > 0; i--) {
+    FUN_0017eb10(p1, p1 + 3, (int)color);
+    FUN_0017eb10(p2, p2 + 3, (int)color);
+    p1 += 3;
+    p2 += 3;
   }
-  for (i = 0; i < 4; i++) {
-    FUN_0017eb10(&buffers[i * 12], &buffers[i * 12 + 51], (int)color);
+
+  p1 = buffers;
+  p2 = buffers + 51;
+  for (i = 4; i > 0; i--) {
+    FUN_0017eb10(p1, p2, (int)color);
+    p1 += 12;
+    p2 += 12;
   }
-  for (i = 0; i < 2; i++) {
-    FUN_0017eb10(&buffers[i * 12], &buffers[i * 12 + 24], (int)color);
-    FUN_0017eb10(&buffers[i * 12 + 51], &buffers[i * 12 + 75], (int)color);
+
+  p1 = buffers;
+  p2 = buffers + 51;
+  for (i = 2; i > 0; i--) {
+    FUN_0017eb10(p1, p1 + 24, (int)color);
+    FUN_0017eb10(p2, p2 + 24, (int)color);
+    p1 += 12;
+    p2 += 12;
   }
 }
 
