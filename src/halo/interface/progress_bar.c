@@ -473,9 +473,12 @@ void progress_bar_decode_texture(int height, int width, void *out_texture,
 
   /* RLE decode loop */
   for (src_idx = 0; src_idx < data_size; src_idx++) {
-    char byte_val = ((char *)data)[src_idx];
-    uint32_t color = (uint32_t)(byte_val % 16) << 4;
-    uint8_t run_length = (uint8_t)byte_val >> 4;
+    /* MOVZX EAX,CL at 0xe2527 zero-extends the source byte before the
+     * signed-modulo sequence (AND 0x8000000f / JNS / DEC / OR / INC), so the
+     * operand is an unsigned char promoted to int, never a signed char. */
+    unsigned char byte_val = ((const unsigned char *)data)[src_idx];
+    uint32_t color = (uint32_t)((int)byte_val % 16) << 4;
+    uint8_t run_length = byte_val >> 4;
     uint32_t pixel;
     int i;
 

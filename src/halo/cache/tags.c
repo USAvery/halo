@@ -697,12 +697,13 @@ void FUN_001ba930(char *self)
  * args pushed 2, 0x20000, buffer -> (buffer, 0x20000, 2). */
 short *FUN_001ba9d0(char *self, short key)
 {
-  char new_var;
+  /* 0x1ba9d4 MOV BX,[EBP+0xc] / 0x1ba9e3 CMP WORD PTR [...],BX — the
+   * comparison is 16-bit against the raw parameter; a narrower staged copy
+   * would truncate ids >= 0x80. */
   short i;
-  new_var = key;
   for (i = 0; i < 8; i++) {
     short *slot;
-    if (((*((short *)((self + 0xa78) + (((int)i) * 2)))) == new_var) &&
+    if (((*((short *)((self + 0xa78) + (((int)i) * 2)))) == key) &&
         (((*((unsigned int *)((self + 0x998) + ((((int)i) >> 5) * 4)))) &
           ((unsigned int)(1 << (((int)i) & 0x1f)))) != 0)) {
       slot = (short *)((self + 0xa78) + (((int)i) * 2));
