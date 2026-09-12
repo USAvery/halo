@@ -1278,6 +1278,7 @@ void player_add_equipment(int unit_handle, int16_t equipment_index,
   char *unit;
   char *equip_def;
   int weapon;
+  char *scenario;
   char *dst;
   char *src;
   int count;
@@ -1285,8 +1286,9 @@ void player_add_equipment(int unit_handle, int16_t equipment_index,
   if ((unit_handle != -1) && (equipment_index != -1) &&
       (unit = (char *)object_try_and_get_and_verify_type(unit_handle, 3),
        *(int *)(unit + 0x1c8) != -1)) {
+    scenario = (char *)global_scenario_get();
     equip_def = (char *)tag_block_get_element(
-      (char *)global_scenario_get() + 0x348, (int)equipment_index, 0x68);
+      scenario + 0x348, (int)equipment_index, 0x68);
 
     if (reset_flag != '\0') {
       unit_clear_weapons(unit_handle);

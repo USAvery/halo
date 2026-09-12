@@ -1233,7 +1233,7 @@ int network_game_server_get_client_machine(int server, int machine, int *out)
                    0x701, 1);
     system_exit(-1);
   }
-  if (*(short *)(machine + 0xc) > 3) {
+  if (*(short *)(machine + 0xc) >= 4) {
     display_assert(
       "client_machine->machine_index<MAXIMUM_NETWORK_MACHINE_COUNT",
       "c:\\halo\\SOURCE\\networking\\network_server_manager.c", 0x702, 1);

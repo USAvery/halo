@@ -1070,6 +1070,7 @@ bool FUN_0011beb0(short *table, short growth_bits)
   int old_bitmap;
   int old_array[3];
   int new_capacity;
+  short *new_var;
   int bitmap_bytes;
   int new_bitmap;
   int i;
@@ -1081,8 +1082,9 @@ bool FUN_0011beb0(short *table, short growth_bits)
   old_bitmap = *(int *)(table + 0xc);
   array_hdr = table + 0xe;
   old_capacity_bits = (int)table[3];
+  new_var = table + 0x10;
   old_array[0] = *(int *)array_hdr;
-  old_array[1] = *(int *)(table + 0x10);
+  old_array[1] = *(int *)new_var;
   old_array[2] = *(int *)(table + 0x12);
   if (!hashtable_valid(table)) {
     display_assert("hashtable_valid(table)",
@@ -1139,7 +1141,7 @@ bool FUN_0011beb0(short *table, short growth_bits)
   table[2] = old_count;
   *(int *)(table + 0xc) = old_bitmap;
   *(int *)array_hdr = old_array[0];
-  *(int *)(table + 0x10) = old_array[1];
+  *(int *)new_var = old_array[1];
   *(int *)(table + 0x12) = old_array[2];
   return 0;
 }

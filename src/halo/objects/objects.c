@@ -6931,11 +6931,12 @@ void objects_fix_for_deleted_object(int object_handle)
 
   data_verify(*(data_t **)0x5a8d50);
 
+  /* MSVC writes cookie (EBP-4) first; clang otherwise stores it last. */
+  it.cookie = 0x86868686;
   it.type_mask = -1;
   it.flags = 0;
   it.current_index = 0;
   it.last_handle = -1;
-  it.cookie = 0x86868686;
 
   obj = (object_data_t *)object_iterator_next(&it);
   while (obj != (object_data_t *)0) {
@@ -8487,6 +8488,7 @@ int find_objects_from_point_vector(int param_1, int param_2, int param_3,
   int obj_handle;
   int obj_datum;
   int *obj_body;
+  int new_var;
   int type_val;
   int type_mask;
   int iter_state[2];
@@ -8542,7 +8544,8 @@ int find_objects_from_point_vector(int param_1, int param_2, int param_3,
               obj_body = *(int **)(obj_datum + 8);
 
               type_val = (int)*(short *)((char *)obj_body + 0x64);
-              type_mask = 1 << (type_val & 0x1f);
+              new_var = 1 << (type_val & 0x1f);
+              type_mask = new_var;
               if (type_mask == 0) {
                 display_assert(csprintf((char *)0x5ab100,
                                         "got an object type we didn't expect "
@@ -8557,6 +8560,7 @@ int find_objects_from_point_vector(int param_1, int param_2, int param_3,
                 display_assert("object_globals->object_marker_initialized",
                                "c:\\halo\\SOURCE\\objects\\objects.c", 0xdd7,
                                1);
+                cluster_end = abs_cluster + 0x20;
                 system_exit(-1);
               }
 
@@ -12671,6 +12675,8 @@ void attachments_delete(int object_handle)
       break;
     case 3:
       object_compute_node_matrices(object_handle);
+      /* Force a post-call reload; EAX is clobbered by the matrices call. */
+      attachment_handle = *(int *)((char *)obj + 0xfc + (int)i * 4);
       contrail_set_state_for_object(attachment_handle, 1, 0);
       break;
     case 4:

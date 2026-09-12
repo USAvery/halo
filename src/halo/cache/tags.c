@@ -347,13 +347,15 @@ void *cache_copy_compressed_alloc(void *opaque, int items, int size)
   unsigned char *globals;
   int previous;
   int next;
+  int *zlib_buffer;
 
   globals = *(unsigned char **)0x32ea98;
   previous = *(int *)(globals + 0x948);
   next = items * size + previous;
   *(int *)(globals + 0x948) = next;
+  zlib_buffer = (int *)(globals + 0x940);
 
-  if (next - *(int *)(globals + 0x940) >= *(int *)(globals + 0x944)) {
+  if (next - *zlib_buffer >= *(int *)(globals + 0x944)) {
     display_assert("global_self->next_allocation-global_self->zlib_buffer<"
                    "global_self->zlib_buffer_size",
                    "c:\\halo\\SOURCE\\cache\\cache_files_decompress_windows.c",

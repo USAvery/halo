@@ -2032,15 +2032,18 @@ void ai_debug_idle_look_clear(int actor_handle)
  * i.e. the score array begins exactly one 32-entry dword array later. */
 void ai_debug_idle_look_addprop(int index, float value)
 {
+  int16_t *count;
+
   if (*(uint8_t *)0x6323d4 == 0) {
     display_assert("ai_debug.idle_look_valid",
                    "c:\\halo\\SOURCE\\ai\\ai_debug.c", 0x13b1, 1);
     system_exit(-1);
   }
-  if (*(int16_t *)0x6323dc < 0x20) {
-    ((int32_t *)0x6323e0)[*(int16_t *)0x6323dc] = index;
-    ((float *)0x632460)[*(int16_t *)0x6323dc] = value;
-    (*(int16_t *)0x6323dc)++;
+  count = (int16_t *)0x6323dc;
+  if (*count < 0x20) {
+    ((int32_t *)0x6323e0)[*count] = index;
+    ((float *)0x632460)[*count] = value;
+    (*count)++;
   }
 }
 

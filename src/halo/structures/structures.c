@@ -548,7 +548,9 @@ void obstacles_get_discs_in_sphere(int16_t *obstacle_set, float *center,
 short FUN_00062410(void *obstacles, short disc_index_skip, float *position_xy,
                    float radius)
 {
+  char *new_var2;
   char *base;
+  float new_var;
   short i;
   short disc_count;
   char *disc;
@@ -571,12 +573,14 @@ short FUN_00062410(void *obstacles, short disc_index_skip, float *position_xy,
         disc = base + 8 + i * 0x18;
         sum_radius = *(float *)(disc + 0x10) + radius;
         dx = *(float *)(disc + 8) - position_xy[0];
-        dy = *(float *)(disc + 0xc) - position_xy[1];
-        if (!(sum_radius * sum_radius < dy * dy + dx * dx)) {
+        new_var = position_xy[1];
+        dy = *(float *)(disc + 0xc) - new_var;
+        if (!((dy * dy + dx * dx) > (sum_radius * sum_radius))) {
           return i;
         }
       }
-      disc_count = *(short *)(base + 2);
+      new_var2 = base;
+      disc_count = *(short *)(new_var2 + 2);
       i = i + 1;
     } while (i < disc_count);
   }
@@ -7653,12 +7657,15 @@ int16_t structure_find_in_cluster(uint16_t cluster_count, float *position,
  */
 void set_file_location_volume_name(int16_t location, const char *volume_name)
 {
-  if (location < 1 || location > 1) {
+  int new_var;
+
+  if (1 > location || location > 1) {
     display_assert("location>0 && location<NUMBER_OF_FILE_REFERENCE_LOCATIONS",
                    "c:\\halo\\SOURCE\\tag_files\\files.c", 0x4b, true);
     system_exit(-1);
   }
-  if (csstrlen(file_location_volume_names + location * 0x100) != 0) {
+  new_var = location * 0x100;
+  if (csstrlen(file_location_volume_names + new_var) != 0) {
     display_assert("strlen(file_location_volume_names[location])==0",
                    "c:\\halo\\SOURCE\\tag_files\\files.c", 0x4c, true);
     system_exit(-1);
@@ -7668,6 +7675,6 @@ void set_file_location_volume_name(int16_t location, const char *volume_name)
                    "c:\\halo\\SOURCE\\tag_files\\files.c", 0x4d, true);
     system_exit(-1);
   }
-  csstrncpy(file_location_volume_names + location * 0x100, volume_name, 0xff);
-  file_location_volume_names[location * 0x100 + 0xff] = '\0';
+  csstrncpy(file_location_volume_names + new_var, volume_name, 0xff);
+  file_location_volume_names[new_var + 0xff] = '\0';
 }

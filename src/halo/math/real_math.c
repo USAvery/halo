@@ -5223,38 +5223,36 @@ int FUN_00111170(int param_1)
   int status;
   int ptr;
 
-  if (param_1 == 0)
-    goto z_stream_error;
-  state = *(int *)(param_1 + 0x1c);
-  if (state == 0)
-    goto z_stream_error;
-  status = *(int *)(state + 4);
-  if (status != 0x2a && status != 0x71 && status != 0x29a)
-    goto z_stream_error;
+  if (param_1 != 0) {
+    state = *(int *)(param_1 + 0x1c);
+    if (state != 0) {
+      status = *(int *)(state + 4);
+      if (status == 0x2a || status == 0x71 || status == 0x29a) {
+        zfree = (void (*)(int, int))*(void **)(param_1 + 0x24);
 
-  zfree = (void (*)(int, int)) * (void **)(param_1 + 0x24);
+        ptr = *(int *)(state + 8);
+        if (ptr != 0) {
+          zfree(*(int *)(param_1 + 0x28), ptr);
+        }
+        ptr = *(int *)(*(int *)(param_1 + 0x1c) + 0x3c);
+        if (ptr != 0) {
+          zfree(*(int *)(param_1 + 0x28), ptr);
+        }
+        ptr = *(int *)(*(int *)(param_1 + 0x1c) + 0x38);
+        if (ptr != 0) {
+          zfree(*(int *)(param_1 + 0x28), ptr);
+        }
+        ptr = *(int *)(*(int *)(param_1 + 0x1c) + 0x30);
+        if (ptr != 0) {
+          zfree(*(int *)(param_1 + 0x28), ptr);
+        }
+        zfree(*(int *)(param_1 + 0x28), *(int *)(param_1 + 0x1c));
+        *(int *)(param_1 + 0x1c) = 0;
 
-  ptr = *(int *)(state + 8);
-  if (ptr != 0) {
-    zfree(*(int *)(param_1 + 0x28), ptr);
+        return ((status != 0x71) - 1) & 0xfffffffd;
+      }
+    }
   }
-  ptr = *(int *)(*(int *)(param_1 + 0x1c) + 0x3c);
-  if (ptr != 0) {
-    zfree(*(int *)(param_1 + 0x28), ptr);
-  }
-  ptr = *(int *)(*(int *)(param_1 + 0x1c) + 0x38);
-  if (ptr != 0) {
-    zfree(*(int *)(param_1 + 0x28), ptr);
-  }
-  ptr = *(int *)(*(int *)(param_1 + 0x1c) + 0x30);
-  if (ptr != 0) {
-    zfree(*(int *)(param_1 + 0x28), ptr);
-  }
-  zfree(*(int *)(param_1 + 0x28), *(int *)(param_1 + 0x1c));
-  *(int *)(param_1 + 0x1c) = 0;
-
-  return ((status != 0x71) - 1) & 0xfffffffd;
-z_stream_error:
   return -2;
 }
 

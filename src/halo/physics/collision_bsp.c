@@ -423,6 +423,7 @@ float collision_surface_area(int bsp, int surface_index)
   float pa_x, pa_y, pa_z; /* edge[side] vertex - anchor */
   volatile float qa_x, qa_y; /* edge[!side] vertex - anchor */
   float qa_z;
+  float new_var;
   float *anchor;
   float *v0;
   float *v1;
@@ -449,12 +450,13 @@ float collision_surface_area(int bsp, int surface_index)
   is_owner = (*(int *)(edge + 0x14) == surface_index);
   side = is_owner;
   if (*(int *)(edge + 8 + side * 4) != surface[1]) {
+    new_var = anchor[0];
     do {
       v1 = (float *)tag_block_get_element((void *)verts_block,
                                           *(int *)(edge + side * 4), 0x10);
       v0 = (float *)tag_block_get_element(
         (void *)verts_block, *(int *)(edge + (!is_owner) * 4), 0x10);
-      pa_x = v1[0] - anchor[0];
+      pa_x = v1[0] - new_var;
       pa_y = v1[1] - anchor[1];
       pa_z = v1[2] - anchor[2];
       qa_x = v0[0] - anchor[0];
@@ -644,8 +646,10 @@ int collision_surface_test_line2d(int bsp, int surface_index, int param3,
                                 to the out_result param home slot and
                                 reloads it 3x (==0 test, divide, sign) */
   float pt_cross;
-  float ex, ey; /* v1 - v0 (edge vector), kept ST-resident */
-  float cx, cy; /* point - v0, kept ST-resident */
+  float ex;
+  float ey; /* v1 - v0 (edge vector), kept ST-resident */
+  float cx;
+  float cy; /* point - v0, kept ST-resident */
   int *out_i;
 
   out_i = (int *)out_result;
@@ -688,13 +692,17 @@ int collision_surface_test_line2d(int bsp, int surface_index, int param3,
         out_i[4] = edge_index;
         out_i[5] = edge[!side + 4];
       }
-    } else if ((pt_cross < 0.0f) != side) {
-      out_result[0] = 3.4028235e+38f;
-      out_i[1] = edge_index;
-      out_i[2] = edge[!side + 4];
-      out_result[3] = -3.4028235e+38f;
-      out_i[4] = edge_index;
-      out_i[5] = edge[!side + 4];
+    } else {
+      if (edge_cross) {
+      }
+      if ((pt_cross < 0.0f) != side) {
+        out_result[0] = 3.4028235e+38f;
+        out_i[1] = edge_index;
+        out_i[2] = edge[!side + 4];
+        out_result[3] = -3.4028235e+38f;
+        out_i[4] = edge_index;
+        out_i[5] = edge[!side + 4];
+      }
     }
 
     edge_index = edge[side + 2];

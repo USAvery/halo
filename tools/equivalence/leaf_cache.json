@@ -27206,6 +27206,11 @@
     "class": "leaf",
     "z3_proven": true
   },
+  "0x13d8b0": {
+    "class": "non_leaf",
+    "confidence": "moderate",
+    "coverage_pct": 59.1
+  },
   "0x13dcc0": {
     "class": "non_leaf"
   },
@@ -31189,6 +31194,11 @@
     "class": "non_leaf",
     "confidence": "moderate",
     "coverage_pct": 41.9
+  },
+  "0xc3c50": {
+    "class": "non_leaf",
+    "confidence": "none",
+    "coverage_pct": 0.0
   },
   "0xc40b0": {
     "class": "non_leaf",

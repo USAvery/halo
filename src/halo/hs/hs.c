@@ -8393,7 +8393,7 @@ void hs_update(void)
   if (*(uint8_t *)0x449ef1 != 0 && *(uint8_t *)0x2f1c18 != 0)
     profile_enter_private((void *)0x2f1c10);
 
-  ((void (*)(void))0xcde00)();
+  hs_runtime_update();
 
   if (*(uint8_t *)0x449ef1 != 0 && *(uint8_t *)0x2f1c18 != 0)
     profile_exit_private((void *)0x2f1c10);

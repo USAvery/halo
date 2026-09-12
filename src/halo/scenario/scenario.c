@@ -2886,18 +2886,26 @@ valid:
  * bool. */
 bool scenario_location_potentially_visible(void *location)
 {
+  int new_var2;
   int16_t cluster_index;
   void *pvs;
+  void **new_var;
+  void *new_var3;
+  volatile unsigned int new_var4;
 
-  if (*(int16_t *)((char *)location + 4) >= 0) {
+  new_var = &location;
+  new_var3 = *new_var;
+  if (*(int16_t *)((char *)new_var3 + 4) >= 0) {
     if (!global_structure_bsp) {
+      new_var2 = -1;
       display_assert("global_structure_bsp",
                      "c:\\halo\\SOURCE\\scenario\\scenario.c", 0xc5, 1);
-      system_exit(-1);
+      system_exit(new_var2);
     }
     if ((int)*(int16_t *)((char *)location + 4) <
-        *(int *)((char *)global_structure_bsp + 0x134))
+        *(int *)((char *)global_structure_bsp + 0x134)) {
       goto valid;
+    }
   }
   display_assert(
     "location->cluster_index>=0 && "
@@ -2907,8 +2915,12 @@ bool scenario_location_potentially_visible(void *location)
 
 valid:
   cluster_index = *(int16_t *)((char *)location + 4);
-  pvs = players_get_combined_pvs();
-  return (*(uint32_t *)((char *)pvs + ((int)cluster_index >> 5) * 4) &
+#ifdef __clang__
+  (void)pvs;
+  (void)new_var4;
+#endif
+  return (*(uint32_t *)((char *)players_get_combined_pvs() +
+          ((((int)cluster_index >> 1) >> 4) * 4)) &
           (1u << (cluster_index & 0x1f))) != 0;
 }
 

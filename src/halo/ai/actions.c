@@ -1145,7 +1145,7 @@ char actor_action_allow_cover_seeking(int actor_handle, char param_2)
   if (((actor_t *)actor)->field_160 != '\0') {
     return 0;
   }
-  return result;
+  return result & 0xFF;
 }
 
 /* actor_action_can_stop_guarding (0x1cf10)

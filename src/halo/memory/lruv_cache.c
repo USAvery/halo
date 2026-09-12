@@ -257,6 +257,7 @@ void *lrar_cache_new(const char *name, unsigned int minimum_address,
   char *cache;
   unsigned int alignment_mask;
   void *blocks;
+  short *new_var;
 
   cache = (char *)debug_malloc(0x48, 0,
                                "c:\\halo\\SOURCE\\memory\\lrar_cache.c", 0x56);
@@ -304,13 +305,14 @@ void *lrar_cache_new(const char *name, unsigned int minimum_address,
       *(unsigned int *)(cache + 0x28) = maximum_address;
       *(short *)(cache + 0x22) = boundary_bit;
       *(unsigned short *)(cache + 0x34) = 0xffff;
+      new_var = (short *)(cache + 0x38);
       *(unsigned short *)(cache + 0x36) = 0xffff;
       *(short *)(cache + 0x20) = alignment_bit;
       *(void (**)(short *, short))(cache + 0x3c) = lock_proc;
       *(unsigned char *)(cache + 0x1f) = 0;
       *(unsigned int *)(cache + 0x2c) = maximum_address - minimum_address;
       *(void **)(cache + 0x30) = blocks;
-      *(short *)(cache + 0x38) = block_count;
+      *new_var = block_count;
       *(void (**)(short *))(cache + 0x40) = unlock_proc;
       *(unsigned int *)(cache + 0x44) = 0x6c726172;
       lruv_update_function_pointers((int)cache);

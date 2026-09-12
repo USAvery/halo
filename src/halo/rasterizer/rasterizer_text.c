@@ -336,7 +336,11 @@ void FUN_00180570(int param_1, float *param_2)
   result = FUN_0017ffc0(local_out, *(unsigned int *)(param_1 + 0x0c));
   param_2[0] = result[0];
   param_2[1] = result[1];
-  param_2[2] = result[2];
+  {
+    int i;
+    i = 2;
+    param_2[i] = result[i];
+  }
 }
 
 /* rasterizer_geometry_vertex_get_texcoord: copy 2-float texcoord from
@@ -379,7 +383,11 @@ void FUN_00180660(unsigned int *param_1, float *param_2)
   }
   result = FUN_0017ffc0(local_out, *param_1);
   param_2[0] = result[0];
-  param_2[1] = result[1];
+  {
+    int i;
+    i = 1;
+    param_2[i] = result[i];
+  }
   param_2[2] = result[2];
 }
 

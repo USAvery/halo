@@ -308,14 +308,14 @@ void device_set_never_appears_locked(int object_index,
  * request, whose exact meaning is unproven). The iterator is advanced once
  * before the loop guard, giving the original's do/while shape.
  */
-void device_group_set_actual_value(int device_group_index, float value)
+void device_group_set_actual_value(short device_group_index, float value)
 {
   short index;
   char *device_group;
   int iterator[4];
   char *object;
 
-  index = (short)device_group_index;
+  index = device_group_index;
 
   if (value < *(float *)0x2533c0) {
     value = 0.0f;

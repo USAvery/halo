@@ -12464,10 +12464,10 @@ void unit_impact_melee_damage(int unit_handle, int param_2, int param_3,
 
   /* Copy and negate damage direction as the impact vector (obj+0x24) */
   impact_dir = (float *)(unit + 0x24);
-  impact_dir[0] = param_7[0];
-  impact_dir[1] = param_7[1];
-  impact_dir[2] = param_7[2];
-  impact_dir[0] = -impact_dir[0];
+  ((float *)(unit + 0x24))[0] = param_7[0];
+  ((float *)(unit + 0x24))[1] = param_7[1];
+  ((float *)(unit + 0x24))[2] = param_7[2];
+  ((float *)(unit + 0x24))[0] = -impact_dir[0];
   impact_dir[1] = -impact_dir[1];
   impact_dir[2] = -impact_dir[2];
 
@@ -12517,14 +12517,15 @@ void unit_impact_melee_damage(int unit_handle, int param_2, int param_3,
  */
 void unit_place(int unit_handle, void *placement)
 {
+  float *place;
   char *unit;
   int unit_tag;
+  char *new_var;
   int antr_tag;
   int anim_element;
   int death_frame;
   int flags;
   int obj_flags;
-  float *place;
 
   place = (float *)placement;
   unit = (char *)object_get_and_verify_type(unit_handle, 3);
@@ -12544,6 +12545,7 @@ void unit_place(int unit_handle, void *placement)
       /* Clear weapons and grenade state */
       unit_clear_weapons(unit_handle);
       csmemset((void *)(unit + 0x2ce), 0, 2);
+      new_var = unit + 0x4;
 
       /* Delete weapon object if one exists */
       if (*(int *)(unit + 0x2c8) != NONE) {
@@ -12560,7 +12562,7 @@ void unit_place(int unit_handle, void *placement)
       /* Mark as dead: set object flag bits */
       *(uint8_t *)(unit + 0xb6) = *(uint8_t *)(unit + 0xb6) | 4;
       obj_flags = *(int *)(unit + 0x4);
-      *(int *)(unit + 0x4) = obj_flags | 0x20000;
+      *(int *)new_var = obj_flags | 0x20000;
 
       /* Clamp death frame to >= 0 (branchless: mask with sign) */
       *(uint16_t *)(unit + 0x82) =
