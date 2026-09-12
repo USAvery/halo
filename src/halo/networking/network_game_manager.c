@@ -356,6 +356,7 @@ bool network_game_player_is_valid(void *player, void *game)
   char controller_index;
   int i;
   char *controller_ptr;
+  bool result;
 
   if (p == NULL || g == NULL) {
     display_assert("player && game",
@@ -364,6 +365,7 @@ bool network_game_player_is_valid(void *player, void *game)
     system_exit(-1);
   }
 
+  result = false;
   if (p != NULL) {
     controller_index = p[0x1d];
     if (controller_index >= 0 && controller_index < 4) {
@@ -375,15 +377,16 @@ bool network_game_player_is_valid(void *player, void *game)
                *controller_ptr != controller_index) {
           i++;
           controller_ptr += 0x20;
-          if (i > 15) {
-            return false;
+          if (i >= 16) {
+            goto done;
           }
         }
-        return true;
+        result = true;
       }
     }
   }
-  return false;
+done:
+  return result;
 }
 
 void network_game_invalidate(void *game)
@@ -481,7 +484,7 @@ bool network_game_create_game_objects(void *game)
   int i;
   char *player;
   game_options_t options;
-  int16_t conn;
+  int conn;
 
   if (g == NULL) {
     display_assert(
@@ -533,8 +536,9 @@ bool network_game_create_game_objects(void *game)
         break;
       }
       if (!network_game_spawn_player(player)) {
-        g[0x430] = 0;
-        return (bool)g[0x430];
+        volatile char *valid_flag = (volatile char *)(g + 0x430);
+        *valid_flag = 0;
+        return (bool)*valid_flag;
       }
     }
 

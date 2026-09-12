@@ -368,9 +368,8 @@ __declspec(noinline) bool network_game_server_start_network_game(void *server)
           if (FUN_0012f430(server, msg)) {
             network_game_log(
               "signalling client machines to begin loading for network game");
-            *(int *)((char *)server + 0x47c) = 0;
             *(char *)((char *)server + 0x4b9) = 1;
-            return true;
+            goto set_and_return;
           }
         }
       }
@@ -378,6 +377,7 @@ __declspec(noinline) bool network_game_server_start_network_game(void *server)
     network_game_log(
       "failed to signal client machines to begin loading for network game");
   }
+set_and_return:
   *(int *)((char *)server + 0x47c) = 0;
   return true;
 }
@@ -1277,7 +1277,7 @@ int network_game_server_get_machine_connection(int server, int machine)
   int i;
   short *slot;
   short machine_idx;
-  int result;
+  volatile int result;
 
   result = 0;
   if (!server || !machine || *(char *)(machine + 0x40) < 0 ||
@@ -1493,7 +1493,7 @@ void network_game_server_change_game_variant(void *server, void *variant)
 bool FUN_0012d880(int server, int new_connection)
 {
   char *s = (char *)server;
-  bool result = false;
+  volatile bool result = false;
   int i;
   short *slot;
   char addr_buf[24];
@@ -1516,7 +1516,7 @@ bool FUN_0012d880(int server, int new_connection)
   slot = (short *)(s + 0x448);
   do {
     if (*slot == -1) {
-      csmemset(addr_buf, 0, 24);
+      memset(addr_buf, 0, 24);
       network_connection_get_address(new_connection, addr_buf, 0);
       if (*(int *)addr_buf == 0) {
         network_game_log(
@@ -2207,14 +2207,18 @@ loop_top:
     if (!network_connection_active(*(int *)machine)) {
       if (FUN_0012e090((void *)server, s + 0x11c + (int)*flags * 0x44)) {
         network_game_log("client machine %x removed from game", (int)*flags);
+        FUN_0012de20((void *)server);
+        i++;
+        flags += 8;
+        goto loop_top;
       } else {
         network_game_log("failed to remove client machine %x from game",
                          (int)*flags);
+        FUN_0012de20((void *)server);
+        i++;
+        flags += 8;
+        goto loop_top;
       }
-      FUN_0012de20((void *)server);
-      i++;
-      flags += 8;
-      goto loop_top;
     }
 
     if (!FUN_00129cf0(*(int *)machine, 0, 0))
@@ -2312,12 +2316,13 @@ bool FUN_0012e750(int server)
       timer_ms = countdown_timer_get_time_remaining(s + 0x488);
       if (timer_ms == 0) {
         if (FUN_0012dbb0(server) && *(char *)(s + 0x495) == 0) {
+          volatile bool result_shadow;
           network_game_server_close_game((void *)server);
-          result = network_game_server_start_network_game((void *)server);
-          if (result == 1)
+          result_shadow = network_game_server_start_network_game((void *)server);
+          if (result_shadow == 1)
             return true;
           network_game_log("network_game_server_start_network_game() failed");
-          return result;
+          return result_shadow;
         }
       }
       if (now - *(int *)(s + 0x490) < 0x3e9)
@@ -2522,7 +2527,7 @@ bool network_game_server_start(void *server)
 bool network_server_manager_pregame_start(void *server)
 {
   char *s;
-  bool result;
+  volatile bool result;
   int i;
   char *client_ptr;
   char *flags_ptr;
@@ -2643,40 +2648,40 @@ void *FUN_0012eef0(void)
   *(char *)0x46eed4 = 1;
   csmemset((void *)0x5a90e0, 0, 0x4bc);
   *(int *)0x5a90e0 = network_connection_new(1, 0x141e);
-  if (!*(int *)0x5a90e0) {
-    error(2, "failed to create the server connection");
-    network_game_client_dispose((void *)0x5a90e0);
-    return (void *)0;
+  if (*(int *)0x5a90e0) {
+    FUN_00082a90();
+    *(short *)0x5a90e4 = 0;
+    *(short *)0x5a90e6 = 2;
+    csmemset((void *)0x5a90e8, 0, 0x434);
+    network_connection_set_connection_rejection_procedure(*(int *)0x5a90e0,
+                                                          (void *)FUN_0012db30);
+    network_game_invalidate((void *)0x5a90e8);
+    *(short *)0x5a91f8 = (short)main_get_difficulty();
+    *(int *)0x5a9514 = -1;
+    i = 0;
+    slot = (int *)0x5a9520;
+    do {
+      slot[-1] = 0;
+      slot[0] = 0;
+      slot[1] = 0;
+      *(unsigned short *)(slot + 2) = 0xffff;
+      *(unsigned short *)((char *)(slot + 2) + 2) = 0;
+      network_game_invalidate_machine((void *)0x5a90e8, i);
+      slot += 4;
+      i++;
+    } while ((int)slot < 0x5a9560);
+    *(char *)0x5a9599 = 0;
+    *(int *)0x5a9564 = 0;
+    if (!network_server_manager_pregame_start((void *)0x5a90e0)) {
+      error(2, "failed to initialize server pregame settings");
+      network_game_client_dispose((void *)0x5a90e0);
+      return (void *)0;
+    }
+    return (void *)0x5a90e0;
   }
-  FUN_00082a90();
-  *(short *)0x5a90e4 = 0;
-  *(short *)0x5a90e6 = 2;
-  csmemset((void *)0x5a90e8, 0, 0x434);
-  network_connection_set_connection_rejection_procedure(*(int *)0x5a90e0,
-                                                        (void *)FUN_0012db30);
-  network_game_invalidate((void *)0x5a90e8);
-  *(short *)0x5a91f8 = (short)main_get_difficulty();
-  *(int *)0x5a9514 = -1;
-  i = 0;
-  slot = (int *)0x5a9520;
-  do {
-    slot[-1] = 0;
-    slot[0] = 0;
-    slot[1] = 0;
-    *(unsigned short *)(slot + 2) = 0xffff;
-    *(unsigned short *)((char *)(slot + 2) + 2) = 0;
-    network_game_invalidate_machine((void *)0x5a90e8, i);
-    slot += 4;
-    i++;
-  } while ((int)slot < 0x5a9560);
-  *(char *)0x5a9599 = 0;
-  *(int *)0x5a9564 = 0;
-  if (!network_server_manager_pregame_start((void *)0x5a90e0)) {
-    error(2, "failed to initialize server pregame settings");
-    network_game_client_dispose((void *)0x5a90e0);
-    return (void *)0;
-  }
-  return (void *)0x5a90e0;
+  error(2, "failed to create the server connection");
+  network_game_client_dispose((void *)0x5a90e0);
+  return (void *)0;
 }
 
 #if defined(_MSC_VER) && !defined(__clang__)
@@ -2797,57 +2802,66 @@ bool FUN_0012f200(int server, int machine, void *message_data, int message_size)
   short packet_type;
   short packet_version;
 
-  if (network_game_server_get_state(server, (short *)0) != 1) {
+  if (network_game_server_get_state(server, (short *)0) == 1) {
+    message_size -= 2;
+    packet_type = 0x1a;
+    packet_version = 1;
+    if (FUN_0012bce0((int)decoded_buf, (int)((char *)message_data + 2),
+                     (short *)&message_size, &packet_type, &packet_version, 5)) {
+      network_game_server_queue_player_for_addition(server, (int)decoded_buf);
+      return true;
+    }
     network_game_log(
-      "failed to handle a message_client_add_player_request_ingame because "
-      "the server is not in game");
-    return true;
-  }
-  message_size -= 2;
-  packet_type = 0x1a;
-  packet_version = 1;
-  if (FUN_0012bce0((int)decoded_buf, (int)((char *)message_data + 2),
-                   (short *)&message_size, &packet_type, &packet_version, 5)) {
-    network_game_server_queue_player_for_addition(server, (int)decoded_buf);
+      "server failed to decode a message_client_add_player_request_ingame "
+      "packet");
     return true;
   }
   network_game_log(
-    "server failed to decode a message_client_add_player_request_ingame "
-    "packet");
+    "failed to handle a message_client_add_player_request_ingame because "
+    "the server is not in game");
   return true;
 }
 #if defined(_MSC_VER) && !defined(__clang__)
 #pragma inline_depth()
 #endif
 
-/* Handle remove-player request postgame (0x12f290). */
+/* Handle remove-player request postgame (0x12f290).
+ * The reference makes a real CALL to network_game_server_get_state;
+ * cl.exe /Ob2 inlines it here. Scoped inline_depth(0) matches the
+ * original's call shape. */
+#if defined(_MSC_VER) && !defined(__clang__)
+#pragma inline_depth(0)
+#endif
 bool FUN_0012f290(int server, int machine, void *message_data, int message_size)
 {
   char decoded_buf[32];
   short packet_type;
   short packet_version;
 
-  if (network_game_server_get_state(server, (short *)0) != 2) {
+  if (network_game_server_get_state(server, (short *)0) == 2) {
+    message_size -= 2;
+    packet_type = 0x20;
+    packet_version = 1;
+    if (FUN_0012bce0((int)decoded_buf, (int)((char *)message_data + 2),
+                     (short *)&message_size, &packet_type, &packet_version, 7)) {
+      if (!network_game_server_remove_player_from_game(server, machine,
+                                                       (int)decoded_buf))
+        network_game_log("server failed to remove a network player post-game");
+      return true;
+    }
     network_game_log(
-      "failed to handle a message_client_remove_player_request_postgame "
-      "because the server is not in post-game");
-    return true;
-  }
-  message_size -= 2;
-  packet_type = 0x20;
-  packet_version = 1;
-  if (FUN_0012bce0((int)decoded_buf, (int)((char *)message_data + 2),
-                   (short *)&message_size, &packet_type, &packet_version, 7)) {
-    if (!network_game_server_remove_player_from_game(server, machine,
-                                                     (int)decoded_buf))
-      network_game_log("server failed to remove a network player post-game");
+      "server failed to decode a message_client_remove_player_request_postgame "
+      "packet");
     return true;
   }
   network_game_log(
-    "server failed to decode a message_client_remove_player_request_postgame "
-    "packet");
+    "failed to handle a message_client_remove_player_request_postgame "
+    "because the server is not in post-game");
   return true;
 }
+#if defined(_MSC_VER) && !defined(__clang__)
+#pragma inline_depth()
+#endif
 
 /* Handle client switch-to-pregame request (0x12f330). */
 #if defined(_MSC_VER) && !defined(__clang__)
@@ -3155,7 +3169,13 @@ char network_game_server_reset_to_pregame(int server, void *client_message,
   return true;
 }
 
-/* Handle a ping message from a client - send pong response (0x12f8d0). */
+/* Handle a ping message from a client - send pong response (0x12f8d0).
+ * The reference calls network_game_server_get_connection() out of line
+ * (call count 7); cl.exe /Ob2 inlines its trivial NULL-guard here, which
+ * duplicates a nested display_assert call (our count 8). */
+#if defined(_MSC_VER) && !defined(__clang__)
+#pragma inline_depth(0)
+#endif
 char FUN_0012f8d0(int server, void *decoded_msg, void *client_message)
 {
   int ping_data;
@@ -3193,6 +3213,9 @@ char FUN_0012f8d0(int server, void *decoded_msg, void *client_message)
       "network_game_server_write() failed in handle_message_client_ping()");
   return result;
 }
+#if defined(_MSC_VER) && !defined(__clang__)
+#pragma inline_depth()
+#endif
 
 /* Handle client join-game request (0x12f990).
  * server=stack, machine=ESI(thunk-provided), message/size=stack. */
