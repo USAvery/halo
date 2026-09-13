@@ -202,5 +202,155 @@
     "result": "improved",
     "score_before": 81.6,
     "score_after": 93.2
+  },
+  "game_engine_player_get_team_index": {
+    "last_run_ts": "2026-09-13T12:15:00+02:00",
+    "result": "improved",
+    "score_before": 94.4,
+    "score_after": 100.0
+  },
+  "FUN_000b1570": {
+    "last_run_ts": "2026-09-13T12:15:00+02:00",
+    "result": "improved",
+    "score_before": 82.0,
+    "score_after": 86.0
+  },
+  "game_engine_evaluate_game_complexity": {
+    "last_run_ts": "2026-09-13T12:15:00+02:00",
+    "result": "improved",
+    "score_before": 79.4,
+    "score_after": 89.4
+  },
+  "game_engine_get_place": {
+    "last_run_ts": "2026-09-13T12:15:00+02:00",
+    "result": "improved",
+    "score_before": 77.7,
+    "score_after": 78.8
+  },
+  "find_netgame_flags": {
+    "last_run_ts": "2026-09-13T12:15:00+02:00",
+    "result": "improved",
+    "score_before": 83.5,
+    "score_after": 86.1
+  },
+  "FUN_000b1aa0": {
+    "last_run_ts": "2026-09-13T12:15:00+02:00",
+    "result": "improved",
+    "score_before": 95.4,
+    "score_after": 98.5
+  },
+  "game_engine_get_goal_position": {
+    "last_run_ts": "2026-09-13T12:15:00+02:00",
+    "result": "improved",
+    "score_before": 94.5,
+    "score_after": 98.2
+  },
+  "game_engine_update": {
+    "last_run_ts": "2026-09-13T12:15:00+02:00",
+    "result": "improved",
+    "score_before": 93.8,
+    "score_after": 94.5
+  },
+  "FUN_000b3120": {
+    "last_run_ts": "2026-09-13T12:15:00+02:00",
+    "result": "no_improvement",
+    "score_before": 83.3,
+    "score_after": 83.3
+  },
+  "game_engine_get_score_hud_text": {
+    "last_run_ts": "2026-09-13T12:15:00+02:00",
+    "result": "ceiling",
+    "score_before": 93.8,
+    "score_after": 93.8
+  },
+  "game_engine_king_default": {
+    "last_run_ts": "2026-09-13T12:15:00+02:00",
+    "result": "no_improvement",
+    "score_before": 95.3,
+    "score_after": 95.3
+  },
+  "ticks_to_unicode_time_string": {
+    "last_run_ts": "2026-09-13T12:15:00+02:00",
+    "result": "no_improvement",
+    "score_before": 97.8,
+    "score_after": 97.8
+  },
+  "FUN_000ae920": {
+    "last_run_ts": "2026-09-13T12:15:00+02:00",
+    "result": "no_improvement",
+    "score_before": 97.8,
+    "score_after": 97.8
+  },
+  "game_engine_rally_default": {
+    "last_run_ts": "2026-09-13T12:15:00+02:00",
+    "result": "no_improvement",
+    "score_before": 97.7,
+    "score_after": 97.7
+  },
+  "FUN_000abfd0": {
+    "last_run_ts": "2026-09-13T12:15:00+02:00",
+    "result": "no_improvement",
+    "score_before": 97.5,
+    "score_after": 97.5
+  },
+  "game_engine_man_out": {
+    "last_run_ts": "2026-09-13T12:15:00+02:00",
+    "result": "no_improvement",
+    "score_before": 97.3,
+    "score_after": 97.3
+  },
+  "FUN_000a85d0": {
+    "last_run_ts": "2026-09-13T12:15:00+02:00",
+    "result": "no_improvement",
+    "score_before": 97.2,
+    "score_after": 97.2
+  },
+  "FUN_000ad2b0": {
+    "last_run_ts": "2026-09-13T12:15:00+02:00",
+    "result": "no_improvement",
+    "score_before": 96.9,
+    "score_after": 96.9
+  },
+  "game_engine_update_flag_state": {
+    "last_run_ts": "2026-09-13T12:15:00+02:00",
+    "result": "no_improvement",
+    "score_before": 96.8,
+    "score_after": 96.8
+  },
+  "FUN_000adb20": {
+    "last_run_ts": "2026-09-13T12:15:00+02:00",
+    "result": "no_improvement",
+    "score_before": 95.5,
+    "score_after": 95.5
+  },
+  "FUN_000b0100": {
+    "last_run_ts": "2026-09-13T12:15:00+02:00",
+    "result": "no_improvement",
+    "score_before": 95.2,
+    "score_after": 95.2
+  },
+  "FUN_000ae340": {
+    "last_run_ts": "2026-09-13T12:15:00+02:00",
+    "result": "no_improvement",
+    "score_before": 95.1,
+    "score_after": 95.1
+  },
+  "FUN_000afe50": {
+    "last_run_ts": "2026-09-13T12:15:00+02:00",
+    "result": "no_improvement",
+    "score_before": 95.1,
+    "score_after": 95.1
+  },
+  "game_engine_get_distance_rating_for_spawn": {
+    "last_run_ts": "2026-09-13T12:15:00+02:00",
+    "result": "no_improvement",
+    "score_before": 95.0,
+    "score_after": 95.0
+  },
+  "FUN_000aca70": {
+    "last_run_ts": "2026-09-13T12:15:00+02:00",
+    "result": "no_improvement",
+    "score_before": 94.4,
+    "score_after": 94.4
   }
 }
