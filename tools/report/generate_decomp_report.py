@@ -199,8 +199,20 @@ def _load_snapshot_data(results_path: str = None) -> dict:
         total_seeds = r.get('total_seeds', 0)
         passed = r.get('passed', 0)
         errors = r.get('errors', 0)
+        status = r.get('status')
+        applicable = r.get('applicable')
+        if status == 'not_applicable' or applicable is False:
+            # Harness/reference-data gap (missing delinked reference, truncated
+            # oracle, unicorn unavailable, ...) -- not a tested verdict. Keep it
+            # out of both the passed and failed buckets (None == "not run"),
+            # same treatment as an entry with no snapshot data at all, rather
+            # than summing it into "failed" for the dashboard.
+            snapshot_passed = None
+        else:
+            snapshot_passed = passed == total_seeds and errors == 0 and total_seeds > 0
         out[name] = {
-            'snapshot_passed': passed == total_seeds and errors == 0 and total_seeds > 0,
+            'snapshot_passed': snapshot_passed,
+            'snapshot_status': status,
             'snapshot_coverage': r.get('coverage', 0.0),
             'snapshot_confidence': r.get('confidence', 'unknown'),
             'snapshot_object': r.get('object', '?'),

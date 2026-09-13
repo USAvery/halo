@@ -126,24 +126,39 @@ def run_unicorn_diff(func_name: str, snapshot_path: str,
                     reason = "mem-limit"
                     break
             if reason:
-                return {"func": func_name, "error": reason, "coverage": 0.0}
+                return {"func": func_name, "error": reason, "coverage": 0.0,
+                         "status": "error", "applicable": None, "reason": reason}
         except Exception as e:
-            return {"func": func_name, "error": str(e), "coverage": 0.0}
+            return {"func": func_name, "error": str(e), "coverage": 0.0,
+                     "status": "error", "applicable": None, "reason": str(e)}
 
         if not os.path.exists(output_json):
-            return {"func": func_name, "error": "no output", "coverage": 0.0}
+            return {"func": func_name, "error": "no output", "coverage": 0.0,
+                     "status": "error", "applicable": None, "reason": "no_output"}
 
         with open(output_json, encoding="utf-8") as f:
             result = json.load(f)
 
+        # run_diff's finish() helper writes "status"/"applicable"/"reason" to
+        # distinguish a real pass/fail verdict from "not_applicable" (missing
+        # delinked reference, missing build object, truncated oracle, external
+        # relocations, stub-convention mismatch, unicorn unavailable, etc). Carry
+        # those through instead of collapsing everything to passed/failed/errors
+        # counts, or a harness/reference-data gap reads as a behavioral
+        # regression downstream. The actual seed count run is written under the
+        # "seeds" key -- there is no "total_seeds" key in that payload, so
+        # reading that name always silently fell back to the requested count.
         return {
             "func": func_name,
+            "status": result.get("status", "unknown"),
+            "applicable": result.get("applicable", True),
+            "reason": result.get("reason"),
             "passed": result.get("passed", 0),
             "failed": result.get("failed", 0),
             "errors": result.get("errors", 0),
             "coverage": result.get("coverage_pct", 0.0),
             "confidence": result.get("confidence", "unknown"),
-            "total_seeds": result.get("total_seeds", seeds),
+            "total_seeds": result.get("seeds", seeds),
         }
 
 
@@ -264,6 +279,7 @@ def verify_snapshot(snapshot_path: str,
     n = len(targets)
     report["results"] = []
     passed = 0
+    skipped = 0
     improved = 0
     total_cov = 0.0
 
@@ -277,13 +293,24 @@ def verify_snapshot(snapshot_path: str,
         result["addr"] = f"0x{addr:x}" if addr and addr > 0 else "?"
         result["object"] = obj_name
 
+        # Classify using run_diff's real status/applicable/reason first -- a
+        # "not_applicable" verdict (missing delinked reference, truncated
+        # oracle, unicorn unavailable, ...) is a harness/reference-data gap,
+        # not a behavioral regression, and must NOT fall through to FAIL.
+        rd_status = result.get("status")
         if result.get("error"):
             status = f"ERROR ({result['error']})"
-        elif result.get("passed", 0) == result.get("total_seeds", 0) and result.get("errors", 0) == 0:
+        elif rd_status == "not_applicable" or result.get("applicable") is False:
+            status = f"SKIP ({result.get('reason') or 'not_applicable'})"
+            skipped += 1
+        elif rd_status == "inconclusive":
+            status = f"INCONCLUSIVE ({result.get('reason') or 'no_divergence_observed'})"
+        elif (result.get("passed", 0) == result.get("total_seeds", 0)
+              and result.get("total_seeds", 0) > 0 and result.get("errors", 0) == 0):
             status = "PASS"
             passed += 1
-        elif result.get("errors", 0) > 0:
-            status = "ERRORS"
+        elif rd_status == "error" or result.get("errors", 0) > 0:
+            status = f"ERROR ({result.get('reason') or 'unknown'})" if rd_status == "error" else "ERRORS"
         else:
             status = "FAIL"
 
@@ -299,11 +326,13 @@ def verify_snapshot(snapshot_path: str,
     report["summary"] = {
         "total": len(targets),
         "passed": passed,
+        "skipped": skipped,
         "avg_coverage_pct": round(avg_cov, 1),
     }
 
     print(f"\n{'=' * 60}")
-    print(f"  Summary: {passed}/{len(targets)} passed "
+    print(f"  Summary: {passed}/{len(targets)} passed"
+          f"{f', {skipped} not applicable' if skipped else ''} "
           f"(avg coverage {avg_cov:.1f}%)")
     if all_portable:
         _obj_stats = {}

@@ -78,6 +78,7 @@ class PlayerControlAngleEndpointTest(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="player_angle_") as tmp:
             snapshot = Path(tmp) / ("%s.json" % name)
             _snapshot(snapshot, yaw, pitch, description)
+            output_json = Path(tmp) / ("%s_result.json" % name)
             result = unicorn_diff.run_diff(
                 "player_control_get_facing_angles",
                 num_seeds=1,
@@ -88,7 +89,13 @@ class PlayerControlAngleEndpointTest(unittest.TestCase):
                 mem_trace=True,
                 no_concolic=True,
                 state_snapshot=snapshot,
+                output_json=output_json,
             )
+            if result == 2:
+                payload = json.loads(output_json.read_text(encoding="utf-8"))
+                self.skipTest(
+                    "not_applicable: %s (%s)" % (payload.get("reason"), description)
+                )
             self.assertEqual(0, result, "%s must not be rejected" % description)
 
     def test_yaw_two_pi_is_not_rejected(self):
