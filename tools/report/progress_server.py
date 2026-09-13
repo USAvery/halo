@@ -176,10 +176,9 @@ class SSEHandler(SimpleHTTPRequestHandler):
             logging.warning('Unit %s not found in report.json', unit_name)
             return None
 
-        # Look up unit in objdiff.json to get the source file path and delinked ref.
-        # Some delinked references are tracked only through delinked/manifest.json
-        # and the generated report, so objdiff.json is a preferred source, not a
-        # hard requirement.
+        # Look up unit in objdiff.json for its source path.  objdiff.json is a
+        # preferred source, not a hard requirement — report_unit's own
+        # source_path (from kb.json) is the fallback.
         try:
             with open('objdiff.json') as f:
                 objdiff_config = json.load(f)
@@ -187,17 +186,11 @@ class SSEHandler(SimpleHTTPRequestHandler):
             logging.warning('Cannot read objdiff.json: %s', e)
             objdiff_config = {'units': []}
 
-        unit_config = None
+        source_path_rel = None
         for entry in objdiff_config.get('units', []):
             if entry['name'] == unit_name or entry['name'].endswith(f'/{unit_name}'):
-                unit_config = entry
+                source_path_rel = entry.get('metadata', {}).get('source_path')
                 break
-
-        source_path_rel = None
-        base_path = None
-        if unit_config:
-            source_path_rel = unit_config.get('metadata', {}).get('source_path')
-            base_path = unit_config.get('base_path')
         if not source_path_rel:
             source_path_rel = report_unit.get('source_path')
 
@@ -205,15 +198,9 @@ class SSEHandler(SimpleHTTPRequestHandler):
             logging.warning('No source_path in objdiff.json metadata for unit %s', unit_name)
             return None
 
-        # Informational only.  Reference selection is vc71_verify's job (whole
-        # delinked object -> per-function chunk -> reference synthesized from the
-        # pristine XBE), resolved per function, so a missing delinked object here
-        # is not a reason to refuse to score.
-        if base_path and os.path.exists(base_path):
-            logging.info('Unit %s has a whole-TU delinked reference: %s', unit_name, base_path)
-        else:
-            logging.info('Unit %s has no whole-TU delinked reference; vc71_verify '
-                         'will resolve one per function', unit_name)
+        # Reference selection is vc71_verify's job: every reference is derived
+        # from the pristine XBE (tools/verify/function_bounds.json), resolved
+        # per function.  Delinked objects on disk are irrelevant to scoring.
 
         # Score through vc71_regression's `populate`, scoped to this one TU.
         #

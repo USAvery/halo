@@ -571,7 +571,6 @@ def compute_unit_stats(kb: KnowledgeBase, store: MetadataStore,
             'name': obj_name.replace('.obj', ''),
             'synthetic': synthetic,
             'source_path': unit_source_path,
-            'obj_path': f'delinked/{obj_name}',
             'functions': sorted(unit_funcs, key=lambda x: x['address']),
             'data': sorted(unit_data, key=lambda x: x['address']),
             'summary': {
@@ -583,6 +582,12 @@ def compute_unit_stats(kb: KnowledgeBase, store: MetadataStore,
                 'bytes_percent': round(ported_bytes / total_bytes * 100, 2) if total_bytes else 0,
                 'match_avg': match_avg,
                 'match_weighted': match_weighted,
+                # Match percentage is only meaningful for the functions that have
+                # a score. Keep its coverage explicit so consumers do not mistake
+                # a partial VC71 snapshot for whole-TU byte accuracy.
+                'match_scored_count': len(match_scores),
+                'match_scored_bytes': match_scored_bytes,
+                'match_coverage_percent': round(match_scored_bytes / ported_bytes * 100, 2) if ported_bytes else None,
                 # Canonical name; `has_delinked_ref` is the legacy alias kept for
                 # existing consumers (tools/report/progress_server.py) and now
                 # carries the same bounds-derived meaning.
@@ -1262,8 +1267,31 @@ def generate_html(report: dict, output_path: str, history_path: str = None):
             display: flex; flex-wrap: wrap; gap: 3px; margin-top: 4px;
         }
         .tu-tile {
-            width: 14px; height: 14px; border-radius: 2px; cursor: pointer;
-            transition: transform 0.1s; flex-shrink: 0;
+            width: 28px; height: 24px; border-radius: 3px; cursor: pointer;
+            transition: transform 0.1s; flex-shrink: 0; position: relative;
+            box-sizing: border-box; padding: 2px 3px;
+            background: var(--bg-tertiary); border: 1px solid var(--border);
+        }
+        .tu-tile.fully-verified { border-color: #3fb950; }
+        .tu-tile.byte-complete { border-color: #388bfd; }
+        .tu-tile.has-divergence {
+            border-color: #f85149;
+            box-shadow: 0 0 0 1px rgba(248,81,73,0.25);
+        }
+        .tu-meter {
+            position: absolute; left: 3px; right: 3px; height: 4px;
+            border-radius: 1px; background: #30363d; overflow: hidden;
+        }
+        .tu-meter.port { top: 3px; }
+        .tu-meter.byte { top: 9px; }
+        .tu-meter.verify { top: 15px; }
+        .tu-meter-fill { height: 100%; min-width: 0; border-radius: 1px; }
+        .tu-meter-fill.port { background: #f0883e; }
+        .tu-meter-fill.byte { background: #388bfd; }
+        .tu-meter-fill.verify { background: #3fb950; }
+        .tu-divergence-dot {
+            position: absolute; right: 1px; top: 1px; width: 4px; height: 4px;
+            border-radius: 50%; background: #f85149;
         }
         .tu-tile:hover { transform: scale(1.8); z-index: 10; }
         .tu-legend {
@@ -1273,7 +1301,11 @@ def generate_html(report: dict, output_path: str, history_path: str = None):
             display: flex; align-items: center; gap: 5px;
             font-size: 0.72em; color: var(--text-secondary);
         }
-        .tu-legend-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+        .tu-legend-swatch { width: 16px; height: 4px; border-radius: 1px; flex-shrink: 0; }
+        .tu-map-note {
+            flex-basis: 100%; color: var(--text-secondary); font-size: 0.72em;
+            line-height: 1.4; margin-top: 1px;
+        }
         .addr-strip-wrap {
             height: 56px; background: var(--bg-tertiary); border-radius: 6px;
             overflow: hidden; position: relative; margin-top: 4px;
@@ -1383,7 +1415,7 @@ def generate_html(report: dict, output_path: str, history_path: str = None):
                     <div id="verif-funnel"></div>
                 </div>
                 <div class="card">
-                    <div class="chart-title">Unit Evidence Map &mdash; <span style="font-weight:400;text-transform:none;letter-spacing:0">click a tile to open unit</span></div>
+                    <div class="chart-title">Unit Evidence Map &mdash; <span style="font-weight:400;text-transform:none;letter-spacing:0">three independent meters; click a tile to open unit</span></div>
                     <div class="tu-heatmap-grid" id="tu-heatmap"></div>
                     <div class="tu-legend" id="tu-legend"></div>
                 </div>
@@ -1786,13 +1818,13 @@ def generate_html(report: dict, output_path: str, history_path: str = None):
                 '</div>' +
                 (s.match ?
                 '<div class="card" title="' + escHtml(matchTip) + '">' +
-                    '<div class="stat-label">VC71 Byte-Match <span style="opacity:.6;font-weight:400">(diagnostic)</span></div>' +
+                    '<div class="stat-label">VC71 Match Score <span style="opacity:.6;font-weight:400">(diagnostic)</span></div>' +
                     '<div class="stat-value" style="color:' + matchColor(s.match.weighted) + '">' + s.match.weighted.toFixed(1) + '%</div>' +
                     '<div class="stat-label">Byte-weighted &middot; ' + fmtNum(s.match.scored_count) + ' of ' + fmtNum(s.functions.ported) + ' scored &middot; has structural ceilings</div>' +
                     '<div class="progress-bar"><div class="progress-fill" style="width:' + Math.max(s.match.weighted, 2) + '%;background:linear-gradient(90deg,var(--accent-green),#2ea043)"><span class="progress-text">' + s.match.weighted.toFixed(1) + '%</span></div></div>' +
                 '</div>' : '') +
                 '<div class="card" title="' + escHtml(verifiedTip) + '">' +
-                    '<div class="stat-label">Verified</div>' +
+                    '<div class="stat-label">Verified functions</div>' +
                     '<div class="stat-value" style="color:#3fb950">' + fmtNum(vData.total) + '</div>' +
                     '<div class="stat-label">' + verifiedPct + '% of ported &middot; hover for breakdown</div>' +
                     (s.functions.ported > 0 ? '<div class="progress-bar"><div class="progress-fill" style="width:' + Math.max(vData.total / s.functions.ported * 100, 0.3) + '%;background:linear-gradient(90deg,#238636,#3fb950)"><span class="progress-text">' + verifiedPct + '%</span></div></div>' : '') +
@@ -2044,8 +2076,8 @@ def generate_html(report: dict, output_path: str, history_path: str = None):
             var steps = [
                 { label: 'All functions',   count: total,       color: '#3d444d', pct: 100 },
                 { label: 'Ported',          count: ported,      color: '#388bfd', pct: total > 0 ? ported / total * 100 : 0 },
-                { label: 'Byte-matched',    count: vc71,        color: '#d29922', pct: total > 0 ? vc71 / total * 100 : 0 },
-                { label: 'Verified',        count: vData.total, color: '#3fb950', pct: total > 0 ? vData.total / total * 100 : 0 }
+                { label: 'VC71 scored',     count: vc71,        color: '#d29922', pct: total > 0 ? vc71 / total * 100 : 0 },
+                { label: 'Function verified', count: vData.total, color: '#3fb950', pct: total > 0 ? vData.total / total * 100 : 0 }
             ];
 
             var html = '';
@@ -2069,55 +2101,134 @@ def generate_html(report: dict, output_path: str, history_path: str = None):
             if (el) el.innerHTML = html;
         }
 
-        function tuEvidenceLevel(unit) {
-            if (!unit.summary || !unit.summary.ported) return 'none';
+        // The map deliberately does not collapse a TU to one evidence color. A
+        // TU can be partly ported, partly scored, and partly behaviorally verified
+        // at the same time. Each meter below uses the total TU byte count as its
+        // common scale; the tooltip adds function counts and the scored-byte
+        // denominator. If sizes are unavailable, it falls back to function count.
+        function unitEvidenceStats(unit) {
             var funcs = unit.functions || [];
-            var anyVerified = false;
+            var total = funcs.length;
+            var totalBytes = 0;
+            var ported = 0;
+            var portedBytes = 0;
+            var scored = 0;
+            var scoredBytes = 0;
+            var verified = 0;
+            var verifiedBytes = 0;
+            var divergent = 0;
+            var methods = { equiv: 0, snapshot: 0, runtime: 0, byte: 0 };
+
             for (var i = 0; i < funcs.length; i++) {
-                if (isVerified(funcs[i])) { anyVerified = true; break; }
+                var f = funcs[i];
+                var size = Math.max(Number(f.size) || 0, 0);
+                totalBytes += size;
+                if (!f.ported) continue;
+                ported++;
+                portedBytes += size;
+                if (typeof f.match_percent === 'number') {
+                    scored++;
+                    scoredBytes += size;
+                }
+                if (isDivergent(f)) divergent++;
+                if (equivVerified(f)) methods.equiv++;
+                if (f.snapshot_passed === true) methods.snapshot++;
+                if (f.runtime_oracle_passed === true) methods.runtime++;
+                if (f.match_percent !== null && f.match_percent !== undefined && f.match_percent >= 90) methods.byte++;
+                if (isVerified(f)) {
+                    verified++;
+                    verifiedBytes += size;
+                }
             }
-            if (anyVerified) return 'verified';
-            if (unit.summary.match_weighted !== null && unit.summary.match_weighted !== undefined) return 'matched';
-            return 'ported';
+
+            var byteCoverage = portedBytes > 0 ? scoredBytes / portedBytes * 100 : null;
+            var state = 'No ported functions';
+            if (ported > 0) {
+                if (divergent > 0) state = 'Divergence candidate needs triage';
+                else if (ported === total && verified === ported) state = 'Fully ported; all functions verified';
+                else if (ported === total && scored === ported) state = 'Fully ported; every function has VC71 evidence';
+                else if (ported === total) state = 'Fully ported; evidence is incomplete';
+                else state = 'Partially ported';
+            }
+            return {
+                total: total,
+                totalBytes: totalBytes,
+                ported: ported,
+                portedBytes: portedBytes,
+                scored: scored,
+                scoredBytes: scoredBytes,
+                byteCoverage: byteCoverage,
+                verified: verified,
+                verifiedBytes: verifiedBytes,
+                divergent: divergent,
+                methods: methods,
+                state: state
+            };
         }
 
-        var EVIDENCE_COLORS = {
-            none: '#6e7681',
-            ported: '#f0883e',
-            matched: '#388bfd',
-            verified: '#3fb950'
-        };
-        var EVIDENCE_LABELS = {
-            none: 'Not started',
-            ported: 'Ported, unverified',
-            matched: 'Byte-matched (VC71)',
-            verified: 'Verified'
-        };
+        function pctText(value) {
+            return value === null || value === undefined ? 'n/a' : value.toFixed(1) + '%';
+        }
+
+        function unitMeterPct(st, bytes, funcs) {
+            var denominator = st.totalBytes > 0 ? st.totalBytes : st.total;
+            var numerator = st.totalBytes > 0 ? bytes : funcs;
+            return denominator > 0 ? numerator / denominator * 100 : 0;
+        }
+
+        function unitEvidenceTooltip(unit, st) {
+            var s = unit.summary || {};
+            var match = s.match_weighted !== null && s.match_weighted !== undefined
+                ? s.match_weighted.toFixed(1) + '%'
+                : 'not scored';
+            var lines = [
+                unit.name,
+                st.state,
+                'Ported: ' + st.ported + '/' + st.total + ' functions (' + pctText(st.total ? st.ported / st.total * 100 : 0) + '; ' + pctText(unitMeterPct(st, st.portedBytes, st.ported)) + ' of TU bytes)',
+                'VC71 byte evidence: ' + st.scored + '/' + st.ported + ' ported functions (' + pctText(unitMeterPct(st, st.scoredBytes, st.scored)) + ' of TU bytes; ' + pctText(st.byteCoverage) + ' of ported bytes scored)',
+                'VC71 match score: ' + match + ' (weighted over scored bytes only)',
+                'Verified: ' + st.verified + '/' + st.ported + ' ported functions (' + pctText(unitMeterPct(st, st.verifiedBytes, st.verified)) + ' of TU bytes; ' + pctText(st.ported ? st.verified / st.ported * 100 : 0) + ' of ported functions)'
+            ];
+            var methodText = [];
+            if (st.methods.equiv) methodText.push(st.methods.equiv + ' equivalence/Z3');
+            if (st.methods.snapshot) methodText.push(st.methods.snapshot + ' snapshot');
+            if (st.methods.runtime) methodText.push(st.methods.runtime + ' runtime oracle');
+            if (st.methods.byte) methodText.push(st.methods.byte + ' VC71 >=90%');
+            lines.push('Verified evidence: ' + (methodText.length ? methodText.join(', ') : 'none'));
+            if (st.divergent) lines.push('Divergence candidates: ' + st.divergent + ' (not counted as verified)');
+            lines.push('Verified is per-function evidence, not a whole-TU correctness proof.');
+            return lines.join('\\n');
+        }
 
         function renderTuHeatmap() {
             var units = REPORT.units;
             var html = '';
             for (var i = 0; i < units.length; i++) {
                 var u = units[i];
-                var level = tuEvidenceLevel(u);
-                var color = EVIDENCE_COLORS[level];
-                var s = u.summary;
-                var tip = u.name + '\\n' + EVIDENCE_LABELS[level] +
-                    '\\n' + s.ported + '/' + s.total + ' ported';
-                if (s.match_weighted !== null && s.match_weighted !== undefined) tip += '\\nVC71: ' + s.match_weighted.toFixed(1) + '%';
-                html += '<div class="tu-tile" style="background:' + color + '" title="' + escHtml(tip) + '" onclick="goToUnit(\\'' + jsEsc(u.name) + '\\')"></div>';
+                var st = unitEvidenceStats(u);
+                var stateClass = st.divergent ? 'has-divergence' :
+                    (st.verified > 0 && st.verified === st.ported ? 'fully-verified' :
+                    (st.scored > 0 && st.scored === st.ported ? 'byte-complete' : ''));
+                var tip = unitEvidenceTooltip(u, st);
+                var label = u.name + ': ' + st.state;
+                html += '<div class="tu-tile ' + stateClass + '" title="' + escHtml(tip) + '" aria-label="' + escHtml(label) + '" onclick="goToUnit(\\'' + jsEsc(u.name) + '\\')">' +
+                    '<div class="tu-meter port"><div class="tu-meter-fill port" style="width:' + unitMeterPct(st, st.portedBytes, st.ported) + '%"></div></div>' +
+                    '<div class="tu-meter byte"><div class="tu-meter-fill byte" style="width:' + unitMeterPct(st, st.scoredBytes, st.scored) + '%"></div></div>' +
+                    '<div class="tu-meter verify"><div class="tu-meter-fill verify" style="width:' + unitMeterPct(st, st.verifiedBytes, st.verified) + '%"></div></div>' +
+                    (st.divergent ? '<div class="tu-divergence-dot"></div>' : '') +
+                    '</div>';
             }
             var el = document.getElementById('tu-heatmap');
             if (el) el.innerHTML = html;
 
             var legEl = document.getElementById('tu-legend');
             if (legEl) {
-                var legHtml = '';
-                var keys = ['none', 'ported', 'matched', 'verified'];
-                for (var j = 0; j < keys.length; j++) {
-                    var k = keys[j];
-                    legHtml += '<div class="tu-legend-item"><div class="tu-legend-dot" style="background:' + EVIDENCE_COLORS[k] + '"></div>' + EVIDENCE_LABELS[k] + '</div>';
-                }
+                var legHtml =
+                    '<div class="tu-legend-item"><div class="tu-legend-swatch" style="background:#f0883e"></div>Ported surface / all TU bytes</div>' +
+                    '<div class="tu-legend-item"><div class="tu-legend-swatch" style="background:#388bfd"></div>VC71 score coverage / all TU bytes</div>' +
+                    '<div class="tu-legend-item"><div class="tu-legend-swatch" style="background:#3fb950"></div>Verified surface / all TU bytes</div>' +
+                    '<div class="tu-legend-item"><div class="tu-legend-swatch" style="background:#f85149"></div>Red dot: divergence candidate</div>' +
+                    '<div class="tu-map-note">Empty meters mean no evidence in that lane. Hover for function counts, the ported-byte denominator, weighted VC71 score, and verification methods; no single meter claims whole-TU accuracy.</div>';
                 legEl.innerHTML = legHtml;
             }
         }
