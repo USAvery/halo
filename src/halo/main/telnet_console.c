@@ -1049,3 +1049,30 @@ void FUN_00132e20(int object_handle, int flag_datum_handle, int param_3,
     flag_render_proper(flag, definition, param_3, param_4);
   }
 }
+
+/* FUN_00132ea0 (0x132ea0) -- per-tick update over every live flag datum.
+ * Each iteration fetches the flag's "flag" definition tag, bumps the idle
+ * counter at +0x6, and simulates the cloth (FUN_00131fc0) while the flag is
+ * still attached to an object (+0x8 != NONE), the counter is under 5, and the
+ * elapsed time is non-zero.  The compare at 0x132efb is FCOMP against the
+ * 0.0f constant at 0x2533c0 with TEST AH,0x44 / JNP, i.e. skip when equal. */
+void FUN_00132ea0(float dt)
+{
+  int datum_handle;
+  void *flag;
+  void *definition;
+
+  for (datum_handle = data_next_index(*(data_t **)0x5a90d0, -1);
+       datum_handle != -1;
+       datum_handle = data_next_index(*(data_t **)0x5a90d0, datum_handle)) {
+    flag = datum_get(*(data_t **)0x5a90d0, datum_handle);
+    definition = tag_get(0x666c6167, *(int *)((char *)flag + 0xc));
+    *(int16_t *)((char *)flag + 6) =
+      (int16_t)(*(int16_t *)((char *)flag + 6) + 1);
+
+    if (*(int *)((char *)flag + 8) != -1 &&
+        *(int16_t *)((char *)flag + 6) < 5 && dt != *(float *)0x2533c0) {
+      FUN_00131fc0(flag, definition, dt);
+    }
+  }
+}

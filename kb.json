@@ -26393,7 +26393,8 @@
     },
     {
      "addr": "0x132ea0",
-     "decl": "void FUN_00132ea0(void);"
+     "decl": "void FUN_00132ea0(float dt);",
+     "ported": true
     }
    ],
    "name": "telnet_console.obj",

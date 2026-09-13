@@ -32413,6 +32413,21 @@
       "score": 100.0,
       "source": "src/halo/main/telnet_console.c"
     },
+    "FUN_00132ea0": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 97.2,
+      "addr": "0x132ea0",
+      "end": "0x132f31",
+      "kind": "auto",
+      "n_r": 54,
+      "opnd_percent": 95.4,
+      "raw_mnemonic_pct": 97.2,
+      "ref": "synth",
+      "ref_sha": "a44f1dacef2dee6d",
+      "score": 97.2,
+      "source": "src/halo/main/telnet_console.c"
+    },
     "FUN_001330a0": {
       "abi_model": "raw",
       "abi_model_items": 0,
