@@ -1264,36 +1264,19 @@ def generate_html(report: dict, output_path: str, history_path: str = None):
         }
         .funnel-sub { color: var(--text-secondary); }
         .tu-heatmap-grid {
-            display: flex; flex-wrap: wrap; gap: 3px; margin-top: 4px;
+            display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px;
         }
-        .tu-tile {
-            width: 28px; height: 24px; border-radius: 3px; cursor: pointer;
-            transition: transform 0.1s; flex-shrink: 0; position: relative;
-            box-sizing: border-box; padding: 2px 3px;
-            background: var(--bg-tertiary); border: 1px solid var(--border);
+        .tu-bar-tile {
+            width: 34px; height: 16px; border-radius: 3px; cursor: pointer;
+            background: #21262d; position: relative; overflow: hidden;
+            transition: transform 0.1s; flex-shrink: 0;
         }
-        .tu-tile.fully-verified { border-color: #3fb950; }
-        .tu-tile.byte-complete { border-color: #388bfd; }
-        .tu-tile.has-divergence {
-            border-color: #f85149;
-            box-shadow: 0 0 0 1px rgba(248,81,73,0.25);
+        .tu-bar-tile:hover { transform: scale(1.6); z-index: 10; }
+        .tu-bar-fill {
+            position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px;
+            min-width: 0;
         }
-        .tu-meter {
-            position: absolute; left: 3px; right: 3px; height: 4px;
-            border-radius: 1px; background: #30363d; overflow: hidden;
-        }
-        .tu-meter.port { top: 3px; }
-        .tu-meter.byte { top: 9px; }
-        .tu-meter.verify { top: 15px; }
-        .tu-meter-fill { height: 100%; min-width: 0; border-radius: 1px; }
-        .tu-meter-fill.port { background: #f0883e; }
-        .tu-meter-fill.byte { background: #388bfd; }
-        .tu-meter-fill.verify { background: #3fb950; }
-        .tu-divergence-dot {
-            position: absolute; right: 1px; top: 1px; width: 4px; height: 4px;
-            border-radius: 50%; background: #f85149;
-        }
-        .tu-tile:hover { transform: scale(1.8); z-index: 10; }
+        .tu-bar-tile.divergent { outline: 1px solid #f85149; outline-offset: -1px; }
         .tu-legend {
             display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px;
         }
@@ -1301,7 +1284,7 @@ def generate_html(report: dict, output_path: str, history_path: str = None):
             display: flex; align-items: center; gap: 5px;
             font-size: 0.72em; color: var(--text-secondary);
         }
-        .tu-legend-swatch { width: 16px; height: 4px; border-radius: 1px; flex-shrink: 0; }
+        .tu-legend-swatch { width: 16px; height: 5px; border-radius: 2px; flex-shrink: 0; }
         .tu-map-note {
             flex-basis: 100%; color: var(--text-secondary); font-size: 0.72em;
             line-height: 1.4; margin-top: 1px;
@@ -1415,7 +1398,7 @@ def generate_html(report: dict, output_path: str, history_path: str = None):
                     <div id="verif-funnel"></div>
                 </div>
                 <div class="card">
-                    <div class="chart-title">Unit Evidence Map &mdash; <span style="font-weight:400;text-transform:none;letter-spacing:0">three independent meters; click a tile to open unit</span></div>
+                    <div class="chart-title">Unit Evidence Map &mdash; <span style="font-weight:400;text-transform:none;letter-spacing:0">bar length = implemented, color = byte accuracy; click a tile to open unit</span></div>
                     <div class="tu-heatmap-grid" id="tu-heatmap"></div>
                     <div class="tu-legend" id="tu-legend"></div>
                 </div>
@@ -2101,11 +2084,30 @@ def generate_html(report: dict, output_path: str, history_path: str = None):
             if (el) el.innerHTML = html;
         }
 
-        // The map deliberately does not collapse a TU to one evidence color. A
-        // TU can be partly ported, partly scored, and partly behaviorally verified
-        // at the same time. Each meter below uses the total TU byte count as its
-        // common scale; the tooltip adds function counts and the scored-byte
-        // denominator. If sizes are unavailable, it falls back to function count.
+        // The map answers the two headline questions per unit at a glance, with
+        // a single visual element: bar length = implemented surface (ported
+        // bytes / unit bytes) and bar color = byte accuracy (byte-weighted VC71
+        // match over scored bytes). Everything else — function counts, the
+        // scored-byte denominator, verification-lane evidence — lives in the
+        // hover tooltip. A TU can be partly ported, partly scored, and partly
+        // behaviorally verified at the same time, so no tile claims whole-TU
+        // correctness.
+        function accuracyColor(match) {
+            if (match === null || match === undefined) return '#8b949e';
+            if (match >= 95) return '#7ee787';
+            if (match >= 85) return '#d29922';
+            return '#f85149';
+        }
+
+        // A unit earns the solid-green "byte-accurate" distinction only when
+        // every ported function has been scored AND the byte-weighted match is
+        // 100%. A 100% match over a partial score coverage is just light green —
+        // the unscored remainder is unproven.
+        function unitIsPerfect(unit, st) {
+            if (st.ported === 0 || st.scored !== st.ported) return false;
+            var match = (unit.summary || {}).match_weighted;
+            return match !== null && match !== undefined && match >= 100;
+        }
         function unitEvidenceStats(unit) {
             var funcs = unit.functions || [];
             var total = funcs.length;
@@ -2184,6 +2186,7 @@ def generate_html(report: dict, output_path: str, history_path: str = None):
             var lines = [
                 unit.name,
                 st.state,
+                (unitIsPerfect(unit, st) ? 'Byte-accurate: 100% weighted match over all ported bytes' : null),
                 'Ported: ' + st.ported + '/' + st.total + ' functions (' + pctText(st.total ? st.ported / st.total * 100 : 0) + '; ' + pctText(unitMeterPct(st, st.portedBytes, st.ported)) + ' of TU bytes)',
                 'VC71 byte evidence: ' + st.scored + '/' + st.ported + ' ported functions (' + pctText(unitMeterPct(st, st.scoredBytes, st.scored)) + ' of TU bytes; ' + pctText(st.byteCoverage) + ' of ported bytes scored)',
                 'VC71 match score: ' + match + ' (weighted over scored bytes only)',
@@ -2197,7 +2200,7 @@ def generate_html(report: dict, output_path: str, history_path: str = None):
             lines.push('Verified evidence: ' + (methodText.length ? methodText.join(', ') : 'none'));
             if (st.divergent) lines.push('Divergence candidates: ' + st.divergent + ' (not counted as verified)');
             lines.push('Verified is per-function evidence, not a whole-TU correctness proof.');
-            return lines.join('\\n');
+            return lines.filter(function(l) { return l !== null; }).join('\\n');
         }
 
         function renderTuHeatmap() {
@@ -2206,16 +2209,15 @@ def generate_html(report: dict, output_path: str, history_path: str = None):
             for (var i = 0; i < units.length; i++) {
                 var u = units[i];
                 var st = unitEvidenceStats(u);
-                var stateClass = st.divergent ? 'has-divergence' :
-                    (st.verified > 0 && st.verified === st.ported ? 'fully-verified' :
-                    (st.scored > 0 && st.scored === st.ported ? 'byte-complete' : ''));
+                var s = u.summary || {};
+                var match = st.ported > 0 ? s.match_weighted : null;
+                var perfect = unitIsPerfect(u, st);
+                var color = perfect ? '#2ea043' : accuracyColor(match);
+                var portedPct = unitMeterPct(st, st.portedBytes, st.ported);
                 var tip = unitEvidenceTooltip(u, st);
                 var label = u.name + ': ' + st.state;
-                html += '<div class="tu-tile ' + stateClass + '" title="' + escHtml(tip) + '" aria-label="' + escHtml(label) + '" onclick="goToUnit(\\'' + jsEsc(u.name) + '\\')">' +
-                    '<div class="tu-meter port"><div class="tu-meter-fill port" style="width:' + unitMeterPct(st, st.portedBytes, st.ported) + '%"></div></div>' +
-                    '<div class="tu-meter byte"><div class="tu-meter-fill byte" style="width:' + unitMeterPct(st, st.scoredBytes, st.scored) + '%"></div></div>' +
-                    '<div class="tu-meter verify"><div class="tu-meter-fill verify" style="width:' + unitMeterPct(st, st.verifiedBytes, st.verified) + '%"></div></div>' +
-                    (st.divergent ? '<div class="tu-divergence-dot"></div>' : '') +
+                html += '<div class="tu-bar-tile' + (st.divergent ? ' divergent' : '') + '" title="' + escHtml(tip) + '" aria-label="' + escHtml(label) + '" onclick="goToUnit(\\'' + jsEsc(u.name) + '\\')">' +
+                    '<div class="tu-bar-fill" style="width:' + portedPct + '%;background:' + color + '"></div>' +
                     '</div>';
             }
             var el = document.getElementById('tu-heatmap');
@@ -2224,11 +2226,13 @@ def generate_html(report: dict, output_path: str, history_path: str = None):
             var legEl = document.getElementById('tu-legend');
             if (legEl) {
                 var legHtml =
-                    '<div class="tu-legend-item"><div class="tu-legend-swatch" style="background:#f0883e"></div>Ported surface / all TU bytes</div>' +
-                    '<div class="tu-legend-item"><div class="tu-legend-swatch" style="background:#388bfd"></div>VC71 score coverage / all TU bytes</div>' +
-                    '<div class="tu-legend-item"><div class="tu-legend-swatch" style="background:#3fb950"></div>Verified surface / all TU bytes</div>' +
-                    '<div class="tu-legend-item"><div class="tu-legend-swatch" style="background:#f85149"></div>Red dot: divergence candidate</div>' +
-                    '<div class="tu-map-note">Empty meters mean no evidence in that lane. Hover for function counts, the ported-byte denominator, weighted VC71 score, and verification methods; no single meter claims whole-TU accuracy.</div>';
+                    '<div class="tu-legend-item"><div class="tu-legend-swatch" style="background:#2ea043"></div>100% byte-accurate (fully scored)</div>' +
+                    '<div class="tu-legend-item"><div class="tu-legend-swatch" style="background:#7ee787"></div>&ge;95% match</div>' +
+                    '<div class="tu-legend-item"><div class="tu-legend-swatch" style="background:#d29922"></div>85&ndash;95%</div>' +
+                    '<div class="tu-legend-item"><div class="tu-legend-swatch" style="background:#f85149"></div>&lt;85%</div>' +
+                    '<div class="tu-legend-item"><div class="tu-legend-swatch" style="background:#8b949e"></div>unscored</div>' +
+                    '<div class="tu-legend-item"><div class="tu-legend-swatch" style="background:transparent;outline:1px solid #f85149;outline-offset:-1px"></div>divergence candidate</div>' +
+                    '<div class="tu-map-note">Bar length = implemented (ported bytes / unit bytes). Color = byte-weighted VC71 match over scored bytes; hover a tile for detail.</div>';
                 legEl.innerHTML = legHtml;
             }
         }
