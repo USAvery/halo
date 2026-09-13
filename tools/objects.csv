@@ -72,7 +72,7 @@ point_physics.obj,true,0x00150710-0x00154C50,29
 predicted_resources.obj,true,0x001BDD40-0x001BE0C0,8
 profile.obj,true,0x0008F870-0x000924A0,50
 projectiles.obj,true,0x000F7CB0-0x000FAF00,28
-progress_bar.obj,true,0x000E19C0-0x000E35E0,31
+progress_bar.obj,true,0x000E19C0-0x000E3500,29
 random_math.obj,true,0x0010A930-0x0010CB20,38
 rasterizer.obj,true,0x0016DE60-0x0017CC40,89
 rasterizer_xbox_vertex_shaders_initialize.obj,true,0x00178850-0x00178CB0,2
@@ -105,7 +105,7 @@ structure_detail_objects.obj,true,0x00193910-0x00193E00,8
 structure_runtime_decals.obj,true,0x001963C0-0x001965C0,1
 structure_visibility.obj,true,0x001965D0-0x00197D00,10
 telnet_console.obj,true,0x00130980-0x001330A0,30
-terminal.obj,true,0x000E3410-0x000E3C10,10
+terminal.obj,true,0x000E33A0-0x000E3C10,12
 tiff_file.obj,true,0x0007F570-0x0007FC00,3
 thread_win32.obj,true,0x00081170-0x00081C20,15
 transport_endpoint_set_winsock.obj,true,0x00081E00-0x00084B70,53
