@@ -1377,6 +1377,10 @@
       "kind": "function",
       "status": "ported"
     },
+    "0x40700": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0x40860": {
       "kind": "function",
       "status": "ported"
@@ -9840,11 +9844,23 @@
       "kind": "function",
       "status": "ported"
     },
+    "0xdd190": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0xdd410": {
       "kind": "function",
       "status": "ported"
     },
     "0xdd4d0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0xddae0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0xddb90": {
       "kind": "function",
       "status": "ported"
     },
@@ -10945,6 +10961,10 @@
       "kind": "function",
       "status": "ported"
     },
+    "0xfad60": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0xfae30": {
       "kind": "function",
       "status": "ported"
@@ -10963,6 +10983,10 @@
       "uncertain": [
         "FUN_000f7da0 second parameter (param_3) is passed as a float on the stack via a standard push; the original MSVC code pushes EDX (from [EBP+0x10]) directly so param_3 is treated as float bits, not an int \u2014 the actual semantic of the value is unknown."
       ]
+    },
+    "0xfaf50": {
+      "kind": "function",
+      "status": "ported"
     },
     "0xfb090": {
       "kind": "function",
@@ -10996,6 +11020,10 @@
       "kind": "function",
       "status": "ported"
     },
+    "0xfb880": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0xfba20": {
       "kind": "function",
       "status": "ported"
@@ -11004,7 +11032,31 @@
       "kind": "function",
       "status": "ported"
     },
+    "0xfbea0": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0xfc290": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0xfc4b0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0xfc550": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0xfc690": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0xfc710": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0xfc930": {
       "kind": "function",
       "status": "ported"
     },
@@ -11042,6 +11094,10 @@
       "uncertain": [
         "param_3 and param_4 types are uncertain: param_3 may be a position float3* and param_4 may be a float3* velocity/direction based on how FUN_000f84d0 uses them at [EBP+0xc] and [EBP+0x10]."
       ]
+    },
+    "0xfd510": {
+      "kind": "function",
+      "status": "ported"
     },
     "0xff400": {
       "kind": "function",
@@ -19253,6 +19309,10 @@
       ]
     },
     "0x1cc490": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x1cc710": {
       "kind": "function",
       "status": "ported"
     },
