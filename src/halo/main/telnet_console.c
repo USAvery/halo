@@ -597,7 +597,11 @@ void antenna_debug_data_simulate_rope(void *rec, void *tag_def,
 {
   float world_pos[3];
   float marker_pos[3];
-  float location_out[3];
+  int location_out[2]; /* {leaf_index, cluster_index@+4}; point_physics_update
+                         * aliases this SAME stack slot on every loop
+                         * iteration in the original disasm (LEA EBP-0x8c
+                         * reused each call) -- must persist across the loop,
+                         * not be a fresh per-iteration local. */
   int count;
 
   antenna_debug_data_relocate_marker(world_pos, rec, marker_pos, tag_def,
@@ -651,7 +655,6 @@ void antenna_debug_data_simulate_rope(void *rec, void *tag_def,
           delta_vec[1] = world_pos[1];
           delta_vec[2] = world_pos[2];
         } else {
-          int collision_location[2];
           float dist;
           float ratio;
           float blend;
@@ -662,7 +665,7 @@ void antenna_debug_data_simulate_rope(void *rec, void *tag_def,
           pos[2] = *(float *)(elem + 8);
 
           physics_tag = tag_get(0x70706879, *(int *)((char *)tag_def + 0x3c));
-          point_physics_update(0, (int)physics_tag, collision_location, -1, pos,
+          point_physics_update(0, (int)physics_tag, location_out, -1, pos,
                                (float *)(elem + 0xc), NULL, NULL, NULL, 0.02f,
                                delta_time);
 
