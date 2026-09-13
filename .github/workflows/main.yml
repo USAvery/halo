@@ -64,7 +64,9 @@ jobs:
 
       - name: Build
         run: |
-          brew install llvm
+          # Homebrew LLVM 23 no longer ships lld; the toolchain invokes
+          # lld-link to create the Xbox import library.
+          brew install llvm lld
           python3 -m pip install --break-system-packages --user -r requirements.txt
           export PATH="/opt/homebrew/opt/llvm/bin:/usr/local/opt/llvm/bin:$PATH"
           cmake -Bbuild -S. -DCMAKE_TOOLCHAIN_FILE=toolchains/llvm.cmake -DCMAKE_BUILD_TYPE=${{ matrix.configuration }}

@@ -3,10 +3,10 @@
 #
 #   run_local_equiv.sh fast   # curated regression set incl. --real-callees +
 #                             # committed snapshot fixtures. Fast (~seconds).
-#   run_local_equiv.sh full   # full batch_verify sweep (--skip-existing). Slow.
+#   run_local_equiv.sh full   # bounded full batch_verify sweep (--skip-existing).
 #
-# Installed via crontab (see install_local_cron.sh):
-#   fast every 2h, full nightly. flock prevents overlapping runs; logs rotate.
+# Installed via crontab (see install_local_cron.sh): fast every 2h, with full
+# runs only when explicitly requested. flock prevents overlap; logs rotate.
 set -u
 
 REPO="/mnt/g/dev/halo"
@@ -40,9 +40,15 @@ case "$MODE" in
     BASE=""
     [ -f artifacts/batch_verify/summary.json ] && \
       BASE="--baseline artifacts/batch_verify/summary.json"
+    # The GitHub nightly already runs the complete suite. Keep an explicit
+    # local full run bounded so it cannot starve the self-hosted runner when
+    # it is used for diagnosis. Three 3-GiB workers fit within this WSL VM
+    # while leaving room for the runner, build tools, and desktop agents.
+    HALO_EQUIV_MEM_LIMIT_GB="${HALO_EQUIV_MEM_LIMIT_GB:-3}" \
     "$PY" tools/equivalence/batch_verify.py \
-      --seeds 50 --timeout 120 --csv --skip-existing \
+      --seeds 50 --timeout 120 --jobs 3 --max-wall-minutes 105 --csv --skip-existing \
       --allowlist tools/equivalence/batch_verify_allowlist.json \
+      --skip-allowlisted \
       $BASE --output-dir artifacts/batch_verify >>"$LOG" 2>&1
     rc=$?
     ;;

@@ -143,9 +143,9 @@ jobs:
       # all, so the nightly reported green through any regression.
       - name: Run batch verification
         env:
-          # 4 workers on the 15 GB self-hosted box: cap per-child RSS at 3 GB so
-          # aggregate peak (jobs * limit = 12 GB) leaves headroom and never OOMs
-          # the host (the failure mode that caused GitHub to cancel the nightly).
+          # 3 workers on the 15 GB self-hosted box: cap per-child RSS at 3 GB so
+          # aggregate peak (jobs * limit = 9 GB) leaves headroom for the runner,
+          # build tools, and desktop agents instead of exhausting the host.
           HALO_EQUIV_MEM_LIMIT_GB: "3"
         run: |
           # timeout 120 (not lower): --jobs parallelism alone brings a cold run to
@@ -156,7 +156,7 @@ jobs:
           ${{ env.VENV_PYTHON }} tools/equivalence/batch_verify.py \
             --seeds 50 \
             --timeout 120 \
-            --jobs 4 \
+            --jobs 3 \
             --max-wall-minutes 105 \
             --csv \
             --skip-existing \
