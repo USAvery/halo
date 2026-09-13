@@ -71,8 +71,11 @@ jobs:
       - name: Verify prerequisites
         run: |
           python3 -c "import capstone; print('capstone ok')"
-          test -f halo-patched/cachebeta.xbe
-          test -f delinked/game_state.obj
+          fail=0
+          check() { if [ ! "$1" "$2" ]; then echo "::error::missing prerequisite: $2"; fail=1; else echo "ok: $2"; fi; }
+          check -f halo-patched/cachebeta.xbe
+          check -f delinked/game_state.obj
+          exit "$fail"
 
       - name: Build PR candidate
         run: |

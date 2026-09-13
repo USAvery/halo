@@ -50,10 +50,13 @@ jobs:
       - name: Verify prerequisites
         run: |
           ${{ env.VENV_PYTHON }} -c "import unicorn, capstone; print('deps ok')"
-          test -d delinked
-          test -f delinked/game_state.obj
-          test -f halo-patched/cachebeta.xbe
-          test -f ci/snapshot.json
+          fail=0
+          check() { if [ ! "$1" "$2" ]; then echo "::error::missing prerequisite: $2"; fail=1; else echo "ok: $2"; fi; }
+          check -d delinked
+          check -f delinked/game_state.obj
+          check -f halo-patched/cachebeta.xbe
+          check -f ci/snapshot.json
+          exit "$fail"
 
       - name: Build
         run: |
