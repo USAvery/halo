@@ -78196,17 +78196,17 @@
     "poll_endpoint_set": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 4.4,
+      "abi_modeled_mnemonic_pct": 93.8,
       "addr": "0x824d0",
       "end": "0x826f7",
       "kind": "auto",
       "n_r": 178,
-      "opnd_percent": 3.3,
-      "raw_mnemonic_pct": 4.4,
+      "opnd_percent": 69.7,
+      "raw_mnemonic_pct": 93.8,
       "ref": "synth",
       "ref_sha": "e20bb04027ae7939",
-      "score": 4.4,
-      "source": "src/halo/unported_thunks.c"
+      "score": 93.8,
+      "source": "src/halo/bungie_net/network/transport_endpoint_set_winsock.c"
     },
     "post_evaluator_hide": {
       "abi_model": "raw",

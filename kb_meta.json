@@ -15554,7 +15554,7 @@
     },
     "0x17ed70": {
       "kind": "function",
-      "status": "unknown",
+      "status": "ported",
       "inferred": [
         "Body is mov ax,[ebp+8] / cmp ax,[ebp+0xc] / jbe / mov al,1, i.e. return (uint16_t)a > (uint16_t)b with an unsigned compare; return type is char because the sole consumer FUN_00091da0 loads the result into a byte register and branches on != 0.",
         "Named rasterizer_frame_statistics_sort_index_compare: FUN_00091da0 is an explicit-stack quicksort over 16-bit elements driven by a caller-supplied char (*)(uint16_t, uint16_t) predicate, and the array being sorted is rasterizer_frame_statistics_temp_buffer (T1 assert-expression string) at *(void **)0x47ec40, which holds u16 vertex indices."
@@ -15569,7 +15569,7 @@
     },
     "0x17ef00": {
       "kind": "function",
-      "status": "unknown",
+      "status": "ported",
       "inferred": [
         "Named rasterizer_frame_statistics_update from T1 format strings in its body: a framerate/min/max pane, a vertices/triangles/primitives pane, a GPU-profile pane driven by a 0x1d-iteration loop over the profile table calling FUN_0016fb80 (name), FUN_0016fbd0 (time, float) and FUN_0016fcf0 (data bytes, int) with a \"|t%s|t%.2f|t%d\" style format, an allocation/memory-usage pane, and \"### ERROR failed to open rasterizer profile log (%s)\" for the d:\\r_prof.txt writer.",
         "Chose _update over _render/_draw because the function does two separable things: it draws the on-screen panes gated on DAT_003256ba in {1,2,3,4}, and it appends to the d:\\r_prof.txt profile log gated on DAT_00325704; a _render/_draw name would describe only the first.",

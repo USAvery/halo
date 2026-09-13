@@ -26708,7 +26708,8 @@
     },
     {
      "addr": "0x824d0",
-     "decl": "int poll_endpoint_set(int endpoint_set, unsigned short timeout);"
+     "decl": "int poll_endpoint_set(int endpoint_set, unsigned short timeout);",
+     "ported": true
     },
     {
      "addr": "0x82700",

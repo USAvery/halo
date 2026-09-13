@@ -292,8 +292,7 @@ void transport_initialize(void)
     return;
 
   /* Start WinSock 2.2. */
-  /* hazard-ok: fnptr-conv */
-  wsa_result = ((int16_t(__stdcall *)(int16_t, uint8_t *))0x223206)(2, wsadata);
+  wsa_result = ((int16_t(__stdcall *)(int16_t, uint8_t *))0x223206)(2, wsadata);  /* hazard-ok: fnptr-conv */
   if (wsa_result != 0) {
     /* Cleanup: WSACleanup then report error. */
     ((void (*)(void))0x2232ed)();
@@ -510,6 +509,183 @@ int FUN_000824a0(const int *a, const int *b)
   }
 
   return 0;
+}
+
+/* Poll every endpoint in a set for readability, up to a timeout.
+ *
+ * The set carries two parallel structures: an inline Winsock fd_set at
+ * offset 0 (dword 0 = fd_count, dwords 1..64 = fd_array, 0x104 bytes total,
+ * FD_SETSIZE 64) and a pointer at 0x104 to an array of endpoint pointers
+ * whose highest live index is the signed dword at 0x10c (inclusive bound,
+ * -1 when empty).  The dword at 0x114 is the "dirty" flag that
+ * remove_endpoint_from_set sets (it stores 1 to endpoint_set[0x45]) after
+ * nulling an array slot.
+ *
+ * When the set is dirty the endpoint array is first compacted: qsort with
+ * FUN_000824a0 (the NULL-last predicate) pushes the nulled slots to the
+ * end, the trailing NULL slots are then walked off the bound at 0x10c, and
+ * the inline fd_set is rebuilt from scratch (count zeroed, then each
+ * endpoint's socket appended if it is not already present and the count is
+ * still under 64).  Either way every endpoint's flags byte has bit 2
+ * (mask 0x04, the "readable" result bit) cleared before the poll.
+ *
+ * The inline fd_set is then copied to a stack scratch copy — select()
+ * rewrites its fd_set in place, so the set's own copy must survive — and
+ * handed to select() as the READ set with a timeval of
+ * {0 sec, timeout_msec * 1000 usec}.  On a positive result each endpoint is
+ * re-tested with __WSAFDIsSet and has bit 2 set when it is ready.
+ *
+ * Returns 0 on success, -12 when an endpoint in the set holds
+ * INVALID_SOCKET, -13 when select() reports zero ready descriptors
+ * (timeout), and -21 on a select() error (after reporting the Winsock error
+ * code).
+ *
+ * Local layout (from SUB ESP,0x10c at 0x824d3):
+ *   [EBP-0x10c] 0x104-byte fd_set scratch copy (csmemcpy destination)
+ *   [EBP-0x008] 8-byte timeval — dword 0 = tv_sec, dword 1 = tv_usec
+ * Same layout as the sibling single-socket polls FUN_00083040 /
+ * transport_server_initialize.
+ *
+ * Confirmed: display_assert (0x8d9f0, cdecl 4 args) with message "set" at
+ * 0x266450 line 0x1dd and "transport_initialized" at 0x265fe4 line 0x1de,
+ * __FILE__ at 0x266458; system_exit (0x8e2f0, PUSH -1) after each.  Both are
+ * single-condition two-branch tests (TEST ESI,ESI / JNZ at 0x824e2;
+ * MOV AL,[0x335090] / TEST AL,AL / JNZ at 0x8250b), so each maps to one
+ * assert macro.
+ * Confirmed: MOVZX EAX,word [EBP+0xc] / IMUL EAX,EAX,0x3e8 at 0x8252d — the
+ * second parameter is a 16-bit unsigned millisecond count scaled to
+ * microseconds — and the store order is tv_usec (0x82537) before tv_sec
+ * (0x82542).
+ * Confirmed argument order (first PUSH is the last arg): qsort at 0x82565
+ * from the pushes at 0x8255b..0x82564 is (ep_array, bound+1, 4,
+ * FUN_000824a0) with ADD ESP,0x10 at 0x82579 (cdecl, 4 dwords); csmemcpy at
+ * 0x82645 from 0x82638..0x82644 is (scratch, set, 0x104) with ADD ESP,0xc
+ * (cdecl, 3 dwords); xnet_select at 0x82664 from 0x82653..0x82663 is
+ * (bound+1, &scratch, NULL, NULL, &timeval) and xnet_wsafdisset at 0x82698
+ * from 0x82690..0x82697 is (socket, &scratch) — both are followed directly
+ * by TEST EAX,EAX with no ADD ESP, so those two callees clean up (__stdcall).
+ * Confirmed: the select() nfds argument is the endpoint count (bound+1),
+ * not the constant 1 the single-socket siblings pass (MOV ECX,[ESI+0x10c] /
+ * INC ECX at 0x8264a/0x82662).
+ * Confirmed: the duplicate search loads the candidate socket once before the
+ * scan (0x825b8..0x825c1) but re-loads it through the array again for the
+ * store at 0x825db..0x825e4, so both spellings are reproduced literally.
+ * Confirmed: the error tail at 0x826cc is JL / CMP EAX,-1 / JNZ, i.e. the
+ * two-test `result < 0 || result == SOCKET_ERROR` shape; the second test is
+ * unreachable for the only value that reaches it (0) but is emitted, so it
+ * is kept.
+ * Confirmed return constants: MOV EAX,0xfffffff4 (-12) at 0x826c2,
+ * MOV EAX,0xffffffeb (-21) at 0x826e2, MOV EAX,0xfffffff3 (-13) at 0x826ed,
+ * XOR EAX,EAX at 0x826ba.
+ *
+ * Uncertain: the fd_set rebuild's 0x40 ceiling is compared against the
+ * running fd_count, so an endpoint whose socket does not fit is silently
+ * dropped from the poll rather than reported — no error path exists for it
+ * here and nothing names that behavior.  The meaning of the flags byte's
+ * other bits is not established by this function (bit 3 is the cached-state
+ * gate FUN_00083040 reads; bit 2 is the readable result written here). */
+int poll_endpoint_set(int endpoint_set, unsigned short timeout)
+{
+  uint32_t poll_set[65];
+  int32_t timeval[2];
+  int i = 0;
+  uint32_t count;
+  uint32_t slot;
+  uint32_t *fds;
+  int socket;
+  int ready;
+
+  assert_halt_msg_at(
+    "set",
+    "c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_set_winsock.c",
+    0x1dd, endpoint_set);
+  assert_halt_msg_at(
+    "transport_initialized",
+    "c:\\halo\\SOURCE\\bungie_net\\network\\transport_endpoint_set_winsock.c",
+    0x1de, *(uint8_t *)0x335090);
+
+  timeval[1] = timeout * 1000;
+  timeval[0] = 0;
+
+  if (*(int *)(endpoint_set + 0x114) != 0) {
+    qsort(*(void **)(endpoint_set + 0x104),
+          (size_t)(*(int *)(endpoint_set + 0x10c) + 1), 4,
+      (qsort_compar_proc)FUN_000824a0);
+
+    /* Walk the bound back over the NULL slots qsort pushed to the end. */
+    while (*(int *)(*(int *)(endpoint_set + 0x104) +
+                    *(int *)(endpoint_set + 0x10c) * 4) == 0) {
+      *(int *)(endpoint_set + 0x10c) = *(int *)(endpoint_set + 0x10c) - 1;
+    }
+
+    *(uint32_t *)endpoint_set = 0;
+    if (*(int *)(endpoint_set + 0x10c) >= 0) {
+      do {
+        count = *(uint32_t *)endpoint_set;
+        slot = 0;
+        if (count != 0) {
+          socket = **(int **)(*(int *)(endpoint_set + 0x104) + i * 4);
+          fds = (uint32_t *)(endpoint_set + 4);
+          do {
+            if (*fds == (uint32_t)socket) {
+              break;
+            }
+            slot++;
+            fds++;
+          } while (slot < *(uint32_t *)endpoint_set);
+        }
+
+        if (slot == count && count < 0x40) {
+          *(uint32_t *)(endpoint_set + 4 + slot * 4) =
+            (uint32_t) * *(int **)(*(int *)(endpoint_set + 0x104) + i * 4);
+          *(uint32_t *)endpoint_set = *(uint32_t *)endpoint_set + 1;
+        }
+
+        *(uint8_t *)(*(int *)(*(int *)(endpoint_set + 0x104) + i * 4) + 4) &=
+          0xfb;
+        i++;
+      } while (i <= *(int *)(endpoint_set + 0x10c));
+    }
+
+    *(int *)(endpoint_set + 0x114) = 0;
+  } else {
+    if (*(int *)(endpoint_set + 0x10c) >= 0) {
+      do {
+        *(uint8_t *)(*(int *)(*(int *)(endpoint_set + 0x104) + i * 4) + 4) &=
+          0xfb;
+        i++;
+      } while (i <= *(int *)(endpoint_set + 0x10c));
+    }
+  }
+
+  csmemcpy(poll_set, (void *)endpoint_set, 0x104);
+
+  ready = xnet_select(*(int *)(endpoint_set + 0x10c) + 1, poll_set, NULL, NULL,
+                      timeval);
+  if (ready > 0) {
+    i = 0;
+    if (*(int *)(endpoint_set + 0x10c) >= 0) {
+      do {
+        socket = **(int **)(*(int *)(endpoint_set + 0x104) + i * 4);
+        if (socket == -1) {
+          return -12;
+        }
+        if (xnet_wsafdisset(socket, poll_set) != 0) {
+          *(uint8_t *)(*(int *)(*(int *)(endpoint_set + 0x104) + i * 4) + 4) |=
+            4;
+        }
+        i++;
+      } while (i <= *(int *)(endpoint_set + 0x10c));
+    }
+    return 0;
+  }
+
+  if (ready < 0 || ready == -1) {
+    winsock_error_report(xapi_GetLastError());
+    return -21;
+  }
+
+  return -13;
 }
 
 /* Remove an endpoint from an endpoint set.
