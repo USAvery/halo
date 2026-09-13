@@ -83,16 +83,16 @@ void game_engine_evaluate_game_complexity(void)
   }
 
   /* Set complexity flags at 0x5aa720 */
-  if ((player_count > 8 && seat_count > 1) || player_count > 12)
+  if ((player_count >= 9 && seat_count >= 2) || player_count >= 13)
     *(uint32_t *)0x5aa720 |= 1;
 
-  if (player_count > 4 || seat_count > 3 || (*(uint32_t *)0x5aa720 & 1) != 0)
+  if (player_count >= 5 || seat_count >= 4 || (*(uint32_t *)0x5aa720 & 1) != 0)
     *(uint32_t *)0x5aa720 |= 2;
 
-  if (player_count > 4)
+  if (player_count >= 5)
     *(uint32_t *)0x5aa720 |= 4;
 
-  if (player_count > 8)
+  if (player_count >= 9)
     *(uint32_t *)0x5aa720 |= 8;
 }
 
@@ -643,12 +643,14 @@ check_tick:
  */
 unsigned int game_engine_player_get_team_index(int player_handle)
 {
+  void **players_table;
   char *player;
   unsigned int team;
 
+  players_table = (void **)0x5aa6d4;
   assert_halt_msg(current_game_engine, "game_engine");
   if (*(int *)((char *)current_game_engine + 0x74) == 0) {
-    player = (char *)datum_get(*(void **)0x5aa6d4, player_handle);
+    player = (char *)datum_get(*players_table, player_handle);
     team = (int)*(short *)(player + 2) % 2;
     return team;
   }
@@ -1028,6 +1030,7 @@ int *game_engine_get_goal_position(int *param_1, short param_2)
   src = (char *)(0x4566f8 + index * 0x20);
   *param_1 = *(int *)src;
   param_1[1] = *(int *)(src + 4);
+  param_1[2] = *(int *)(src + 8);
   param_1[2] = *(int *)(src + 8);
   return param_1;
 }
@@ -1678,7 +1681,7 @@ int game_engine_get_place(int param_1, int param_2)
         if (!is_same) {
           if (param_2 == 1) {
             uint32_t team_bit = 1u
-                                << ((uint8_t) * (int *)(other + 0x20) & 0x1f);
+                                << (*(int *)(other + 0x20) & 0x1f);
             if ((team_bit & team_mask) != 0)
               goto next;
             team_mask |= team_bit;
@@ -4399,9 +4402,7 @@ int find_netgame_flags(float *position, float radius, float height,
         }
         /* Height check: skip if height <= 0.0f */
         if (!(height <= 0.0f)) {
-          float abs_dz = entry[2] - position[2];
-          if (abs_dz < 0.0f)
-            abs_dz = -abs_dz;
+          float abs_dz = x87_fabs(entry[2] - position[2]);
           if (abs_dz > height)
             goto next;
         }
@@ -5883,17 +5884,17 @@ void game_engine_update(void)
       if (((*(uint32_t *)0x456b18 & 0x10) != 0 ||
            (vtable[32] &&
             ((char (*)(int, int))vtable[32])(player_handle, 1))) &&
-          *(int *)((char *)datum_get(player_data, player_handle) + 0x34) !=
+          *(int *)((char *)datum_get(player_data, iter.datum_handle) + 0x34) !=
             NONE) {
-        player_set_respawn_timer(player_handle, 0, 0xf);
+        player_set_respawn_timer(iter.datum_handle, 0, 0xf);
       }
     }
 
-    game_engine_player_update_netgame_flag(player_handle);
+    game_engine_player_update_netgame_flag(iter.datum_handle);
 
     vtable = (void (**)(void))current_game_engine;
     if (vtable[13])
-      ((void (*)(int))vtable[13])(player_handle);
+      ((void (*)(int))vtable[13])(iter.datum_handle);
   }
 
   vtable = (void (**)(void))current_game_engine;
@@ -7434,7 +7435,7 @@ char FUN_000b1570(int player_handle)
     player = (int)datum_get(player_data, player_handle);
     if (*(int *)(player + 0x34) != -1) {
       biped = (int)object_get_and_verify_type(*(int *)(player + 0x34), 3);
-      if (*(float *)(0x456d48) <= *(float *)(biped + 0x58)) {
+      if (*(float *)(biped + 0x58) >= *(float *)(0x456d48)) {
         if (*(float *)(biped + 0x58) < *(float *)(0x456d44)) {
           float pos[2];
           pos[0] = *(float *)(biped + 0x50);
@@ -7710,8 +7711,8 @@ void FUN_000b1aa0(void)
   *(int *)0x5aa700 = src[2];
 
   *(int *)0x5aa704 = src[0];
-  *(int *)0x5aa708 = src[1];
-  *(int *)0x5aa70c = src[2];
+  *(int *)0x5aa708 = (*(int **)0x2ee708)[1];
+  *(int *)0x5aa70c = (*(int **)0x2ee708)[2];
 
   *(int *)0x5aa710 = 0;
   *(int *)0x5aa714 = 0;
