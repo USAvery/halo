@@ -33179,7 +33179,10 @@
    "functions": [
     {
      "addr": "0xfad60",
-     "decl": "void weapon_place(void);"
+     "decl": "int weapon_place(int weapon_handle, void *placement);",
+     "name": "weapon_place",
+     "ported": true,
+     "source_path": "halo/items/weapons.c"
     },
     {
      "addr": "0xfae30",
@@ -33253,7 +33256,9 @@
     },
     {
      "addr": "0xfb320",
-     "decl": "void FUN_000fb320(void);"
+     "decl": "void *FUN_000fb320(void *weapon_obj@<edi>, int16_t trigger_index@<si>);",
+     "ported": true,
+     "source_path": "halo/items/weapons.c"
     },
     {
      "addr": "0xfb370",
@@ -33269,7 +33274,8 @@
     },
     {
      "addr": "0xfb510",
-     "decl": "void FUN_000fb510(void);"
+     "decl": "float FUN_000fb510(int weapon_handle@<eax>, int16_t trigger_index@<cx>);",
+     "ported": true
     },
     {
      "addr": "0xfb5a0",
@@ -33287,15 +33293,21 @@
     },
     {
      "addr": "0xfb7d0",
-     "decl": "void FUN_000fb7d0(void);"
+     "decl": "int FUN_000fb7d0(int param_1@<ebx>, int weapon_handle@<esi>);",
+     "ported": true,
+     "source_path": "src/halo/items/weapons.c"
     },
     {
      "addr": "0xfb880",
-     "decl": "void weapon_trigger_release_charge(void);"
+     "decl": "void weapon_trigger_release_charge(int16_t charge_ticks, int weapon_handle@<eax>, int16_t trigger_index@<si>, int16_t new_state@<bx>);",
+     "ported": true,
+     "source_path": "src/halo/items/weapons.c"
     },
     {
      "addr": "0xfb910",
-     "decl": "void FUN_000fb910(void);"
+     "decl": "void FUN_000fb910(char param_1, int weapon_handle@<eax>, int16_t trigger_index@<cx>);",
+     "ported": true,
+     "source_path": "src/halo/items/weapons.c"
     },
     {
      "addr": "0xfb990",
@@ -33327,7 +33339,8 @@
     },
     {
      "addr": "0xfbea0",
-     "decl": "void weapon_delete(void);"
+     "decl": "void weapon_delete(int weapon_index);",
+     "ported": true
     },
     {
      "addr": "0xfbf00",
@@ -33341,7 +33354,8 @@
     },
     {
      "addr": "0xfc4b0",
-     "decl": "void weapon_owner_update(int weapon_handle, int a1, float a2);"
+     "decl": "void weapon_owner_update(int weapon_handle, int a1, float a2);",
+     "ported": true
     },
     {
      "addr": "0xfc550",
