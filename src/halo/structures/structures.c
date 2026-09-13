@@ -6135,8 +6135,13 @@ char FUN_00197570(float *records, int16_t count, float threshold)
       delta[0] = rec[0] - *(float *)0x506550;
       delta[1] = rec[1] - *(float *)0x506554;
       delta[2] = rec[2] - *(float *)0x506558;
-      d = *(float *)0x50655c * delta[0] + *(float *)0x506560 * delta[1] +
-          *(float *)0x506564 * delta[2];
+      /* Association order is the original's, NOT the natural x,y,z: the
+       * disasm at 0x1975a3 builds (n.z*dz + n.y*dy) + n.x*dx.  Float add is
+       * not associative, so writing x+y+z shifts `d` by an ULP and flips the
+       * `d <= threshold` test at the boundary -- which makes FUN_00197b00
+       * skip a whole neighbour cluster. */
+      d = *(float *)0x506564 * delta[2] + *(float *)0x506560 * delta[1] +
+          *(float *)0x50655c * delta[0];
       if (d <= threshold) {
         return 1;
       }
