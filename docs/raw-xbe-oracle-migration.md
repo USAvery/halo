@@ -1,0 +1,121 @@
+# Raw-XBE oracle migration (context for investigation)
+
+Status: **NOT started.** This document exists to make that investigation
+cheaper to pick up later — it does not itself change any code.
+
+## The idea
+
+`tools/equivalence/unicorn_diff.py` (and `z3_equiv.py`) currently load the
+**oracle** side of an equivalence check from a delinked `.obj` exported out of
+Ghidra (`delinked/<object>.obj` or `delinked/functions/<hex>.obj`). Because a
+delinked COFF is a *relocatable* object, everything it references outside its
+own bytes — globals, switch-table data, other functions, internal labels —
+arrives as an unresolved relocation that `unicorn_diff.py` has to synthesize
+by hand before it can execute the code in Unicorn. That machinery is large:
+
+- `_apply_oracle_switch_table_fixups` — reconstructs switch-table bytes the
+  delinked COFF doesn't carry.
+- `_relocate_rdata_text_refs` / `_relocate_text_label_refs` — patches DIR32
+  relocations against `.rdata`/`.text` and internal `$LNNNNN` labels.
+- `_build_globals_seeds` (see [[reference_equiv_oracle_reloc_gap]] in memory)
+  — seeds DIR32-relocated globals into a synthetic "globals slots" region.
+- ~90 lines of `delinked_path`/`build_path` pairing heuristics (around
+  unicorn_diff.py:439-525) to guess which `delinked/*.obj` corresponds to a
+  given kb.json object, because naming isn't 1:1 (multi-TU exports, stray
+  `LIBCMT:` decorations, `delinked/functions/<hex>.obj` singletons, etc).
+
+**The proposed change:** map the oracle's code directly from the *pristine*
+XBE (`halo-patched/cachebeta.xbe` — NOT `default.xbe`, which is our patched
+build; see Gotchas below) into Unicorn at its **real, original virtual
+address**. Every absolute reference in Xbox debug-build code is already
+correct at that address — no relocation of any kind is needed, because
+nothing was ever unlinked from its neighbors. This is exactly why the
+`--state-snapshot` path already works this way (it maps live captured memory
+at real VAs), and why the equivalent migration already happened for VC71
+byte-match scoring on 2026-08-09 (see Precedent below).
+
+## Why this is worth doing
+
+- Removes the single largest source of oracle-side false divergence: a
+  relocation the synthesizer missed or seeded at the wrong width (see
+  [[reference_equiv_oracle_reloc_gap]] — an 8-byte double seeded as 4 bytes
+  produced a wrong epsilon and a wrong branch).
+- Removes the delinked/build pairing heuristics entirely — there is nothing
+  to pair; the oracle is just "this VA range of the one true XBE."
+- Removes this lane's dependency on a live Ghidra bridge. Today's incident is
+  a direct example: `delinked/game_state.obj` went missing from this host and
+  regenerating it required a working `ghidra-live` MCP session, a correct
+  export range, and hit an internal Ghidra exporter error
+  (`buffer does not contain relocation`) on the first attempt. A raw-XBE
+  oracle needs none of that — the XBE bytes are just read off disk.
+- Kills the "too narrow / too wide" reference-bounding bug class
+  ([[reference_delinked_ref_bounding]]) for the equivalence lane the same way
+  the committed `function_bounds.json` + true-bounds detector already killed
+  it for VC71 scoring.
+
+## Precedent: how VC71 scoring already did this (2026-08-09)
+
+`tools/verify/xbe_reference.py` is the model to imitate:
+
+- `_xbe()` (line ~146) lazily loads the pristine XBE once via
+  `check_delinked_bounds.load_xbe()`, which parses XBE sections into a
+  VA→file-offset map.
+- `_bounds()` / `bounds_entry()` (line ~186) load the **committed**
+  `tools/verify/function_bounds.json` table — the single authority for where
+  a function ends. Recomputing bounds at run time is kept only as a fallback
+  with a loud warning, specifically because per-run drift in bounds was the
+  root cause of the whole "too narrow/too wide" bug class.
+- `function_bytes(addr)` (line ~273) returns the raw bytes for a function
+  directly from the XBE image using that bounds table — no Ghidra call, no
+  COFF, no relocation.
+
+The equivalence lane's version of `_xbe()`/`function_bytes()` should reuse
+these exact helpers rather than reimplementing XBE parsing.
+
+## What does NOT change
+
+- The **candidate** side stays a clang-built `.obj` that must still be loaded
+  and relocated into Unicorn's address space (it has no fixed "real" VA of
+  its own — it's freshly compiled, and its address only exists inside the
+  emulator).
+- Stub interception addresses move from *loaded-obj-relative offsets* to
+  *original XBE VAs* — every existing stub/intercept table entry needs the
+  same address-space translation.
+- `--real-callees` (BFS-loading non-intercepted callees and running them
+  natively, see [[reference_equiv_oracle_reloc_gap]]) still applies — it
+  gets simpler, since a callee loaded at its real VA needs no relocation
+  either, but the "which callees to pull in" logic is unchanged.
+
+## Open questions / where to start
+
+1. **Mapping granularity.** Map just the target function's bytes at its real
+   VA (mirrors today's per-function delinked export), or map the *entire*
+   pristine XBE image at its real base once per Unicorn instance? The latter
+   is almost certainly simpler and more robust — it makes every absolute
+   reference correct by construction (switch tables, rdata, sibling
+   functions) with no bounds table needed for the oracle at all, at the cost
+   of a larger one-time memory-map per run. Worth prototyping both.
+2. **Which XBE.** Must read `halo-patched/cachebeta.xbe` (pristine,
+   MD5 `c7869590a1c64ad034e49a5ee0c02465` per CLAUDE.md), never
+   `halo-patched/default.xbe` (our patched build). Loading the patched XBE
+   as the oracle would silently make oracle == candidate in every region
+   we've already ported, hiding real divergences. This is the single most
+   important correctness gotcha for whoever implements this.
+3. **Self-modifying / patch redirects.** If the whole-image-mapping approach
+   is chosen, confirm nothing in the patched build's own toolchain expects to
+   patch memory the oracle emulator also maps (shouldn't apply — they're
+   separate Unicorn instances — but verify before assuming).
+4. **Stub/intercept table migration.** Enumerate every existing stub sentinel
+   address in `stubs.py` and convert from obj-relative to VA — likely a
+   mechanical pass once the addressing scheme is decided.
+5. **`batch_verify_allowlist.json` chronic-timeout entries** (e.g.
+   `game_state.obj @ 0x1bf8e0`, excluded for not terminating under the
+   differential harness) are a pre-existing, unrelated concern — don't expect
+   this migration to fix them, and don't let them block validating the
+   migration itself.
+
+## Related memory
+
+[[reference_unicorn_z3_raw_xbe_oracle_followup]] (the original approved
+follow-up, still NOT started as of this writing),
+[[reference_equiv_oracle_reloc_gap]], [[reference_delinked_ref_bounding]].
