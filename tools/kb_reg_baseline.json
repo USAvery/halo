@@ -3838,7 +3838,6 @@
   "0xbbb80": "bool player_teleport(int player_handle, int anchor_unit_handle, void *anchor_position);",
   "0xbbbe0": "int find_best_starting_location_index(int player_index);",
   "0xbbcb0": "void player_spawn(int player_handle);",
-  "0xbbfe0": "void FUN_000bbfe0(void);",
   "0xbc320": "bool player_handle_powerup(int player_handle, int16_t powerup_type, int16_t ticks);",
   "0xbc410": "void player_set_respawn_timer(int player_handle, int16_t respawn_type, int16_t respawn_ticks);",
   "0xbc520": "void players_debug_render(void);",
@@ -10012,7 +10011,8 @@
     "0x2256bb": "int __stdcall recv(void *xnet@<ecx>, unsigned int socket, char *buf, int len, int flags);",
     "0x002256bb": "int __stdcall recv(void *xnet@<ecx>, unsigned int socket, char *buf, int len, int flags);",
     "0x2258a4": "int __stdcall send(void *xnet@<ecx>, unsigned int socket, const char *buf, int len, int flags);",
-    "0x002258a4": "int __stdcall send(void *xnet@<ecx>, unsigned int socket, const char *buf, int len, int flags);"
+    "0x002258a4": "int __stdcall send(void *xnet@<ecx>, unsigned int socket, const char *buf, int len, int flags);",
+    "0xbbfe0": "void player_set_spawn_action_result(int player_handle@<eax>, int16_t action_result_type, int object_handle, int16_t seat_index);"
   },
   "0x57330": "short FUN_00057330(int16_t scenario_index@<eax>, void *record@<esi>, int field_1a8_val, int child_handle, int reserved);",
   "0x1631d0": "void FUN_001631d0(void);"

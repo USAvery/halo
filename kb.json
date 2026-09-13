@@ -18360,7 +18360,8 @@
     },
     {
      "addr": "0xbbfe0",
-     "decl": "void FUN_000bbfe0(void);"
+     "decl": "void player_set_spawn_action_result(int player_handle@<eax>, int16_t action_result_type, int object_handle, int16_t seat_index);",
+     "ported": true
     },
     {
      "addr": "0xbc0d0",

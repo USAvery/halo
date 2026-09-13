@@ -7139,6 +7139,20 @@
       "kind": "function",
       "status": "ported"
     },
+    "0xbbfe0": {
+      "kind": "function",
+      "status": "ported",
+      "name": "player_set_spawn_action_result",
+      "name_confidence": "medium",
+      "inferred": [
+        "The target consumes player_handle from EAX and action_result_type, object_handle, and seat_index from cdecl stack slots at [EBP+0x8], [EBP+0xc], and [EBP+0x10], respectively; operand sizes establish the two int16_t arguments.",
+        "The helper rejects lower-priority action results and, for equal priority, rejects candidates whose object distance from the player's unit is not strictly smaller."
+      ],
+      "uncertain": [
+        "The semantic name is supported by adjacent player-interaction call sites but has no direct 2276 string or CEA match.",
+        "The player datum field meanings at offsets 0x24, 0x28, 0x2a, and 0x34 remain source-level interpretations; player_data_t stays opaque."
+      ]
+    },
     "0xbc0d0": {
       "kind": "function",
       "status": "ported"

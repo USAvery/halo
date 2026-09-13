@@ -2361,11 +2361,15 @@ void players_update_before_game_client(int player_index /* @<ebx> */,
   *((char *)players_globals + 0x2e) = (moved == 0);
 }
 
-/* Priority-filtered pending action-result update (matches 0xbbfe0). */
-static void player_set_spawn_action_result(int player_handle,
-                                           int16_t action_result_type,
-                                           int object_handle,
-                                           int16_t seat_index)
+/* 0xbbfe0: update a player's pending action-result fields.
+ *
+ * player_handle arrives in EAX; the remaining three arguments are cdecl stack
+ * arguments.  The equal-priority path keeps the existing result unless the
+ * candidate object is strictly closer to the player's unit. */
+__declspec(noinline)
+void player_set_spawn_action_result(int player_handle /* @<eax> */,
+                                    int16_t action_result_type,
+                                    int object_handle, int16_t seat_index)
 {
   char *player;
 

@@ -6264,6 +6264,14 @@
    }
   },
   {
+   "name": "halo/players_FUN_000bbfe0",
+   "target_path": "build/CMakeFiles/halo.dir/src/halo/game/players.c.obj",
+   "base_path": "delinked/players_FUN_000bbfe0.obj",
+   "metadata": {
+    "source_path": "src/halo/game/players.c"
+   }
+  },
+  {
    "name": "halo/point_physics",
    "target_path": "build/CMakeFiles/halo.dir/src/halo/physics/point_physics.c.obj",
    "base_path": "delinked/point_physics.obj",
