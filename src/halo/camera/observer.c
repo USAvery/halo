@@ -97,7 +97,7 @@ void *observer_get_camera(unsigned __int16 local_player_index)
   if (idx == -1)
     return 0;
 
-  assert_halt(idx >= 0 && idx < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
+  assert_halt(((idx >= 0) & 0xFFFFu) && idx < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
 
   entry = (char *)0x33571c + (int)idx * 0x29c;
 
@@ -291,7 +291,7 @@ bool FUN_0008ab90(float *out_fraction, bool indoor, float *ray_origin,
 
   if (FUN_0014df70(flags, ray_origin, direction, -1,
                    (int16_t *)collision_result)) {
-    *out_fraction = *(float *)(collision_result + 0x14);
+    *(int *)out_fraction = *(int *)(collision_result + 0x14);
     result = true;
   }
 
@@ -334,33 +334,33 @@ void observer_update_command(int16_t local_player_index)
        (!valid_real_normal3d_perpendicular((float *)(command + 0x24),
                                            (float *)(command + 0x30)) ||
         (*(uint32_t *)(command + 0x4) & 0x7f800000) == 0x7f800000 ||
-        *(float *)(command + 0x4) < *(float *)0x266e98 ||
-        *(float *)(command + 0x4) > *(float *)0x266e94 ||
+        !(*(float *)(command + 0x4) >= *(float *)0x266e98) ||
+        !(*(float *)(command + 0x4) <= *(float *)0x266e94) ||
         (*(uint32_t *)(command + 0x8) & 0x7f800000) == 0x7f800000 ||
-        *(float *)(command + 0x8) < *(float *)0x266e98 ||
-        *(float *)(command + 0x8) > *(float *)0x266e94 ||
+        !(*(float *)(command + 0x8) >= *(float *)0x266e98) ||
+        !(*(float *)(command + 0x8) <= *(float *)0x266e94) ||
         (*(uint32_t *)(command + 0xc) & 0x7f800000) == 0x7f800000 ||
-        *(float *)(command + 0xc) < *(float *)0x266e98 ||
-        *(float *)(command + 0xc) > *(float *)0x266e94 ||
+        !(*(float *)(command + 0xc) >= *(float *)0x266e98) ||
+        !(*(float *)(command + 0xc) <= *(float *)0x266e94) ||
         (*(uint32_t *)(command + 0x10) & 0x7f800000) == 0x7f800000 ||
-        *(float *)(command + 0x10) < *(float *)0x266e98 ||
-        *(float *)(command + 0x10) > *(float *)0x266e94 ||
+        !(*(float *)(command + 0x10) >= *(float *)0x266e98) ||
+        !(*(float *)(command + 0x10) <= *(float *)0x266e94) ||
         (*(uint32_t *)(command + 0x14) & 0x7f800000) == 0x7f800000 ||
-        *(float *)(command + 0x14) < *(float *)0x266e98 ||
-        *(float *)(command + 0x14) > *(float *)0x266e94 ||
+        !(*(float *)(command + 0x14) >= *(float *)0x266e98) ||
+        !(*(float *)(command + 0x14) <= *(float *)0x266e94) ||
         (*(uint32_t *)(command + 0x18) & 0x7f800000) == 0x7f800000 ||
-        *(float *)(command + 0x18) < *(float *)0x266e98 ||
-        *(float *)(command + 0x18) > *(float *)0x266e94 ||
+        !(*(float *)(command + 0x18) >= *(float *)0x266e98) ||
+        !(*(float *)(command + 0x18) <= *(float *)0x266e94) ||
         !real_vector3d_valid((float *)(command + 0x3c)) ||
         (*(uint32_t *)(command + 0x1c) & 0x7f800000) == 0x7f800000 ||
-        *(float *)(command + 0x1c) < *(float *)0x2533c0 ||
-        *(float *)(command + 0x1c) > *(float *)0x266e94 ||
+        !(*(float *)(command + 0x1c) >= *(float *)0x2533c0) ||
+        !(*(float *)(command + 0x1c) <= *(float *)0x266e94) ||
         (*(uint32_t *)(command + 0x20) & 0x7f800000) == 0x7f800000 ||
-        *(float *)(command + 0x20) < *(float *)0x255ef8 ||
-        *(float *)(command + 0x20) > *(float *)0x2568bc ||
+        !(*(float *)(command + 0x20) >= *(float *)0x255ef8) ||
+        !(*(float *)(command + 0x20) <= *(float *)0x2568bc) ||
         (*(uint32_t *)(command + 0x48) & 0x7f800000) == 0x7f800000 ||
-        *(float *)(command + 0x48) < *(float *)0x2533c0 ||
-        *(float *)(command + 0x48) > *(float *)0x266e90))) {
+        !(*(float *)(command + 0x48) >= *(float *)0x2533c0) ||
+        !(*(float *)(command + 0x48) <= *(float *)0x266e90)))) {
     char *msg = csprintf(
       (char *)0x5ab100,
       "Invalid camera command.\n"
@@ -450,33 +450,33 @@ void observer_compute_accelerations(int16_t local_player_index)
        (!valid_real_normal3d_perpendicular((float *)(observer + 0x2c),
                                            (float *)(observer + 0x38)) ||
         (*(uint32_t *)(observer + 0xc) & 0x7f800000) == 0x7f800000 ||
-        *(float *)(observer + 0xc) < *(float *)0x266e98 ||
-        *(float *)(observer + 0xc) > *(float *)0x266e94 ||
+        !(*(float *)(observer + 0xc) >= *(float *)0x266e98) ||
+        !(*(float *)(observer + 0xc) <= *(float *)0x266e94) ||
         (*(uint32_t *)(observer + 0x10) & 0x7f800000) == 0x7f800000 ||
-        *(float *)(observer + 0x10) < *(float *)0x266e98 ||
-        *(float *)(observer + 0x10) > *(float *)0x266e94 ||
+        !(*(float *)(observer + 0x10) >= *(float *)0x266e98) ||
+        !(*(float *)(observer + 0x10) <= *(float *)0x266e94) ||
         (*(uint32_t *)(observer + 0x14) & 0x7f800000) == 0x7f800000 ||
-        *(float *)(observer + 0x14) < *(float *)0x266e98 ||
-        *(float *)(observer + 0x14) > *(float *)0x266e94 ||
+        !(*(float *)(observer + 0x14) >= *(float *)0x266e98) ||
+        !(*(float *)(observer + 0x14) <= *(float *)0x266e94) ||
         (*(uint32_t *)(observer + 0x18) & 0x7f800000) == 0x7f800000 ||
-        *(float *)(observer + 0x18) < *(float *)0x266e98 ||
-        *(float *)(observer + 0x18) > *(float *)0x266e94 ||
+        !(*(float *)(observer + 0x18) >= *(float *)0x266e98) ||
+        !(*(float *)(observer + 0x18) <= *(float *)0x266e94) ||
         (*(uint32_t *)(observer + 0x1c) & 0x7f800000) == 0x7f800000 ||
-        *(float *)(observer + 0x1c) < *(float *)0x266e98 ||
-        *(float *)(observer + 0x1c) > *(float *)0x266e94 ||
+        !(*(float *)(observer + 0x1c) >= *(float *)0x266e98) ||
+        !(*(float *)(observer + 0x1c) <= *(float *)0x266e94) ||
         (*(uint32_t *)(observer + 0x20) & 0x7f800000) == 0x7f800000 ||
-        *(float *)(observer + 0x20) < *(float *)0x266e98 ||
-        *(float *)(observer + 0x20) > *(float *)0x266e94 ||
+        !(*(float *)(observer + 0x20) >= *(float *)0x266e98) ||
+        !(*(float *)(observer + 0x20) <= *(float *)0x266e94) ||
         !real_vector3d_valid((float *)(observer + 0x44)) ||
         (*(uint32_t *)(observer + 0x24) & 0x7f800000) == 0x7f800000 ||
-        *(float *)(observer + 0x24) < *(float *)0x2533c0 ||
-        *(float *)(observer + 0x24) > *(float *)0x266e94 ||
+        !(*(float *)(observer + 0x24) >= *(float *)0x2533c0) ||
+        !(*(float *)(observer + 0x24) <= *(float *)0x266e94) ||
         (*(uint32_t *)(observer + 0x28) & 0x7f800000) == 0x7f800000 ||
-        *(float *)(observer + 0x28) < *(float *)0x255ef8 ||
-        *(float *)(observer + 0x28) > *(float *)0x2568bc ||
+        !(*(float *)(observer + 0x28) >= *(float *)0x255ef8) ||
+        !(*(float *)(observer + 0x28) <= *(float *)0x2568bc) ||
         (*(uint32_t *)(observer + 0x50) & 0x7f800000) == 0x7f800000 ||
-        *(float *)(observer + 0x50) < *(float *)0x2533c0 ||
-        *(float *)(observer + 0x50) > *(float *)0x266e90))) {
+        !(*(float *)(observer + 0x50) >= *(float *)0x2533c0) ||
+        !(*(float *)(observer + 0x50) <= *(float *)0x266e90)))) {
     char *msg = csprintf(
       (char *)0x5ab100,
       "Invalid camera command.\n"
@@ -499,7 +499,7 @@ void observer_compute_accelerations(int16_t local_player_index)
 
   /* Compute polynomial coefficients for each of 5 components */
   for (comp = 0; comp < 5; comp++) {
-    if ((*(uint8_t *)(observer + 0x8) & 1) && *(float *)0x335718 < *timers) {
+    if ((*(uint8_t *)(observer + 0x8) & 1) && *timers > *(float *)0x335718) {
       float f = 1.0f / *timers;
       float f2 = f * f;
       float f3 = f2 * f;
@@ -798,7 +798,9 @@ void FUN_0008c030(float *forward1, float *result_angular, float *forward0,
                   float *up0, float *up1)
 {
   float mat0[13]; /* 3x4 matrix (13 floats, padded to 52 bytes) */
+  float new_var;
   float mat1[13];
+  float new_var2;
 
   if (!valid_real_normal3d_perpendicular(forward0, up0)) {
     csprintf(
@@ -810,12 +812,14 @@ void FUN_0008c030(float *forward1, float *result_angular, float *forward0,
                    0x382, 1);
     system_exit(-1);
   }
+  new_var2 = forward1[2];
   if (!valid_real_normal3d_perpendicular(forward1, up1)) {
+    new_var = up1[2];
     csprintf(
       (char *)0x5ab100,
       "%s, %s: assert_valid_real_vector3d_axes2(%f, %f, %f / %f, %f, %f)",
       "forward1", (char *)0x267488, (double)forward1[0], (double)forward1[1],
-      (double)forward1[2], (double)up1[0], (double)up1[1], (double)up1[2]);
+      (double)new_var2, (double)up1[0], (double)up1[1], (double)new_var);
     display_assert((char *)0x5ab100, "c:\\halo\\SOURCE\\camera\\observer.c",
                    0x383, 1);
     system_exit(-1);
@@ -1353,7 +1357,7 @@ void observer_update_positions(int16_t local_player_index)
 
     for (i = 5; i != 0; i--) {
       val = *timers - *(float *)0x335718;
-      if (val <= *(float *)0x2533c0) {
+      if (!(val > *(float *)0x2533c0)) {
         val = *(float *)0x2533c0;
       }
       *timers = val;
