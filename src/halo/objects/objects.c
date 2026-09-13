@@ -1405,16 +1405,20 @@ int glow_normal_particle_new(int glow_widget_ptr, short index, short count)
         *(float *)(glow_tag + 0xc0);
     }
 
-    if (*(int16_t *)(glow_tag + 0x24) == 0) {
+    switch (*(int16_t *)(glow_tag + 0x24)) {
+    case 0:
       *(float *)(particle + 0x28) =
         random_real_range((int *)random_math_get_local_seed_address(), 0.0f,
                           *(float *)(glow_widget_ptr + 0x234));
-    } else if (*(int16_t *)(glow_tag + 0x24) == 1) {
+      break;
+    case 1:
       *(float *)(particle + 0x28) =
-        ((float)index / (float)count) * *(float *)(glow_widget_ptr + 0x234);
-    } else {
+        ((float)(int)index / (int)count) * *(float *)(glow_widget_ptr + 0x234);
+      break;
+    default:
       display_assert(0, "c:\\halo\\SOURCE\\objects\\widgets\\glow.c", 0x3b1, 1);
       system_exit(-1);
+      break;
     }
 
     *(float *)(particle + 8) = random_real_range(
@@ -1620,42 +1624,39 @@ void FUN_001342a0(int glow_widget_ptr)
   int prev_node;
   unsigned int flags;
   char parity;
-  int16_t index;
+  short index;
 
   glow_tag = tag_get(0x676c7721, *(int *)(glow_widget_ptr + 0x224));
   index = 0;
-  parity = 1;
   prev_node = 0;
-  if (0 < *(short *)(glow_widget_ptr + 0x24c)) {
-    do {
-      node = glow_normal_particle_new(glow_widget_ptr, index,
-                                      *(short *)(glow_widget_ptr + 0x24c));
-      if (node == 0) {
-        return;
+  parity = 1;
+  for (index = 0; index < *(short *)(glow_widget_ptr + 0x24c); index++) {
+    node = glow_normal_particle_new(glow_widget_ptr, index,
+                                    *(short *)(glow_widget_ptr + 0x24c));
+    if (node == 0) {
+      break;
+    }
+    if ((*(unsigned char *)((int)glow_tag + 0x28) & 2) != 0) {
+      *(unsigned int *)(node + 0x54) |= 1;
+    }
+    if ((*(unsigned char *)((int)glow_tag + 0x28) & 4) != 0) {
+      if (!parity) {
+        flags = *(unsigned int *)(node + 0x54) | 1;
+      } else {
+        flags = *(unsigned int *)(node + 0x54) & 0xfffffffe;
       }
-      if ((*(unsigned char *)((int)glow_tag + 0x28) & 2) != 0) {
-        *(unsigned int *)(node + 0x54) = *(unsigned int *)(node + 0x54) | 1;
-      }
-      if ((*(unsigned char *)((int)glow_tag + 0x28) & 4) != 0) {
-        if (!parity) {
-          flags = *(unsigned int *)(node + 0x54) | 1;
-        } else {
-          flags = *(unsigned int *)(node + 0x54) & 0xfffffffe;
-        }
-        *(unsigned int *)(node + 0x54) = flags;
-        parity = !parity;
-      }
-      if (*(int *)(glow_widget_ptr + 0x250) == 0) {
-        *(int *)(glow_widget_ptr + 0x250) = node;
-      }
-      if (prev_node != 0) {
-        *(int *)(prev_node + 0x5c) = node;
-      }
-      *(int *)(node + 0x60) = prev_node;
-      index = index + 1;
-      *(int *)(glow_widget_ptr + 0x254) = node;
-      prev_node = node;
-    } while (index < *(short *)(glow_widget_ptr + 0x24c));
+      *(unsigned int *)(node + 0x54) = flags;
+      parity = !parity;
+    }
+    if (*(int *)(glow_widget_ptr + 0x250) == 0) {
+      *(int *)(glow_widget_ptr + 0x250) = node;
+    }
+    if (prev_node != 0) {
+      *(int *)(prev_node + 0x5c) = node;
+    }
+    *(int *)(node + 0x60) = prev_node;
+    *(int *)(glow_widget_ptr + 0x254) = node;
+    prev_node = node;
   }
 }
 
@@ -3326,28 +3327,15 @@ void FUN_00139810(float *color /* @<ecx> */, float scale)
   float factor;
 
   /* Find the maximum of the three color components */
-  if (color[1] <= color[2]) {
-    max_comp = color[2];
-  } else {
-    max_comp = color[1];
-  }
-  if (color[0] <= max_comp) {
-    if (color[1] <= color[2]) {
-      max_comp = color[2];
-    } else {
-      max_comp = color[1];
-    }
-  } else {
-    max_comp = color[0];
-  }
+  max_comp = (color[0] > ((color[1] > color[2]) ? color[1] : color[2])) ? color[0] : ((color[1] > color[2]) ? color[1] : color[2]);
 
   /* Compute the desired scale factor */
-  factor = scale + *(float *)0x2533c8;
+  factor = scale + 1.0f;
 
-  /* Clamp: if factor*max_comp > epsilon, use epsilon/max_comp;
+  /* Clamp: if factor*max_comp > 1.0f, use 1.0f/max_comp;
    *        if factor*max_comp < scale, use scale/max_comp */
-  if (*(float *)0x2533c8 < factor * max_comp) {
-    factor = *(float *)0x2533c8 / max_comp;
+  if (factor * max_comp > 1.0f) {
+    factor = 1.0f / max_comp;
   } else if (factor * max_comp < scale) {
     factor = scale / max_comp;
   }
