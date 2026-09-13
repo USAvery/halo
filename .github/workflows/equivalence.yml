@@ -32,7 +32,6 @@ on:
 env:
   VENV_PYTHON: /mnt/g/dev/halo/.venv/bin/python3
   DELINKED_DIR: /mnt/g/dev/halo/delinked
-  BUILD_DIR: /mnt/g/dev/halo/build
   # Directory holding the (host-only, never-committed) .halorec recordings.
   # build_host_snapshots.py reads this; if absent, snapshot-dependent targets SKIP.
   HALO_HALOREC_DIR: /mnt/g/dev/halo-memory-viewer
@@ -41,7 +40,7 @@ jobs:
   regression:
     name: Unicorn regression (quick)
     runs-on: self-hosted
-    timeout-minutes: 5
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -49,9 +48,12 @@ jobs:
         run: |
           # delinked/ contains tracked reference objects, so replace the
           # checkout directory rather than nesting a delinked/delinked link.
-          rm -rf -- delinked build
+          rm -rf -- delinked
           ln -sf ${{ env.DELINKED_DIR }} delinked
-          ln -sf ${{ env.BUILD_DIR }} build
+
+      - name: Build PR candidate
+        run: ${{ env.VENV_PYTHON }} tools/build/build.py -q --target halo
+        timeout-minutes: 20
 
       - name: Build host snapshots (copyrighted game memory stays host-only)
         run: ${{ env.VENV_PYTHON }} tools/equivalence/build_host_snapshots.py
@@ -60,7 +62,7 @@ jobs:
         run: |
           ${{ env.VENV_PYTHON }} -c "import unicorn, capstone; print('ok')"
           test -d delinked
-          test -d build
+          test -f build/halo
 
       - name: Run regression tests
         run: |
@@ -90,16 +92,19 @@ jobs:
         run: |
           # See the regression job: a directory target would otherwise create
           # a nested symlink instead of exposing the host-only references.
-          rm -rf -- delinked build
+          rm -rf -- delinked
           ln -sf ${{ env.DELINKED_DIR }} delinked
-          ln -sf ${{ env.BUILD_DIR }} build
+
+      - name: Build PR candidate
+        run: ${{ env.VENV_PYTHON }} tools/build/build.py -q --target halo
+        timeout-minutes: 20
 
       - name: Verify prerequisites
         run: |
           ${{ env.VENV_PYTHON }} -c "import unicorn, capstone, z3; print('ok')"
           which llvm-objdump
           test -d delinked
-          test -d build
+          test -f build/halo
 
       - name: Determine mode
         id: mode

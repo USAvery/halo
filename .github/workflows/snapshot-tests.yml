@@ -28,7 +28,6 @@ on:
 env:
   VENV_PYTHON: /mnt/g/dev/halo/.venv/bin/python3
   DELINKED_DIR: /mnt/g/dev/halo/delinked
-  BUILD_DIR: /mnt/g/dev/halo/build
   # Host-only CI snapshot (raw game memory - never committed).
   CI_DIR: /mnt/g/dev/halo/ci
 
@@ -42,9 +41,8 @@ jobs:
         run: |
           # delinked/ contains a few tracked reference objects. ln -sfn into
           # that directory creates delinked/delinked rather than replacing it.
-          rm -rf -- delinked build ci
+          rm -rf -- delinked ci
           ln -sfn ${{ env.DELINKED_DIR }} delinked
-          ln -sfn ${{ env.BUILD_DIR }} build
           ln -sfn ${{ env.CI_DIR }} ci
 
       - name: Verify prerequisites
