@@ -409,6 +409,67 @@ int FUN_00053ee0(void *ai_profile_element, const char *name)
   return -1;
 }
 
+/* 0x00053f40 — FUN_00053f40 (weighted random element picker).
+ *
+ * Signature recovered from the sole call site at 0x125a0
+ * (push &skip_bits, push 0x10, push count, push 0x50, push base;
+ *  ADD ESP,0x14 = five cdecl args) and from the frame reads inside the
+ * function (MOVSX word for stride/offset, TEST CX,CX for count).
+ *
+ * Walks `count` elements of `stride` bytes starting at
+ * (char*)base + first_offset, summing the float at each element whose
+ * bit in skip_flags is clear.  Picks a uniform threshold in [0, total)
+ * and returns the index of the element whose running sum first reaches
+ * it, or -1 when the list is empty / fully skipped / weightless.
+ */
+short FUN_00053f40(void *base, short stride, short count, short first_offset,
+                   uint32_t *skip_flags)
+{
+  float total;
+  float running;
+  float threshold;
+  char *p;
+  int i;
+  int n;
+  short j;
+  short result;
+
+  result = -1;
+  total = 0.0f;
+  base = (char *)base + first_offset;
+  p = (char *)base;
+  if (count > 0) {
+    i = 0;
+    n = (unsigned short)count;
+    do {
+      if ((skip_flags[i >> 5] & (1u << (i & 31))) == 0) {
+        total += *(float *)p;
+      }
+      i++;
+      p += stride;
+    } while (--n != 0);
+    if (total > 0.0f) {
+      threshold = random_real_range(get_global_random_seed_address(), 0.0f,
+                                    total);
+      running = 0.0f;
+      p = (char *)base;
+      j = 0;
+      do {
+        if ((skip_flags[j >> 5] & (1u << (j & 31))) == 0) {
+          running += *(float *)p;
+          if (threshold <= running) {
+            result = j;
+            break;
+          }
+        }
+        j++;
+        p += stride;
+      } while (j < count);
+    }
+  }
+  return result;
+}
+
 /* 0x00054020 — encounter_get_platoon_ptr (FUN_00054020).
  *
  * Returns a pointer to the platoon record for a given encounter and relative

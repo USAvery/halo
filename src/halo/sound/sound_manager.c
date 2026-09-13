@@ -610,6 +610,25 @@ void *sound_class_get_definition(short class_index)
   return definition;
 }
 
+/* sound_is_active (0x1c88a0)
+ *
+ * Byte-swaps one "bungie ima adpcm header" record in place.
+ *
+ * Disassembly (0x1c88a0-0x1c88b7) is a single forwarding call:
+ *   MOV EAX,[EBP+8]; PUSH 1; PUSH EAX; PUSH 0x32ecf4;
+ *   CALL 0x00118be0; ADD ESP,0xc
+ * so the arguments are (definition = 0x32ecf4, data = param, count = 1).
+ * 0x32ecf4 is the byte-swap definition whose name string is
+ * "bungie ima adpcm header" (Ghidra: PTR_s_bungie_ima_adpcm_header_0032ecf4).
+ *
+ * The one stack argument at [EBP+8] is proven by the binary; the kb.json
+ * placeholder decl carried (void).  RET (no imm) => cdecl, caller cleans.
+ * The record layout behind `data` is unknown here, so it stays void *. */
+void sound_is_active(void *data)
+{
+  FUN_00118be0((void *)0x32ecf4, data, 1);
+}
+
 /* Return the default priority for a sound tag (0x1c8d10).
  * Reads the priority field at tag offset 0xc. If zero, falls back to
  * the sound class definition's default priority at offset 0x1c. */
@@ -903,6 +922,36 @@ void sound_initialize_for_new_map(void)
 {
 }
 
+/* FUN_001cb820 (0x1cb820)
+ *
+ * Tear down the sound manager (called from shell_dispose, 0x191140).
+ *
+ * If the initialized flag (0x4eaf40) is set: stop the hardware backend via
+ * its vtable+0x8 entry (vtable pointer at 0x4eaf48), invalidate the sounds
+ * table (0x4fdba4) and then the looping-sounds table (0x4fdba0), and clear
+ * the flag.  Afterwards dispose each table that is still allocated, then
+ * tail-call FUN_001bde90.
+ *
+ * Note: the reference emits a single `ADD ESP,0x8` after the two
+ * data_make_invalid calls (coalesced cdecl cleanup for two 1-arg calls),
+ * not a 2-argument call. */
+void FUN_001cb820(void)
+{
+  if (*(unsigned char *)0x4eaf40 != 0) {
+    (*(void (**)(void))(*(int *)0x4eaf48 + 8))();
+    data_make_invalid(*(data_t **)0x4fdba4);
+    data_make_invalid(*(data_t **)0x4fdba0);
+    *(unsigned char *)0x4eaf40 = 0;
+  }
+  if (*(data_t **)0x4fdba4 != (data_t *)0) {
+    data_dispose(*(data_t **)0x4fdba4);
+  }
+  if (*(data_t **)0x4fdba0 != (data_t *)0) {
+    data_dispose(*(data_t **)0x4fdba0);
+  }
+  FUN_001bde90();
+}
+
 /* Fade out all active sounds and then stop the sound manager for map unload.
  *
  * If the sound manager is initialized and hardware is present:
@@ -942,6 +991,98 @@ void sound_set_music_enabled(int enabled)
 unsigned int sound_render_time(void)
 {
   return *(unsigned int *)0x4eaf4c;
+}
+
+/* sound_reconnect_to_structure_bsp (0x1cb8f0)
+ *
+ * After a structure BSP switch, re-resolve the cached scenario location of
+ * every active sound.  Runs only when the sound system is initialized
+ * (0x4eaf40) and hardware is present (0x4eaf41).
+ *
+ * Walks the sounds table (0x4fdba4) with data_next_index and, for each entry
+ * whose 16-bit field at +0x14 equals 1, recomputes the location record at
+ * entry+0x44 from the world point at entry+0x20 via
+ * scenario_location_from_point.  Arg order confirmed from the reference:
+ * PUSH EDX(entry+0x20) then PUSH EAX(entry+0x44), so entry+0x44 is the
+ * out-location and entry+0x20 the source point. */
+void sound_reconnect_to_structure_bsp(void)
+{
+  int sound_index;
+  char *sound_entry;
+
+  if (*(uint8_t *)0x4eaf40 != 0 && *(uint8_t *)0x4eaf41 != 0) {
+    for (sound_index = data_next_index(*(data_t **)0x4fdba4, -1);
+         sound_index != -1;
+         sound_index = data_next_index(*(data_t **)0x4fdba4, sound_index)) {
+      sound_entry = (char *)datum_get(*(data_t **)0x4fdba4, sound_index);
+      if (*(short *)(sound_entry + 0x14) == 1) {
+        scenario_location_from_point(sound_entry + 0x44, sound_entry + 0x20);
+      }
+    }
+  }
+}
+
+/* sound_try_and_get (0x1cb960)
+ *
+ * Resolves an absolute index against the sounds table (0x4fdba4) and reports
+ * whether it names a live entry.  The reference loads the table pointer into
+ * ECX, pushes the caller's [EBP+8] argument first and the table second
+ * (cdecl, ADD ESP,8), then normalizes the returned index to 0/1 with
+ * NEG/SBB/NEG -- i.e. a plain "!= 0" test on an int return.
+ *
+ * The exact meaning of a nonzero result beyond "index resolved" is unknown;
+ * the name is the kb.json symbol. */
+int sound_try_and_get(int absolute_index)
+{
+  return datum_absolute_index_to_index(*(data_t **)0x4fdba4, absolute_index) !=
+         0;
+}
+
+/* sound_enable (0x1cb980)
+ *
+ * Stores the caller's byte argument into the global at 0x4eaf41.  The
+ * reference is a bare frame: PUSH EBP / MOV EBP,ESP / MOV AL,[EBP+8] /
+ * MOV [0x004eaf41],AL / POP EBP / RET.  No other side effects, no callees.
+ *
+ * kb.json declares the parameter as bool.  Other functions in this TU gate
+ * work on (0x4eaf40 != 0 && 0x4eaf41 != 0); the precise meaning of 0x4eaf41
+ * beyond "a byte flag this setter writes" is unknown. */
+void sound_enable(bool enable)
+{
+  *(uint8_t *)0x4eaf41 = (uint8_t)enable;
+}
+
+/* sound_scripted_dialog_is_playing (0x1cb990)
+ *
+ * Reports whether the scripted-dialog hold is still in effect: frameless
+ * reference is CALL game_time_get (0xb5aa0) / MOV EDX,[0x004eaf44] /
+ * XOR ECX,ECX / CMP EAX,EDX / SETL CL / MOV AL,CL / RET -- a signed
+ * "current game time < deadline" test returning bool in AL.  Ghidra's
+ * decompile drops the comparison and shows a void tail call; the
+ * disassembly is authoritative here.
+ *
+ * 0x4eaf44 is the same deadline this TU clears in sound_manager_stop_all
+ * and raises with a max() when scripted dialog is queued. */
+bool sound_scripted_dialog_is_playing(void)
+{
+  return game_time_get() < *(int *)0x4eaf44;
+}
+
+/* sound_manager_set_sound_environment (0x1cb9b0)
+ *
+ * Copies a 0x48-byte (18-dword) sound-environment block into the sound
+ * manager globals at 0x4eb068.  Reference is a bare cdecl frame plus
+ * MOV ESI,[EBP+8] / MOV ECX,0x12 / MOV EDI,0x4eb068 / REP MOVSD -- an
+ * MSVC 18-dword struct assignment, no calls, no return value.
+ *
+ * The parameter is the pointer VALUE produced by
+ * scenario_get_sound_environment's out-param (see the caller at 0x1c815b
+ * in game_sound_update), not the address of that local.  Element type is
+ * unproven, so the copy is expressed as a raw 0x48-byte block move; the
+ * inline memcpy is what reproduces the reference REP MOVSD. */
+void sound_manager_set_sound_environment(const void *sound_environment)
+{
+  memcpy((void *)0x4eb068, sound_environment, 0x12 * sizeof(uint32_t));
 }
 
 /* Check whether a sound tag can currently play.
@@ -1044,6 +1185,77 @@ int16_t sound_check_promotion(int sound_tag_index /* @<eax> */)
   }
 
   return result;
+}
+
+/* FUN_001cbc40 (0x1cbc40)
+ *
+ * Per-sound update tick.  sound_index arrives in EBX (register argument) and
+ * the result comes back in AL.
+ *
+ * Resolves the sound entry from the sounds table (0x4fdba4), validates the
+ * cached playing channel (0x8c) against the channel array at 0x4fc3a0
+ * (stride 0x18, sound_index at +0x00), then, unless the entry is flagged
+ * (+0x04 bit 0), invokes the entry's update callback at +0x10 with
+ * (entry+0x0c, entry+0x54, entry+0x14) if the entry timestamp (+0x84) is
+ * older than the render time (0x4eaf4c).
+ *
+ * Returns true (AL=1) when the sound is done being serviced this tick, and
+ * false when the callback reported completion but the sound must keep
+ * playing (entry+0x02 non-zero, or the sound class definition byte at +0x08
+ * is set).  In the remaining case the callback pointer is cleared and true is
+ * returned. */
+bool FUN_001cbc40(int sound_index /* @<ebx> */)
+{
+  char *sound;
+  short channel_index;
+  char (*update_proc)(int, void *, void *);
+  void *sound_tag;
+  void *class_definition;
+
+  sound = (char *)datum_get(*(data_t **)0x4fdba4, sound_index);
+  channel_index = *(short *)(sound + 0x8c);
+  if (channel_index != -1) {
+    assert_halt_msg_at("index>=0 && index<sound_manager_globals.channel_count",
+                       "c:\\halo\\SOURCE\\sound\\sound_manager.c", 0x428,
+                       channel_index >= 0 &&
+                         channel_index < *(short *)0x4eb0b4);
+    assert_halt_msg_at(
+      "sound->playing_channel_index==NONE || "
+      "channel_get(sound->playing_channel_index)->sound_index==sound_index",
+      "c:\\halo\\SOURCE\\sound\\sound_manager.c", 0x59f,
+      *(int *)(0x4fc3a0 + (int)channel_index * 0x18) == sound_index);
+  }
+
+  if ((*(unsigned char *)(sound + 4) & 1) != 0) {
+    return 1;
+  }
+
+  update_proc = *(char (**)(int, void *, void *))(sound + 0x10);
+  if (update_proc == 0) {
+    return 1;
+  }
+
+  if (*(int *)(sound + 0x84) >= *(int *)0x4eaf4c) {
+    return 1;
+  }
+
+  if (update_proc(*(int *)(sound + 0xc), sound + 0x54, sound + 0x14) != 0) {
+    return 1;
+  }
+
+  if (*(short *)(sound + 2) != 0) {
+    return 0;
+  }
+
+  sound_tag = tag_get(0x736e6421, *(int *)(sound + 8));
+  class_definition =
+    sound_class_get_definition(*(short *)((char *)sound_tag + 4));
+  if (*(char *)((char *)class_definition + 8) != 0) {
+    return 0;
+  }
+
+  *(int *)(sound + 0x10) = 0;
+  return 1;
 }
 
 /* sound_collect_like_sounds (0x1cbd30)
@@ -1367,6 +1579,52 @@ void sound_channel_stop(short channel_index)
 
   /* Stop the hardware channel via driver vtable+0x20. */
   (*(void (**)(int))(*(int *)0x4eaf48 + 0x20))(channel_index);
+}
+
+/* FUN_001cc1c0 (0x1cc1c0)
+ *
+ * Looping-sound source refresh callback.  Stored as a function pointer in
+ * the sound entry at +0x10 (see the store of 0x1cc1c0 in FUN_001cda50);
+ * the only xref to this address is that DATA reference, so the parameter
+ * meanings below come from the binary alone.
+ *
+ * Looks the looping-sound handle up in the looping-sounds table
+ * (*(data_t **)0x4fdba0) via datum_absolute_index_to_index.  If the datum
+ * is gone, returns 0.  Otherwise copies the 0x40-byte block at
+ * looping_source + 0xc into the caller's buffer (REP MOVSD, ECX = 0x10)
+ * and returns 1.  That is the same source block FUN_001cda50 seeds into
+ * sound_entry + 0x14 with qmemcpy(..., looping_source + 0xc, 0x40).
+ *
+ * param_2 ([EBP + 0xc]) is never read by this function; its meaning is
+ * unknown. */
+char FUN_001cc1c0(int looping_handle, int param_2, void *out_source_data)
+{
+  char *looping_source;
+
+  looping_source = (char *)(int)datum_absolute_index_to_index(
+    *(data_t **)0x4fdba0, looping_handle);
+  if (looping_source != (char *)0) {
+    qmemcpy(out_source_data, looping_source + 0xc, 0x40);
+    return 1;
+  }
+  return 0;
+}
+
+/* FUN_001cc2f0 (0x1cc2f0)
+ *
+ * Both arguments arrive in registers: the sound datum handle in EAX and the
+ * value in ESI (the two callers at 0x1ce7ea / 0x1ce930 in FUN_001ce550 set
+ * them up).  Resolves the handle in the sounds table (0x4fdba4) and, when the
+ * entry's field_08 differs from the value, stores the value into field_98.
+ * The meanings of both fields are unknown from this function alone. */
+void FUN_001cc2f0(int sound_handle /* @<eax> */, int value /* @<esi> */)
+{
+  char *sound_entry;
+
+  sound_entry = (char *)datum_get(*(data_t **)0x4fdba4, sound_handle);
+  if (*(int *)(sound_entry + 8) != value) {
+    *(int *)(sound_entry + 0x98) = value;
+  }
 }
 
 /* sound_update_channel_attenuation (0x1cc310)

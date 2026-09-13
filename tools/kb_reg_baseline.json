@@ -9441,6 +9441,7 @@
     "0xbb180": "void player_set_unit_camo_flag(int player_handle@<eax>, int16_t powerup_index);",
     "0xbb1c0": "void FUN_000bb1c0(int player_index@<eax>, int16_t param2);",
     "0xbb1f0": "void FUN_000bb1f0(int player_index@<eax>, int16_t param2);",
+    "0xbbfe0": "void player_set_spawn_action_result(int player_handle@<eax>, int16_t action_result_type, int object_handle, int16_t seat_index);",
     "0xbc0d0": "bool player_try_to_spawn_in_vehicle(int player_handle@<eax>);",
     "0xbc4b0": "void player_update_weapon_timers(int datum_handle@<ebx>);",
     "0xbc920": "void players_update_before_game_client(int player_index @<ebx>, int object_handle, void *position);",
@@ -9987,6 +9988,7 @@
     "0x1cbfb0": "void sound_channel_set_properties(short channel_index@<si>, int update_only@<ebx>, void *properties);",
     "0x1cc050": "short sound_channel_update_status(short channel_index@<ax>);",
     "0x1cc140": "void sound_channel_stop(short channel_index@<di>);",
+    "0x1cc2f0": "void FUN_001cc2f0(int sound_handle@<eax>, int value@<esi>);",
     "0x1cc310": "float sound_update_channel_attenuation(int sound_handle@<eax>);",
     "0x1cc440": "int FUN_001cc440(int value@<edi>);",
     "0x1cca60": "void sound_stop_channel(int sound_handle@<ebx>);",
@@ -10011,8 +10013,7 @@
     "0x2256bb": "int __stdcall recv(void *xnet@<ecx>, unsigned int socket, char *buf, int len, int flags);",
     "0x002256bb": "int __stdcall recv(void *xnet@<ecx>, unsigned int socket, char *buf, int len, int flags);",
     "0x2258a4": "int __stdcall send(void *xnet@<ecx>, unsigned int socket, const char *buf, int len, int flags);",
-    "0x002258a4": "int __stdcall send(void *xnet@<ecx>, unsigned int socket, const char *buf, int len, int flags);",
-    "0xbbfe0": "void player_set_spawn_action_result(int player_handle@<eax>, int16_t action_result_type, int object_handle, int16_t seat_index);"
+    "0x002258a4": "int __stdcall send(void *xnet@<ecx>, unsigned int socket, const char *buf, int len, int flags);"
   },
   "0x57330": "short FUN_00057330(int16_t scenario_index@<eax>, void *record@<esi>, int field_1a8_val, int child_handle, int reserved);",
   "0x1631d0": "void FUN_001631d0(void);"
