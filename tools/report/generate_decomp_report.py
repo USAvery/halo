@@ -1289,6 +1289,7 @@ def generate_html(report: dict, output_path: str, history_path: str = None):
             position: absolute; left: 0; top: 0; bottom: 0; border-radius: 2px;
             min-width: 0;
         }
+        .tu-bar-tile.divergent { outline: 1px solid #f85149; outline-offset: -1px; }
         .tu-bar-tile.divergent .tu-bar-fill::after {
             content: ''; position: absolute; inset: 0;
             background-image: repeating-linear-gradient(
@@ -2257,6 +2258,7 @@ def generate_html(report: dict, output_path: str, history_path: str = None):
                     '<div class="tu-legend-item"><div class="tu-legend-swatch" style="background:#da3633"></div>&lt;70%</div>' +
                     '<div class="tu-legend-item"><div class="tu-legend-swatch" style="background:#8b949e"></div>unscored</div>' +
                     '<div class="tu-legend-item"><div class="tu-legend-swatch" style="background-color:#58a6ff;background-image:repeating-linear-gradient(-45deg,rgba(0,0,0,0.35),rgba(0,0,0,0.35) 3px,transparent 3px,transparent 6px)"></div>divergence candidate (striped)</div>' +
+                    '<div class="tu-legend-item"><div class="tu-legend-swatch" style="background:transparent;outline:1px solid #f85149;outline-offset:-1px"></div>divergence candidate outline</div>' +
                     '<div class="tu-map-note">Bar length = implemented (ported bytes / unit bytes). Color = byte-weighted VC71 match over scored bytes; hover a tile for detail.</div>';
                 legEl.innerHTML = legHtml;
             }
