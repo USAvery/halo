@@ -50926,17 +50926,17 @@
     "actor_situation_update_target_status": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 6.8,
+      "abi_modeled_mnemonic_pct": 94.0,
       "addr": "0x300b0",
       "end": "0x30297",
       "kind": "auto",
       "n_r": 141,
-      "opnd_percent": 4.1,
-      "raw_mnemonic_pct": 6.8,
+      "opnd_percent": 81.3,
+      "raw_mnemonic_pct": 94.0,
       "ref": "synth",
       "ref_sha": "bab885a38564aa9a",
-      "score": 6.8,
-      "source": "src/halo/unported_thunks.c"
+      "score": 94.0,
+      "source": "src/halo/ai/actor_perception.c"
     },
     "actor_swarm_attach_unit": {
       "abi_model": "raw",

@@ -696,7 +696,7 @@ void actor_situation_update_target_status(int actor_handle)
     } else if (*(short *)(prop + 0x38) != 0 && *(short *)(prop + 0x38) != 1) {
       status = 7;
     } else if (*(char *)(prop + 0x122) > 2 ||
-               *(float *)(prop + 0x11c) >= *(float *)0x254640) {
+               !(*(float *)(prop + 0x11c) < *(float *)0x254640)) {
       status = 8;
     } else {
       status = 9;
