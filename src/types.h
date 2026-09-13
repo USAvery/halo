@@ -512,6 +512,9 @@ typedef struct
 
 #define MAXIMUM_NUMBER_OF_TRIGGERS_PER_WEAPON 2
 #define MAXIMUM_NUMBER_OF_MAGAZINES_PER_WEAPON 2  // TODO: confirm
+// Confirmed via disassembly at 0xfb880 (weapon_trigger_release_charge):
+// CMP BX,0x9 / JL 0xfb8e7 bounds new_state before the assert_halt fires.
+#define NUMBER_OF_TRIGGER_STATES 9
 
 // OBJE -> ITEM -> WEAP
 /// size=0x27C
