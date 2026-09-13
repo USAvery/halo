@@ -75,7 +75,7 @@ bool FUN_000eed10(void *widget, void *event_data, bool *widget_deleted)
   (void)event_data;
   (void)widget_deleted;
 
-  if (*(short *)((char *)widget + 0xe) == 0) {
+  if (*(short *)((char *)widget + 0xe) != 0) {
     display_assert(
       "expected the player profile select screen to be a container widget",
       "c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 0xe53,
