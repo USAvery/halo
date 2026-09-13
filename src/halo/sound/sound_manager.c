@@ -289,6 +289,7 @@ void FUN_001be100(int permutation_ptr)
     *(int16_t *)0x5054ea += 1;
   }
 }
+
 /* FUN_001be140 (0x1be140)
  *
  * Release counterpart of FUN_001be100: drops the hardware reference the
@@ -318,6 +319,7 @@ void FUN_001be140(int permutation_ptr)
     *(int16_t *)0x5054ea += 1;
   }
 }
+
 /* FUN_001be170 (0x1be170)
  *
  * LRU-V block-query callback for the Xbox sound cache: sound_cache_new hands
@@ -352,6 +354,7 @@ int FUN_001be170(int cache_block_index)
 
   return 1;
 }
+
 /* FUN_001be1b0 (0x1be1b0)
  *
  * LRU-V block-delete callback for the Xbox sound cache: sound_cache_new hands
@@ -408,6 +411,7 @@ void FUN_001be1b0(int block_index)
   *(int *)(*(char **)(cache_sound + 8) + 0x30) = 0;
   datum_delete(*(data_t **)0x4e9368, block_index);
 }
+
 /* FUN_001be270 (0x1be270)
  *
  * Name-formatting callback for the Xbox sound cache LRU dump: FUN_001be2b0
@@ -441,6 +445,7 @@ char *FUN_001be270(int cache_block_index)
               sound);
   return (char *)0x4e9268;
 }
+
 /* FUN_001be2b0 (0x1be2b0)
  *
  * Sound-cache counterpart of xbox_texture_cache_request: reserves an LRU
@@ -592,24 +597,6 @@ void FUN_001c7b40(void)
   } while (local_player_index < 4);
 }
 
-/* Return a pointer to the sound class definition at class_index.
- * The definitions live in a static table at 0x32ed08 with a stride of 0x2c.
- * Originally inlined from sound_classes.h; compiled into sound_manager.obj.
- * Asserts that class_index is in range [0,0x33), the class name is non-empty,
- * and the per-definition and per-object instance limits are <= 0x10. */
-void *sound_class_get_definition(short class_index)
-{
-  int idx = (int)class_index;
-  void *definition = (void *)(0x32ed08 + idx * 0x2c);
-
-  assert_halt(class_index >= 0 && class_index < 0x33);
-  assert_halt(((const char **)0x32f5d0)[idx][0]);
-  assert_halt(*(short *)definition <= 0x10);
-  assert_halt(*(short *)((char *)definition + 2) <= 0x10);
-
-  return definition;
-}
-
 /* sound_is_active (0x1c88a0)
  *
  * Byte-swaps one "bungie ima adpcm header" record in place.
@@ -627,6 +614,24 @@ void *sound_class_get_definition(short class_index)
 void sound_is_active(void *data)
 {
   FUN_00118be0((void *)0x32ecf4, data, 1);
+}
+
+/* Return a pointer to the sound class definition at class_index.
+ * The definitions live in a static table at 0x32ed08 with a stride of 0x2c.
+ * Originally inlined from sound_classes.h; compiled into sound_manager.obj.
+ * Asserts that class_index is in range [0,0x33), the class name is non-empty,
+ * and the per-definition and per-object instance limits are <= 0x10. */
+void *sound_class_get_definition(short class_index)
+{
+  int idx = (int)class_index;
+  void *definition = (void *)(0x32ed08 + idx * 0x2c);
+
+  assert_halt(class_index >= 0 && class_index < 0x33);
+  assert_halt(((const char **)0x32f5d0)[idx][0]);
+  assert_halt(*(short *)definition <= 0x10);
+  assert_halt(*(short *)((char *)definition + 2) <= 0x10);
+
+  return definition;
 }
 
 /* Return the default priority for a sound tag (0x1c8d10).
@@ -745,8 +750,8 @@ void FUN_001c8ee0(void *pitch_range)
   if ((~*(unsigned int *)(record + 0x34) & all_played) == 0) {
     *(int *)(record + 0x34) = 0;
     if (count > 1) {
-      *(int *)(record + 0x34) =
-        1u << (*(unsigned char *)(record + 0x38) & 0x1f);
+      *(int *)(record + 0x34) = 1u
+                                << (*(unsigned char *)(record + 0x38) & 0x1f);
     }
   }
 }
@@ -1788,6 +1793,114 @@ void FUN_001cc4f0(int sound_handle)
                 (double)*(float *)(sound_entry + 0x50));
     FUN_00189cb0('\0', position, text, (int)*(void **)0x2ee6c4);
   }
+}
+
+/* sound_initialize (0x1cc710)
+ *
+ * Bring the sound manager up.  Sequence follows the reference exactly:
+ *   1. sound_manager_globals.initialized (0x4eaf40) = 0, and the hardware
+ *      byte at 0x4eaf41 = 1.
+ *   2. FUN_001cf820(&config) hands back the platform sound-configuration
+ *      block (it stores the fixed address 0x32fce4 through the out-pointer).
+ *   3. sound_cache_new() (0x1be3e0).
+ *   4. REP MOVSD of 0x12 dwords from 0x2c1220 into the environment block at
+ *      0x4eb068 (same shape as the copy in sound_environment_set), then the
+ *      float at 0x4eb0b0 = 1.0f (MOV dword ptr,0x3f800000).
+ *   5. config + 0x0 is a device index; it must be in [0, 2) and select a
+ *      non-NULL backend descriptor from the pointer table at 0x32f6dc whose
+ *      own first int16 equals the index.  The descriptor pointer is cached at
+ *      0x4eaf48.  Every failure path just returns with initialized == 0.
+ *   6. Allocate the two data arrays ("sounds" 0x200 x 0xac at 0x4fdba4,
+ *      "looping sounds" 0x80 x 0xe4 at 0x4fdba0); a NULL from either returns.
+ *   7. Call the backend's function pointer at descriptor + 4 with the config
+ *      block; it returns a bool in AL (TEST AL,AL at 0x1cc7e4).
+ *   8. data_delete_all on both arrays, then walk four channel classes: the
+ *      int16 at config + 0xa + 2*class is that class's channel count, which is
+ *      accumulated into sound_manager_globals.channel_count (0x4eb0b4, asserted
+ *      <= MAXIMUM_SOUND_CHANNELS = 0x100 at line 0x168).  Each channel gets
+ *      sound_index = NONE, the int16 from the parallel table at 0x32fcee +
+ *      0xa + 2*class stored at +4, and +0x10 / +0x14 zeroed.
+ *   9. initialized = 1.
+ *
+ * The meaning of the config block fields and of the 0x32fcee table entry is
+ * UNKNOWN beyond the widths and offsets proven by the disassembly. */
+void sound_initialize(void)
+{
+  void *config;
+  short *backend;
+  char (*backend_initialize)(void *);
+  int *channel;
+  short device_index;
+  short channel_index;
+  short class_offset;
+  short count_in_class;
+  short channel_total;
+  int class_remaining;
+
+  *(uint8_t *)0x4eaf40 = 0;
+  *(uint8_t *)0x4eaf41 = 1;
+
+  config = NULL;
+  FUN_001cf820(&config);
+  sound_cache_new();
+
+  memcpy((void *)0x4eb068, (const void *)0x2c1220, 0x12 * sizeof(uint32_t));
+  *(float *)0x4eb0b0 = 1.0f;
+
+  device_index = *(short *)config;
+  if (device_index < 0 || device_index >= 2)
+    return;
+
+  backend = *(short **)(0x32f6dc + (int)device_index * 4);
+  if (backend == NULL || *backend != device_index)
+    return;
+
+  *(short **)0x4eaf48 = backend;
+
+  *(data_t **)0x4fdba4 = data_new("sounds", 0x200, 0xac);
+  if (*(data_t **)0x4fdba4 == NULL)
+    return;
+
+  *(data_t **)0x4fdba0 = data_new("looping sounds", 0x80, 0xe4);
+  if (*(data_t **)0x4fdba0 == NULL)
+    return;
+
+  backend_initialize = *(char (**)(void *))((char *)backend + 4);
+  if (backend_initialize(config) == '\0')
+    return;
+
+  channel_index = 0;
+  data_delete_all(*(data_t **)0x4fdba4);
+  data_delete_all(*(data_t **)0x4fdba0);
+
+  class_offset = 10;
+  class_remaining = 4;
+  do {
+    channel_total =
+      (short)(*(short *)0x4eb0b4 + *(short *)((char *)config + class_offset));
+    *(short *)0x4eb0b4 = channel_total;
+    assert_halt_msg_at(
+      "sound_manager_globals.channel_count<=MAXIMUM_SOUND_CHANNELS",
+      "c:\\halo\\SOURCE\\sound\\sound_manager.c", 0x168,
+      channel_total <= 0x100);
+
+    count_in_class = 0;
+    while (count_in_class < *(short *)((char *)config + class_offset)) {
+      channel = (int *)sound_channel_get(channel_index);
+      channel[0] = -1;
+      channel_index++;
+      *(short *)((char *)channel + 4) =
+        *(short *)(0x32fcee + (int)class_offset);
+      channel[4] = 0;
+      channel[5] = 0;
+      count_in_class++;
+    }
+
+    class_offset = (short)(class_offset + 2);
+    class_remaining--;
+  } while (class_remaining != 0);
+
+  *(uint8_t *)0x4eaf40 = 1;
 }
 
 /* sound_compute_random_scale (0x1cc8c0)

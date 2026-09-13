@@ -24963,7 +24963,8 @@
     },
     {
      "addr": "0x1cc710",
-     "decl": "void sound_initialize(void);"
+     "decl": "void sound_initialize(void);",
+     "ported": true
     },
     {
      "addr": "0x1cce80",
@@ -33183,32 +33184,32 @@
      "decl": "int weapon_place(int weapon_handle, void *placement);",
      "name": "weapon_place",
      "ported": true,
-     "source_path": "halo/items/weapons.c"
+     "source_path": "src/halo/items/weapons.c"
     },
     {
      "addr": "0xfae30",
      "decl": "void weapon_preprocess_node_orientations(int weapon_handle);",
      "name": "weapon_preprocess_node_orientations",
      "ported": true,
-     "source_path": "halo/items/weapons.c"
+     "source_path": "src/halo/items/weapons.c"
     },
     {
      "addr": "0xfae80",
      "decl": "char *weapon_get_label(int weapon_handle);",
      "ported": true,
-     "source_path": "halo/items/weapons.c"
+     "source_path": "src/halo/items/weapons.c"
     },
     {
      "addr": "0xfaeb0",
      "decl": "void weapon_set_integrated_light_power(int weapon_handle, int light_power);",
      "ported": true,
-     "source_path": "halo/items/weapons.c"
+     "source_path": "src/halo/items/weapons.c"
     },
     {
      "addr": "0xfaed0",
      "decl": "float weapon_estimate_time_to_target(int weapon_handle, int16_t trigger_index, float param_3);",
      "ported": true,
-     "source_path": "halo/items/weapons.c"
+     "source_path": "src/halo/items/weapons.c"
     },
     {
      "addr": "0xfaf50",
@@ -33227,51 +33228,51 @@
      "decl": "int weapon_must_be_readied(int weapon_handle);",
      "name": "weapon_must_be_readied",
      "ported": true,
-     "source_path": "halo/items/weapons.c"
+     "source_path": "src/halo/items/weapons.c"
     },
     {
      "addr": "0xfb0c0",
      "decl": "bool weapon_is_flag(int object_index);",
      "ported": true,
-     "source_path": "halo/items/weapons.c"
+     "source_path": "src/halo/items/weapons.c"
     },
     {
      "addr": "0xfb0f0",
      "decl": "int weapon_prevents_grenade_throwing(int weapon_handle);",
      "name": "weapon_prevents_grenade_throwing",
      "ported": true,
-     "source_path": "halo/items/weapons.c"
+     "source_path": "src/halo/items/weapons.c"
     },
     {
      "addr": "0xfb140",
      "decl": "int16_t weapon_get_animation_frame(int weapon_handle, int16_t param_2, int16_t param_3, int16_t param_4);",
      "ported": true,
-     "source_path": "halo/items/weapons.c"
+     "source_path": "src/halo/items/weapons.c"
     },
     {
      "addr": "0xfb2f0",
      "decl": "int weapon_overcharged(int weapon_handle);",
      "name": "weapon_overcharged",
      "ported": true,
-     "source_path": "halo/items/weapons.c"
+     "source_path": "src/halo/items/weapons.c"
     },
     {
      "addr": "0xfb320",
      "decl": "void *FUN_000fb320(void *weapon_obj@<edi>, int16_t trigger_index@<si>);",
      "ported": true,
-     "source_path": "halo/items/weapons.c"
+     "source_path": "src/halo/items/weapons.c"
     },
     {
      "addr": "0xfb370",
      "decl": "void *FUN_000fb370(void *weapon_obj@<edi>, int16_t magazine_index@<si>);",
      "ported": true,
-     "source_path": "halo/items/weapons.c"
+     "source_path": "src/halo/items/weapons.c"
     },
     {
      "addr": "0xfb3c0",
      "decl": "bool weapon_has_activity(int weapon_handle @<eax>);",
      "ported": true,
-     "source_path": "halo/items/weapons.c"
+     "source_path": "src/halo/items/weapons.c"
     },
     {
      "addr": "0xfb510",
@@ -33290,7 +33291,7 @@
      "addr": "0xfb6e0",
      "decl": "int weapon_start_effect(int trigger_effect, float scale, float param_3, int weapon_handle @<eax>);",
      "ported": true,
-     "source_path": "halo/items/weapons.c"
+     "source_path": "src/halo/items/weapons.c"
     },
     {
      "addr": "0xfb7d0",
@@ -33322,13 +33323,13 @@
      "addr": "0xfba20",
      "decl": "int weapon_set_animation_state(int weapon_handle, char param_2, int16_t state @<bx>);",
      "ported": true,
-     "source_path": "halo/items/weapons.c"
+     "source_path": "src/halo/items/weapons.c"
     },
     {
      "addr": "0xfbbd0",
      "decl": "void weapon_set_total_rounds(int weapon_handle, int16_t *rounds_array);",
      "ported": true,
-     "source_path": "halo/items/weapons.c"
+     "source_path": "src/halo/items/weapons.c"
     },
     {
      "addr": "0xfbcf0",
@@ -33351,7 +33352,7 @@
      "addr": "0xfc290",
      "decl": "bool weapon_handle_potential_inventory_item(int seat_occupant, int object_handle, uint16_t local_player_index, int16_t *seat_index);",
      "ported": true,
-     "source_path": "halo/items/weapons.c"
+     "source_path": "src/halo/items/weapons.c"
     },
     {
      "addr": "0xfc4b0",
@@ -33360,15 +33361,18 @@
     },
     {
      "addr": "0xfc550",
-     "decl": "void weapon_build_weapon_interface_state(int weapon_handle, int param_2);"
+     "decl": "void weapon_build_weapon_interface_state(int weapon_handle, int param_2);",
+     "ported": true
     },
     {
      "addr": "0xfc690",
-     "decl": "void weapon_reloading(void);"
+     "decl": "bool weapon_reloading(int weapon_handle);",
+     "ported": true
     },
     {
      "addr": "0xfc710",
-     "decl": "int16_t weapon_rotate_zoom_level(int weapon_datum, int16_t current_index);"
+     "decl": "int16_t weapon_rotate_zoom_level(int weapon_datum, int16_t current_index);",
+     "ported": true
     },
     {
      "addr": "0xfc780",
@@ -33380,19 +33384,21 @@
     },
     {
      "addr": "0xfc930",
-     "decl": "char weapon_prevents_melee_attack(int weapon_handle);"
+     "decl": "char weapon_prevents_melee_attack(int weapon_handle);",
+     "ported": true,
+     "source_path": "src/halo/items/weapons.c"
     },
     {
      "addr": "0xfc990",
      "decl": "void FUN_000fc990(int16_t magazine_index@<ax>, int weapon_handle, int param_2);",
      "ported": true,
-     "source_path": "halo/items/weapons.c"
+     "source_path": "src/halo/items/weapons.c"
     },
     {
      "addr": "0xfcaf0",
      "decl": "void FUN_000fcaf0(int weapon_handle, int magazine_index);",
      "ported": true,
-     "source_path": "halo/items/weapons.c"
+     "source_path": "src/halo/items/weapons.c"
     },
     {
      "addr": "0xfcbd0",
@@ -33412,17 +33418,19 @@
     },
     {
      "addr": "0xfce60",
-     "decl": "void FUN_000fce60(void);"
+     "decl": "void FUN_000fce60(int weapon_handle@<eax>, int16_t trigger_index@<si>);",
+     "ported": true,
+     "source_path": "src/halo/items/weapons.c"
     },
     {
      "addr": "0xfcec0",
-     "decl": "void FUN_000fcec0(void);"
+     "decl": "void FUN_000fcec0(int trigger_index@<eax>, int weapon_handle@<ebx>);"
     },
     {
      "addr": "0xfcf20",
      "decl": "void weapon_reset_state(int weapon_handle);",
      "ported": true,
-     "source_path": "halo/items/weapons.c"
+     "source_path": "src/halo/items/weapons.c"
     },
     {
      "addr": "0xfd0b0",
@@ -33430,38 +33438,42 @@
     },
     {
      "addr": "0xfd150",
-     "decl": "void FUN_000fd150(void);"
+     "decl": "void FUN_000fd150(int weapon_handle@<esi>);",
+     "ported": true,
+     "source_path": "src/halo/items/weapons.c"
     },
     {
      "addr": "0xfd180",
      "decl": "void weapon_set_current_amount(int weapon_handle, float ammo_fraction);",
      "ported": true,
-     "source_path": "halo/items/weapons.c"
+     "source_path": "src/halo/items/weapons.c"
     },
     {
      "addr": "0xfd2e0",
      "comment": "Initialize a weapon after it becomes the active weapon for a unit.",
      "decl": "void weapon_activate(int weapon_handle);",
      "ported": true,
-     "source_path": "halo/items/weapons.c"
+     "source_path": "src/halo/items/weapons.c"
     },
     {
      "addr": "0xfd360",
      "comment": "Attempt to put away a weapon; returns false if the weapon has active triggers.",
      "decl": "bool weapon_try_place(int weapon_handle, int flag);",
      "ported": true,
-     "source_path": "halo/items/weapons.c"
+     "source_path": "src/halo/items/weapons.c"
     },
     {
      "addr": "0xfd400",
      "decl": "bool weapon_aim(int weapon_handle, int16_t trigger_index, void *param_3, void *param_4, int param_5, float *param_6, int param_7, void *param_8, void *param_9);",
      "ported": true,
      "signature": "bool weapon_aim(int weapon_handle, int16_t trigger_index, void *param_3, void *param_4, int param_5, float *param_6, int param_7, void *param_8, void *param_9)",
-     "source_path": "halo/items/weapons.c"
+     "source_path": "src/halo/items/weapons.c"
     },
     {
      "addr": "0xfd510",
-     "decl": "void weapon_stop_reload(int weapon_handle);"
+     "decl": "void weapon_stop_reload(int weapon_handle);",
+     "ported": true,
+     "source_path": "src/halo/items/weapons.c"
     },
     {
      "addr": "0xfd520",
@@ -33473,7 +33485,7 @@
     },
     {
      "addr": "0xfdc90",
-     "decl": "void FUN_000fdc90(void);"
+     "decl": "void FUN_000fdc90(int weapon_handle, int trigger_index);"
     },
     {
      "addr": "0xfe450",
@@ -33481,11 +33493,14 @@
     },
     {
      "addr": "0xfe6c0",
-     "decl": "void FUN_000fe6c0(void);"
+     "decl": "void FUN_000fe6c0(int trigger_index@<eax>, int weapon_handle@<ecx>);",
+     "ported": true,
+     "source_path": "src/halo/items/weapons.c"
     },
     {
      "addr": "0xfe790",
-     "decl": "void FUN_000fe790(void);"
+     "decl": "void FUN_000fe790(int trigger_index@<eax>, int weapon_handle@<ecx>);",
+     "ported": true
     },
     {
      "addr": "0xfe890",
