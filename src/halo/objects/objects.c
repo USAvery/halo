@@ -285,64 +285,67 @@ void FUN_00084ae0(int *param_1, unsigned short *param_2, unsigned char *param_3)
         iVar3 = 3;
       }
       param_1[1] = iVar3 * 10000;
-      param_3[0] = 1;
-      param_3[1] = 0;
-      param_3[2] = 0;
-      param_3[3] = 0;
-      *(float *)(param_3 + 0x48) = (float)(iVar3 * 10000);
+      *(uint32_t *)param_3 = 1;
+      *(float *)(param_3 + 0x48) = (float)param_1[1];
       param_1[2] = param_1[2] + 1;
-      if ((param_3[0] & 1) != 0) {
-        cVar2 =
-          CALL_FUN_00084a70((float *)(param_3 + 9), (float *)(param_3 + 0xc));
-        if (cVar2 != '\0' && (param_3[1] & 0x7f800000) != 0x7f800000 &&
-            *(float *)0x266e98 <= *(float *)(param_3 + 1) &&
-            *(float *)(param_3 + 1) <= *(float *)0x266e94 &&
-            (param_3[2] & 0x7f800000) != 0x7f800000 &&
-            *(float *)0x266e98 <= *(float *)(param_3 + 2) &&
-            *(float *)(param_3 + 2) <= *(float *)0x266e94 &&
-            (param_3[3] & 0x7f800000) != 0x7f800000 &&
-            *(float *)0x266e98 <= *(float *)(param_3 + 3) &&
-            *(float *)(param_3 + 3) <= *(float *)0x266e94 &&
-            (param_3[4] & 0x7f800000) != 0x7f800000 &&
-            *(float *)0x266e98 <= *(float *)(param_3 + 4) &&
-            *(float *)(param_3 + 4) <= *(float *)0x266e94 &&
-            (param_3[5] & 0x7f800000) != 0x7f800000 &&
-            *(float *)0x266e98 <= *(float *)(param_3 + 5) &&
-            *(float *)(param_3 + 5) <= *(float *)0x266e94 &&
-            (param_3[6] & 0x7f800000) != 0x7f800000 &&
-            *(float *)0x266e98 <= *(float *)(param_3 + 6) &&
-            *(float *)(param_3 + 6) <= *(float *)0x266e94) {
-          cVar2 = CALL_FUN_00084a10((float *)(param_3 + 0xf));
-          if (cVar2 != '\0' && (param_3[7] & 0x7f800000) != 0x7f800000 &&
-              *(float *)0x2533c0 <= *(float *)(param_3 + 7) &&
-              *(float *)(param_3 + 7) <= *(float *)0x266e94 &&
-              (param_3[8] & 0x7f800000) != 0x7f800000 &&
-              *(float *)0x255ef8 <= *(float *)(param_3 + 8) &&
-              *(float *)(param_3 + 8) <= *(float *)0x2568bc &&
-              (param_3[0x12] & 0x7f800000) != 0x7f800000 &&
-              *(float *)0x2533c0 <= *(float *)(param_3 + 0x12) &&
-              *(float *)(param_3 + 0x12) <= *(float *)0x266e90) {
-            return;
-          }
+      if ((*param_3 & 1) != 0) {
+        if (!valid_real_normal3d_perpendicular((float *)(param_3 + 0x24),
+                                               (float *)(param_3 + 0x30)) ||
+            (*(uint32_t *)(param_3 + 0x4) & 0x7f800000) == 0x7f800000 ||
+            !(*(float *)(param_3 + 0x4) >= *(float *)0x266e98) ||
+            !(*(float *)(param_3 + 0x4) <= *(float *)0x266e94) ||
+            (*(uint32_t *)(param_3 + 0x8) & 0x7f800000) == 0x7f800000 ||
+            !(*(float *)(param_3 + 0x8) >= *(float *)0x266e98) ||
+            !(*(float *)(param_3 + 0x8) <= *(float *)0x266e94) ||
+            (*(uint32_t *)(param_3 + 0xc) & 0x7f800000) == 0x7f800000 ||
+            !(*(float *)(param_3 + 0xc) >= *(float *)0x266e98) ||
+            !(*(float *)(param_3 + 0xc) <= *(float *)0x266e94) ||
+            (*(uint32_t *)(param_3 + 0x10) & 0x7f800000) == 0x7f800000 ||
+            !(*(float *)(param_3 + 0x10) >= *(float *)0x266e98) ||
+            !(*(float *)(param_3 + 0x10) <= *(float *)0x266e94) ||
+            (*(uint32_t *)(param_3 + 0x14) & 0x7f800000) == 0x7f800000 ||
+            !(*(float *)(param_3 + 0x14) >= *(float *)0x266e98) ||
+            !(*(float *)(param_3 + 0x14) <= *(float *)0x266e94) ||
+            (*(uint32_t *)(param_3 + 0x18) & 0x7f800000) == 0x7f800000 ||
+            !(*(float *)(param_3 + 0x18) >= *(float *)0x266e98) ||
+            !(*(float *)(param_3 + 0x18) <= *(float *)0x266e94) ||
+            !real_vector3d_valid((float *)(param_3 + 0x3c)) ||
+            (*(uint32_t *)(param_3 + 0x1c) & 0x7f800000) == 0x7f800000 ||
+            !(*(float *)(param_3 + 0x1c) >= *(float *)0x2533c0) ||
+            !(*(float *)(param_3 + 0x1c) <= *(float *)0x266e94) ||
+            (*(uint32_t *)(param_3 + 0x20) & 0x7f800000) == 0x7f800000 ||
+            !(*(float *)(param_3 + 0x20) >= *(float *)0x255ef8) ||
+            !(*(float *)(param_3 + 0x20) <= *(float *)0x2568bc) ||
+            (*(uint32_t *)(param_3 + 0x48) & 0x7f800000) == 0x7f800000 ||
+            !(*(float *)(param_3 + 0x48) >= *(float *)0x2533c0) ||
+            !(*(float *)(param_3 + 0x48) <= *(float *)0x266e90)) {
+          uVar6 = (int)csprintf(
+            (char *)0x5ab100,
+            "Invalid camera command.\nF: (%f, %f, %f) U: (%f, %f, %f)\nP: (%f, "
+            "%f, %f) O: (%f, %f, %f)\nD: %f V: (%f, %f, %f), FOV: %f, T: %f, "
+            "FL: %ld",
+            (double)*(float *)(param_3 + 0x24),
+            (double)*(float *)(param_3 + 0x28),
+            (double)*(float *)(param_3 + 0x2c),
+            (double)*(float *)(param_3 + 0x30),
+            (double)*(float *)(param_3 + 0x34),
+            (double)*(float *)(param_3 + 0x38),
+            (double)*(float *)(param_3 + 4),
+            (double)*(float *)(param_3 + 8),
+            (double)*(float *)(param_3 + 0xc),
+            (double)*(float *)(param_3 + 0x10),
+            (double)*(float *)(param_3 + 0x14),
+            (double)*(float *)(param_3 + 0x18),
+            (double)*(float *)(param_3 + 0x1c),
+            (double)*(float *)(param_3 + 0x3c),
+            (double)*(float *)(param_3 + 0x40),
+            (double)*(float *)(param_3 + 0x44),
+            (double)*(float *)(param_3 + 0x20),
+            (double)*(float *)(param_3 + 0x48), *(int *)param_3);
+          display_assert((const char *)uVar6,
+                         "c:\\halo\\SOURCE\\camera\\bored_camera.c", 0x5f, 1);
+          CALL_thunk_FUN_001029a0(-1);
         }
-        uVar6 = (int)csprintf(
-          (char *)0x5ab100,
-          "Invalid camera command.\nF: (%f, %f, %f) U: (%f, %f, %f)\nP: (%f, "
-          "%f, %f) O: (%f, %f, %f)\nD: %f V: (%f, %f, %f), FOV: %f, T: %f, FL: "
-          "%ld",
-          (double)*(float *)(param_3 + 9), (double)*(float *)(param_3 + 0xa),
-          (double)*(float *)(param_3 + 0xb), (double)*(float *)(param_3 + 0xc),
-          (double)*(float *)(param_3 + 0xd), (double)*(float *)(param_3 + 0xe),
-          (double)*(float *)(param_3 + 1), (double)*(float *)(param_3 + 2),
-          (double)*(float *)(param_3 + 3), (double)*(float *)(param_3 + 4),
-          (double)*(float *)(param_3 + 5), (double)*(float *)(param_3 + 6),
-          (double)*(float *)(param_3 + 7), (double)*(float *)(param_3 + 0xf),
-          (double)*(float *)(param_3 + 0x10),
-          (double)*(float *)(param_3 + 0x11), (double)*(float *)(param_3 + 8),
-          (double)*(float *)(param_3 + 0x12), *(int *)param_3);
-        display_assert((const char *)uVar6,
-                       "c:\\halo\\SOURCE\\camera\\bored_camera.c", 0x5f, 1);
-        CALL_thunk_FUN_001029a0(-1);
       }
     }
   }
@@ -511,7 +514,7 @@ void FUN_00085280(float *position, float *forward, float *up, float speed,
   *(int *)0x2ee5c4 = *(int *)up;
   *(int *)0x2ee5c8 = *(int *)(up + 1);
   *(int *)0x2ee5cc = *(int *)(up + 2);
-  if (speed != *(float *)0x2533c0) {
+  if (speed != *(const float *)0x2533c0) {
     *(float *)0x2ee5d0 = speed;
   } else {
     *(int *)0x2ee5d0 = 0x3f9c61aa;
@@ -622,26 +625,21 @@ void FUN_000853c0(int param_1, unsigned short *param_2, unsigned int *param_3)
     *(float *)(param_3 + 0xc) = *(float *)0x2ee5c4;
     *(float *)(param_3 + 0xd) = *(float *)0x2ee5c8;
     *(float *)(param_3 + 0xe) = *(float *)0x2ee5cc;
-    if (*(int *)0x2ee5d4 == -1) {
-      *(float *)(param_3 + 1) = *(float *)0x2ee5ac;
-      *(float *)(param_3 + 2) = *(float *)0x2ee5b0;
-      *(float *)(param_3 + 3) = *(float *)0x2ee5b4;
-      *param_3 = *param_3 | 1;
-    } else {
+    if (*(int *)0x2ee5d4 != -1) {
       fVar13 = (float)atan2((double)*(float *)(param_3 + 10), (double)*pfVar1);
-      fVar4 = *(float *)0x2ee5ac * *pfVar1 +
-              *(float *)0x2ee5b0 * *(float *)(param_3 + 10) +
-              *(float *)0x2ee5b4 * *(float *)(param_3 + 0xb);
-      if (*(float *)0x2533c0 < fVar4) {
+      fVar4 = *(float *)0x2ee5b4 * pfVar1[2] +
+              *(float *)0x2ee5b0 * pfVar1[1] +
+              *(float *)0x2ee5ac * pfVar1[0];
+      if (fVar4 > *(float *)0x2533c0) {
         fVar4 = *(float *)0x2533c0;
       }
       *(float *)(param_3 + 7) = -fVar4;
       *(float *)(param_3 + 1) = *(float *)&uVar12;
       *(float *)(param_3 + 2) = *(float *)&uVar11;
       *(float *)(param_3 + 3) = *(float *)&local_c;
-      local_14 = *(float *)0x2ee5ac - fVar4 * *pfVar1;
-      local_10 = *(float *)0x2ee5b0 - fVar4 * *(float *)(param_3 + 10);
-      fVar4 = *(float *)0x2ee5b4 - fVar4 * *(float *)(param_3 + 0xb);
+      local_14 = *(float *)0x2ee5ac - fVar4 * pfVar1[0];
+      local_10 = *(float *)0x2ee5b0 - fVar4 * pfVar1[1];
+      fVar4 = *(float *)0x2ee5b4 - fVar4 * pfVar1[2];
       param_3[0x15] = 0;
       *(unsigned char *)(param_3 + 0x13) = 1;
 #if defined(_MSC_VER) && !defined(__clang__)
@@ -655,9 +653,14 @@ void FUN_000853c0(int param_1, unsigned short *param_2, unsigned int *param_3)
 #else
       fVar13 = x87_fcos(fVar13);
 #endif
-      *(float *)(param_3 + 4) = fVar14 * local_10 + local_14 * fVar13;
-      *(float *)(param_3 + 5) = fVar14 * local_14 - fVar13 * local_10;
+      *(float *)(param_3 + 4) = local_14 * fVar13 + local_10 * fVar14;
+      *(float *)(param_3 + 5) = local_14 * fVar14 - local_10 * fVar13;
       *(float *)(param_3 + 6) = fVar4;
+    } else {
+      *(float *)(param_3 + 1) = *(float *)0x2ee5ac;
+      *(float *)(param_3 + 2) = *(float *)0x2ee5b0;
+      *(float *)(param_3 + 3) = *(float *)0x2ee5b4;
+      *param_3 = *param_3 | 1;
     }
     break;
   case 1:
@@ -706,8 +709,10 @@ void FUN_000853c0(int param_1, unsigned short *param_2, unsigned int *param_3)
     }
     break;
   }
-  *(float *)0x2ee5a8 = *(float *)0x2ee5a8 - local_8 * *(float *)(param_2 + 2);
-  if (*(float *)0x2ee5a8 < *(float *)0x2533c0) {
+  fVar4 = *(float *)0x2ee5a8 - local_8 * *(float *)(param_2 + 2);
+  if (0.0f <= fVar4) {
+    *(float *)0x2ee5a8 = fVar4;
+  } else {
     *(float *)0x2ee5a8 = 0.0f;
   }
   *(char *)0x2ee5a1 = 0;
@@ -831,19 +836,20 @@ int FUN_0009ec30(int param_1, int param_2, int param_3, short param_4,
   int iVar3;
   char *iVar4;
   short fpw_index;
+  int violent_flag;
 
   if (param_3 == -1) {
     display_assert("object_index!=NONE", "c:\\halo\\SOURCE\\effects\\effects.c",
                    0x131, 1);
     system_exit(-1);
   }
-  if (param_5 < 0.0f || param_5 > 1.0f) {
+  if (!(param_5 >= 0.0f && param_5 <= 1.0f)) {
     csprintf((char *)0x5ab100, "scale_a %f not in [0,1]", (double)param_5);
     display_assert((char *)0x5ab100, "c:\\halo\\SOURCE\\effects\\effects.c",
                    0x132, 1);
     system_exit(-1);
   }
-  if (param_6 < 0.0f || param_6 > 1.0f) {
+  if (!(param_6 >= 0.0f && param_6 <= 1.0f)) {
     csprintf((char *)0x5ab100, "scale_b %f not in [0,1]", (double)param_6);
     display_assert((char *)0x5ab100, "c:\\halo\\SOURCE\\effects\\effects.c",
                    0x133, 1);
@@ -858,9 +864,10 @@ int FUN_0009ec30(int param_1, int param_2, int param_3, short param_4,
     fpw_index = (short)first_person_weapon_get_local_index(param_3);
     *(short *)(iVar4 + 0x4c) = fpw_index;
 
+    violent_flag = 0x40;
     if (*(char *)0x2eebe0 != '\0') {
       if (FUN_0009c700(*(int *)(iVar4 + 0x3c))) {
-        *(unsigned short *)(iVar4 + 2) = *(unsigned short *)(iVar4 + 2) | 0x40;
+        *(unsigned short *)(iVar4 + 2) |= (short)violent_flag;
       }
     }
 
@@ -877,7 +884,7 @@ int FUN_0009ec30(int param_1, int param_2, int param_3, short param_4,
         object_name = tag_name_strip_path(tag_get_name(*obj_data));
       }
 
-      if (*(unsigned char *)(iVar4 + 2) & 0x40) {
+      if (*(unsigned short *)(iVar4 + 2) & violent_flag) {
         violent_str = "non";
       } else {
         violent_str = "";
@@ -1158,17 +1165,10 @@ int FUN_000ae250(int param_1)
     return (int)(*(unsigned int *)(iVar4 + 0x20) == (unsigned int)bVar7);
   }
   puVar5 = FUN_000abf50(buf, param_1);
-  puVar6 = buf;
-  for (iVar2 = 7; iVar2 != 0; iVar2 = iVar2 + -1) {
-    *puVar6 = *puVar5;
-    puVar5 = puVar5 + 1;
-    puVar6 = puVar6 + 1;
+  qmemcpy(buf, puVar5, sizeof(buf));
+  if (((uint32_t)buf[6] & 0x80000000) <= 0 || ((uint32_t)buf[6] & 0x7fffffff) != 0) {
+    return (int)(((unsigned int)buf[6] & 0x7fffffff) == 0);
   }
-  if ((unsigned int)buf[6] & 0x80000000) {
-    if (!((unsigned int)buf[6] & 0x7fffffff))
-      goto done_minus1;
-  }
-  return (int)(((unsigned int)buf[6] & 0x7fffffff) == 0);
 done_minus1:
   return (int)0xffffffff;
 }
@@ -2048,30 +2048,20 @@ void FUN_00134e80(int object_handle, int light_volume_datum)
       if (!(dot_to_marker >= *(float *)0x2533c0))
         dot_to_marker = -dot_to_marker;
 
-      blend = 0.0f; /* function-value scratch */
-      depth_factor = 0.0f;
+      blend = 1.0f; /* function-value scratch */
+      depth_factor = 1.0f;
       if (*(float *)(light_tag + 0x38) > *(float *)0x2533c0) {
         t = ((cam_z * *(float *)0x506564 + cam_y * *(float *)0x506560 +
               *(float *)0x50655c * cam_x) -
              *(float *)(light_tag + 0x38)) /
             (*(float *)(light_tag + 0x34) - *(float *)(light_tag + 0x38));
-        /* clamp t to [0,1] kept x87-resident; (t >= 0) outer, (t <= 1) inner
-         * matches the reference's fcoms/test pattern. */
-        depth_factor =
-          (t >= *(float *)0x2533c0) ?
-            ((!(t > *(float *)0x2533c8)) ? t : *(float *)0x2533c8) :
-            *(float *)0x2533c0;
+        depth_factor = (t < 0.0f) ? 0.0f : ((t > 1.0f) ? 1.0f : t);
       }
 
       intensity =
         dot_to_marker * *(float *)(light_tag + 0x40) +
         (*(float *)0x2533c8 - dot_to_marker) * *(float *)(light_tag + 0x3c);
-      /* clamp intensity to [0,1] x87-resident; (intensity >= 0) outer,
-       * (intensity <= 1) inner mirrors reference fcoms/test $0x5/$0x41. */
-      scratch = (intensity >= *(float *)0x2533c0) ?
-                  ((!(intensity > *(float *)0x2533c8)) ? intensity :
-                                                         *(float *)0x2533c8) :
-                  *(float *)0x2533c0;
+      scratch = (intensity < 0.0f) ? 0.0f : ((intensity > 1.0f) ? 1.0f : intensity);
       depth_factor = scratch * depth_factor;
 
       zfn = object_get_function_value(
@@ -2708,22 +2698,22 @@ void FUN_00135510(int *param_1, int param_2, int param_3, int *param_4)
                     maxz = cur->position[2];
                     minz = cur->position[2];
                   } else {
-                    if (cur->position[0] <= minx) {
+                    if (cur->position[0] < minx) {
                       minx = cur->position[0];
                     }
-                    if (cur->position[1] <= miny) {
+                    if (cur->position[1] < miny) {
                       miny = cur->position[1];
                     }
-                    if (cur->position[2] <= minz) {
+                    if (cur->position[2] < minz) {
                       minz = cur->position[2];
                     }
-                    if (maxx < cur->position[0]) {
+                    if (cur->position[0] > maxx) {
                       maxx = cur->position[0];
                     }
-                    if (maxy < cur->position[1]) {
+                    if (cur->position[1] > maxy) {
                       maxy = cur->position[1];
                     }
-                    if (maxz < cur->position[2]) {
+                    if (cur->position[2] > maxz) {
                       maxz = cur->position[2];
                     }
                   }
@@ -3879,12 +3869,12 @@ void FUN_0013a340(int param_1, float *param_2, float *param_3)
     return;
   }
   if (*(float *)(L + 0x14) < 1.5707964f) {
-    if (0.7853982f <= *(float *)(L + 0x14)) {
-      param_3[0] = v * *(float *)(L + 0x28);
-      v = v * *(float *)(L + 0x20);
-    } else {
+    if (*(float *)(L + 0x14) < 0.7853982f) {
       v = v / *(float *)(L + 0x20);
       param_3[0] = v;
+    } else {
+      param_3[0] = v * *(float *)(L + 0x28);
+      v = v * *(float *)(L + 0x20);
     }
     param_2[0] = v * *(float *)(e + 0x3c) + *(float *)(e + 0x30);
     param_2[1] = v * *(float *)(e + 0x40) + *(float *)(e + 0x34);
@@ -4914,7 +4904,7 @@ void FUN_0013b380(void)
         iVar6 = (int)object_get_and_verify_type(uVar11, -1);
         if ((1 << (*(unsigned char *)(iVar6 + 100) & 0x1f) & 3u) != 0) {
           iVar6 = (int)object_get_and_verify_type(uVar11, 3);
-          if (*(float *)0x2533c0 < *(float *)(iVar6 + 0x32c)) {
+          if (*(float *)(iVar6 + 0x32c) > *(float *)0x2533c0) {
             pbVar12 = (unsigned char *)tag_get(0x6c696768, *(int *)(iVar5 + 4));
             if ((*pbVar12 & 0x20) == 0) {
               local_c = *(float *)0x2533c8 - *(float *)(iVar6 + 0x32c);
@@ -6434,36 +6424,36 @@ after_create:
                             (double)frame.matrix[0]);
       display_assert((const char *)uVar5,
                      "c:\\halo\\SOURCE\\objects\\object_types.c", 0x3cf, 1);
-      CALL_thunk_FUN_001029a0(-1);
+      system_exit(-1);
     }
-    cVar2 = CALL_FUN_00021fb0(&frame.matrix[1]);
+    cVar2 = valid_real_normal3d(&frame.matrix[1]);
     if (cVar2 == '\0') {
       uVar5 =
         (int)csprintf((char *)0x5ab100, "forward is not a valid normal3d");
       display_assert((const char *)uVar5,
                      "c:\\halo\\SOURCE\\objects\\object_types.c", 0x3cf, 1);
-      CALL_thunk_FUN_001029a0(-1);
+      system_exit(-1);
     }
-    cVar2 = CALL_FUN_00021fb0(&frame.matrix[4]);
+    cVar2 = valid_real_normal3d(&frame.matrix[4]);
     if (cVar2 == '\0') {
       uVar5 = (int)csprintf((char *)0x5ab100, "left is not a valid normal3d");
       display_assert((const char *)uVar5,
                      "c:\\halo\\SOURCE\\objects\\object_types.c", 0x3cf, 1);
-      CALL_thunk_FUN_001029a0(-1);
+      system_exit(-1);
     }
-    cVar2 = CALL_FUN_00021fb0(&frame.matrix[7]);
+    cVar2 = valid_real_normal3d(&frame.matrix[7]);
     if (cVar2 == '\0') {
       uVar5 = (int)csprintf((char *)0x5ab100, "up is not a valid normal3d");
       display_assert((const char *)uVar5,
                      "c:\\halo\\SOURCE\\objects\\object_types.c", 0x3cf, 1);
-      CALL_thunk_FUN_001029a0(-1);
+      system_exit(-1);
     }
-    cVar2 = CALL_FUN_000a16b0(&frame.matrix[10]);
+    cVar2 = valid_real_point3d(&frame.matrix[10]);
     if (cVar2 == '\0') {
       uVar5 = (int)csprintf((char *)0x5ab100, "position is not valid");
       display_assert((const char *)uVar5,
                      "c:\\halo\\SOURCE\\objects\\object_types.c", 0x3cf, 1);
-      CALL_thunk_FUN_001029a0(-1);
+      system_exit(-1);
     }
     fVar1 = frame.matrix[6] * frame.matrix[3] +
             frame.matrix[5] * frame.matrix[2] +
@@ -6478,7 +6468,7 @@ after_create:
         (double)frame.matrix[5], (double)frame.matrix[6]);
       display_assert((const char *)0x5ab100,
                      "c:\\halo\\SOURCE\\objects\\object_types.c", 0x3cf, 1);
-      CALL_thunk_FUN_001029a0(-1);
+      system_exit(-1);
     }
     fVar1 = frame.matrix[9] * frame.matrix[6] +
             frame.matrix[8] * frame.matrix[5] +
@@ -6492,7 +6482,7 @@ after_create:
                (double)frame.matrix[5], (double)frame.matrix[6]);
       display_assert((const char *)0x5ab100,
                      "c:\\halo\\SOURCE\\objects\\object_types.c", 0x3cf, 1);
-      CALL_thunk_FUN_001029a0(-1);
+      system_exit(-1);
     }
     fVar1 = frame.matrix[9] * frame.matrix[3] +
             frame.matrix[8] * frame.matrix[2] +
@@ -6506,14 +6496,14 @@ after_create:
                (double)frame.matrix[8], (double)frame.matrix[9]);
       display_assert((const char *)0x5ab100,
                      "c:\\halo\\SOURCE\\objects\\object_types.c", 0x3cf, 1);
-      CALL_thunk_FUN_001029a0(-1);
+      system_exit(-1);
     }
-    cVar2 = CALL_FUN_000f6d00_1(frame.matrix);
+    cVar2 = valid_real_matrix4x3(frame.matrix);
     if (cVar2 == '\0') {
       uVar5 = (int)csprintf((char *)0x5ab100, "matrix is not valid");
       display_assert((const char *)uVar5,
                      "c:\\halo\\SOURCE\\objects\\object_types.c", 0x3cf, 1);
-      CALL_thunk_FUN_001029a0(-1);
+      system_exit(-1);
     }
   }
   iVar6 = (int)tag_get(0x6f626a65, *puVar4);
@@ -12471,17 +12461,18 @@ void object_render_debug(int param_1)
       float scale_val;
       sphere_color = *(void **)0x2ee6cc;
       if (*(float *)((char *)obj + 0x5c) <= 0.0f) {
-        int datum_body;
         sphere_color = *(void **)0x2ee6d0;
+      } else {
+        int datum_body;
         datum_body = (int)datum_get(*(data_t **)0x5a8d50, param_1);
         if (*(unsigned char *)(datum_body + 2) & 1) {
           sphere_color = *(void **)0x2ee6e0;
         }
       }
-      if (*(float *)((char *)obj + 0x5c) <= 0.0f) {
-        scale_val = 1.0f;
-      } else {
+      if (*(float *)((char *)obj + 0x5c) > 0.0f) {
         scale_val = *(float *)((char *)obj + 0x5c);
+      } else {
+        scale_val = 1.0f;
       }
       FUN_00189540(1, (char *)obj + 0x50, scale_val, sphere_color);
       tag_data = (char *)tag_get(0x6f626a65, *obj);
