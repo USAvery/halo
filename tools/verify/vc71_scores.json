@@ -25258,6 +25258,21 @@
       "score": 77.6,
       "source": "src/halo/interface/first_person_weapons.c"
     },
+    "FUN_000dedf0": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 86.9,
+      "addr": "0xdedf0",
+      "end": "0xdefac",
+      "kind": "auto",
+      "n_r": 140,
+      "opnd_percent": 70.1,
+      "raw_mnemonic_pct": 86.9,
+      "ref": "synth",
+      "ref_sha": "e5e8ca4d64c15659",
+      "score": 86.9,
+      "source": "src/halo/interface/interface.c"
+    },
     "FUN_000e02d0": {
       "abi_model": "raw",
       "abi_model_items": 0,

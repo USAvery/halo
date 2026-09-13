@@ -104,6 +104,71 @@ void interface_draw_text(int font_index, int style, int justify, int flags,
   draw_string_set_font(tag_index, style, justify, flags, color);
 }
 
+/* 0xdedf0
+ * Resolve the HUD element to draw for the local player's current weapon.
+ * Returns a tag_index-like value read from the weapon definition (+0x48c),
+ * or the hud_globals fallback (+0x2cc) when the unit carries no weapons,
+ * or NONE (-1). *out_value receives the unit field at +0x2f8 (0 when the
+ * weapon came from the parent/seat path). Field meanings unproven. */
+int FUN_000dedf0(int32_t *out_value)
+{
+  char *player;
+  char *unit;
+  char *object;
+  char *tag;
+  unsigned char *element;
+  int player_index;
+  int weapon_handle;
+  int16_t perspective;
+  int result;
+  int32_t value;
+
+  player_index = local_player_get_player_index(*(int16_t *)0x506548);
+  result = -1;
+  value = 0;
+  if (player_index != -1) {
+    player = (char *)datum_get(player_data, player_index);
+    perspective = director_get_perspective(*(int16_t *)0x506548);
+    if (*(char **)0x46bd10 != 0 && **(char **)0x46bd10 != 0 &&
+        perspective != 3 && perspective != 2 && *(int *)(player + 0x34) != -1) {
+      unit = (char *)object_get_and_verify_type(*(int *)(player + 0x34), 3);
+      weapon_handle =
+        unit_get_weapon(*(int *)(player + 0x34), *(int16_t *)(unit + 0x2a2));
+      if (weapon_handle != -1) {
+        object = (char *)object_get_and_verify_type(*(int *)(player + 0x34), 3);
+        value = *(int32_t *)(object + 0x2f8);
+      } else {
+        unit = (char *)object_get_and_verify_type(*(int *)(player + 0x34), 3);
+        if (*(int *)(unit + 0xcc) == -1 || *(int16_t *)(unit + 0x2a0) == -1)
+          goto done;
+        object = (char *)object_get_and_verify_type(*(int *)(unit + 0xcc), 3);
+        tag = (char *)tag_get(0x756e6974, *(int *)object);
+        element = (unsigned char *)tag_block_get_element(
+          tag + 0x2e4, (int)*(int16_t *)(unit + 0x2a0), 0x11c);
+        if ((*element & 8) == 0)
+          goto done;
+        object = (char *)object_get_and_verify_type(*(int *)(unit + 0xcc), 3);
+        weapon_handle =
+          unit_get_weapon(*(int *)(unit + 0xcc), *(int16_t *)(object + 0x2a2));
+      }
+      if (weapon_handle != -1) {
+        object = (char *)object_get_and_verify_type(weapon_handle, 4);
+        tag = (char *)tag_get(0x77656170, *(int *)object);
+        if (*(int *)(tag + 0x48c) != -1) {
+          result = *(int *)(tag + 0x48c);
+          *out_value = value;
+          return result;
+        }
+        if (unit_count_weapons(*(int *)(player + 0x34)) == 0)
+          result = *(int32_t *)((char *)hud_globals + 0x2cc);
+      }
+    }
+  }
+done:
+  *out_value = value;
+  return result;
+}
+
 /* 0xdf350 */
 void profile_graph_toggle(const char *value_name)
 {

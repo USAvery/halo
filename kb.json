@@ -13632,7 +13632,8 @@
     },
     {
      "addr": "0xdedf0",
-     "decl": "void FUN_000dedf0(void);"
+     "decl": "int FUN_000dedf0(int32_t *out_value);",
+     "ported": true
     },
     {
      "addr": "0xdefb0",
