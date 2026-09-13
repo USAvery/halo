@@ -53,7 +53,9 @@ jobs:
           test -f ci/snapshot.json
 
       - name: Build
-        run: ${{ env.VENV_PYTHON }} tools/build/build.py -q --target halo
+        run: |
+          cmake -Bbuild -S. -DCMAKE_TOOLCHAIN_FILE=toolchains/llvm.cmake
+          ${{ env.VENV_PYTHON }} tools/build/build.py -q --target halo
         timeout-minutes: 20
 
       - name: Run snapshot verification

@@ -75,7 +75,9 @@ jobs:
           test -f delinked/game_state.obj
 
       - name: Build PR candidate
-        run: ${{ env.VENV_PYTHON }} tools/build/build.py -q --target halo
+        run: |
+          cmake -Bbuild -S. -DCMAKE_TOOLCHAIN_FILE=toolchains/llvm.cmake
+          ${{ env.VENV_PYTHON }} tools/build/build.py -q --target halo
         timeout-minutes: 20
 
       # State the mode in the summary. A green check that silently covered a
