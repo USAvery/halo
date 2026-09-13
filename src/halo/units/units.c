@@ -112,6 +112,7 @@ char *FUN_0008dc30(char *destination, const char *source)
   const char *source_cursor;
   char *destination_cursor;
   unsigned int source_size;
+  char c;
 
   if (destination == NULL || source == NULL) {
     display_assert("s1 && s2", "c:\\halo\\SOURCE\\cseries\\cseries.c", 0x122,
@@ -120,33 +121,17 @@ char *FUN_0008dc30(char *destination, const char *source)
   }
 
   source_cursor = source;
-  while (*source_cursor != '\0') {
-    source_cursor += 1;
-  }
-  source_size = (unsigned int)(source_cursor - source) + 1;
+  do {
+    c = *source_cursor++;
+  } while (c != '\0');
+  source_size = (unsigned int)(source_cursor - source);
 
   destination_cursor = destination - 1;
   do {
     destination_cursor += 1;
   } while (*destination_cursor != '\0');
 
-  {
-    unsigned int i;
-    for (i = source_size >> 2; i != 0; i -= 1) {
-      *(uint32_t *)destination_cursor = *(const uint32_t *)source;
-      source += 4;
-      destination_cursor += 4;
-    }
-  }
-
-  {
-    unsigned int i;
-    for (i = source_size & 3; i != 0; i -= 1) {
-      *destination_cursor = *source;
-      source += 1;
-      destination_cursor += 1;
-    }
-  }
+  memcpy(destination_cursor, source, source_size);
 
   return destination;
 }
@@ -4570,9 +4555,12 @@ void unit_set_possessed(int unit_handle, char possessed)
 /* Check if a unit is in a vehicle seat based on seat state byte at +0x253. */
 bool unit_is_busy(int unit_handle)
 {
-  char *unit = (char *)object_get_and_verify_type(unit_handle, 3);
-  int seat_state = *(signed char *)(unit + 0x253);
-  switch (seat_state) {
+  char *unit;
+  bool is_busy;
+
+  unit = (char *)object_get_and_verify_type(unit_handle, 3);
+  is_busy = false;
+  switch (*(signed char *)(unit + 0x253)) {
   case 0x17:
   case 0x18:
   case 0x19:
@@ -4587,10 +4575,10 @@ bool unit_is_busy(int unit_handle)
   case 0x23:
   case 0x27:
   case 0x29:
-    return true;
-  default:
-    return false;
+    is_busy = true;
+    break;
   }
+  return is_busy;
 }
 
 /* unit_scripting_set_emotion_animation (0x1a9b30)
@@ -5260,12 +5248,13 @@ void unit_set_desired_flashlight_state(int unit_handle, char desired)
 char unit_get_current_flashlight_state(int unit_handle)
 {
   char *unit;
+  char state = 0;
 
   if (unit_handle != -1) {
     unit = (char *)object_get_and_verify_type(unit_handle, 3);
-    return (*(uint32_t *)(unit + 0x1b4) >> 0x13) & 1;
+    state = (char)((*(uint32_t *)(unit + 0x1b4) >> 0x13) & 1);
   }
-  return 0;
+  return state;
 }
 
 /* unit_detach_from_parent (0x1aa5c0)
@@ -5336,26 +5325,21 @@ void unit_detach_from_parent(int object_handle)
   object_compute_node_matrices(object_handle);
 }
 
-/* unit_seat_filled (0x1aa700)
- * Returns true if any unit is sitting in the specified seat. */
 char unit_seat_filled(int unit_handle, int16_t seat_index)
 {
   char *i1;
   char l_14[16];
+  char result = 0;
 
   object_iterator_new(l_14, 3, 0);
-  i1 = (char *)object_iterator_next(l_14);
-  while (1) {
-    if (i1 == NULL) {
-      return 0;
-    }
+  for (i1 = (char *)object_iterator_next(l_14); i1 != NULL;
+       i1 = (char *)object_iterator_next(l_14)) {
     if (*(int *)(i1 + 0xcc) == unit_handle &&
         *(int16_t *)(i1 + 0x2a0) == seat_index) {
-      break;
+      return 1;
     }
-    i1 = (char *)object_iterator_next(l_14);
   }
-  return 1;
+  return result;
 }
 
 /* unit_seat_is_driver (0x1aa770)
@@ -5866,17 +5850,17 @@ int16_t unit_get_grenade_count(int unit_handle, int16_t grenade_type)
 
   unit = (char *)object_get_and_verify_type(unit_handle, 3);
 
-  if (grenade_type == -1)
-    return 0;
-
-  if ((grenade_type < 0) || (grenade_type > 1)) {
-    display_assert("grenade_type==NONE || (grenade_type>=0 && "
-                   "grenade_type<NUMBER_OF_UNIT_GRENADE_TYPES)",
-                   "c:\\halo\\SOURCE\\units\\units.c", 0x1ea7, 1);
-    system_exit(-1);
+  if (grenade_type != -1) {
+    if (grenade_type < 0 || grenade_type >= 2) {
+      display_assert("grenade_type==NONE || (grenade_type>=0 && "
+                     "grenade_type<NUMBER_OF_UNIT_GRENADE_TYPES)",
+                     "c:\\halo\\SOURCE\\units\\units.c", 0x1ea7, 1);
+      system_exit(-1);
+    }
+    return (int16_t)unit[grenade_type + 0x2ce];
   }
 
-  return (int16_t)unit[grenade_type + 0x2ce];
+  return 0;
 }
 
 /* unit_get_current_grenade_type (0x1aaee0)
@@ -6577,8 +6561,8 @@ void unit_drop_grenades_on_death(int unit_handle)
 {
   char *unit;
   char *grenade_count_ptr;
+  int count;
   int grenade_type;
-  int globals;
   int grenade_tag;
   int new_handle;
   char placement[136];
@@ -6586,15 +6570,12 @@ void unit_drop_grenades_on_death(int unit_handle)
   unit = (char *)object_get_and_verify_type(unit_handle, 3);
   grenade_count_ptr = unit + 0x2ce;
 
-  /* The binary uses a negative-offset trick to compute the grenade type index:
-   * ESI = 0xFFFFFD32 - unit_addr; index = ESI + grenade_count_ptr
-   * Since 0xFFFFFD32 + 0x2CE = 0 (mod 2^32), this yields index = type (0 or 1).
-   * We compute the type directly. */
-  for (grenade_type = 0; grenade_type < NUMBER_OF_UNIT_GRENADE_TYPES;
-       grenade_type++) {
-    globals = (int)game_globals_get();
+  count = 2;
+  do {
+    grenade_type = (int)(grenade_count_ptr - (unit + 0x2ce));
     grenade_tag =
-      (int)tag_block_get_element((void *)(globals + 0x128), grenade_type, 0x44);
+      (int)tag_block_get_element((void *)((char *)game_globals_get() + 0x128),
+                                 grenade_type, 0x44);
 
     while (*grenade_count_ptr > 0) {
       object_placement_data_new(placement, *(int *)(grenade_tag + 0x30),
@@ -6604,10 +6585,11 @@ void unit_drop_grenades_on_death(int unit_handle)
         object_disconnect_from_map(new_handle);
         unit_detach_weapon(unit_handle, new_handle);
       }
-      *grenade_count_ptr = *grenade_count_ptr - 1;
+      (*grenade_count_ptr)--;
     }
     grenade_count_ptr++;
-  }
+    count--;
+  } while (count != 0);
 }
 
 /* unit_drop_weapons_on_death (0x1abbd0)
@@ -8760,10 +8742,12 @@ bool unit_current_weapon_is_busy(int unit_handle)
  * Attempts to set the unit's seat via animation lookup. */
 char unit_set_seat(int unit_handle, int seat_name)
 {
-  /* `!!` triggers VC71's branchless neg/sbb/neg bool-normalize (matching the
-   * original at 0x1ae1f8) rather than a test/setne branch. Runtime-identical.
-   */
-  return (char)!!unit_set_or_test_seat_and_weapon_label(unit_handle, (const char *)seat_name, 0, 1);
+  char result = false;
+
+  if (unit_set_or_test_seat_and_weapon_label(unit_handle, (const char *)seat_name, 0, 1)) {
+    result = true;
+  }
+  return result;
 }
 
 /* units_set_desired_flashlight_state (0x1ae210)
@@ -9161,39 +9145,38 @@ int16_t unit_next_weapon_index(int unit_handle, int16_t weapon_index,
  */
 bool unit_set_in_vehicle(int unit_handle, bool flag)
 {
-  unit_data_t *unit;
+  char *unit;
   int weapon_handle;
   int16_t new_index;
-  object_data_t *weapon_obj;
+  char *weapon_obj;
   int16_t cur_index;
 
-  unit = (unit_data_t *)object_get_and_verify_type(unit_handle, 3);
+  unit = (char *)object_get_and_verify_type(unit_handle, 3);
   tag_get(0x756e6974, *(int *)unit);
-  (void)object_get_and_verify_type(unit_handle, 3);
-  weapon_handle = unit_get_weapon(unit_handle, unit->unk_674);
-  new_index = unit_next_weapon_index(unit_handle, unit->unk_674, 1);
+  object_get_and_verify_type(unit_handle, 3);
+  weapon_handle = unit_get_weapon(unit_handle, *(int16_t *)(unit + 0x2a2));
+  new_index = unit_next_weapon_index(unit_handle, *(int16_t *)(unit + 0x2a2), 1);
 
   if (weapon_handle == -1)
     return false;
-  if (new_index == unit->unk_674 && !flag)
+  if (new_index == *(int16_t *)(unit + 0x2a2) && !flag)
     return false;
 
-  weapon_obj = (object_data_t *)object_get_and_verify_type(weapon_handle, -1);
-  if (weapon_obj->flags & 1)
+  weapon_obj = (char *)object_get_and_verify_type(weapon_handle, -1);
+  if (*(uint32_t *)(weapon_obj + 4) & 1)
     return false;
 
-  if (!((bool (*)(int, bool))0xfd360)(weapon_handle, flag))
+  if (!weapon_try_place(weapon_handle, flag))
     return false;
 
   first_person_weapon_message_from_unit(unit_handle, 0xd);
 
   unit_detach_weapon(unit_handle, weapon_handle);
 
-  cur_index = (int16_t)unit->unk_674;
-  unit->unk_680[cur_index].value = -1;
-  unit->unk_674 = (uint16_t)-1;
-  new_index = unit_next_weapon_index(unit_handle, -1, 0);
-  unit->unk_676 = (uint16_t)new_index;
+  cur_index = *(int16_t *)(unit + 0x2a2);
+  *(int *)(unit + (int)cur_index * 4 + 0x2a8) = -1;
+  *(int16_t *)(unit + 0x2a2) = -1;
+  *(int16_t *)(unit + 0x2a4) = unit_next_weapon_index(unit_handle, -1, 0);
 
   if (!weapon_can_be_fired(weapon_handle))
     object_delete(weapon_handle);
@@ -12367,12 +12350,7 @@ char unit_throw_grenade_begin(int unit_handle, float *alignment_vector)
  * unit handle from player_data, then calls unit_melee_attack_begin. */
 void scripting_magic_melee_attack(void)
 {
-  char *player;
-  int unit_handle;
-
-  player = (char *)datum_get(player_data, 0);
-  unit_handle = *(int *)(player + 0x34);
-  unit_melee_attack_begin(unit_handle, 0, 0);
+  unit_melee_attack_begin(*(int *)((char *)datum_get(player_data, 0) + 0x34), 0, 0);
 }
 
 /* unit_impact_melee_damage (0x1b2290) — apply melee damage at impact point.
@@ -13201,7 +13179,28 @@ void unit_died(int unit_handle, char param_2)
 
   unit = (char *)object_get_and_verify_type(unit_handle, 3);
 
-  if (param_2 == 0) {
+  if (param_2 != 0) {
+    /* Feign death */
+    if (*(int16_t *)(unit + 0x3d0) <= 0) {
+      display_assert("unit->unit.feign_death_timer > 0",
+                     "c:\\halo\\SOURCE\\units\\units.c", 0x13eb, true);
+      system_exit(-1);
+    }
+
+    unit_tag = (char *)tag_get(0x756e6974, *(int *)unit);
+
+    {
+      int *seed;
+      float rnd;
+      seed = get_global_random_seed_address();
+      rnd = random_math_real((unsigned int *)seed);
+      if (rnd < *(float *)(unit_tag + 0x248)) {
+        *(uint32_t *)(unit + 0x1b4) |= 0x2000;
+      } else {
+        *(uint32_t *)(unit + 0x1b4) &= ~0x2000u;
+      }
+    }
+  } else {
     /* Real death */
     *(int16_t *)(unit + 0x3d0) = 0;
     object_set_garbage_flag(unit_handle, 1);
@@ -13234,27 +13233,6 @@ void unit_died(int unit_handle, char param_2)
 
     /* Record time of death */
     *(int *)(unit + 0x3cc) = game_time_get();
-  } else {
-    /* Feign death */
-    if (*(int16_t *)(unit + 0x3d0) < 1) {
-      display_assert("unit->unit.feign_death_timer > 0",
-                     "c:\\halo\\SOURCE\\units\\units.c", 0x13eb, true);
-      system_exit(-1);
-    }
-
-    unit_tag = (char *)tag_get(0x756e6974, *(int *)unit);
-
-    {
-      int *seed;
-      float rnd;
-      seed = get_global_random_seed_address();
-      rnd = random_math_real((unsigned int *)seed);
-      if (rnd < *(float *)(unit_tag + 0x248)) {
-        *(uint32_t *)(unit + 0x1b4) |= 0x2000;
-      } else {
-        *(uint32_t *)(unit + 0x1b4) &= ~0x2000u;
-      }
-    }
   }
 
   /* Common death cleanup */
@@ -13280,10 +13258,10 @@ void unit_died(int unit_handle, char param_2)
 
   /* Detach from parent (vehicle seat exit) */
   if (*(int *)(unit + 0xcc) != -1) {
-    if (*(int16_t *)(unit + 0x2a0) == -1) {
-      unit_detach_from_parent(unit_handle);
-    } else {
+    if (*(int16_t *)(unit + 0x2a0) != -1) {
       unit_exit_seat_end(unit_handle);
+    } else {
+      unit_detach_from_parent(unit_handle);
     }
   }
 
