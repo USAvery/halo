@@ -28,6 +28,7 @@ on:
 env:
   VENV_PYTHON: /mnt/g/dev/halo/.venv/bin/python3
   DELINKED_DIR: /mnt/g/dev/halo/delinked
+  XBE_DIR: /mnt/g/dev/halo/halo-patched
   # Host-only CI snapshot (raw game memory - never committed).
   CI_DIR: /mnt/g/dev/halo/ci
 
@@ -41,8 +42,9 @@ jobs:
         run: |
           # delinked/ contains a few tracked reference objects. ln -sfn into
           # that directory creates delinked/delinked rather than replacing it.
-          rm -rf -- delinked ci
+          rm -rf -- delinked halo-patched ci
           ln -sfn ${{ env.DELINKED_DIR }} delinked
+          ln -sfn ${{ env.XBE_DIR }} halo-patched
           ln -sfn ${{ env.CI_DIR }} ci
 
       - name: Verify prerequisites
@@ -50,6 +52,7 @@ jobs:
           ${{ env.VENV_PYTHON }} -c "import unicorn, capstone; print('deps ok')"
           test -d delinked
           test -f delinked/game_state.obj
+          test -f halo-patched/cachebeta.xbe
           test -f ci/snapshot.json
 
       - name: Build
