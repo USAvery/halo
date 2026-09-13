@@ -30,6 +30,12 @@ if [ "$BRANCH" = "main" ]; then
             exec 9>/tmp/halo_retrieval_refresh.lock
             if flock -n 9; then
                 cd "$ROOT"
+                # A killed mid-write refresh (session teardown, tool timeout)
+                # leaves an unreplayable WAL that fails every future refresh
+                # at the extract stage until someone notices and moves it
+                # aside by hand (2026-08-17, 2026-09-02, 2026-09-12 outages).
+                # Auto-quarantine instead of wedging silently.
+                export RETRIEVAL_WAL_AUTORECOVER=1
                 echo "=== $(date -Is) post-commit refresh @ $(git rev-parse --short HEAD) ===" >>"$RLOG"
                 # Each stage names itself so a failure in the log is
                 # attributable; a failed chain must be LOUD.  Until 2026-09-02
