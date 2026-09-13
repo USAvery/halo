@@ -193,12 +193,16 @@ void FUN_00122a50(int animation, float frame_pos, float blend_weight,
   int temp_scale_b;
 
   weight_complement = *(float *)0x2533c8 - blend_weight;
-  frac = (float)x87_fmod(frame_pos, 1.0);
+#if defined(_MSC_VER) && !defined(__clang__)
+  frac = (float)fmod((double)frame_pos, *(const double *)0x2573d8);
+#else
+  frac = (float)x87_fmod(frame_pos, *(const double *)0x2573d8);
+#endif
   floor_val = (float)floor((double)frame_pos);
-  frame_idx_int = (int)floor_val;
+  frame_idx_int = x87_round_to_int(floor_val);
 
   if (frame_pos < *(float *)0x2533c0 ||
-      frame_pos > (float)(int)*(short *)(animation + 0x22)) {
+      (float)*(short *)(animation + 0x22) < frame_pos) {
     error(
       2,
       "### ERROR animation frame index out of bounds B(%f,%x) -- tell Bernie!!",
@@ -255,16 +259,16 @@ void FUN_00122a50(int animation, float frame_pos, float blend_weight,
                          interp_rot);
             rotation_counter = rotation_counter + 1;
           } else {
-            rot_a[0] = (float)(int)data[0] * *(float *)0x290dd8;
-            rot_a[1] = (float)(int)data[1] * *(float *)0x290dd8;
-            rot_a[2] = (float)(int)data[2] * *(float *)0x290dd8;
-            rot_a[3] = (float)(int)data[3] * *(float *)0x290dd8;
-            rot_b[0] = (float)(int)next_data[0] * *(float *)0x290dd8;
-            rot_b[1] = (float)(int)next_data[1] * *(float *)0x290dd8;
-            rot_b[2] = (float)(int)next_data[2] * *(float *)0x290dd8;
-            rot_b[3] = (float)(int)next_data[3] * *(float *)0x290dd8;
-            data = data + 4;
-            next_data = next_data + 4;
+            rot_a[0] = (float)data[0] * *(float *)0x290dd8;
+            rot_a[1] = (float)data[1] * *(float *)0x290dd8;
+            rot_a[2] = (float)data[2] * *(float *)0x290dd8;
+            rot_a[3] = (float)data[3] * *(float *)0x290dd8;
+            data += 4;
+            rot_b[0] = (float)next_data[0] * *(float *)0x290dd8;
+            rot_b[1] = (float)next_data[1] * *(float *)0x290dd8;
+            rot_b[2] = (float)next_data[2] * *(float *)0x290dd8;
+            rot_b[3] = (float)next_data[3] * *(float *)0x290dd8;
+            next_data += 4;
             quaternions_interpolate_and_normalize(rot_a, rot_b, frac,
                                                   interp_rot);
           }

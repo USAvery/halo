@@ -31201,16 +31201,16 @@
     "FUN_00122a50": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 82.4,
+      "abi_modeled_mnemonic_pct": 85.0,
       "addr": "0x122a50",
       "end": "0x122e44",
       "kind": "auto",
       "n_r": 348,
-      "opnd_percent": 70.9,
-      "raw_mnemonic_pct": 82.4,
+      "opnd_percent": 74.2,
+      "raw_mnemonic_pct": 85.0,
       "ref": "synth",
       "ref_sha": "cdb82d839205619d",
-      "score": 82.4,
+      "score": 85.0,
       "source": "src/halo/units/units.c"
     },
     "FUN_00122e50": {
@@ -33211,16 +33211,16 @@
     "FUN_00136f40": {
       "abi_model": "regparam_stripped_saves",
       "abi_model_items": 6,
-      "abi_modeled_mnemonic_pct": 79.4,
+      "abi_modeled_mnemonic_pct": 95.7,
       "addr": "0x136f40",
       "end": "0x137157",
       "kind": "auto",
       "n_r": 189,
-      "opnd_percent": 70.8,
-      "raw_mnemonic_pct": 78.1,
+      "opnd_percent": 85.1,
+      "raw_mnemonic_pct": 94.2,
       "ref": "synth",
       "ref_sha": "ee01601ad6f0cf89",
-      "score": 79.4,
+      "score": 95.7,
       "source": "src/halo/objects/damage.c"
     },
     "FUN_00137690": {
