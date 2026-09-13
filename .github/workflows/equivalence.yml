@@ -47,6 +47,9 @@ jobs:
 
       - name: Link local assets
         run: |
+          # delinked/ contains tracked reference objects, so replace the
+          # checkout directory rather than nesting a delinked/delinked link.
+          rm -rf -- delinked build
           ln -sf ${{ env.DELINKED_DIR }} delinked
           ln -sf ${{ env.BUILD_DIR }} build
 
@@ -85,6 +88,9 @@ jobs:
 
       - name: Link local assets
         run: |
+          # See the regression job: a directory target would otherwise create
+          # a nested symlink instead of exposing the host-only references.
+          rm -rf -- delinked build
           ln -sf ${{ env.DELINKED_DIR }} delinked
           ln -sf ${{ env.BUILD_DIR }} build
 

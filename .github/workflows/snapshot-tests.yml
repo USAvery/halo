@@ -40,6 +40,9 @@ jobs:
 
       - name: Link local assets
         run: |
+          # delinked/ contains a few tracked reference objects. ln -sfn into
+          # that directory creates delinked/delinked rather than replacing it.
+          rm -rf -- delinked build ci
           ln -sfn ${{ env.DELINKED_DIR }} delinked
           ln -sfn ${{ env.BUILD_DIR }} build
           ln -sfn ${{ env.CI_DIR }} ci
@@ -76,6 +79,10 @@ jobs:
       - name: Report results
         if: always()
         run: |
+          if [ ! -f artifacts/equivalence/ci_results.json ]; then
+            echo "Snapshot verification produced no results; see the earlier failed step."
+            exit 0
+          fi
           ${{ env.VENV_PYTHON }} -c "
           import json
           with open('artifacts/equivalence/ci_results.json') as f:
