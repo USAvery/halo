@@ -1,3 +1,134 @@
+/* 0x124730 — model marker lookup. The assert strings stamp
+ * "c:\halo\SOURCE\models\models.c" (lines 0x2f8/0x2f9/0x311), so this function
+ * belongs to models.c in the original tree; it is kept here because that is the
+ * object mapping kb.json currently records.
+ *
+ * Resolves marker_name to a 16-bit marker-group index via FUN_00123d80
+ * (0x123d80; two stack args, ADD ESP,8 at 0x12474b, 16-bit result compared
+ * CMP SI,-1 at 0x12479e). -1 means "no such marker group" and yields 0.
+ * Otherwise it fetches the 'mode' tag (0x6d6f6465) for model_ref, takes element
+ * marker_group_index (0x40 bytes) of the block at model+0xac, and walks that
+ * element's nested block at +0x34 whose elements are 0x20 bytes.
+ *
+ * Per source marker element:
+ *   +0x00 byte  region index (used to index magic_table)
+ *   +0x01 byte  expected permutation value
+ *   +0x02 byte  node index
+ *   +0x04 float[3] position
+ *   +0x10 float[4] rotation basis data
+ * A marker is accepted when magic_table is 0, or when
+ * ((unsigned char *)magic_table)[marker[0]] == marker[1].
+ *
+ * Each accepted marker writes one 0x6c-byte output record:
+ *   +0x00 int16  node index (remapped through node_remap when non-null)
+ *   +0x04 float[13] local matrix from component_vectors_from_normal3d
+ *   +0x38 float[13] node matrix * local matrix (matrix4x3_multiply)
+ * When mirrored is non-zero the three floats at +0x48/+0x4c/+0x50 of the record
+ * are negated (FLD/FCHS/FSTP at 0x1248af..0x1248c4).
+ *
+ * The node-index bound is model+0xb8 when there is no remapping table, else the
+ * caller-supplied node_count (0x124852..0x12486d). Both assert failures share
+ * the one display_assert site at 0x12486f, so the C uses a goto into that block
+ * to keep the single call.
+ *
+ * Output is capped at max_markers: the loop returns early (0x1248e6) rather
+ * than overrunning out_markers. The loop counter is a 16-bit value
+ * sign-extended before each comparison against the 32-bit block count, which is
+ * re-read from memory every iteration (0x1248ca).
+ */
+int16_t FUN_00124730(int model_ref, const char *marker_name, int magic_table,
+                     int node_remap, int16_t node_count, void *node_matrices,
+                     char mirrored, void *out_markers, int16_t max_markers)
+{
+  int16_t marker_count;
+  int16_t marker_index;
+  int16_t marker_group_index;
+  int16_t node_index;
+  int *marker_block;
+  void *model;
+  unsigned char *marker;
+  unsigned char *out;
+  int node_limit;
+  int element_index;
+
+  marker_count = 0;
+  marker_group_index = FUN_00123d80(model_ref, marker_name);
+
+  if (node_matrices == NULL) {
+    display_assert("node_matrices", "c:\\halo\\SOURCE\\models\\models.c", 0x2f8,
+                   true);
+    system_exit(-1);
+  }
+  if (out_markers == NULL) {
+    display_assert("markers", "c:\\halo\\SOURCE\\models\\models.c", 0x2f9,
+                   true);
+    system_exit(-1);
+  }
+  if (marker_group_index == -1) {
+    return 0;
+  }
+
+  model = tag_get(0x6d6f6465, model_ref);
+  marker_block =
+    (int *)((char *)tag_block_get_element((void *)((char *)model + 0xac),
+                                          (int)marker_group_index, 0x40) +
+            0x34);
+
+  marker_index = 0;
+  if (*marker_block > 0) {
+    element_index = 0;
+    do {
+      marker = (unsigned char *)tag_block_get_element(marker_block,
+                                                      element_index, 0x20);
+      if (magic_table == 0 ||
+          *(unsigned char *)(magic_table + (unsigned int)marker[0]) ==
+            marker[1]) {
+        if (marker_count >= max_markers) {
+          return marker_count;
+        }
+        out = (unsigned char *)out_markers + (int)marker_count * 0x6c;
+        marker_count++;
+        if (node_remap == 0) {
+          *(uint16_t *)out = (uint16_t)marker[2];
+        } else {
+          *(uint16_t *)out =
+            (uint16_t) * (int16_t *)(node_remap + (unsigned int)marker[2] * 2);
+        }
+        component_vectors_from_normal3d(
+          (float *)(out + 4), (float *)(marker + 4), (float *)(marker + 0x10));
+        node_index = *(int16_t *)out;
+        if (node_index < 0) {
+          goto bad_node_index;
+        }
+        if (node_remap == 0) {
+          node_limit = *(int *)((char *)model + 0xb8);
+        } else {
+          node_limit = (int)node_count;
+        }
+        if ((int)node_index >= node_limit) {
+        bad_node_index:
+          display_assert("object_marker->node_index>=0 && "
+                         "object_marker->node_index<(node_remapping_table ? "
+                         "node_count : model->nodes.count)",
+                         "c:\\halo\\SOURCE\\models\\models.c", 0x311, true);
+          system_exit(-1);
+        }
+        matrix4x3_multiply(
+          (float *)((char *)node_matrices + (int)*(int16_t *)out * 0x34),
+          (float *)(out + 4), (float *)(out + 0x38));
+        if (mirrored != 0) {
+          *(float *)(out + 0x48) = -*(float *)(out + 0x48);
+          *(float *)(out + 0x4c) = -*(float *)(out + 0x4c);
+          *(float *)(out + 0x50) = -*(float *)(out + 0x50);
+        }
+      }
+      marker_index++;
+      element_index = (int)marker_index;
+    } while (element_index < *marker_block);
+  }
+  return marker_count;
+}
+
 /* 0x124900 — Walks the tag_block at offset 0xd0 of the definition, and for
  * each 0x30-byte element walks the nested tag_block at element+0x24 whose
  * elements are 0x68 bytes. Both retrieved elements are discarded: only
@@ -1048,8 +1179,8 @@ bool network_game_client_add_player(void *client, uint16_t player_index)
     csmemcpy(buf, record, 0x20);
     packet = (unsigned short *)encode_network_game_message(0xd, buf, 0x20);
     if (packet != NULL) {
-      result = network_connection_write(*(void **)(c + 0x82c), packet,
-                                        (unsigned short)(*packet >> 4), 0, true);
+      result = network_connection_write(
+        *(void **)(c + 0x82c), packet, (unsigned short)(*packet >> 4), 0, true);
       if (!result) {
         network_game_log("network_game_client_write() failed while sending a "
                          "message_client_add_player_request_pregame message");
@@ -1063,8 +1194,8 @@ bool network_game_client_add_player(void *client, uint16_t player_index)
     csmemcpy(buf, record, 0x20);
     packet = (unsigned short *)encode_network_game_message(0x1a, buf, 0x20);
     if (packet != NULL) {
-      result = network_connection_write(*(void **)(c + 0x82c), packet,
-                                        (unsigned short)(*packet >> 4), 0, true);
+      result = network_connection_write(
+        *(void **)(c + 0x82c), packet, (unsigned short)(*packet >> 4), 0, true);
       if (!result) {
         network_game_log("network_game_client_write() failed while sending a "
                          "message_client_add_player_request_ingame message");
@@ -1335,9 +1466,8 @@ void FUN_00125ce0(void *message_packet, void *advertised_games)
   const char *platform_str;
   const char *open_str;
 
-  local_open =
-    (*(unsigned char *)((char *)message_packet + 0x102) & 2) != 0 &&
-    *(int16_t *)((char *)message_packet + 0xfa) < 4;
+  local_open = (*(unsigned char *)((char *)message_packet + 0x102) & 2) != 0 &&
+               *(int16_t *)((char *)message_packet + 0xfa) < 4;
 
   m = (char *)message_packet;
   g = (char *)advertised_games;
@@ -1733,7 +1863,8 @@ char network_game_client_request_remove_player(void *client, void *record)
                    0x208, true);
     system_exit(-1);
   }
-  if (*(char *)((char *)client + 0x9b0 + (*(uint16_t *)client) * 0x44) != *(char *)((char *)record + 0x1c)) {
+  if (*(char *)((char *)client + 0x9b0 + (*(uint16_t *)client) * 0x44) !=
+      *(char *)((char *)record + 0x1c)) {
     display_assert("client's can only remove players from their own machines",
                    "c:\\halo\\SOURCE\\networking\\network_client_manager.c",
                    0x209, true);
@@ -1769,7 +1900,7 @@ char network_game_client_request_remove_player(void *client, void *record)
         "message");
       return 0;
     }
-send_packet:
+  send_packet:
     return network_connection_write(*(void **)((char *)client + 0x82c), packet,
                                     (unsigned short)(*packet >> 4), 0, true);
   case 4:
@@ -1781,8 +1912,9 @@ send_packet:
         "message");
       return 0;
     }
-    result = network_connection_write(*(void **)((char *)client + 0x82c), packet,
-                                      (unsigned short)(*packet >> 4), 0, true);
+    result =
+      network_connection_write(*(void **)((char *)client + 0x82c), packet,
+                               (unsigned short)(*packet >> 4), 0, true);
     if (!result) {
       network_game_log("network_game_client_write() failed while sending a "
                        "message_client_remove_player_request_postgame message");

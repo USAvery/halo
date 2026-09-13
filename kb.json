@@ -14781,7 +14781,8 @@
     },
     {
      "addr": "0x124730",
-     "decl": "int16_t FUN_00124730(int model_ref, const char *marker_name, int magic_table, int node_remap, int16_t node_count, void *node_matrices, char mirrored, void *out_markers, int16_t max_markers);"
+     "decl": "int16_t FUN_00124730(int model_ref, const char *marker_name, int magic_table, int node_remap, int16_t node_count, void *node_matrices, char mirrored, void *out_markers, int16_t max_markers);",
+     "ported": true
     },
     {
      "addr": "0x124900",
@@ -37413,7 +37414,7 @@
     },
     {
      "addr": "0x123d80",
-     "decl": "void FUN_00123d80(void);"
+     "decl": "int16_t FUN_00123d80(int model_ref, const char *marker_name);"
     },
     {
      "addr": "0x123e20",

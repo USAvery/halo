@@ -31081,17 +31081,17 @@
     "FUN_00124730": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 4.7,
+      "abi_modeled_mnemonic_pct": 87.5,
       "addr": "0x124730",
       "end": "0x1248fa",
       "kind": "auto",
       "n_r": 164,
-      "opnd_percent": 3.6,
-      "raw_mnemonic_pct": 4.7,
+      "opnd_percent": 73.4,
+      "raw_mnemonic_pct": 87.5,
       "ref": "synth",
       "ref_sha": "38ed78caad7194bd",
-      "score": 4.7,
-      "source": "src/halo/unported_thunks.c"
+      "score": 87.5,
+      "source": "src/halo/networking/network_client_manager.c"
     },
     "FUN_00124900": {
       "abi_model": "raw",
