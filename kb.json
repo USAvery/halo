@@ -25755,7 +25755,7 @@
     },
     {
      "addr": "0x196190",
-     "decl": "void FUN_00196190(float *center, float radius_x4, float *bounds6, int count, float *planes6);",
+     "decl": "void render_structure_shadows(float *center, float radius_x4, float *bounds6, int count, float *planes6);",
      "ported": true
     },
     {

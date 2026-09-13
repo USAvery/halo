@@ -165,7 +165,7 @@ flag-write bug does not affect them.
    `0x18b000`-`0x18c3a0`.
 
 Hand-verified faithful against the pristine disassembly (no builds spent):
-`FUN_00172a30`, `FUN_0018b990`, `FUN_00196190`, `render_camera_build_frustum`.
+`FUN_00172a30`, `FUN_0018b990`, `render_structure_shadows`, `render_camera_build_frustum`.
 Note that the z-axis asymmetry in `FUN_0018b990` is Bungie's. Do not "fix" it.
 
 ## Open problems

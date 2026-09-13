@@ -5066,7 +5066,7 @@
   "0x195ec0": "void FUN_00195ec0(void);",
   "0x195f30": "void FUN_00195f30(int object_handle, float *position, float radius, int gel_count, int gel_buffer);",
   "0x196060": "void FUN_00196060(int object_handle, float *position, float radius, int gel_count, int gel_buffer);",
-  "0x196190": "void FUN_00196190(float *center, float radius_x4, float *bounds6, int count, float *planes6);",
+  "0x196190": "void render_structure_shadows(float *center, float radius_x4, float *bounds6, int count, float *planes6);",
   "0x196290": "void structure_runtime_decals_initialize(void);",
   "0x1962d0": "void structure_runtime_decals_initialize_for_new_map(void);",
   "0x196330": "void FUN_00196330(void);",

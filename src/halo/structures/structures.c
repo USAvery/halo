@@ -5609,7 +5609,7 @@ void FUN_00196060(int object_handle, float *position, float radius,
 }
 
 /*
- * FUN_00196190 (0x196190) — structures.obj
+ * render_structure_shadows (0x196190) — structures.obj
  *
  * render_structure_shadows: structure shadow render entry.  Sibling of
  * FUN_00196060 (diffuse lights) / FUN_00195f30 (specular): identical shape, but
@@ -5640,8 +5640,8 @@ void FUN_00196060(int object_handle, float *position, float radius,
  *   - center/bounds/planes are pointers passed through as dwords; radius is a
  *     float by value.  All calls cdecl, args pushed right-to-left.
  */
-void FUN_00196190(float *center, float radius_x4, float *bounds6, int count,
-                  float *planes6)
+void render_structure_shadows(float *center, float radius_x4, float *bounds6, int count,
+                              float *planes6)
 {
   char buffer[0x4000];
   short surface_count;

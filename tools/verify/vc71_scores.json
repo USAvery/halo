@@ -42913,7 +42913,7 @@
       "score": 94.0,
       "source": "src/halo/structures/structures.c"
     },
-    "FUN_00196190": {
+    "render_structure_shadows": {
       "abi_model": "raw",
       "abi_model_items": 0,
       "abi_modeled_mnemonic_pct": 94.0,

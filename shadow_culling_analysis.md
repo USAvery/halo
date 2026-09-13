@@ -1,5 +1,10 @@
 # Halo CE Dynamic Shadow & Frustum Culling Technical Report
 
+Naming note: `render_structure_shadows` at `0x196190` is supported by the
+existing binary profiler label at `0x32b170`. The other `FUN_` identifiers in
+this report remain address-based because their behavior describes a role but
+does not, by itself, prove Bungie's original source identifier.
+
 ## 1. Overview & Architecture: How Dynamic Shadows Work
 
 Dynamic shadows in Halo CE (Xbox debug build 2276) are generated per-frame using a multi-stage hybrid decal and stencil volume projection pipeline:
@@ -19,7 +24,7 @@ Dynamic shadows in Halo CE (Xbox debug build 2276) are generated per-frame using
                 ├── Ambient darkness & active camouflage fade calculation
                 ├── FUN_0018b830 (0x18b830) ──> 4x3 shadow basis matrix & FUN_0017ccb0
                 └── FUN_0018b990 (0x18b990) [Builds 6-Plane Oriented Shadow Box]
-                      └── FUN_00196190 (0x196190, render_structure_shadows)
+                      └── render_structure_shadows (0x196190)
                             └── FUN_00197e90 (0x197e90)
                                   └── FUN_00196fd0 (0x196fd0)
                                         ├── FUN_00196a60 (0x196a60) AABB cull
@@ -31,8 +36,8 @@ Dynamic shadows in Halo CE (Xbox debug build 2276) are generated per-frame using
 ### Key Stages
 1. **Camera Visibility Sweep**:
    - The engine builds the primary camera frustum.
-   - It performs a BSP surface sweep ([`FUN_00196850`](file:///data/data/com.termux/files/home/halo/src/halo/structures/structure_visibility.c#L141)), marking surfaces visible to the camera in a bitvector at `0x5137d0`.
-   - It gathers all objects visible to the camera into the visible-object table `0x4d82d4` ([`FUN_0018b080`](file:///data/data/com.termux/files/home/halo/src/halo/scenario/scenario.c#L108) $\rightarrow$ `FUN_00196c90`).
+   - It performs a BSP surface sweep (`FUN_00196850` in `src/halo/structures/structure_visibility.c`), marking surfaces visible to the camera in a bitvector at `0x5137d0`.
+   - It gathers all objects visible to the camera into the visible-object table `0x4d82d4` (`FUN_0018b080` in `src/halo/scenario/scenario.c` $\rightarrow$ `FUN_00196c90`).
 2. **Shadow Pass Dispatch**:
    - `scenario_test_pas` (`0x18c460`) drives the pass by looping over `0x4d82d4` with `FUN_0018c370`.
    - Each caster is evaluated in `FUN_0018c100`. If its screen-space diameter drops below threshold or if ambient lighting is too bright, the shadow is discarded.
@@ -81,14 +86,14 @@ When adjusting view angle with the right thumbstick, shadows abruptly appear or 
 | `0x18b130` | `FUN_0018b130` | `scenario.obj` | Ported | Fetches object sphere and calls `render_frustum_sphere_diameter_in_pixels`. |
 | `0x18b830` | `FUN_0018b830` | `scenario.obj` | Ported | Builds 4x3 shadow basis matrix and calls `FUN_0017ccb0`. |
 | `0x18b990` | `FUN_0018b990` | `scenario.obj` | Ported | Builds 6-plane oriented-box shadow volume and AABB scalars. |
-| `0x196190` | `FUN_00196190` (`render_structure_shadows`) | `structures.obj` | Ported | Allocates 16 KB scratch buffer and drives structure shadow queries. |
+| `0x196190` | `render_structure_shadows` | `structures.obj` | Ported | Allocates 16 KB scratch buffer and drives structure shadow queries. |
 | `0x197e90` | `FUN_00197e90` | `structures.obj` | Ported | Cluster query dispatcher; delegates to `FUN_00196fd0` or BSP walk. |
 | `0x196fd0` | `FUN_00196fd0` | `structures.obj` | Ported | Collects cluster surfaces; checks against `0x5137d0`, `0x196a60`, and `0x196b10`. |
 | `0x196a60` | `FUN_00196a60` | `structure_visibility.obj` | Unported | AABB vs AABB overlap test for shadow volume bounding box. |
 | `0x196b10` | `FUN_00196b10` | `structure_visibility.obj` | Unported | 8-corner AABB vs 6 shadow planes intersection/cull test. |
 | `0x172a30` | `FUN_00172a30` | `rasterizer.obj` | Ported | Computes shadow projection matrix and uploads to VS constant `-0x44`. |
 | `0x17ccb0` | `FUN_0017ccb0` | `decals.obj` | Ported | Thunk forwarding directly to `FUN_00172a30`. |
-| `0x17ccf0` | `FUN_0017ccf0` | `decals.obj` | Ported | Surface-draw callback passed into `FUN_00195790` by `FUN_00196190`. |
+| `0x17ccf0` | `FUN_0017ccf0` | `decals.obj` | Ported | Surface-draw callback passed into `FUN_00195790` by `render_structure_shadows`. |
 | `0x17cd00` | `FUN_0017cd00` | `decals.obj` | Unported | Shadow profile and render state flush thunk. |
 | `0x172590` | `FUN_00172590` | `rasterizer_xbox_shadows.obj` | Ported | Sets shadow model skinning parameters. |
 | `0x172730` | `FUN_00172730` | `rasterizer_xbox_shadows.obj` | Ported | Fullscreen quad 4-tap blur pass for shadow accumulation buffer. |
