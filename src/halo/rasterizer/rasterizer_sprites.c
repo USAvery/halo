@@ -297,7 +297,8 @@ void FUN_0017cf20(void *shader, int arg2, int arg3, int arg4, int arg5,
   FUN_001677d0(shader, arg2, arg3, arg4, arg5, arg6);
 }
 
-/* 0x17cf30: bare JMP 0x167920.  Reached by a CALL at 0x195ef5 and a tail JMP at 0x195f29. */
+/* 0x17cf30: bare JMP 0x167920.  Reached by a CALL at 0x195ef5 and a tail JMP at
+ * 0x195f29. */
 void FUN_0017cf30(void)
 {
   FUN_00167920();
@@ -580,7 +581,8 @@ void FUN_0017d010(float *position, float radius, float *scale2d, float angle,
   FUN_0017b7d0(position, radius, scale2d, angle, color);
 }
 
-/* 0x17d020: bare JMP 0x17ad90.  Reached by CALLs at 0x1351fd, 0x181bfd and 0x182428. */
+/* 0x17d020: bare JMP 0x17ad90.  Reached by CALLs at 0x1351fd, 0x181bfd and
+ * 0x182428. */
 void FUN_0017d020(void)
 {
   FUN_0017ad90();
@@ -1266,8 +1268,8 @@ void FUN_0017d950(void)
  * 0x17d980, bounds 0x17d980..0x17d981, followed by 15 NOP bytes of padding to
  * the next 16-byte slot.  No prologue, no frame, no callee: this is a
  * genuinely empty function in the shipped debug build, not a placeholder
- * for unrecovered logic.  Reached by a single CALL at 0x155070.  Nothing in the binary
- * names it or shows what it did in a build where it was non-empty. */
+ * for unrecovered logic.  Reached by a single CALL at 0x155070.  Nothing in the
+ * binary names it or shows what it did in a build where it was non-empty. */
 void FUN_0017d980(void)
 {
 }
@@ -1276,8 +1278,8 @@ void FUN_0017d980(void)
  * 0x17d990, bounds 0x17d990..0x17d991, followed by 15 NOP bytes of padding to
  * the next 16-byte slot.  No prologue, no frame, no callee: this is a
  * genuinely empty function in the shipped debug build, not a placeholder
- * for unrecovered logic.  Reached by a single CALL at 0x155bc2.  Nothing in the binary
- * names it or shows what it did in a build where it was non-empty. */
+ * for unrecovered logic.  Reached by a single CALL at 0x155bc2.  Nothing in the
+ * binary names it or shows what it did in a build where it was non-empty. */
 void FUN_0017d990(void)
 {
 }
@@ -2114,8 +2116,8 @@ void FUN_0017e010(void)
  * 0x17e030, bounds 0x17e030..0x17e031, followed by 15 NOP bytes of padding to
  * the next 16-byte slot.  No prologue, no frame, no callee: this is a
  * genuinely empty function in the shipped debug build, not a placeholder
- * for unrecovered logic.  Reached by a single CALL at 0x159056.  Nothing in the binary
- * names it or shows what it did in a build where it was non-empty. */
+ * for unrecovered logic.  Reached by a single CALL at 0x159056.  Nothing in the
+ * binary names it or shows what it did in a build where it was non-empty. */
 void FUN_0017e030(void)
 {
 }
@@ -3064,4 +3066,513 @@ int rasterizer_frame_statistics_count_static_vertices(
     return triangle_count / ((int)negated - 2);
   }
   return negated;
+}
+
+
+/* One row of the mode-4 ("allocation") memory-usage page.
+ *
+ * Frame-proven layout: 16 rows of 12 bytes occupying [EBP-0x138]..[EBP-0x7d],
+ * walked by the reference with a pointer aimed at the MIDDLE dword
+ * (EDI = &row.bytes at 0x17fb99, stride 0xc, `MOV EDX,[EDI-0x4]` for the name
+ * and `MOV EAX,[EDI+0x4]` for the third dword).
+ *
+ * Explicit unknown: the third dword is never printed.  It is only read to
+ * accumulate `bytes - field_08` into the parenthesised half of the "total"
+ * line, so nothing in this function proves what it means. */
+typedef struct rasterizer_memory_usage_row_s {
+  const char *name;
+  int bytes;
+  int field_08;
+} rasterizer_memory_usage_row_t;
+
+
+/* rasterizer_frame_statistics_update @ 0x17ef00 -- draws the on-screen
+ * rasterizer statistics pages and, independently, appends a frame to the
+ * GPU-profile log file.
+ *
+ * The page selector is the 16-bit value at 0x3256ba: 0 = off, 1 = pass counts,
+ * 2 = geometry counts, 3 = GPU profile, 4 = allocations.  The log section at
+ * the bottom runs regardless of the page selector and is gated only by the
+ * byte flag at 0x325704.
+ *
+ * Call-site notes taken from the disassembly rather than the decompiler:
+ *
+ *  - 0x17f1b2 is CALL 0x8e370 (system_milliseconds); Ghidra renders it as
+ *    `thunk_FUN_001d0581`.
+ *  - Both the varargs `crt_sprintf` sites and the profile-timer sites evaluate
+ *    right-to-left under MSVC, so e.g. FUN_0016fcf0 runs BEFORE
+ *    rasterizer_initialize at 0x17f89a/0x17f8b3 and main_get_window_count runs
+ *    BEFORE local_player_count at 0x17f35f/0x17f368.  Temporaries below pin
+ *    that order instead of relying on the C argument-evaluation order.
+ *  - Ghidra drops the varargs of five sprintf sites entirely (0x17f2ef,
+ *    0x17f46c, 0x17f5ee, 0x17fc9d and the tail fprintf at 0x17feef); those
+ *    argument lists were recovered by walking the PUSH sequences.
+ *  - 0x17f886 is FST (store without pop) followed by FCOMP, so the comparison
+ *    at 0x17f889 sees the un-narrowed ST(0) while [EBP-0x24] keeps the float.
+ *
+ * Explicit unknowns: the meaning of the byte flag at 0x3256b8 (it selects the
+ * framerate line that additionally reports a tick/millisecond ratio), the
+ * dword pair 0x325668/0x32566c differenced against 0x47ec50/0x47ec54, and the
+ * scale factors at 0x254cb8 and 0x255d90. */
+void rasterizer_frame_statistics_update(void)
+{
+  char text[12288]; /* [EBP-0x3158] */
+  /* MEMORYSTATUS (0x20 bytes); only dwTotalPhys (+0x08) and dwAvailPhys
+   * (+0x0c) are read. */
+  unsigned int memory_status[8]; /* [EBP-0x158] */
+  rasterizer_memory_usage_row_t rows[16]; /* [EBP-0x138] */
+  float color_restore[4]; /* [EBP-0x78] */
+  int64_t elapsed_ms; /* [EBP-0x68] */
+  int64_t frame_delta; /* [EBP-0x60] */
+  int object_primitives; /* [EBP-0x58] */
+  int total_triangles; /* [EBP-0x54] */
+  int total_vertices; /* [EBP-0x50] */
+  int object_vertices; /* [EBP-0x4c] */
+  float color_white[4]; /* [EBP-0x48] */
+  float color_dim[4]; /* [EBP-0x38] */
+  int total_primitives; /* [EBP-0x28] */
+  int object_triangles; /* [EBP-0x24] */
+  float profile_seconds; /* [EBP-0x24], mode 3 */
+  int usage_total; /* [EBP-0x24], mode 4 */
+  int usage_delta; /* [EBP-0x28], mode 4 */
+  short tab_stops[6]; /* [EBP-0x20] */
+  short tab_base; /* [EBP-0x14] */
+  short rect[4]; /* [EBP-0x10] */
+  short extent[2]; /* [EBP-0x8]  */
+  int env_vertices; /* ESI */
+  int env_triangles; /* EDI */
+  int env_primitives; /* EBX */
+  short tab_indent_a;
+  short tab_indent_b;
+  short mode;
+  short i;
+  short row_index;
+  int count;
+  int bytes;
+  int length;
+  unsigned int dots;
+  const char *profile_name;
+  void *log;
+  const float *sample;
+  rasterizer_memory_usage_row_t *row;
+  float ratio;
+  float profile_total;
+  int profile_bytes;
+  int window_count;
+
+  mode = *(short *)0x3256ba;
+  if (mode != 0) {
+    extent[0] = 0;
+    extent[1] = 0;
+    env_vertices = *(int *)0x5a54ac + *(int *)0x5a549c + *(int *)0x5a5490 +
+                   *(int *)0x5a5484 + *(int *)0x5a5478 + *(int *)0x5a546c +
+                   *(int *)0x5a5460 + *(int *)0x5a5440 + *(int *)0x5a5434 +
+                   *(int *)0x5a5424;
+    env_triangles = *(int *)0x5a54b0 + *(int *)0x5a54a0 + *(int *)0x5a5494 +
+                    *(int *)0x5a5488 + *(int *)0x5a547c + *(int *)0x5a5470 +
+                    *(int *)0x5a5464 + *(int *)0x5a5444 + *(int *)0x5a5438 +
+                    *(int *)0x5a5428;
+    env_primitives = *(int *)0x5a54b4 + *(int *)0x5a54a8 + *(int *)0x5a5498 +
+                     *(int *)0x5a548c + *(int *)0x5a5480 + *(int *)0x5a5474 +
+                     *(int *)0x5a5468 + *(int *)0x5a5448 + *(int *)0x5a543c +
+                     *(int *)0x5a542c;
+
+    tab_base = *(short *)0x32565e;
+
+    tab_stops[0] = 100;
+    tab_stops[1] = 200;
+    tab_stops[2] = 300;
+    tab_stops[3] = 400;
+    tab_stops[4] = 500;
+    tab_stops[5] = 600;
+
+    color_dim[0] = 1.0f;
+    color_dim[1] = 0.66f;
+    color_dim[2] = 1.0f;
+    color_dim[3] = 0.66f;
+
+    color_white[0] = 1.0f;
+    color_white[1] = 1.0f;
+    color_white[2] = 1.0f;
+    color_white[3] = 1.0f;
+
+    color_restore[0] = 1.0f;
+    color_restore[1] = 1.0f;
+    color_restore[2] = 1.0f;
+    color_restore[3] = 1.0f;
+
+    object_vertices = *(int *)0x5a54e4 + *(int *)0x5a54d8;
+    object_triangles = *(int *)0x5a54e8 + *(int *)0x5a54dc;
+    object_primitives = *(int *)0x5a54e0 + *(int *)0x5a54f0;
+    total_vertices = object_vertices + *(int *)0x5a54f8 + env_vertices;
+    total_triangles = *(int *)0x5a54fc + object_triangles + env_triangles;
+    total_primitives = *(int *)0x5a5500 + object_primitives + env_primitives;
+
+    count = 6;
+    {
+      short *stop = tab_stops;
+      do {
+        *stop = (short)(*stop + tab_base);
+        stop++;
+        count--;
+      } while (count != 0);
+    }
+
+    *(int *)&rect[0] = *(int *)0x32565c;
+    *(int *)&rect[2] = *(int *)0x325660;
+    rect2d_offset(rect, 0, 0x20);
+
+    interface_draw_text(1, -1, 0, 0, 5, 0);
+
+    crt_sprintf(text, "|n|tframerate|taverage (of %d)|tmin|tmax",
+                *(short *)0x5a5404);
+    tab_stops[0] = tab_base;
+    draw_string_set_tab_stops(tab_stops, 6);
+    draw_string_set_color(color_white);
+    rasterizer_text_draw(rect, 0, extent, -4, text);
+    rect[0] = (short)(extent[1] - 1);
+
+    if (*(unsigned char *)0x3256b8 != 0) {
+      frame_delta = *(int64_t *)0x325668 - *(int64_t *)0x47ec50;
+      elapsed_ms =
+        (int64_t)(uint64_t)system_milliseconds() - *(int64_t *)0x47ec48;
+      ratio = ((float)frame_delta * *(float *)0x254cb8) / (float)elapsed_ms;
+      crt_sprintf(text, "|t%.0f|t%.0f/%.0f|t%.0f|t%.0f|n", *(float *)0x5a5400,
+                  *(float *)0x5a5408, ratio, *(float *)0x5a540c,
+                  *(float *)0x5a5410);
+    } else {
+      crt_sprintf(text, "|t%.0f|t%.0f|t%.0f|t%.0f|n", *(float *)0x5a5400,
+                  *(float *)0x5a5408, *(float *)0x5a540c, *(float *)0x5a5410);
+    }
+    tab_stops[0] = tab_base;
+    draw_string_set_tab_stops(tab_stops, 6);
+    draw_string_set_color(color_dim);
+    rasterizer_text_draw(rect, 0, extent, -4, text);
+    rect[0] = (short)(extent[1] - 1);
+
+    if (mode == 1) {
+      tab_stops[0] = tab_base;
+      draw_string_set_tab_stops(tab_stops, 6);
+      draw_string_set_color(color_dim);
+      crt_sprintf(
+        text, "|tfogged|t%d|n|tnormal|t%d|n|tfast|t%d|n|tscenery|t%d|n",
+        *(int *)0x5a5414, *(int *)0x5a5418, *(int *)0x5a541c, *(int *)0x5a5420);
+      rasterizer_text_draw(rect, 0, extent, -4, text);
+      rect[0] = (short)(extent[1] - 1);
+
+      crt_sprintf(text,
+                  "|tskinning|t%d|n|tlighting|t%d|n|tvertex shaders|t%d|n",
+                  *(int *)0x5a5560, *(int *)0x5a5564, *(int *)0x5a5568);
+      rasterizer_text_draw(rect, 0, extent, -4, text);
+      rect[0] = (short)(extent[1] - 1);
+
+      window_count = (short)main_get_window_count();
+      crt_sprintf(text,
+                  "|tlocal_player_count|t%d|n|tmain_get_window_count|t%d|n",
+                  local_player_count(), window_count);
+      rasterizer_text_draw(rect, 0, extent, -4, text);
+      rect[0] = (short)(extent[1] - 1);
+    } else if (mode == 2) {
+      crt_sprintf(text, "|t|tvertices|ttriangles|tprimitives");
+      tab_stops[0] = tab_base;
+      draw_string_set_tab_stops(tab_stops, 6);
+      draw_string_set_color(color_white);
+      rasterizer_text_draw(rect, 0, extent, -4, text);
+      rect[0] = (short)(extent[1] - 1);
+
+      crt_sprintf(text, "|ttotal|t%d|t%d|t%d|n", total_vertices,
+                  total_triangles, total_primitives);
+      tab_stops[0] = tab_base;
+      draw_string_set_tab_stops(tab_stops, 6);
+      draw_string_set_color(color_dim);
+      rasterizer_text_draw(rect, 0, extent, -4, text);
+      rect[0] = (short)(extent[1] - 1);
+
+      crt_sprintf(text, "|tenvironment|t%d|t%d|t%d", env_vertices,
+                  env_triangles, env_primitives);
+      tab_indent_a = (short)(tab_base + 0x19);
+      tab_stops[0] = tab_indent_a;
+      draw_string_set_tab_stops(tab_stops, 6);
+      rasterizer_text_draw(rect, 0, extent, -4, text);
+      rect[0] = (short)(extent[1] - 1);
+
+      crt_sprintf(
+        text,
+        "|tlightmaps|t%d|t%d|t%d|n|tshadows (%d)|t%d|t%d|t%d|n"
+        "|tlights|t%d|t%d|t%d|n|ttextures|t%d|t%d|t%d|n"
+        "|tlights specular|t%d|t%d|t%d|n"
+        "|tlightmaps specular|t%d|t%d|t%d|n"
+        "|tlightmaps ref.mask|t%d|t%d|t%d|n"
+        "|treflections|t%d|t%d|t%d|n"
+        "|ttransparent|t%d|t%d/%d|t%d|n|tfog|t%d|t%d|t%d|n",
+        *(int *)0x5a5424, *(int *)0x5a5428, *(int *)0x5a542c, *(int *)0x5a5430,
+        *(int *)0x5a5434, *(int *)0x5a5438, *(int *)0x5a543c, *(int *)0x5a5440,
+        *(int *)0x5a5444, *(int *)0x5a5448, *(int *)0x5a5460, *(int *)0x5a5464,
+        *(int *)0x5a5468, *(int *)0x5a546c, *(int *)0x5a5470, *(int *)0x5a5474,
+        *(int *)0x5a5478, *(int *)0x5a547c, *(int *)0x5a5480, *(int *)0x5a5484,
+        *(int *)0x5a5488, *(int *)0x5a548c, *(int *)0x5a5490, *(int *)0x5a5494,
+        *(int *)0x5a5498, *(int *)0x5a549c, *(int *)0x5a54a0, *(int *)0x5a54a4,
+        *(int *)0x5a54a8, *(int *)0x5a54ac, *(int *)0x5a54b0, *(int *)0x5a54b4);
+      tab_indent_b = (short)(tab_base + 0x32);
+      tab_stops[0] = tab_indent_b;
+      draw_string_set_tab_stops(tab_stops, 6);
+      rasterizer_text_draw(rect, 0, extent, -4, text);
+      rect[0] = (short)(extent[1] - 1);
+
+      crt_sprintf(text, "|tmodel shadows (%d)|t%d|t%d|t%d", *(int *)0x5a54f4,
+                  *(int *)0x5a54f8, *(int *)0x5a54fc, *(int *)0x5a5500);
+      tab_stops[0] = tab_indent_a;
+      draw_string_set_tab_stops(tab_stops, 6);
+      rasterizer_text_draw(rect, 0, extent, -4, text);
+      rect[0] = (short)(extent[1] - 1);
+
+      crt_sprintf(text, "|tmodels (%d)|t%d|t%d|t%d", *(int *)0x5a54d4,
+                  object_vertices, object_triangles, object_primitives);
+      tab_stops[0] = tab_indent_a;
+      draw_string_set_tab_stops(tab_stops, 6);
+      rasterizer_text_draw(rect, 0, extent, -4, text);
+      rect[0] = (short)(extent[1] - 1);
+
+      crt_sprintf(text, "|tsolid|t%d|t%d|t%d|n|ttransparent|t%d|t%d/%d|t%d|n",
+                  *(int *)0x5a54d8, *(int *)0x5a54dc, *(int *)0x5a54e0,
+                  *(int *)0x5a54e4, *(int *)0x5a54e8, *(int *)0x5a54ec,
+                  *(int *)0x5a54f0);
+      tab_stops[0] = tab_indent_b;
+      draw_string_set_tab_stops(tab_stops, 6);
+      rasterizer_text_draw(rect, 0, extent, -4, text);
+      rect[0] = (short)(extent[1] - 1);
+
+      crt_sprintf(text, "|tdecals|t%d|t%d|t%d|n", *(int *)0x5a544c,
+                  *(int *)0x5a5450, *(int *)0x5a5454);
+      tab_stops[0] = tab_base;
+      draw_string_set_tab_stops(tab_stops, 6);
+      rasterizer_text_draw(rect, 0, extent, -4, text);
+      rect[0] = (short)(extent[1] - 1);
+
+      crt_sprintf(text, "|tdynamic geometry|t%d/%d|t%d/%d|n", *(int *)0x5a5530,
+                  *(int *)0x5a5534, *(int *)0x5a5538, *(int *)0x5a553c);
+      tab_stops[0] = tab_base;
+      draw_string_set_tab_stops(tab_stops, 6);
+      rasterizer_text_draw(rect, 0, extent, -4, text);
+      rect[0] = (short)(extent[1] - 1);
+
+      crt_sprintf(text, "|t%d dynamic lights|n|t%d lens flares|n",
+                  *(int *)0x5a5548, *(int *)0x5a554c);
+      tab_stops[0] = tab_base;
+      draw_string_set_tab_stops(tab_stops, 6);
+      rasterizer_text_draw(rect, 0, extent, -4, text);
+      rect[0] = (short)(extent[1] - 1);
+    } else if (mode == 3) {
+      tab_stops[0] = tab_base;
+      tab_stops[1] = (short)(tab_base + 0xc8);
+      tab_stops[2] = (short)(tab_base + 0x12c);
+      tab_stops[3] = 600;
+      crt_sprintf(text, "|tGPU profile|ttime (msecs)|tdata (bytes)");
+      draw_string_set_tab_stops(tab_stops, 4);
+      draw_string_set_color(color_white);
+      extent[1] = (short)(extent[1] - 0x1e);
+      rasterizer_text_draw(rect, 0, extent, -4, text);
+      rect[0] = (short)(extent[1] - 1);
+      draw_string_set_color(color_dim);
+
+      i = 0;
+      do {
+        profile_seconds = FUN_0016fbd0(i);
+        if (profile_seconds < *(float *)0x2533c0) {
+          profile_name = rasterizer_initialize(i);
+          crt_sprintf(text, "|t%s|t----|t0", profile_name);
+        } else {
+          profile_bytes = FUN_0016fcf0(i);
+          ratio = profile_seconds * *(float *)0x254cb8;
+          profile_name = rasterizer_initialize(i);
+          crt_sprintf(text, "|t%s|t%.2f|t%d", profile_name, ratio,
+                      profile_bytes);
+        }
+        rasterizer_text_draw(rect, 0, extent, -4, text);
+        rect[0] = (short)(extent[1] - 1);
+        i++;
+      } while (i < 0x1d);
+
+      profile_bytes = FUN_0016fcf0(0x1d);
+      profile_total = FUN_0016fbd0(0x1d) * *(float *)0x254cb8;
+      crt_sprintf(text, "|ttotal|t%.2f|t%d|n", profile_total, profile_bytes);
+      draw_string_set_color(*(void **)0x2ee6e0);
+      rect[0] = (short)(rect[0] + 4);
+      rasterizer_text_draw(rect, 0, extent, -4, text);
+      rect[0] = (short)(extent[1] - 1);
+    } else if (mode == 4) {
+      rows[4].bytes = 0x10000;
+      rows[10].bytes = 0x10000;
+      rows[12].bytes = 0x10000;
+      rows[13].bytes = 0x14000;
+      rows[13].field_08 = 0x14000;
+      rows[2].field_08 = 0x4b000;
+      rows[9].field_08 = 0x4b000;
+      rows[1].bytes = 0x30000;
+      rows[6].bytes = 0x30000;
+      rows[14].bytes = 0x1b0000;
+      rows[14].field_08 = 0x1b0000;
+      rows[11].bytes = 0x8000;
+      rows[11].field_08 = 0x8000;
+
+      usage_total = 0;
+      usage_delta = 0;
+
+      rows[0].name = "memory pool";
+      rows[0].bytes = 0x18000;
+      rows[0].field_08 = 0;
+      rows[1].name = "dynamic vertices (unlit)";
+      rows[1].field_08 = 0;
+      rows[2].name = "dynamic vertices (lit*)";
+      rows[2].bytes = 0x48;
+      rows[3].name = "dynamic vertices (screen)";
+      rows[3].bytes = 0x50000;
+      rows[3].field_08 = 0;
+      rows[4].name = "dynamic vertices (model)";
+      rows[4].field_08 = 0;
+      rows[5].name = "dynamic vertices (detail objects)";
+      rows[5].bytes = 0x20000;
+      rows[5].field_08 = 0;
+      rows[6].name = "dynamic triangles";
+      rows[6].field_08 = 0;
+      rows[7].name = "transparent geometry groups";
+      rows[7].bytes = 0xf000;
+      rows[7].field_08 = 0;
+      rows[8].name = "bump map palette";
+      rows[8].bytes = 0x400;
+      rows[8].field_08 = 0;
+      rows[9].name = "mirror buffers (includes z-buffer*)";
+      rows[9].bytes = 0x96000;
+      rows[10].name = "shadow buffers";
+      rows[10].field_08 = 0;
+      rows[11].name = "sun glow buffers*";
+      rows[12].name = "water buffers";
+      rows[12].field_08 = 0;
+      rows[13].name = "motion sensor buffers*";
+      rows[14].name = "debug geometry*";
+      rows[15].name = "vertex shaders|t~35k last i checked";
+      rows[15].bytes = 0x8c00;
+      rows[15].field_08 = 0x3000;
+
+      tab_stops[0] = tab_base;
+      tab_stops[1] = (short)(tab_base + 0x12c);
+      tab_stops[2] = 600;
+      crt_sprintf(text, "|tallocation|tmemory usage (bytes)");
+      draw_string_set_tab_stops(tab_stops, 3);
+      draw_string_set_color(color_white);
+      rasterizer_text_draw(rect, 0, extent, -4, text);
+      rect[0] = (short)(extent[1] - 1);
+      draw_string_set_color(color_dim);
+
+      row = rows;
+      count = 0x10;
+      do {
+        bytes = row->bytes;
+        crt_sprintf(text, "|t%s|t%d", row->name, bytes);
+        rasterizer_text_draw(rect, 0, extent, -4, text);
+        rect[0] = (short)(extent[1] - 1);
+        usage_total += bytes;
+        usage_delta += bytes - row->field_08;
+        row++;
+        count--;
+      } while (count != 0);
+
+      crt_sprintf(text, "|n|ttotal|t%d (%d)", usage_total, usage_delta);
+      rasterizer_text_draw(rect, 0, extent, -4, text);
+      rect[0] = (short)(extent[1] - 1);
+
+      xbox_query_global_memory_status(memory_status);
+      draw_string_set_color(color_white);
+      crt_sprintf(text, "|n|tsystem total|t%dKb", memory_status[2] >> 10);
+      rasterizer_text_draw(rect, 0, extent, -4, text);
+      rect[0] = (short)(extent[1] - 1);
+      crt_sprintf(text, "|tsystem available|t%dKb", memory_status[3] >> 10);
+      rasterizer_text_draw(rect, 0, extent, -4, text);
+      rect[0] = (short)(extent[1] - 1);
+      draw_string_set_color(color_dim);
+    }
+
+    draw_string_set_tab_stops(0, 0);
+    draw_string_set_color(color_restore);
+  }
+
+  if (*(unsigned char *)0x325704 == 0) {
+    log = *(void **)0x47ec58;
+    if (log != 0) {
+      crt_fclose(log);
+      *(void **)0x47ec58 = 0;
+    }
+    return;
+  }
+
+  log = *(void **)0x47ec58;
+  if (log == 0) {
+    log = crt_fopen(*(const char **)0x325744, "w");
+    *(void **)0x47ec58 = log;
+    if (log == 0) {
+      error(2, "### ERROR failed to open rasterizer profile log (%s)",
+            *(const char **)0x325744);
+      log = *(void **)0x47ec58;
+      *(unsigned char *)0x325704 = 0;
+    }
+    *(float *)0x47ed58 = 0.0f;
+    *(int *)0x47ed5c = 0;
+    if (log == 0) {
+      return;
+    }
+  }
+
+  i = 0;
+  count = 0;
+  do {
+    ((float *)0x47e500)[*(short *)0x47ed54 + count] =
+      FUN_0016fbd0(i) * *(float *)0x254cb8;
+    i++;
+    count += 0x10;
+  } while (i < 0x1d);
+
+  *(float *)0x47ed58 =
+    FUN_0016fbd0(0x1d) * *(float *)0x254cb8 + *(float *)0x47ed58;
+  *(int *)0x47ed5c = *(int *)0x47ed5c + FUN_0016fcf0(0x1d);
+  *(short *)0x47ed54 = (short)(*(short *)0x47ed54 + 1);
+  if (*(short *)0x47ed54 != 0x10) {
+    return;
+  }
+
+  crt_fprintf(*(void **)0x47ec58, "\n");
+  row_index = 0;
+  sample = (const float *)0x47e500;
+  do {
+    profile_name = rasterizer_initialize(row_index);
+    crt_fprintf(*(void **)0x47ec58, "%s", profile_name);
+    length = csstrlen(rasterizer_initialize(row_index));
+    if ((short)length < 0x20) {
+      dots = (unsigned int)(unsigned short)(0x20 - length);
+      do {
+        crt_fprintf(*(void **)0x47ec58, ".");
+        dots--;
+      } while (dots != 0);
+    }
+    count = 0x10;
+    do {
+      if (*sample < *(float *)0x2533c0) {
+        crt_fprintf(*(void **)0x47ec58, "  ----");
+      } else {
+        crt_fprintf(*(void **)0x47ec58, "%6.2f", *sample);
+      }
+      sample++;
+      count--;
+    } while (count != 0);
+    crt_fprintf(*(void **)0x47ec58, "\n");
+    row_index++;
+  } while (row_index < 0x1d);
+
+  crt_fprintf(*(void **)0x47ec58, "average total frame time= %.2f msecs\n",
+              *(float *)0x47ed58 * *(float *)0x255d90);
+  crt_fprintf(*(void **)0x47ec58, "average total pushbuffer= %d bytes\n",
+              (*(int *)0x47ed5c + 8) / 0x10);
+  crt_fflush(*(void **)0x47ec58);
+  *(short *)0x47ed54 = 0;
+  *(float *)0x47ed58 = 0.0f;
+  *(int *)0x47ed5c = 0;
 }

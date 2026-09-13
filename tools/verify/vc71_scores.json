@@ -79828,6 +79828,21 @@
       "score": 91.2,
       "source": "src/halo/rasterizer/rasterizer_sprites.c"
     },
+    "rasterizer_frame_statistics_update": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 90.0,
+      "addr": "0x17ef00",
+      "end": "0x17ff45",
+      "kind": "auto",
+      "n_r": 1167,
+      "opnd_percent": 64.3,
+      "raw_mnemonic_pct": 90.0,
+      "ref": "synth",
+      "ref_sha": "6a36ae12e49d4f22",
+      "score": 90.0,
+      "source": "src/halo/rasterizer/rasterizer_sprites.c"
+    },
     "rasterizer_frame_update": {
       "abi_model": "raw",
       "abi_model_items": 0,

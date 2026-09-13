@@ -31119,7 +31119,8 @@
     },
     {
      "addr": "0x17ef00",
-     "decl": "void rasterizer_frame_statistics_update(void);"
+     "decl": "void rasterizer_frame_statistics_update(void);",
+     "ported": true
     }
    ],
    "name": "rasterizer_sprites.obj",
