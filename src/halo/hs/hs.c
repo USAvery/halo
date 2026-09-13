@@ -2652,14 +2652,15 @@ void hs_evaluate_texture_cache_flush(int16_t function_index, int thread_datum, c
  *   0x1be490 = sound_cache_flush(void)   [not yet ported; called via thunk]
  *   0xcbf80  = hs_return(thread_handle, value)
  */
-void FUN_000c1ee0(int16_t function_index, int thread_datum, char init)
+void hs_evaluate_sound_cache_flush(int16_t function_index, int thread_datum, char init)
 {
   sound_cache_flush();
   hs_return(thread_datum, 0);
+  return;
 }
 
-/* 0xc1f00 — HaloScript script-function stub (no-argument, void-result form).
- * Twin of FUN_000c1ee0 immediately above: it takes no script arguments, so it
+/* hs_evaluate_debug_memory (0xc1f00) — HaloScript script-function stub (no-argument, void-result form).
+ * Twin of hs_evaluate_sound_cache_flush immediately above: it takes no script arguments, so it
  * never calls hs_macro_function_evaluate and has no null-check branch.  The
  * body unconditionally invokes the cseries/errors.c helper FUN_0008f1e0 and
  * then commits a zero result to the calling thread via hs_return.
@@ -2673,14 +2674,15 @@ void FUN_000c1ee0(int16_t function_index, int thread_datum, char init)
  *   0x8f1e0  = FUN_0008f1e0(void)   [errors.c]
  *   0xcbf80  = hs_return(thread_handle, value)
  */
-void FUN_000c1f00(int16_t function_index, int thread_datum, char init)
+void hs_evaluate_debug_memory(int16_t function_index, int thread_datum, char init)
 {
   FUN_0008f1e0();
   hs_return(thread_datum, 0);
+  return;
 }
 
-/* 0xc1f20 — HaloScript script-function stub (no-argument, void-result form).
- * Twin of FUN_000c1f00 immediately above: it takes no script arguments, so it
+/* hs_evaluate_debug_memory_by_file (0xc1f20) — HaloScript script-function stub (no-argument, void-result form).
+ * Twin of hs_evaluate_debug_memory immediately above: it takes no script arguments, so it
  * never calls hs_macro_function_evaluate and has no null-check branch.  The
  * body unconditionally invokes debug_dump_memory_by_file and then commits a
  * zero result to the calling thread via hs_return.
@@ -2694,13 +2696,14 @@ void FUN_000c1f00(int16_t function_index, int thread_datum, char init)
  *   0x8ec60  = debug_dump_memory_by_file(void)
  *   0xcbf80  = hs_return(thread_handle, value)
  */
-void FUN_000c1f20(int16_t function_index, int thread_datum, char init)
+void hs_evaluate_debug_memory_by_file(int16_t function_index, int thread_datum, char init)
 {
   debug_dump_memory_by_file();
   hs_return(thread_datum, 0);
+  return;
 }
 
-/* 0xc1f40 — HaloScript script-function handler for the single-string form of
+/* hs_evaluate_debug_memory_for_file (0xc1f40) — HaloScript script-function handler for the single-string form of
  * the memory dump command.  Evaluates the macro arguments; on success the
  * result block holds a `const char *` at +0x0 (the tag/file name filter),
  * which is forwarded to debug_dump_memory_for_file.  The thread is then
@@ -2721,7 +2724,7 @@ void FUN_000c1f20(int16_t function_index, int thread_datum, char init)
  *   0x8eb80  = debug_dump_memory_for_file(const char *tag_filter)
  *   0xcbf80  = hs_return(thread_handle, value)
  */
-void FUN_000c1f40(int16_t function_index, int thread_datum, char init)
+void hs_evaluate_debug_memory_for_file(int16_t function_index, int thread_datum, char init)
 {
   int *result;
 
@@ -2731,10 +2734,11 @@ void FUN_000c1f40(int16_t function_index, int thread_datum, char init)
     debug_dump_memory_for_file((const char *)result[0]);
     hs_return(thread_datum, 0);
   }
+  return;
 }
 
-/* 0xc1f80 — HaloScript script-function stub (no-argument, void-result form,
- * empty body).  Byte-for-byte this is FUN_000c1fa0 below with its single
+/* hs_evaluate_debug_tags (0xc1f80) — HaloScript script-function stub (no-argument, void-result form,
+ * empty body).  Byte-for-byte this is hs_evaluate_profile_reset below with its single
  * helper call removed: the reference bytes are
  *   55 8bec 8b450c 6a00 50 e8f29f0000 83c408 5d c3
  * versus 0xc1fa0's
@@ -2744,7 +2748,7 @@ void FUN_000c1f40(int16_t function_index, int thread_datum, char init)
  *
  * [EBP+0x8] (function_index) and [EBP+0x10] (init) are never read by this
  * body; they complete the standard hs-evaluator signature shared by every
- * other handler in this TU (proven by siblings such as FUN_000c1f40, which
+ * other handler in this TU (proven by siblings such as hs_evaluate_debug_memory_for_file, which
  * forwards all three to hs_macro_function_evaluate).  Ghidra mis-prototypes
  * this as void(void) and reports the [EBP+0xc] read as the phantom local
  * `in_stack_00000008` — that offset is frame-relative, not EBP+8.
@@ -2757,13 +2761,14 @@ void FUN_000c1f40(int16_t function_index, int thread_datum, char init)
  * Callee (cdecl, no register args):
  *   0xcbf80  = hs_return(thread_handle, value)
  */
-void FUN_000c1f80(int16_t function_index, int thread_datum, char init)
+void hs_evaluate_debug_tags(int16_t function_index, int thread_datum, char init)
 {
   hs_return(thread_datum, 0);
+  return;
 }
 
-/* 0xc1fa0 — HaloScript script-function stub (no-argument, void-result form).
- * Same shape as FUN_000c1f00/FUN_000c1f20 above: it takes no script
+/* hs_evaluate_profile_reset (0xc1fa0) — HaloScript script-function stub (no-argument, void-result form).
+ * Same shape as hs_evaluate_debug_memory/hs_evaluate_debug_memory_by_file above: it takes no script
  * arguments, so it never calls hs_macro_function_evaluate and has no
  * null-check branch.  The body unconditionally invokes the errors.c
  * error-ring-buffer reset helper FUN_0008f630 and then commits a zero result
@@ -2783,13 +2788,14 @@ void FUN_000c1f80(int16_t function_index, int thread_datum, char init)
  *   0x8f630  = FUN_0008f630(void)   [errors.c] — reset error ring buffer
  *   0xcbf80  = hs_return(thread_handle, value)
  */
-void FUN_000c1fa0(int16_t function_index, int thread_datum, char init)
+void hs_evaluate_profile_reset(int16_t function_index, int thread_datum, char init)
 {
   FUN_0008f630();
   hs_return(thread_datum, 0);
+  return;
 }
 
-/* 0xc1fc0 — HaloScript builtin "profile_dump" (one string argument).
+/* hs_evaluate_profile_dump (0xc1fc0) — HaloScript builtin "profile_dump" (one string argument).
  *
  * The script-function definition record at 0x2718f0 gives return_type = 4
  * (void), num_params = 1, param_types[0] = 9 (string), name = "profile_dump",
@@ -2814,7 +2820,7 @@ void FUN_000c1fa0(int16_t function_index, int thread_datum, char init)
  *   0x90650  = profile_dump_to_file(const char *substring)
  *   0xcbf80  = hs_return(thread_handle, value)
  */
-void FUN_000c1fc0(int16_t function_index, int thread_datum, char init)
+void hs_evaluate_profile_dump(int16_t function_index, int thread_datum, char init)
 {
   int *result;
 
@@ -2824,9 +2830,10 @@ void FUN_000c1fc0(int16_t function_index, int thread_datum, char init)
     profile_dump_to_file((const char *)result[0]);
     hs_return(thread_datum, 0);
   }
+  return;
 }
 
-/* 0xc2000 (hs.obj) — HaloScript function handler: activate profile sections.
+/* hs_evaluate_profile_activate (0xc2000) (hs.obj) — HaloScript function handler: activate profile sections.
  *
  * Evaluates the macro arguments; on success the result block holds a single
  * dword at +0x0 which is passed straight through to 0x90860
@@ -2844,7 +2851,7 @@ void FUN_000c1fc0(int16_t function_index, int thread_datum, char init)
  *   0x90860  = profile_sections_activate(const char *substring)
  *   0xcbf80  = hs_return(thread_handle, value)
  */
-void FUN_000c2000(int16_t function_index, int thread_datum, char init)
+void hs_evaluate_profile_activate(int16_t function_index, int thread_datum, char init)
 {
   int *result;
 
@@ -2854,11 +2861,12 @@ void FUN_000c2000(int16_t function_index, int thread_datum, char init)
     profile_sections_activate((const char *)result[0]);
     hs_return(thread_datum, 0);
   }
+  return;
 }
 
-/* 0xc2040 (hs.obj) — HaloScript function handler: deactivate profile sections.
+/* hs_evaluate_profile_deactivate (0xc2040) (hs.obj) — HaloScript function handler: deactivate profile sections.
  *
- * The exact deactivate twin of FUN_000c2000 above; byte-identical in shape,
+ * The exact deactivate twin of hs_evaluate_profile_activate above; byte-identical in shape,
  * differing only in which result-consumer it calls (0x90880
  * profile_sections_deactivate instead of 0x90860 profile_sections_activate).
  * Evaluates the macro arguments; while hs_macro_function_evaluate returns NULL
@@ -2906,7 +2914,7 @@ void FUN_000c2000(int16_t function_index, int thread_datum, char init)
  *   0x90880  = profile_sections_deactivate(const char *substring)
  *   0xcbf80  = hs_return(thread_handle, value)
  */
-void FUN_000c2040(int16_t function_index, int thread_datum, char init)
+void hs_evaluate_profile_deactivate(int16_t function_index, int thread_datum, char init)
 {
   int *result;
 
@@ -2916,9 +2924,10 @@ void FUN_000c2040(int16_t function_index, int thread_datum, char init)
     profile_sections_deactivate((const char *)result[0]);
     hs_return(thread_datum, 0);
   }
+  return;
 }
 
-/* 0xc2080 (hs.obj) — HaloScript function handler: "profile_graph_toggle".
+/* hs_evaluate_profile_graph_toggle (0xc2080) (hs.obj) — HaloScript function handler: "profile_graph_toggle".
  *
  * Evaluates the macro arguments; on success the result block holds a single
  * dword at +0x0 which is passed straight through to 0xdf350
@@ -2944,7 +2953,7 @@ void FUN_000c2040(int16_t function_index, int thread_datum, char init)
  *   0xdf350  = profile_graph_toggle(const char *value_name)
  *   0xcbf80  = hs_return(thread_handle, value)
  */
-void FUN_000c2080(int16_t function_index, int thread_datum, char init)
+void hs_evaluate_profile_graph_toggle(int16_t function_index, int thread_datum, char init)
 {
   int *result;
 
@@ -2954,15 +2963,16 @@ void FUN_000c2080(int16_t function_index, int thread_datum, char init)
     profile_graph_toggle((const char *)result[0]);
     hs_return(thread_datum, 0);
   }
+  return;
 }
 
-/* 0xc20c0 (hs.obj) — HaloScript function handler: "debug_pvs".
+/* hs_evaluate_debug_pvs (0xc20c0) (hs.obj) — HaloScript function handler: "debug_pvs".
  *
  * Evaluates the macro arguments; on success the result block holds a single
  * BYTE at +0x0 which is zero-extended and passed to 0x1965d0 (debug_pvs).
  * The disassembly does `XOR EDX,EDX; MOV DL,byte ptr [EAX]; PUSH EDX`, so the
- * load is one byte wide — not the dword shape used by the 0xc2000/0xc2040/
- * 0xc2080 siblings above.  `result` is therefore `unsigned char *`; an `int *`
+ * load is one byte wide — not the dword shape used by the hs_evaluate_profile_activate/hs_evaluate_profile_deactivate/
+ * hs_evaluate_profile_graph_toggle siblings above.  `result` is therefore `unsigned char *`; an `int *`
  * deref here would emit a dword load and be a width bug.
  *
  * `thread_datum` is held in ESI across the whole body because it is reused by
@@ -2981,7 +2991,7 @@ void FUN_000c2080(int16_t function_index, int thread_datum, char init)
  *   0x1965d0 = debug_pvs(uint8_t enabled)
  *   0xcbf80  = hs_return(thread_handle, value)
  */
-void FUN_000c20c0(int16_t function_index, int thread_datum, char init)
+void hs_evaluate_debug_pvs(int16_t function_index, int thread_datum, char init)
 {
   unsigned char *result;
 
@@ -2991,9 +3001,10 @@ void FUN_000c20c0(int16_t function_index, int thread_datum, char init)
     debug_pvs(*result);
     hs_return(thread_datum, 0);
   }
+  return;
 }
 
-/* 0xc2100 (hs.obj) — HaloScript function handler: "radiosity_start".
+/* hs_evaluate_radiosity_start (0xc2100) (hs.obj) — HaloScript function handler: "radiosity_start".
  *
  * The script-function record at 0x271990 names this handler: return_type 4
  * (void), name "radiosity_start", help "starts radiosity computation.",
@@ -3001,7 +3012,7 @@ void FUN_000c20c0(int16_t function_index, int thread_datum, char init)
  * evaluate 0xc2100 (this function), num_params 0.  The command therefore
  * takes no script arguments, which is why there is no
  * hs_macro_function_evaluate call and no result NULL check — identical in
- * shape to FUN_000c2140 directly below.  In this build the handler body
+ * shape to hs_evaluate_radiosity_debug_point directly below.  In this build the handler body
  * performs no side effect of its own: it only completes the calling script
  * thread with the value 0.  The symbol keeps its address name because
  * "radiosity_start" names the script command, not this wrapper.
@@ -3028,14 +3039,15 @@ void FUN_000c20c0(int16_t function_index, int thread_datum, char init)
  * Callees (cdecl, no register args, ported):
  *   0xcbf80 = hs_return(thread_handle, value)
  */
-void FUN_000c2100(int16_t function_index, int thread_datum, char init)
+void hs_evaluate_radiosity_start(int16_t function_index, int thread_datum, char init)
 {
   hs_return(thread_datum, 0);
+  return;
 }
 
-/* 0xc2120 (hs.obj) — HaloScript function handler, no-op body.
+/* hs_evaluate_radiosity_save (0xc2120) (hs.obj) — HaloScript function handler, no-op body.
  *
- * Same minimal handler shape as FUN_000c2100 above and FUN_000c2140 below:
+ * Same minimal handler shape as hs_evaluate_radiosity_start above and hs_evaluate_radiosity_debug_point below:
  * the command takes no script arguments (no hs_macro_function_evaluate call,
  * no result NULL check) and the body performs no side effect of its own — it
  * only completes the calling script thread with the value 0.  Which script
@@ -3065,17 +3077,18 @@ void FUN_000c2100(int16_t function_index, int thread_datum, char init)
  * Callees (cdecl, no register args, ported):
  *   0xcbf80 = hs_return(thread_handle, value)
  */
-void FUN_000c2120(int16_t function_index, int thread_datum, char init)
+void hs_evaluate_radiosity_save(int16_t function_index, int thread_datum, char init)
 {
   hs_return(thread_datum, 0);
+  return;
 }
 
-/* 0xc2140 (hs.obj) — HaloScript function handler, no-op body.
+/* hs_evaluate_radiosity_debug_point (0xc2140) (hs.obj) — HaloScript function handler, no-op body.
  *
  * The smallest handler shape in this TU: the command takes no script
  * arguments (no hs_macro_function_evaluate call) and performs no side effect
  * of its own — it only completes the calling script thread with the value 0.
- * Compared with FUN_000c2160 directly below it is the same sub-shape minus
+ * Compared with hs_evaluate_ai_lines directly below it is the same sub-shape minus
  * the leading debug-toggle CALL.  Which script command this record belongs to
  * is not established from the binary here, so the function keeps its address
  * name.
@@ -3102,19 +3115,20 @@ void FUN_000c2120(int16_t function_index, int thread_datum, char init)
  * Callees (cdecl, no register args, ported):
  *   0xcbf80 = hs_return(thread_handle, value)
  */
-void FUN_000c2140(int16_t function_index, int thread_datum, char init)
+void hs_evaluate_radiosity_debug_point(int16_t function_index, int thread_datum, char init)
 {
   hs_return(thread_datum, 0);
+  return;
 }
 
-/* 0xc2160 (hs.obj) — HaloScript function handler: "ai_lines".
+/* hs_evaluate_ai_lines (0xc2160) (hs.obj) — HaloScript function handler: "ai_lines".
  *
  * Script-function table record at 0x2719e4: name "ai_lines", parse 0xc7e50,
  * help "cycles through AI line-spray modes", return_type 4 (void),
  * num_params 0.  Because the command takes no script arguments there is no
  * hs_macro_function_evaluate call — the handler runs the debug toggle and
  * completes the calling thread with the value 0.  Same minimal 10-instruction
- * sub-shape as FUN_000c1e80 / FUN_000c1ee0 / FUN_000c1f20 above.
+ * sub-shape as FUN_000c1e80 / hs_evaluate_sound_cache_flush / hs_evaluate_debug_memory_by_file above.
  *
  * Disassembly (10 instructions).  Frame is PUSH EBP; MOV EBP,ESP only — no
  * locals and no `sub esp`.  Body:
@@ -3140,17 +3154,18 @@ void FUN_000c2140(int16_t function_index, int thread_datum, char init)
  *   0x53890 = FUN_00053890(void) -> int16_t   (AI line-spray mode cycle)
  *   0xcbf80 = hs_return(thread_handle, value)
  */
-void FUN_000c2160(int16_t function_index, int thread_datum, char init)
+void hs_evaluate_ai_lines(int16_t function_index, int thread_datum, char init)
 {
   FUN_00053890();
   hs_return(thread_datum, 0);
+  return;
 }
 
-/* 0xc2180 (hs.obj) — HaloScript function handler: AI sound-point debug toggle.
+/* hs_evaluate_ai_debug_sound_point_set (0xc2180) (hs.obj) — HaloScript function handler: AI sound-point debug toggle.
  *
  * Zero-argument script builtin, so there is no hs_macro_function_evaluate
  * call — the handler runs the debug toggle and completes the calling thread
- * with the value 0.  Structural twin of FUN_000c2160 directly above (same
+ * with the value 0.  Structural twin of hs_evaluate_ai_lines directly above (same
  * 10-instruction sub-shape, same frame).
  *
  * Disassembly (10 instructions, 0xc2180-0xc2197).  Frame is PUSH EBP;
@@ -3174,13 +3189,14 @@ void FUN_000c2160(int16_t function_index, int thread_datum, char init)
  *   0x49270 = ai_debug_sound_point_set(void)
  *   0xcbf80 = hs_return(thread_handle, value)
  */
-void FUN_000c2180(int16_t function_index, int thread_datum, char init)
+void hs_evaluate_ai_debug_sound_point_set(int16_t function_index, int thread_datum, char init)
 {
   ai_debug_sound_point_set();
   hs_return(thread_datum, 0);
+  return;
 }
 
-/* 0xc21a0 (hs.obj) — HaloScript function handler: ai_debug_vocalize.
+/* hs_evaluate_ai_debug_vocalize (0xc21a0) (hs.obj) — HaloScript function handler: ai_debug_vocalize.
  *
  * Standard two-string macro-function wrapper.  The arguments are evaluated
  * by hs_macro_function_evaluate(function_index, thread_datum, init); on
@@ -3227,7 +3243,7 @@ void FUN_000c2180(int16_t function_index, int thread_datum, char init)
  *   0x49f60 = ai_debug_vocalize(vocalization_name, vocalization_type_name)
  *   0xcbf80 = hs_return(thread_handle, value)
  */
-void FUN_000c21a0(int16_t function_index, int thread_datum, char init)
+void hs_evaluate_ai_debug_vocalize(int16_t function_index, int thread_datum, char init)
 {
   const char **result;
 
@@ -3237,9 +3253,10 @@ void FUN_000c21a0(int16_t function_index, int thread_datum, char init)
     ai_debug_vocalize(result[0], result[1]);
     hs_return(thread_datum, 0);
   }
+  return;
 }
 
-/* HaloScript builtin: evaluate the macro-function argument block, then hand
+/* hs_evaluate_ai_debug_teleport_to (0xc21e0) — HaloScript builtin: evaluate the macro-function argument block, then hand
  * the first dword of the result record to the AI debug teleport command.
  *
  * Disassembly (0xc21e0):
@@ -3275,7 +3292,7 @@ void FUN_000c21a0(int16_t function_index, int thread_datum, char init)
  *   0x4b0f0 = ai_debug_teleport_to(encounter_index)
  *   0xcbf80 = hs_return(thread_handle, value)
  */
-void FUN_000c21e0(int16_t function_index, int thread_datum, char init)
+void hs_evaluate_ai_debug_teleport_to(int16_t function_index, int thread_datum, char init)
 {
   int *result;
 
@@ -3285,9 +3302,10 @@ void FUN_000c21e0(int16_t function_index, int thread_datum, char init)
     ai_debug_teleport_to(result[0]);
     hs_return(thread_datum, 0);
   }
+  return;
 }
 
-/* Script macro-function wrapper for ai_debug_speak.
+/* hs_evaluate_ai_debug_speak (0xc2220) — Script macro-function wrapper for ai_debug_speak.
  *
  * Evaluates the macro function's single argument, then — if the evaluator
  * returned a non-NULL value block — passes that block's first dword (a char *
@@ -3322,7 +3340,7 @@ void FUN_000c21e0(int16_t function_index, int thread_datum, char init)
  *   0x4a220 = ai_debug_speak(name)
  *   0xcbf80 = hs_return(thread_handle, value)
  */
-void FUN_000c2220(int16_t function_index, int thread_datum, char init)
+void hs_evaluate_ai_debug_speak(int16_t function_index, int thread_datum, char init)
 {
   char **result;
 
@@ -3332,11 +3350,12 @@ void FUN_000c2220(int16_t function_index, int thread_datum, char init)
     ai_debug_speak(result[0]);
     hs_return(thread_datum, 0);
   }
+  return;
 }
 
-/* 0xc2260 (hs.obj) — HaloScript function handler: ai_debug_speak_list.
+/* hs_evaluate_ai_debug_speak_list (0xc2260) (hs.obj) — HaloScript function handler: ai_debug_speak_list.
  *
- * Single-string macro-function wrapper, identical in shape to 0xc2220
+ * Single-string macro-function wrapper, identical in shape to hs_evaluate_ai_debug_speak (0xc2220)
  * (ai_debug_speak).  The arguments are evaluated by
  * hs_macro_function_evaluate(function_index, thread_datum, init); on success
  * it returns a pointer to the evaluated result block whose FIRST dword
@@ -3371,7 +3390,7 @@ void FUN_000c2220(int16_t function_index, int thread_datum, char init)
  *   0x4a290 = ai_debug_speak_list(list_name)
  *   0xcbf80 = hs_return(thread_handle, value)
  */
-void FUN_000c2260(int16_t function_index, int thread_datum, char init)
+void hs_evaluate_ai_debug_speak_list(int16_t function_index, int thread_datum, char init)
 {
   char **result;
 
@@ -3381,6 +3400,7 @@ void FUN_000c2260(int16_t function_index, int thread_datum, char init)
     ai_debug_speak_list(result[0]);
     hs_return(thread_datum, 0);
   }
+  return;
 }
 
 /* 0xc22a0 (hs.obj) — HaloScript function handler: screen effect fade in.
@@ -3424,7 +3444,7 @@ void FUN_000c2260(int16_t function_index, int thread_datum, char init)
  *   ADD ESP,0x18              ; one coalesced cleanup for BOTH calls (4 + 2)
  *   POP ESI; POP EBP; RET
  *
- * The Ghidra decompile prototyped this as `void FUN_000c22a0(void)` with
+ * The Ghidra decompile prototyped this as `void(void)` with
  * `in_stack_*` phantoms and rendered the middle call as `FUN_000a2970()` with
  * no arguments — it dropped all four (both floats are hidden behind the
  * PUSH/FSTP idiom).  The ARG_COUNT hazard on hs_return (cleanup=6 vs decl=2)
@@ -3435,7 +3455,7 @@ void FUN_000c2260(int16_t function_index, int thread_datum, char init)
  *   0xa2970 = player_effect_screen_fade_in(effect, scale_a, scale_b, flags)
  *   0xcbf80 = hs_return(thread_handle, value)
  */
-void FUN_000c22a0(int16_t function_index, int thread_datum, char init)
+void hs_evaluate_fade_in(int16_t function_index, int thread_datum, char init)
 {
   int *result;
 
@@ -3447,6 +3467,7 @@ void FUN_000c22a0(int16_t function_index, int thread_datum, char init)
                                  *(uint16_t *)(result + 3));
     hs_return(thread_datum, 0);
   }
+  return;
 }
 
 /* 0xc22f0 (hs.obj) — HaloScript function handler: screen effect fade out.
@@ -3457,7 +3478,7 @@ void FUN_000c22a0(int16_t function_index, int thread_datum, char init)
  *   help = "does a screen fade out to a particular color",
  *   num_params = 4,  param_types = (6, 6, 6, 7) = (real, real, real, short).
  *
- * Structural twin of FUN_000c22a0 (fade_in) directly above: evaluate the four
+ * Structural twin of hs_evaluate_fade_in (fade_in) directly above: evaluate the four
  * script arguments, and when the evaluator returns a completed argument block,
  * forward it to player_effect_screen_fade_out() and return 0 to the script.
  *
@@ -3486,7 +3507,7 @@ void FUN_000c22a0(int16_t function_index, int thread_datum, char init)
  *   ADD  ESP,0x18             ; one coalesced cleanup for BOTH calls (4 + 2)
  *   POP ESI; POP EBP; RET
  *
- * The Ghidra decompile prototyped this as `void FUN_000c22f0(void)` with
+ * The Ghidra decompile prototyped this as `void(void)` with
  * `in_stack_*` phantoms and rendered the middle call as `FUN_000a29c0()` with
  * no arguments — the PUSH/FSTP idiom hides both float arguments.  The
  * ARG_COUNT hazard on hs_return (cleanup=6 vs decl=2) is a false positive from
@@ -3503,7 +3524,7 @@ void FUN_000c22a0(int16_t function_index, int thread_datum, char init)
  *   0xa29c0 = player_effect_screen_fade_out(effect, scale_a, scale_b, flags)
  *   0xcbf80 = hs_return(thread_handle, value)
  */
-void FUN_000c22f0(int16_t function_index, int thread_datum, char init)
+void hs_evaluate_fade_out(int16_t function_index, int thread_datum, char init)
 {
   int *result;
 
@@ -3515,13 +3536,14 @@ void FUN_000c22f0(int16_t function_index, int thread_datum, char init)
                                   *(uint16_t *)(result + 3));
     hs_return(thread_datum, 0);
   }
+  return;
 }
 
 /* 0xc2340 (hs.obj) — HaloScript function handler: cinematic start.
  *
  * Zero-argument script builtin, so there is no hs_macro_function_evaluate
  * call — the handler runs cinematic_start() and completes the calling thread
- * with the value 0.  Structural twin of FUN_000c2180 above (same
+ * with the value 0.  Structural twin of 0xc2180 above (same
  * 10-instruction sub-shape, same frame).
  *
  * Disassembly (10 instructions).  Frame is PUSH EBP; MOV EBP,ESP only — no
@@ -3547,15 +3569,16 @@ void FUN_000c22f0(int16_t function_index, int thread_datum, char init)
  *   0x92e20 = cinematic_start(void)
  *   0xcbf80 = hs_return(thread_handle, value)
  */
-void FUN_000c2340(int16_t function_index, int thread_datum, char init)
+void hs_evaluate_cinematic_start(int16_t function_index, int thread_datum, char init)
 {
   cinematic_start();
   hs_return(thread_datum, 0);
+  return;
 }
 
 /* 0xc2360 (hs.obj) — HaloScript function handler: cinematic stop.
  *
- * Exact mirror of FUN_000c2340 above with the inner callee swapped from
+ * Exact mirror of hs_evaluate_cinematic_start above with the inner callee swapped from
  * cinematic_start (0x92e20) to cinematic_stop (0x93050).  Zero-argument
  * script builtin, so there is no hs_macro_function_evaluate call — the
  * handler stops the cinematic and completes the calling thread with 0.
@@ -3587,16 +3610,17 @@ void FUN_000c2340(int16_t function_index, int thread_datum, char init)
  *   0x93050 = cinematic_stop(void)
  *   0xcbf80 = hs_return(thread_handle, value)
  */
-void FUN_000c2360(int16_t function_index, int thread_datum, char init)
+void hs_evaluate_cinematic_stop(int16_t function_index, int thread_datum, char init)
 {
   cinematic_stop();
   hs_return(thread_datum, 0);
+  return;
 }
 
 /* 0xc2380 (hs.obj) — HaloScript function handler: cinematic skip start.
  *
  * Third member of the cinematic_start / cinematic_stop trio above; an exact
- * mirror of FUN_000c2360 with the inner callee swapped from cinematic_stop
+ * mirror of hs_evaluate_cinematic_stop with the inner callee swapped from cinematic_stop
  * (0x93050) to cinematic_skip_start (0x92e70).  Zero-argument script builtin,
  * so there is no hs_macro_function_evaluate call — the handler arms the
  * cinematic skip and completes the calling thread with 0.
@@ -3629,17 +3653,18 @@ void FUN_000c2360(int16_t function_index, int thread_datum, char init)
  *   0x92e70 = cinematic_skip_start(void)
  *   0xcbf80 = hs_return(thread_handle, value)
  */
-void FUN_000c2380(int16_t function_index, int thread_datum, char init)
+void hs_evaluate_cinematic_skip_start_internal(int16_t function_index, int thread_datum, char init)
 {
   cinematic_skip_start();
   hs_return(thread_datum, 0);
+  return;
 }
 
 /* 0xc23a0 (hs.obj) — HaloScript function handler: cinematic skip stop.
  *
  * Fourth and final member of the cinematic quartet (start 0xc2340, stop
  * 0xc2360, skip_start 0xc2380, skip_stop here); an exact mirror of
- * FUN_000c2380 with the inner callee swapped from cinematic_skip_start
+ * hs_evaluate_cinematic_skip_start_internal with the inner callee swapped from cinematic_skip_start
  * (0x92e70) to cinematic_skip_stop (0x92e80).  Zero-argument script builtin,
  * so there is no hs_macro_function_evaluate call — the handler disarms the
  * cinematic skip and completes the calling thread with 0.
@@ -3672,10 +3697,11 @@ void FUN_000c2380(int16_t function_index, int thread_datum, char init)
  *   0x92e80 = cinematic_skip_stop(void)
  *   0xcbf80 = hs_return(thread_handle, value)
  */
-void FUN_000c23a0(int16_t function_index, int thread_datum, char init)
+void hs_evaluate_cinematic_skip_stop_internal(int16_t function_index, int thread_datum, char init)
 {
   cinematic_skip_stop();
   hs_return(thread_datum, 0);
+  return;
 }
 
 /* 0xc23c0 — HaloScript handler: evaluate the macro-function argument and use
@@ -3704,7 +3730,7 @@ void FUN_000c23a0(int16_t function_index, int thread_datum, char init)
  *   0x92e90 = cinematic_show_letterbox(char show)
  *   0xcbf80 = hs_return(thread_handle, value)
  */
-void FUN_000c23c0(int16_t function_index, int thread_datum, char init)
+void hs_evaluate_cinematic_show_letterbox(int16_t function_index, int thread_datum, char init)
 {
   char *result;
 
@@ -3764,7 +3790,7 @@ void FUN_000c23c0(int16_t function_index, int thread_datum, char init)
  *   0x93640 = FUN_00093640(int value)
  *   0xcbf80 = hs_return(thread_handle, value)
  */
-void FUN_000c2400(int16_t function_index, int thread_datum, char init)
+void hs_evaluate_cinematic_set_title(int16_t function_index, int thread_datum, char init)
 {
   uint16_t *result;
 
@@ -3838,7 +3864,7 @@ void FUN_000c2400(int16_t function_index, int thread_datum, char init)
  *   0x930b0 = cinematic_set_title_delayed(int index, float value)
  *   0xcbf80 = hs_return(thread_handle, value)
  */
-void FUN_000c2440(int16_t function_index, int thread_datum, char init)
+void hs_evaluate_cinematic_set_title_delayed(int16_t function_index, int thread_datum, char init)
 {
   uint16_t *result;
 
@@ -3899,7 +3925,7 @@ void FUN_000c2440(int16_t function_index, int thread_datum, char init)
  *   0x93030 = cinematic_suppress_bsp_object_creation(unsigned char suppress)
  *   0xcbf80 = hs_return(thread_handle, value)
  */
-void FUN_000c2480(int16_t function_index, int thread_datum, char init)
+void hs_evaluate_cinematic_suppress_bsp_object_creation(int16_t function_index, int thread_datum, char init)
 {
   unsigned char *result;
 
@@ -3930,10 +3956,11 @@ void FUN_000c2480(int16_t function_index, int thread_datum, char init)
  * ([EBP+0x10]) are never read but complete the uniform hs-evaluator dispatch
  * signature. Push order at the second call (PUSH 0x0 then PUSH EAX, ADD
  * ESP,0x8) confirms hs_return(thread_datum, 0), not (0, thread_datum). */
-void FUN_000c24c0(int16_t function_index, int thread_datum, char init)
+void hs_evaluate_attract_mode_start(int16_t function_index, int thread_datum, char init)
 {
   event_manager_tab_process();
   hs_return(thread_datum, 0);
+  return;
 }
 
 /* 0xc24e0 — HaloScript function evaluator: flag the current map as won for
@@ -5130,7 +5157,7 @@ void hs_evaluate_debug_sounds_distances(int16_t function_index, int thread_datum
  * calls (0x8 for debug_sound_classes_set_wet + 0x8 for hs_return); a naive
  * cdecl reading of that one cleanup makes hs_return look like it takes 4
  * stack args, but it takes 2.  The call-site audit's ARG_COUNT warning here
- * is that false positive (same as FUN_000c22a0 / hs_evaluate_debug_sounds_enable). */
+ * is that false positive (same as hs_evaluate_fade_in / hs_evaluate_debug_sounds_enable). */
 void hs_evaluate_debug_sounds_wet(int16_t function_index, int thread_datum, char init)
 {
   int *result;
@@ -5874,7 +5901,7 @@ void hs_evaluate_error_overflow_suppression(int16_t function_index, int thread_d
 }
 
 /* Zero-argument HaloScript builtin handler.  Structural twin of
- * FUN_000c2160 / FUN_000c2180 above: no hs_macro_function_evaluate call
+ * hs_evaluate_ai_lines / hs_evaluate_ai_debug_sound_point_set above: no hs_macro_function_evaluate call
  * (the builtin takes no script arguments), so the handler just runs its
  * side-effecting callee and completes the calling thread with the value 0.
  *
