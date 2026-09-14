@@ -19414,7 +19414,8 @@
     },
     {
      "addr": "0xbf380",
-     "decl": "void FUN_000bf380(void);"
+     "decl": "void FUN_000bf380(int16_t function_index, int thread_datum, char init);",
+     "ported": true
     },
     {
      "addr": "0xbf3d0",

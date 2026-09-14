@@ -697,7 +697,8 @@ int FUN_000bac10(void *record, int parent_handle)
  *       - if player+0x3C is valid, OR that cluster's visibility row into
  *         combined_pvs.
  *   - Then OR in the cluster returned by 0x13DCC0 (the "currently focused
- *     parent object" cluster -- see objects.c objects_get_activating_cluster_index) when valid. */
+ *     parent object" cluster -- see objects.c
+ * objects_get_activating_cluster_index) when valid. */
 void players_update_pvs(void *combined_pvs /* @<edi> */, bool local_player_only)
 {
   void *structure_bsp;
@@ -1291,8 +1292,8 @@ void player_add_equipment(int unit_handle, int16_t equipment_index,
       (unit = (char *)object_try_and_get_and_verify_type(unit_handle, 3),
        *(int *)(unit + 0x1c8) != -1)) {
     scenario = (char *)global_scenario_get();
-    equip_def = (char *)tag_block_get_element(
-      scenario + 0x348, (int)equipment_index, 0x68);
+    equip_def = (char *)tag_block_get_element(scenario + 0x348,
+                                              (int)equipment_index, 0x68);
 
     if (reset_flag != '\0') {
       unit_clear_weapons(unit_handle);
@@ -1651,6 +1652,63 @@ common_tail:
   if (*(int16_t *)(player + 2) != NONE) {
     ((void (*)(int16_t))0x8aa30)(*(int16_t *)(player + 2));
   }
+}
+
+/* 0xbbfe0: update a player's pending action-result fields.
+ *
+ * player_handle arrives in EAX; the remaining three arguments are cdecl stack
+ * arguments.  The equal-priority path keeps the existing result unless the
+ * candidate object is strictly closer to the player's unit. */
+__declspec(noinline) void
+player_set_spawn_action_result(int player_handle /* @<eax> */,
+                               int16_t action_result_type, int object_handle,
+                               int16_t seat_index)
+{
+  char *player;
+
+  player = (char *)datum_get(player_data, player_handle);
+  if (action_result_type != 11) {
+    int16_t current_type = *(int16_t *)(player + 0x28);
+    if (action_result_type == current_type) {
+      char *unit_obj;
+      char *cur_obj;
+      char *new_obj;
+      float cur_dx;
+      float cur_dy;
+      float cur_dz;
+      float new_dx;
+      float new_dy;
+      float new_dz;
+      float cur_dist;
+      float new_dist;
+
+      unit_obj =
+        (char *)object_get_and_verify_type(*(int *)(player + 0x34), -1);
+      cur_obj = (char *)object_get_and_verify_type(*(int *)(player + 0x24), -1);
+      new_obj = (char *)object_get_and_verify_type(object_handle, -1);
+
+      cur_dx = *(float *)(cur_obj + 0xc) - *(float *)(unit_obj + 0xc);
+      cur_dy = *(float *)(cur_obj + 0x10) - *(float *)(unit_obj + 0x10);
+      cur_dz = *(float *)(cur_obj + 0x14) - *(float *)(unit_obj + 0x14);
+
+      new_dx = *(float *)(new_obj + 0xc) - *(float *)(unit_obj + 0xc);
+      new_dy = *(float *)(new_obj + 0x10) - *(float *)(unit_obj + 0x10);
+      new_dz = *(float *)(new_obj + 0x14) - *(float *)(unit_obj + 0x14);
+
+      cur_dist =
+        xbox_sqrtf(cur_dx * cur_dx + cur_dy * cur_dy + cur_dz * cur_dz);
+      new_dist =
+        xbox_sqrtf(new_dx * new_dx + new_dy * new_dy + new_dz * new_dz);
+      if (cur_dist <= new_dist)
+        return;
+    } else if (action_result_type <= current_type) {
+      return;
+    }
+  }
+
+  *(int16_t *)(player + 0x28) = action_result_type;
+  *(int *)(player + 0x24) = object_handle;
+  *(int16_t *)(player + 0x2a) = seat_index;
 }
 
 /* Attempt to spawn the player into a vehicle or interact with a world
@@ -2363,63 +2421,6 @@ void players_update_before_game_client(int player_index /* @<ebx> */,
 
   moved = FUN_000bb670(player_index, object_handle, position);
   *((char *)players_globals + 0x2e) = (moved == 0);
-}
-
-/* 0xbbfe0: update a player's pending action-result fields.
- *
- * player_handle arrives in EAX; the remaining three arguments are cdecl stack
- * arguments.  The equal-priority path keeps the existing result unless the
- * candidate object is strictly closer to the player's unit. */
-__declspec(noinline)
-void player_set_spawn_action_result(int player_handle /* @<eax> */,
-                                    int16_t action_result_type,
-                                    int object_handle, int16_t seat_index)
-{
-  char *player;
-
-  player = (char *)datum_get(player_data, player_handle);
-  if (action_result_type != 11) {
-    int16_t current_type = *(int16_t *)(player + 0x28);
-    if (action_result_type == current_type) {
-      char *unit_obj;
-      char *cur_obj;
-      char *new_obj;
-      float cur_dx;
-      float cur_dy;
-      float cur_dz;
-      float new_dx;
-      float new_dy;
-      float new_dz;
-      float cur_dist;
-      float new_dist;
-
-      unit_obj =
-        (char *)object_get_and_verify_type(*(int *)(player + 0x34), -1);
-      cur_obj = (char *)object_get_and_verify_type(*(int *)(player + 0x24), -1);
-      new_obj = (char *)object_get_and_verify_type(object_handle, -1);
-
-      cur_dx = *(float *)(cur_obj + 0xc) - *(float *)(unit_obj + 0xc);
-      cur_dy = *(float *)(cur_obj + 0x10) - *(float *)(unit_obj + 0x10);
-      cur_dz = *(float *)(cur_obj + 0x14) - *(float *)(unit_obj + 0x14);
-
-      new_dx = *(float *)(new_obj + 0xc) - *(float *)(unit_obj + 0xc);
-      new_dy = *(float *)(new_obj + 0x10) - *(float *)(unit_obj + 0x10);
-      new_dz = *(float *)(new_obj + 0x14) - *(float *)(unit_obj + 0x14);
-
-      cur_dist =
-        xbox_sqrtf(cur_dx * cur_dx + cur_dy * cur_dy + cur_dz * cur_dz);
-      new_dist =
-        xbox_sqrtf(new_dx * new_dx + new_dy * new_dy + new_dz * new_dz);
-      if (cur_dist <= new_dist)
-        return;
-    } else if (action_result_type <= current_type) {
-      return;
-    }
-  }
-
-  *(int16_t *)(player + 0x28) = action_result_type;
-  *(int *)(player + 0x24) = object_handle;
-  *(int16_t *)(player + 0x2a) = seat_index;
 }
 
 /* Re-seat every local player into the scenario's pending structure BSP
@@ -5532,8 +5533,8 @@ void FUN_000bebf0(int16_t function_index, int thread_datum, char init)
  * hs_macro_function_evaluate(function_index, thread_datum, init); while that
  * returns NULL the evaluation is still pending and nothing is committed. Once a
  * non-NULL evaluation record is returned, its first field is loaded as a 16-bit
- * value (*(short *)record) and forwarded to object_pvs_set_camera_point, then the thread is
- * committed with hs_return(thread_datum, 0).
+ * value (*(short *)record) and forwarded to object_pvs_set_camera_point, then
+ * the thread is committed with hs_return(thread_datum, 0).
  *
  * cdecl frame (PUSH EBP; MOV EBP,ESP):
  *   function_index  int16_t  [EBP+0x08]  -> hs_macro_function_evaluate arg1
@@ -5542,11 +5543,11 @@ void FUN_000bebf0(int16_t function_index, int thread_datum, char init)
  *
  * hs_macro_function_evaluate returns the record pointer in EAX. On non-NULL the
  * original loads its first field as a 16-bit value (word load) and passes it to
- * object_pvs_set_camera_point (which takes a short camera_point_index), then commits the
- * thread with hs_return(thread_datum, 0). Ghidra modeled this void(void) with
- * the three cdecl params read as in_stack_*; the correct prototype is the 3-arg
- * cdecl below. kb decl corrected from void(void) so callers pass all three
- * arguments. */
+ * object_pvs_set_camera_point (which takes a short camera_point_index), then
+ * commits the thread with hs_return(thread_datum, 0). Ghidra modeled this
+ * void(void) with the three cdecl params read as in_stack_*; the correct
+ * prototype is the 3-arg cdecl below. kb decl corrected from void(void) so
+ * callers pass all three arguments. */
 void FUN_000bec30(int16_t function_index, int thread_datum, char init)
 {
   short *record;
@@ -5571,12 +5572,12 @@ void FUN_000bec30(int16_t function_index, int thread_datum, char init)
  *   function_index  int16_t  [EBP+0x08]  (unused -- never loaded)
  *   thread_handle   int      [EBP+0x0c]  -> hs_return arg1
  *
- * object_pvs_clear() takes no args and is called first. The second stack param is
- * then loaded (MOV EAX,[EBP+0xc]) and pushed as hs_return's thread_handle; the
- * constant 0 is pushed as hs_return's value (PUSH 0; PUSH EAX; CALL hs_return;
- * ADD ESP,8 cleans the two cdecl args). Ghidra modeled this void(void) and read
- * the second cdecl param as in_stack_00000008 (mislabeled -- it is [EBP+0xc]);
- * kb decl was previously void(void). */
+ * object_pvs_clear() takes no args and is called first. The second stack param
+ * is then loaded (MOV EAX,[EBP+0xc]) and pushed as hs_return's thread_handle;
+ * the constant 0 is pushed as hs_return's value (PUSH 0; PUSH EAX; CALL
+ * hs_return; ADD ESP,8 cleans the two cdecl args). Ghidra modeled this
+ * void(void) and read the second cdecl param as in_stack_00000008 (mislabeled
+ * -- it is [EBP+0xc]); kb decl was previously void(void). */
 void FUN_000bec70(int16_t function_index, int thread_handle)
 {
   object_pvs_clear();
@@ -6758,9 +6759,9 @@ void FUN_000bf220(int16_t function_index, int thread_datum, char init)
  *
  * Callees (all cdecl, in kb.json):
  *   0xcc560  = hs_macro_function_evaluate(int16_t, int, char) -> record ptr
- *   0x1a9c90 = unit_scripting_vehicle_test_seat_list(int unit_handle, const char *seat_name,
- *              int object_list) -> char predicate in AL
- *   0xcbf80  = hs_return(int thread_handle, int value) */
+ *   0x1a9c90 = unit_scripting_vehicle_test_seat_list(int unit_handle, const
+ * char *seat_name, int object_list) -> char predicate in AL 0xcbf80  =
+ * hs_return(int thread_handle, int value) */
 void FUN_000bf260(int16_t function_index, int thread_datum, char init)
 {
   int *record;
@@ -6773,7 +6774,8 @@ void FUN_000bf260(int16_t function_index, int thread_datum, char init)
   record =
     (int *)hs_macro_function_evaluate(function_index, thread_datum, init);
   if (record != NULL) {
-    value.b = unit_scripting_vehicle_test_seat_list(record[0], (const char *)record[1], record[2]);
+    value.b = unit_scripting_vehicle_test_seat_list(
+      record[0], (const char *)record[1], record[2]);
     hs_return(thread_datum, value.i);
   }
 }
@@ -6991,6 +6993,76 @@ void FUN_000bf340(int16_t function_index, int thread_datum, char init)
     (int *)hs_macro_function_evaluate(function_index, thread_datum, init);
   if (record != NULL) {
     FUN_001b5500(record[0]);
+    hs_return(thread_datum, 0);
+  }
+}
+
+/* FUN_000bf380 @ 0x000bf380
+ *
+ * HaloScript builtin dispatcher, same family as 0xbf300/0xbf340 above and the
+ * structural twin of FUN_000bf3d0 below: identical 3-parameter cdecl shape,
+ * identical evaluate / NULL-check / worker / hs_return skeleton, and the
+ * "worker return discarded, script gets a CONSTANT 0" tail.  The record is
+ * THREE fields (int, float, float) and the worker is FUN_001a7a90.
+ *
+ * cdecl frame, 0xbf380-0xbf3c1, 22 instructions: PUSH EBP; MOV EBP,ESP;
+ * PUSH ESI.  No local dword, no _chkstk, no SEH, no local buffers.  RET
+ * carries no immediate (caller cleans, cdecl).
+ *   function_index  int16_t  [EBP+0x08]  -> ECX
+ *   thread_datum    int      [EBP+0x0c]  -> ESI (the only callee-saved
+ *                                          register; held live across the
+ *                                          evaluate call and reused as
+ *                                          hs_return arg1 -- do NOT source it
+ *                                          from the record)
+ *   init            char     [EBP+0x10]  -> EAX
+ *
+ * Binary evidence:
+ *   CALL 0xcc560 @0xbf390 pushes EAX([EBP+0x10]), ESI([EBP+0xc]),
+ *   ECX([EBP+0x8]) in cdecl reverse order -> C order (function_index,
+ *   thread_datum, init); ADD ESP,0xc @0xbf395 = 3 args, straight
+ *   pass-through.  TEST EAX,EAX / JZ 0xbf3bf @0xbf398 skips BOTH remaining
+ *   calls on a NULL record, so the 0xcc560 return is a POINTER that is
+ *   dereferenced even though kb.json declares it `int` -- cast at the call
+ *   site, as every twin in this family does; the kb decl is left alone.
+ *
+ *   Record deref, THREE fields, MIXED widths (no MOVZX/MOVSX anywhere, so
+ *   nothing is narrowed):
+ *     +0x00 int    object handle        (MOV EDX,dword ptr [EAX]  @0xbf39f)
+ *     +0x04 float  first damage scalar  (FLD  float ptr [EAX+0x4] @0xbf3a8)
+ *     +0x08 float  second damage scalar (FLD  float ptr [EAX+0x8] @0xbf39c)
+ *   The two floats go out via the MSVC float-argument push (SUB ESP,0x8
+ *   @0xbf3a1 / FSTP [ESP+0x4] @0xbf3a4 / FSTP [ESP] @0xbf3ab) rather than
+ *   PUSH, which is why the FPU_ARG hazard on 0x1a7a90 reports the pushed
+ *   dummy slot instead of the real argument; kb.json already declares
+ *   FUN_001a7a90(int, float, float).  The +0x8 load runs FIRST because the
+ *   stack slots are filled top-down -- argument order in C is still
+ *   (+0x00, +0x04, +0x08).
+ *
+ *   CALL 0xcbf80 @0xbf3b7 pushes the immediate 0x0 @0xbf3b4 then ESI
+ *   @0xbf3b6 -> hs_return(thread_datum, 0); the script return value is the
+ *   CONSTANT 0, there is no result slot.  ONE combined ADD ESP,0x14 @0xbf3bc
+ *   folds FUN_001a7a90's 3 dwords with hs_return's 2 -- the ARG_COUNT warning
+ *   on 0xcbf80 ("cleanup=5 vs decl=2") is that merged cleanup, hs_return
+ *   really takes 2 args, do NOT "fix" its decl.
+ *
+ *   Ghidra modelled this void(void), so the three cdecl params showed up as
+ *   in_stack_00000004/8/c pseudo-locals (off by 4); they are stack args, not
+ *   @<reg> (lift-learnings 31 / void-decl trap).  kb.json's decl was
+ *   corrected from `void(void)` to the 3-arg cdecl form.
+ *
+ * Callees (all cdecl, in kb.json, no @<reg> args anywhere):
+ *   0xcc560  = hs_macro_function_evaluate(int16_t, int, char) -> record ptr
+ *   0x1a7a90 = FUN_001a7a90(int object_handle, float, float) -- void
+ *   0xcbf80  = hs_return(int thread_handle, int value) */
+void FUN_000bf380(int16_t function_index, int thread_datum, char init)
+{
+  void *record;
+
+  record =
+    (void *)hs_macro_function_evaluate(function_index, thread_datum, init);
+  if (record != NULL) {
+    FUN_001a7a90(*(int *)record, *(float *)((char *)record + 4),
+                 *(float *)((char *)record + 8));
     hs_return(thread_datum, 0);
   }
 }
