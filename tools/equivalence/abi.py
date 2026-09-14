@@ -69,10 +69,11 @@ def _parse_params(decl: str) -> list[Param]:
     Does NOT handle function pointer parameters — those are treated as void*.
     """
     # Extract content inside the outermost parentheses
-    m = re.search(r'\(([^)]*)\)\s*;?\s*$', decl)
-    if not m:
+    first_open = decl.find('(')
+    last_close = decl.rfind(')')
+    if first_open == -1 or last_close == -1 or last_close <= first_open:
         return []
-    params_str = m.group(1).strip()
+    params_str = decl[first_open + 1:last_close].strip()
     if not params_str or params_str in ('void', ''):
         return []
 

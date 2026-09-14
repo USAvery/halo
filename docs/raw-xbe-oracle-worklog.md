@@ -407,7 +407,68 @@ and calls the row a triage item, not an excuse.
 
 The allowlist now holds 379 rows.
 
-The 71 `oracle_extract_failed` entries are the next sweep.
+### Scoping the unmappable passes, 67 rows
+
+The 69 `now_passes` rows from the 245-row sweep were audited. 67 rows have
+proven coverage (averaging 65.8%). Two rows (`actor_look_compute_prop_interest`
+and `game_engine_post_rasterize_post_game`) had 0.0% coverage because all seeds
+were `domain_skipped` to an unmapped callback or early exit; they stay excused as
+inconclusive rather than claiming a false pass.
+
+All 67 solid passes gained `"oracle": "delinked"` and a note citing the artifact.
+They are now active under the raw XBE oracle and continue to excuse the delinked
+lane until step 10.
+
+### Relabeling the 8 un-emulatable system functions
+
+Eight rows that still errored are permanently un-emulatable in an isolated zero-fill
+harness: `actor_delete_props`, `director_initialize_for_new_map`, `director_update`,
+`main`, `path_state_new`, `system_get_used_memory_size`, `system_malloc`, and
+`update_loaded_module_section_attributes`.
+
+Their reason was rewritten from the obsolete delinked reference-crash text to state
+the permanent truth: "not differentially testable: allocator / state initializer /
+memory protection / CRT entry point". They carry no oracle scope and remain excused
+everywhere.
+
+Five concrete error rows gained specific failure reasons: `FUN_0003dc20`,
+`FUN_000d7080`, and `FUN_000d7d10` hit `insn_limit` (assert->stub loop); `FUN_000b3770`
+and `FUN_0011c4d0` hit unmapped callbacks/fetches (`eip=0x0`).
+
+### Sweep results, 68 `oracle_extract_failed` entries
+
+Three of the original 71 rows were retired in the rename pass (`seat_label_to_base_seat_index`,
+`base_weapon_label_get`, `point_in_rectangle3d`). The remaining 68 ran under `--oracle=xbe`,
+20 seeds each, in 60.0 seconds:
+
+| Verdict | Count | Share |
+|---|---|---|
+| `now_passes` | 44 | 65% |
+| `now_runs_no_verdict` | 18 | 26% |
+| `now_fails` | 4 | 6% |
+| `still_errors` | 2 | 3% |
+
+Every one of the 44 `now_passes` rows has proven coverage (>0%). All 44 gained
+`"oracle": "delinked"` and a note citing `artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json}`.
+
+The 4 `now_fails` are real divergences needing triage: `FUN_00188d00`,
+`object_detach_from_parent`, `object_get_markers_by_string_id`, and `object_set_position`.
+
+The 2 `still_errors` are `system_calloc` (an allocator, relabeled permanently) and
+`FUN_00084ae0` (escapes to CRT code at `0x1d0581`).
+
+111 of 379 allowlist rows (29%) are now scoped to `delinked`, leaving 268 active
+excuses under `--oracle=xbe`.
+
+### Two harness fixes found during triage
+
+1. `abi.py` parameter parsing used `\(([^)]*)\)\s*;?\s*$` which failed on function
+   pointer parameters like `void (*callback)(void)`. It fell back to `params: []`,
+   pushing 0 stack arguments to multi-argument functions. It now extracts between
+   the first `(` and last `)`.
+2. `unicorn_diff.py` fell through to `status="pass"` when `passed == 0` if all seeds
+   were `domain_skipped` (since `failed == 0` and `errors == 0`). It now explicitly
+   reports `inconclusive` when `passed == 0`.
 
 ## The progress dashboard
 

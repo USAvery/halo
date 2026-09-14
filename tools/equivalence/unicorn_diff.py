@@ -4259,6 +4259,11 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
         return finish("fail", True, "divergence", 1, **extra)
     if errors > 0 and passed == 0:
         return finish("error", True, "emulation_error", 2, **extra)
+    if passed == 0:
+        reason = f"domain_skipped: all {domain_skipped} seed(s) escaped" if domain_skipped else "no_seeds_passed"
+        log("")
+        log(f"  INCONCLUSIVE: {reason}")
+        return finish("inconclusive", True, reason, 3, **extra)
 
     # A run that never entered the function body, or that observed exactly one
     # behaviour across every seed, has not compared anything -- both sides

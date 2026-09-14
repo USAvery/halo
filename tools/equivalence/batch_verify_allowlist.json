@@ -30,8 +30,10 @@
         "*"
       ],
       "reasons": [
-        "oracle crash: @eax=tree (ct_data*) \u2014 random seed used as struct pointer, crashes on first field access"
-      ]
+        "oracle crash: @eax=tree (ct_data*) \u2014 random seed used as struct pointer, crashes on first field access",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_00117000": {
       "statuses": [
@@ -70,8 +72,10 @@
         "*"
       ],
       "reasons": [
-        "oracle crash: @eax=bl_count (short[16]*) \u2014 random seed used as array pointer, crashes on first element access"
-      ]
+        "oracle crash: @eax=bl_count (short[16]*) \u2014 random seed used as array pointer, crashes on first element access",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_001bd5f0": {
       "statuses": [
@@ -334,8 +338,10 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "actors_initialize": {
       "statuses": [
@@ -398,7 +404,8 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
+        "not differentially testable: allocator / state initializer; cannot run in isolated zero-fill harness",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: still error/emulation_error. Permanent excuse (allocator / state initializer / CRT entry point / protection mutator)."
       ]
     },
     "actor_died": {
@@ -438,7 +445,8 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
+        "insn_limit within instruction budget (assert->stub loop in actor/datum handling); needs live-state or higher budget",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: still error/emulation_error. Specific failure captured; kept excused until state snapshot or budget increase."
       ]
     },
     "actor_attach_unit": {
@@ -462,8 +470,10 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_000153e0": {
       "statuses": [
@@ -478,7 +488,8 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: returns inconclusive/domain_skipped -- all seeds escape to callback/exit. Kept excused: retiring it would trade an honest infra excuse for a permanently grey row."
       ]
     },
     "FUN_00016ff0": {
@@ -502,8 +513,10 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "ai_enemies_attacking_player": {
       "statuses": [
@@ -527,8 +540,10 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "bink_playback_update": {
       "statuses": [
@@ -551,8 +566,10 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_001bdb10": {
       "statuses": [
@@ -567,8 +584,10 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_0014cfe0": {
       "statuses": [
@@ -583,31 +602,38 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "collision_log_add_call": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "display_debug_string": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "system_malloc": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
+        "not differentially testable: system memory allocator; cannot run in isolated zero-fill harness",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: still error/emulation_error. Permanent excuse (allocator / state initializer / CRT entry point / protection mutator)."
       ]
     },
     "system_get_used_memory_size": {
@@ -615,7 +641,8 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
+        "not differentially testable: allocator heap walker; cannot run in isolated zero-fill harness",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: still error/emulation_error. Permanent excuse (allocator / state initializer / CRT entry point / protection mutator)."
       ]
     },
     "memory_pool_delete": {
@@ -623,56 +650,70 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "stack_memory_pool_allocate": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "data_dispose": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "data_new_datum": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "data_new_at_index": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "datum_delete": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "data_iterator_new": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "data_next_index": {
       "statuses": [
@@ -695,7 +736,8 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
+        "not differentially testable: state initializer; cannot run in isolated zero-fill harness",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: still error/emulation_error. Permanent excuse (allocator / state initializer / CRT entry point / protection mutator)."
       ]
     },
     "director_update": {
@@ -703,7 +745,8 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
+        "not differentially testable: state updater / director loop; cannot run in isolated zero-fill harness",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: still error/emulation_error. Permanent excuse (allocator / state initializer / CRT entry point / protection mutator)."
       ]
     },
     "file_error": {
@@ -711,8 +754,10 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "file_create": {
       "statuses": [
@@ -816,8 +861,10 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "game_engine_test_flag": {
       "statuses": [
@@ -850,8 +897,10 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "game_engine_update_player_always_invis": {
       "statuses": [
@@ -923,7 +972,8 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: returns inconclusive/domain_skipped -- all seeds escape to callback/exit. Kept excused: retiring it would trade an honest infra excuse for a permanently grey row."
       ]
     },
     "FUN_000af9a0": {
@@ -979,8 +1029,10 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_000b2bc0": {
       "statuses": [
@@ -1003,7 +1055,8 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
+        "unmapped callback/vtable call (oracle_escaped eip=0x0); needs initialized function pointers",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: still error/emulation_error. Specific failure captured; kept excused until state snapshot or budget increase."
       ]
     },
     "FUN_000b39a0": {
@@ -1011,8 +1064,10 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "game_state_call_after_load_procs": {
       "statuses": [
@@ -1035,8 +1090,10 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_000c4ff0": {
       "statuses": [
@@ -1059,16 +1116,20 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_000c7ca0": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "hs_thread_stack_alloc": {
       "statuses": [
@@ -1099,8 +1160,10 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_000cc340": {
       "statuses": [
@@ -1115,8 +1178,10 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "hs_macro_function_evaluate": {
       "statuses": [
@@ -1163,16 +1228,20 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "hs_evaluate_arithmetic": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "hs_evaluate_sleep": {
       "statuses": [
@@ -1219,8 +1288,10 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_000d1540": {
       "statuses": [
@@ -1243,8 +1314,10 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_000d6120": {
       "statuses": [
@@ -1339,7 +1412,8 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
+        "insn_limit within instruction budget (assert->stub loop in HUD / data); needs live-state or higher budget",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: still error/emulation_error. Specific failure captured; kept excused until state snapshot or budget increase."
       ]
     },
     "FUN_000d7800": {
@@ -1363,7 +1437,8 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
+        "insn_limit within instruction budget (assert->stub loop in local_player_get_next / HUD update); needs live-state or higher budget",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: still error/emulation_error. Specific failure captured; kept excused until state snapshot or budget increase."
       ]
     },
     "FUN_000d7d40": {
@@ -1411,16 +1486,20 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_0011a6d0": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_0011c430": {
       "statuses": [
@@ -1435,15 +1514,18 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_0011c4d0": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
+        "unmapped callback/vtable fetch (oracle_crash UC_ERR_FETCH_UNMAPPED eip=0x0 in cache dispatch); needs initialized cache object",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: still error/emulation_error. Specific failure captured; kept excused until state snapshot or budget increase."
       ]
     },
     "encode_network_game_message": {
@@ -1451,16 +1533,20 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_0012e090": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "network_game_server_get_oldest_client_update_received": {
       "statuses": [
@@ -1508,24 +1594,30 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "point_physics_definition_get_mass": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "profile_enter_private": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "projectile_new": {
       "statuses": [
@@ -1540,8 +1632,10 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "progress_bar_set_quad_texcoords": {
       "statuses": [
@@ -1580,79 +1674,98 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_00189450": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_001894d0": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_001896d0": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_00189860": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_0018a770": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_0018a990": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_0018a9d0": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_0018ab30": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "update_loaded_module_section_attributes": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
+        "not differentially testable: memory protection / page attribute mutator; cannot run in isolated zero-fill harness",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: still error/emulation_error. Permanent excuse (allocator / state initializer / CRT entry point / protection mutator)."
       ]
     },
     "main": {
@@ -1660,7 +1773,8 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
+        "not differentially testable: CRT / game entry point; cannot run in isolated zero-fill harness",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: still error/emulation_error. Permanent excuse (allocator / state initializer / CRT entry point / protection mutator)."
       ]
     },
     "scenario_leaf_index_from_point": {
@@ -1716,8 +1830,10 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "sound_get_default_priority": {
       "statuses": [
@@ -1764,16 +1880,20 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "sound_find_oldest_channel": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "sound_start_next_looping_permutation": {
       "statuses": [
@@ -1796,8 +1916,10 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "sound_update_music": {
       "statuses": [
@@ -1828,32 +1950,40 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "thread_is_done": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "take_mutex": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "release_mutex": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "ui_widget_display_error": {
       "statuses": [
@@ -1900,16 +2030,20 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "xbox_texture_cache_request": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "rasterizer_text_draw_cached_char": {
       "statuses": [
@@ -1956,8 +2090,10 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "lruv_debug_to_file": {
       "statuses": [
@@ -1996,32 +2132,40 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "actor_move_to_move_position": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "actor_move_to_prop": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "actor_move_compute_facing": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_0002f5b0": {
       "statuses": [
@@ -2119,8 +2263,10 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "circular_queue_delete": {
       "statuses": [
@@ -2135,8 +2281,10 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "object_destroy": {
       "statuses": [
@@ -2159,7 +2307,8 @@
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
+        "not differentially testable: allocator / pathfinding initialization; cannot run in isolated zero-fill harness",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: still error/emulation_error. Permanent excuse (allocator / state initializer / CRT entry point / protection mutator)."
       ]
     },
     "effects_update": {
@@ -2337,8 +2486,10 @@
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
+        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_00015bb0": {
       "statuses": [
@@ -2385,7 +2536,8 @@
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
+        "not differentially testable: system memory allocator; cannot run in isolated zero-fill harness",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: still error/emulation_error. Permanent excuse (allocator)."
       ]
     },
     "file_open": {
@@ -2425,15 +2577,18 @@
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
+        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_00084ae0": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
+        "unmapped callee / runtime escape (oracle_escaped eip=0x1d0581); needs initialized seed or CRT stub",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: still error/emulation_error."
       ]
     },
     "FUN_00085110": {
@@ -2449,8 +2604,10 @@
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
+        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_001362d0": {
       "statuses": [
@@ -2481,8 +2638,10 @@
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
+        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "object_get_markers_by_string_id": {
       "statuses": [
@@ -2497,8 +2656,10 @@
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
+        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "object_detach_from_parent": {
       "statuses": [
@@ -2513,8 +2674,10 @@
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
+        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "object_set_position": {
       "statuses": [
@@ -2545,16 +2708,20 @@
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
+        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_00110a10": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
+        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_00111170": {
       "statuses": [
@@ -2569,40 +2736,50 @@
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
+        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_00188970": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
+        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_00188a90": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
+        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_00188bf0": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
+        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_00188c60": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
+        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_00188d00": {
       "statuses": [
@@ -2665,24 +2842,30 @@
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
+        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_001a6e20": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
+        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_001a6ef0": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
+        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_001a74d0": {
       "statuses": [
@@ -2697,24 +2880,30 @@
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
+        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "unit_set_animation": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
+        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_001ab940": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
+        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "unit_drop_grenades_on_death": {
       "statuses": [
@@ -2753,40 +2942,50 @@
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
+        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "draw_string_set_tab_stops": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
+        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "draw_string_set_color": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
+        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "draw_string_set_style_justify_flags": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
+        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "draw_string_set_font": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
+        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "lruv_resize": {
       "statuses": [
@@ -2809,16 +3008,20 @@
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
+        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_00076bb0": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
+        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_00076bd0": {
       "statuses": [
@@ -2841,32 +3044,40 @@
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
+        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_00077510": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
+        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_00077540": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
+        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_00077590": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
+        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_00077720": {
       "statuses": [
@@ -2889,8 +3100,10 @@
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
+        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_00077ff0": {
       "statuses": [
@@ -2905,104 +3118,130 @@
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
+        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_00079630": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
+        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "real_rgb_color_brightness": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
+        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "bitmap_clone": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
+        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "real_hsv_color_to_real_rgb_color": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
+        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "argb_color_to_real_argb_color": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
+        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "rgb_color_to_real_rgb_color": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
+        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "pixel32_to_real_argb_color": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
+        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "pixel32_to_real_rgb_color": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
+        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "valid_real_rgb_color": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
+        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "bitmap_shrink": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
+        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "bitmap_smooth": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
+        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "bitmap_alpha_bleed": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
+        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_extract_failed.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: pass. Scoped to delinked; active under xbe."
+      ],
+      "oracle": "delinked"
     },
     "FUN_00137170": {
       "statuses": [
