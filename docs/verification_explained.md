@@ -308,16 +308,33 @@ failure categories:
 
 ### Leaf cache and function classification
 
-`unicorn_diff.py --batch-classify` scans all delinked `.obj` files and
-classifies each function as:
+`unicorn_diff.py --batch-classify` classifies every function in
+`tools/verify/function_bounds.json` against the pristine `cachebeta.xbe` as:
 
 - **leaf** — no external calls or data references (pure computation)
 - **data_only** — references global data but makes no external calls
 - **stubbable** — calls known stubs (csmemcpy, fabs, etc.)
-- **non_leaf** — calls unknown functions (can't emulate yet)
+- **non_leaf** — no usable classification (raw bytes at real VAs resolve every
+  call target, so this category no longer arises from the XBE sweep; it
+  survives for the delinked lane, where an unresolvable intra-object
+  relocation produced it)
 
-Results are cached in `tools/equivalence/leaf_cache.json`. `batch_verify.py`
-uses this cache to select testable candidates.
+It used to iterate `delinked/*.obj` instead. `delinked/` is gitignored and
+holds one object on this tree, so that sweep covered 20 functions out of ~8000
+and every other row was whatever an older checkout had left behind. Bounds
+that cannot found a verdict — `table_data`, `no_terminator`, a run-time
+`computed` extent, or bytes that do not disassemble to a terminator — are
+skipped rather than guessed, because a class derived from a guessed extent
+would look exactly like a reviewed one.
+
+Results are cached in `tools/equivalence/leaf_cache.json`, keyed by unpadded
+lowercase `0x<hex>` and stamped with `_meta.oracle` / `_meta.xbe_md5`.
+`coverage_pct` and `confidence` are measurements, not derivations: they are
+absent until a run under the recording oracle fills them in, because
+`oracle_func_size` changed from a delinked slice length to a bounds-table
+length and a pre-migration coverage number describes a different denominator.
+`batch_verify.py` uses this cache to select testable candidates, and
+`tools/equivalence/test_leaf_cache_schema.py` pins all of the above.
 
 
 ## Where to read next

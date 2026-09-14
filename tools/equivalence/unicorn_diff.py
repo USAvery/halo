@@ -48,8 +48,10 @@ FLAGS
     --verbose          Print per-seed register dump, FPU state, stub trace,
                        and scratch buffer diff for failures.
     --output-json PATH Write structured JSON result for CI/automation.
-    --batch-classify   Scan all delinked/ .obj files and classify each
-                       function as leaf / data_only / stubbable / non_leaf.
+    --batch-classify   Classify every function in
+                       tools/verify/function_bounds.json against the pristine
+                       XBE as leaf / data_only / stubbable / non_leaf, into
+                       leaf_cache.json.
     --list-funcs OBJ   List function symbols in a .obj file.
 
 HOW IT WORKS
@@ -4354,91 +4356,71 @@ def _summarize_scratch_diff(params, oracle_scratch: bytes, lifted_scratch: bytes
 # ---------------------------------------------------------------------------
 
 def _run_batch_classify() -> int:
-    """Classify all functions in delinked/ .obj files into leaf_cache.json.
+    """Classify every bounded function into leaf_cache.json from the XBE.
 
-    Iterates every delinked .obj, extracts all function symbols, and
-    classifies each by its relocation profile.  No emulation is performed.
+    Until the raw-XBE migration this iterated `delinked/*.obj` and read each
+    function's relocation table.  `delinked/` is gitignored and holds ONE
+    object on this tree, so the sweep covered 20 functions out of ~8000 and
+    every other row in the cache was whatever an older, better-stocked
+    checkout had left behind.  `function_bounds.json` plus the pristine image
+    cover all of them from two committed, reviewable inputs with no Ghidra in
+    the loop, and `_classify_raw_oracle` recovers by disassembly what the
+    relocation table used to supply.
+
+    Bounds that cannot found a verdict are SKIPPED, not guessed.  A `class`
+    derived from a run-time-computed extent, from a `table_data` range, or
+    from a `no_terminator` end that is really just the next symbol's start
+    would sit in the cache looking exactly like a reviewed one -- and
+    `--allow-stubs` budgets, the z3 gate and target selection all read this
+    file.  `_oracle_bound_unreliable` is the same gate the live oracle uses,
+    so the cache cannot claim a classification for a function the oracle
+    would refuse to run.
     """
     sys.path.insert(0, str(_SCRIPT_DIR))
-    from coff_loader import load_coff, CoffParseError, IMAGE_SYM_CLASS_EXTERNAL, _canonical
-    from stubs import classify_relocations, IMAGE_REL_I386_DIR32, IMAGE_REL_I386_REL32
+    sys.path.insert(0, str(_REPO_ROOT / "tools" / "verify"))
+    import xbe_image
+    import xbe_reference
 
-    kb = _load_kb()
+    bounds_path = _REPO_ROOT / "tools" / "verify" / "function_bounds.json"
+    try:
+        bounds = json.loads(bounds_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"cannot read {bounds_path}: {exc}", file=sys.stderr)
+        return 2
 
-    addr_to_entry = {}
-    for obj in kb.get("objects", []):
-        for fn in obj.get("functions", []):
-            a = fn.get("addr", "")
-            if a:
-                addr_to_entry[a.lower()] = fn
+    addrs = []
+    for key in bounds:
+        if key.startswith("_"):
+            continue
+        try:
+            addrs.append(int(key, 16))
+        except ValueError:
+            continue
+    addrs.sort()
 
     cache = {}
-    obj_files = sorted(DELINKED_DIR.glob("*.obj"))
-    total_funcs = 0
     counts = {"leaf": 0, "data_only": 0, "stubbable": 0, "non_leaf": 0}
+    skipped = {}
 
-    for obj_path in obj_files:
-        try:
-            sections, symbols, _ = load_coff(str(obj_path))
-        except CoffParseError:
+    for va in addrs:
+        why = _oracle_bound_unreliable(va)
+        if why is not None:
+            skipped[hex(va)] = why
             continue
-
-        defined = {s.name for s in symbols if s.section_num > 0}
-
-        with open(obj_path, "rb") as f:
-            raw_data = f.read()
-
-        for sym in symbols:
-            if (sym.section_num <= 0
-                    or sym.storage_class != IMAGE_SYM_CLASS_EXTERNAL
-                    or not (sym.sym_type & 0x20)):
-                continue
-
-            sec_idx = sym.section_num - 1
-            if sec_idx >= len(sections):
-                continue
-
-            section = sections[sec_idx]
-
-            next_offset = len(section.data)
-            for s2 in symbols:
-                if (s2.section_num == sym.section_num
-                        and s2.value > sym.value
-                        and s2.value < next_offset
-                        and s2.storage_class in (IMAGE_SYM_CLASS_EXTERNAL, 3)):
-                    next_offset = s2.value
-
-            from coff_loader import CoffReloc, RELOC_SIZE
-            relocs = []
-            off = section.reloc_offset
-            for _ in range(section.num_relocs):
-                if off + RELOC_SIZE > len(raw_data):
-                    break
-                va, si, rt = struct.unpack_from("<IIH", raw_data, off)
-                off += RELOC_SIZE
-                if sym.value <= va < next_offset:
-                    sn = symbols[si].name if si < len(symbols) else f"SYM_{si}"
-                    relocs.append(CoffReloc(va - sym.value, sn, rt))
-
-            cls = classify_relocations(relocs, defined)
-
-            canon = _canonical(sym.name)
-            addr_hex = None
-            m = re.match(r'FUN_([0-9a-fA-F]+)', canon)
-            if m:
-                addr_hex = "0x" + m.group(1).lower()
-
-            if addr_hex:
-                entry = {"class": cls.category}
-                if cls.dir32_count > 0:
-                    entry["dir32_count"] = cls.dir32_count
-                if cls.call_count > 0:
-                    entry["call_count"] = cls.call_count
-                if cls.category == "non_leaf":
-                    entry["reason"] = cls.reason
-                cache[addr_hex] = entry
-                counts[cls.category] = counts.get(cls.category, 0) + 1
-                total_funcs += 1
+        code, err = xbe_reference.function_bytes(va)
+        if not code:
+            skipped[hex(va)] = err or "no bytes for %#x" % va
+            continue
+        cls = _classify_raw_oracle(code, va)
+        entry = {"class": cls.category}
+        if cls.dir32_count > 0:
+            entry["dir32_count"] = cls.dir32_count
+        if cls.call_count > 0:
+            entry["call_count"] = cls.call_count
+        if cls.category == "non_leaf":
+            entry["reason"] = cls.reason
+        cache[hex(va)] = entry
+        counts[cls.category] = counts.get(cls.category, 0) + 1
 
     try:
         if _LEAF_CACHE_PATH.exists():
@@ -4448,21 +4430,153 @@ def _run_batch_classify() -> int:
     except (OSError, json.JSONDecodeError):
         existing = {}
 
-    for addr, old_val in existing.items():
+    for addr, old_val in list(existing.items()):
         if isinstance(old_val, str):
             existing[addr] = {"class": old_val}
 
-    existing.update(cache)
+    # Canonicalize the key form to unpadded lowercase `0x<hex>`, which is what
+    # `_record_confidence` (hex(addr)), function_bounds.json and kb.json all
+    # use.  The old batch sweep derived its key from a delinked symbol name
+    # (`FUN_00012000` -> "0x00012000") and so wrote a ZERO-PADDED key, which
+    # left 6125 padded rows beside 1278 unpadded ones -- 1223 addresses present
+    # in both forms.  That was not cosmetic: populate_regression_targets.py
+    # looks each key up in a kb.json-derived index, whose addresses are
+    # unpadded, so every padded row was invisible to target selection, and
+    # `--batch-classify` could never update the row a measurement had written.
+    # Measurements win on collision: the padded rows carry only `class`, and
+    # all 1066 coverage numbers and all 58 z3_proven flags live on the
+    # unpadded side, so folding padded into unpadded loses nothing.
+    renamed = 0
+    for addr in sorted(existing):
+        if addr.startswith("_"):
+            continue
+        try:
+            canon = hex(int(addr, 16))
+        except ValueError:
+            continue
+        if canon == addr:
+            continue
+        src = existing.pop(addr)
+        dst = existing.get(canon)
+        if isinstance(dst, dict) and isinstance(src, dict):
+            for k, v in src.items():
+                dst.setdefault(k, v)
+        elif canon not in existing:
+            existing[canon] = src
+        renamed += 1
+
+    # H8.  `class`/`dir32_count`/`call_count` are re-derived above, but
+    # `coverage_pct` and `confidence` are MEASUREMENTS from an emulation run,
+    # and `oracle_func_size` changed from a delinked slice length to a
+    # bounds-table length -- so every pre-migration coverage number describes a
+    # different denominator than the one it will be compared against.  They are
+    # dropped rather than carried forward or re-estimated: the nightly refills
+    # them so each number has a run behind it, and a missing number reads as
+    # "not measured yet" where a stale one reads as fact.  `z3_proven` is NOT
+    # dropped -- re-validating those proofs is its own reviewed step
+    # (tools/audit/revalidate_z3_proofs.py) and deleting the flags first would
+    # destroy the very list that step works from.
+    invalidated = 0
+    for addr, val in existing.items():
+        if addr.startswith("_") or not isinstance(val, dict):
+            continue
+        if val.get("oracle") == "xbe":
+            continue            # already measured under this oracle
+        if "coverage_pct" in val or "confidence" in val:
+            val.pop("coverage_pct", None)
+            val.pop("confidence", None)
+            val.pop("oracle", None)
+            invalidated += 1
+
+    # Field-wise merge, not `existing.update(cache)`.  A wholesale replacement
+    # would drop `z3_proven`, and the 58 flags in this file ARE the worklist
+    # tools/audit/revalidate_z3_proofs.py reads -- deleting them would destroy
+    # the list before anything re-validated it.  The four classification fields
+    # are re-derived here and so are cleared first: an entry that used to carry
+    # `dir32_count` and no longer does must lose it, or the stale count would
+    # read as a fresh measurement.
+    _DERIVED = ("class", "dir32_count", "call_count", "reason")
+    for addr, entry in cache.items():
+        dst = existing.get(addr)
+        if not isinstance(dst, dict):
+            existing[addr] = entry
+            continue
+        for field in _DERIVED:
+            dst.pop(field, None)
+        dst.update(entry)
+
+    # Rows this sweep could not reproduce.  Two kinds: addresses the bounds
+    # table does not cover (XDK/library thunks in the D3D..XPP sections, plus a
+    # handful of mid-function addresses the old delinked sweep mistook for
+    # entry points), and rows the H8 invalidation emptied out completely --
+    # junk keys like the 0x3f800034 / 0xccccccda ones test_leaf_cache_key.py
+    # documents, which held a measurement and nothing else.  An empty dict
+    # asserts nothing, so it is dropped; a carried-over class is kept, because
+    # deleting it would discard the only claim anyone ever made about that
+    # address, but `_meta.carried_over` says how many rows the current inputs
+    # cannot re-derive.
+    dropped_empty = 0
+    for addr in [a for a in existing if not a.startswith("_")]:
+        val = existing[addr]
+        if isinstance(val, dict) and not val:
+            del existing[addr]
+            dropped_empty += 1
+    carried_over = sum(1 for a in existing
+                       if not a.startswith("_") and a not in cache)
+
+    existing["_meta"] = {
+        "oracle": "xbe",
+        "schema": 2,
+        "xbe_md5": xbe_image.PRISTINE_MD5,
+        "classified": len(cache),
+        "bounds_entries": len(addrs),
+        "carried_over": carried_over,
+        "note": ("class/dir32_count/call_count are derived from "
+                 "tools/verify/function_bounds.json + the pristine "
+                 "cachebeta.xbe by _classify_raw_oracle. coverage_pct and "
+                 "confidence are measurements and are absent until a run "
+                 "under this oracle records them."),
+    }
 
     _LEAF_CACHE_PATH.write_text(
         json.dumps(dict(sorted(existing.items())), indent=2) + "\n",
         encoding="utf-8",
     )
 
-    print(f"Classified {total_funcs} functions from {len(obj_files)} .obj files:")
+    print(f"Classified {len(cache)} of {len(addrs)} bounded function(s) "
+          f"from the pristine image:")
     for cat, cnt in sorted(counts.items()):
         print(f"  {cat}: {cnt}")
-    print(f"Cache written to {_LEAF_CACHE_PATH} ({len(existing)} total entries)")
+    if skipped:
+        reasons = {}
+        for why in skipped.values():
+            key = why.split(" ")[0] if " " in why else why
+            # Group by the phrase after the address, which is what differs.
+            for tag in ("table_data", "no_terminator", "computed at run time",
+                        "no usable bound"):
+                if tag in why:
+                    key = tag
+                    break
+            reasons[key] = reasons.get(key, 0) + 1
+        print(f"Skipped {len(skipped)} unreliable bound(s):")
+        for key, cnt in sorted(reasons.items(), key=lambda kv: -kv[1]):
+            print(f"  {key}: {cnt}")
+    if invalidated:
+        print(f"Invalidated coverage_pct/confidence on {invalidated} entry/ies "
+              f"measured under the delinked oracle (H8); the nightly refills "
+              f"them.")
+    if renamed:
+        print(f"Folded {renamed} zero-padded key(s) into the canonical "
+              f"unpadded form")
+    if dropped_empty:
+        print(f"Dropped {dropped_empty} row(s) left with no content at all "
+              f"(a measurement under a junk key and nothing else)")
+    if carried_over:
+        print(f"Carried over {carried_over} row(s) this sweep cannot "
+              f"re-derive (no bounds-table entry)")
+    print(f"Cache written to {_LEAF_CACHE_PATH} "
+          f"({sum(1 for k in existing if not k.startswith('_'))} function "
+          f"entries)")
     return 0
 
 
@@ -4487,7 +4601,7 @@ def main():
     parser.add_argument("--no-leaf-cache", action="store_true",
                         help="Do not update tools/equivalence/leaf_cache.json")
     parser.add_argument("--batch-classify", action="store_true",
-                        help="Classify all functions in delinked/ .obj files and update leaf_cache.json")
+                        help="Classify every function in tools/verify/function_bounds.json against the pristine XBE and update leaf_cache.json")
     parser.add_argument("--z3-equiv", action="store_true",
                         help="Attempt Z3 formal equivalence proof before Unicorn testing")
     parser.add_argument("--allow-stubs", action="store_true",

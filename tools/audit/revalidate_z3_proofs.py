@@ -146,8 +146,23 @@ def revalidate(addr: str, name: str = None) -> dict:
         rec["verdict"] = "survived"
     elif (rec.get("reason") or "") in INFRA_REASONS:
         rec["verdict"] = "unverifiable"
+    elif "divergence" in (rec.get("z3_line") or ""):
+        # Z3 returned SAT: there is a concrete input on which the two sides
+        # differ.  The proof is FALSE, and the counterexample is in the record.
+        rec["verdict"] = "disproven"
     else:
-        rec["verdict"] = "revoked"
+        # The gate produced no proof and no counterexample -- it declined to
+        # run, or ran and returned neither.  That is NOT the same claim as
+        # "the proof is false", and the two were lumped together under
+        # `revoked` until the raw-XBE migration made the difference visible:
+        # re-gating z3_equiv on `_classify_raw_oracle` (hazard H1) means a
+        # function whose empty delinked reloc list used to read as "no calls"
+        # is now correctly seen to have calls, so the gate declines. Five of
+        # the original 58 flags are in exactly that position: they were earned
+        # under the gate H1 fixed, and nothing has since shown them wrong.
+        # The flag still has to go -- `z3_proven` asserts a proof HOLDS, and
+        # none does -- but the report must not call it a failed proof.
+        rec["verdict"] = "not_reestablished"
     return rec
 
 
@@ -183,8 +198,9 @@ def main() -> int:
     for i, addr in enumerate(proven, 1):
         rec = revalidate(addr, names.get(hex(int(addr, 16)).lower()))
         results.append(rec)
-        mark = {"survived": "OK    ", "revoked": "REVOKED",
-                "unverifiable": "UNVERIF"}[rec["verdict"]]
+        mark = {"survived": "OK     ", "disproven": "DISPROVEN",
+                "not_reestablished": "NO-PROOF ",
+                "unverifiable": "UNVERIF  "}[rec["verdict"]]
         name = rec.get("name") or rec.get("target") or addr
         detail = ("" if rec["verdict"] == "survived"
                   else f"  <- {rec.get('z3_line') or rec.get('reason')}")
@@ -192,7 +208,9 @@ def main() -> int:
         print(f"  [{i:3d}/{len(proven)}] {mark} {name:<44s}{detail}{flag}")
 
     survived = [r for r in results if r["verdict"] == "survived"]
-    died = [r for r in results if r["verdict"] == "revoked"]
+    disproven = [r for r in results if r["verdict"] == "disproven"]
+    no_proof = [r for r in results if r["verdict"] == "not_reestablished"]
+    died = disproven + no_proof
     unverif = [r for r in results if r["verdict"] == "unverifiable"]
     contradicted = [r for r in results if r.get("contradicted")]
 
@@ -200,16 +218,22 @@ def main() -> int:
     REPORT.write_text(json.dumps({
         "total": len(results),
         "survived": len(survived),
+        "disproven": len(disproven),
+        "not_reestablished": len(no_proof),
         "revoked": len(died),
         "unverifiable": len(unverif),
         "contradicted_by_seeds": len(contradicted),
         "results": results,
     }, indent=2) + "\n", encoding="utf-8")
 
-    print(f"\n  survived     : {len(survived)}")
-    print(f"  revoked      : {len(died)}   (proof re-ran and no longer holds)")
-    print(f"  unverifiable : {len(unverif)}   (harness could not re-check; "
-          f"flag left in place)")
+    print(f"\n  survived          : {len(survived)}")
+    print(f"  disproven         : {len(disproven)}   (Z3 returned a "
+          f"counterexample -- the proof is FALSE)")
+    print(f"  not re-established: {len(no_proof)}   (the gate produced no "
+          f"proof AND no counterexample; the flag goes, but nothing showed "
+          f"it wrong)")
+    print(f"  unverifiable      : {len(unverif)}   (harness could not "
+          f"re-check; flag left in place)")
     if contradicted:
         print(f"  CONTRADICTED BY SEEDS: {len(contradicted)}  "
               f"(proof and emulation disagree -- investigate)")
@@ -224,9 +248,11 @@ def main() -> int:
             json.dumps(dict(sorted(cache.items())), indent=2) + "\n",
             encoding="utf-8")
         print(f"Stripped z3_proven from {len(died)} entries in "
-              f"{LEAF_CACHE.relative_to(ROOT)}")
+              f"{LEAF_CACHE.relative_to(ROOT)} "
+              f"({len(disproven)} disproven, {len(no_proof)} not "
+              f"re-established)")
     elif died and not args.apply:
-        print("Re-run with --apply to strip the revoked flags.")
+        print("Re-run with --apply to strip these flags.")
 
     if args.check and died:
         return 1

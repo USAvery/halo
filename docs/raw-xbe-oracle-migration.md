@@ -12,7 +12,7 @@ Status: **steps 1-7 of 10 landed; `--oracle=xbe` is the default.**
 | 6a | oracle callees intercepted by patching the image | done |
 | 6b | the data image shared with the candidate | done |
 | 7 | A/B parity artifact, default flipped to `xbe` | done |
-| 8 | regenerate the derived caches (`leaf_cache.json`) | pending |
+| 8 | regenerate the derived caches (`leaf_cache.json`) | done |
 | 9 | retire the allowlist in reviewed batches | pending |
 | 10 | delete the delinked oracle | pending |
 
@@ -35,6 +35,14 @@ Two things the migration surfaced that the plan did not predict:
   those 13 pointers are real functions listed in neither `kb.json` nor
   `function_bounds.json`, which is why the entry test is "exact function
   entry for the FIRST dword, `.text` for the rest".
+- **A derived cache can be wrong in a way that reads as data.**
+  `leaf_cache.json` held two key forms at once -- 6125 zero-padded keys from
+  the old delinked sweep beside 1278 unpadded ones, 1223 addresses in both.
+  `populate_regression_targets.py` resolves each key against a kb.json-derived
+  index whose addresses are unpadded, so every padded row was invisible to
+  target selection and a measurement could never update the classified row for
+  the same function. Nothing failed; the file just quietly described 1278
+  functions instead of 7403.
 - **Enabling the gate is itself a finding.** `regression_test.py` asked only
   whether `delinked/` had an object. `delinked/` is gitignored and holds one,
   so all 72 targets reported SKIP and the gate passed by testing nothing. It
