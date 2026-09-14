@@ -26758,6 +26758,36 @@
       "score": 89.7,
       "source": "src/halo/items/weapons.c"
     },
+    "FUN_000fcd10": {
+      "abi_model": "regparam_stripped",
+      "abi_model_items": 1,
+      "abi_modeled_mnemonic_pct": 90.9,
+      "addr": "0xfcd10",
+      "end": "0xfcdcd",
+      "kind": "auto",
+      "n_r": 64,
+      "opnd_percent": 59.1,
+      "raw_mnemonic_pct": 90.2,
+      "ref": "synth",
+      "ref_sha": "7d9ee8963406c979",
+      "score": 90.9,
+      "source": "src/halo/items/weapons.c"
+    },
+    "FUN_000fcdd0": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 90.5,
+      "addr": "0xfcdd0",
+      "end": "0xfce59",
+      "kind": "auto",
+      "n_r": 45,
+      "opnd_percent": 80.0,
+      "raw_mnemonic_pct": 90.5,
+      "ref": "synth",
+      "ref_sha": "bc734e90be95e808",
+      "score": 90.5,
+      "source": "src/halo/items/weapons.c"
+    },
     "FUN_000fce60": {
       "abi_model": "regparam_stripped_saves",
       "abi_model_items": 4,

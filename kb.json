@@ -33961,13 +33961,15 @@
     },
     {
      "addr": "0xfcd10",
-     "decl": "void weapon_trigger_fully_charged(void);",
-     "comment": "[NAME: weapon_trigger_fully_charged — name_source=2276-symbol-dump method=exact_address tier=confirmed (T1), cea-apply-unified 2026-09-14]"
+     "decl": "void FUN_000fcd10(int16_t trigger_index@<ax>, int weapon_handle);",
+     "ported": true,
+     "source_path": "src/halo/items/weapons.c"
     },
     {
      "addr": "0xfcdd0",
-     "decl": "void weapon_trigger_idle(void);",
-     "comment": "[NAME: weapon_trigger_idle — name_source=2276-symbol-dump method=exact_address tier=confirmed (T1), cea-apply-unified 2026-09-14]"
+     "decl": "void FUN_000fcdd0(int16_t trigger_index@<ax>, int weapon_handle@<ecx>);",
+     "ported": true,
+     "source_path": "src/halo/items/weapons.c"
     },
     {
      "addr": "0xfce60",
