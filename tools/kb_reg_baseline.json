@@ -7004,7 +7004,7 @@
   "0x120930": "void quaternion_decompress_6byte_renormalized(void *compressed_data, float *dest);",
   "0x120950": "void quaternion_compress_8byte(void);",
   "0x1209b0": "void quaternion_compress_6byte(void);",
-  "0x120a40": "void animation_graph_node_matrices_from_orientations(void);",
+  "0x120a40": "void animation_graph_node_matrices_from_orientations(int animation_graph_tag_index, float *node_matrices, float *node_orientations, float *position, float *forward, float *up);",
   "0x120ba0": "void interpolate_node_orientations(int16_t node_count, void *interp_data, void *anim_data, int16_t interp_tick, int16_t interp_total);",
   "0x120cb0": "short animation_graph_get_animation_by_name(int animation_graph_tag_index, const char *name);",
   "0x120ee0": "void animation_frame_get_xy_translation(void *animation, short frame_index, float *out_translation);",

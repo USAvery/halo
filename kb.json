@@ -37988,11 +37988,13 @@
     },
     {
      "addr": "0x1209b0",
-     "decl": "void quaternion_compress_6byte(void);"
+     "decl": "void quaternion_compress_6byte(float *quaternion, unsigned short *compressed_data);",
+     "ported": true
     },
     {
      "addr": "0x120a40",
-     "decl": "void animation_graph_node_matrices_from_orientations(void);"
+     "decl": "void animation_graph_node_matrices_from_orientations(int animation_graph_tag_index, float *node_matrices, float *node_orientations, float *position, float *forward, float *up);",
+     "ported": true
     },
     {
      "addr": "0x120ba0",
@@ -38047,7 +38049,8 @@
     },
     {
      "addr": "0x122060",
-     "decl": "void replacement_animation_apply(void);"
+     "decl": "void replacement_animation_apply(void *animation, short frame_index, void *node_data);",
+     "ported": true
     },
     {
      "addr": "0x122240",
@@ -39319,7 +39322,7 @@
     },
     {
      "addr": "0x804e0",
-     "decl": "unsigned short *FUN_000804e0(int buffer, unsigned short buffer_size, unsigned int *key /* @<esi> */);",
+     "decl": "void FUN_000804e0(int buffer, unsigned short buffer_size, unsigned int *key /* @<esi> */);",
      "ported": true,
      "source_path": "src/halo/networking/message_header.c"
     },

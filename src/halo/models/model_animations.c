@@ -650,6 +650,135 @@ void quaternion_decompress_6byte_renormalized(void *compressed_data,
   sphere_intersects_rectangle3d(dest);
 }
 
+/* quaternion_compress_6byte (0x1209b0) — Compress 4 quaternion floats into 3
+ * packed uint16s (48 bits, 12 bits per component).
+ *
+ * Inverse of quaternion_decompress_6byte: each component is scaled by
+ * 32767.0f, truncated to int (_ftol2), and the top 12 bits of each 16-bit
+ * result are interleaved across the 3 output words.
+ *
+ * Confirmed: cdecl, 2 args ([EBP+8] quaternion float ptr in EDI, [EBP+0xc]
+ * output ushort ptr), void return, RET with no immediate.
+ * Confirmed: float constant at 0x26a600 = 32767.0f (same constant clamped
+ * against in decals.c / rasterizer.c).
+ * Confirmed: conversion order is q[1], q[2], q[3], q[0] — the results land in
+ * ESI, EBX, [EBP+8] and EAX respectively (0x1209b9-0x1209f2).
+ * Confirmed: only callee is _ftol2 (0x1d9068), written as an (int) cast.
+ * Confirmed: packing verified against 0x1209f7-0x120a33 — all three stores
+ * are 16-bit (MOV word ptr [ECX+0/2/4]), so the wider 32-bit intermediates
+ * (SHL ESI,4 / OR EDX,EAX) are truncated.
+ */
+void quaternion_compress_6byte(float *quaternion,
+                               unsigned short *compressed_data)
+{
+  unsigned short v1, v2, v3, v0;
+
+  v1 = (unsigned short)(int)(quaternion[1] * 32767.0f);
+  v2 = (unsigned short)(int)(quaternion[2] * 32767.0f);
+  v3 = (unsigned short)(int)(quaternion[3] * 32767.0f);
+  v0 = (unsigned short)(int)(quaternion[0] * 32767.0f);
+
+  compressed_data[0] = (unsigned short)((v0 & 0xFFF0) | (v1 >> 12));
+  compressed_data[1] = (unsigned short)(((v1 & 0xFFF0) << 4) | (v2 >> 8));
+  compressed_data[2] = (unsigned short)(((v2 & 0xF0) << 8) | (v3 >> 4));
+}
+
+/* animation_graph_node_matrices_from_orientations (0x120a40) — Compose the
+ * per-node world matrices of an 'antr' animation graph's node hierarchy from a
+ * per-node local orientation array and a root (forward/up/position) basis.
+ *
+ * Breadth-first walk of the node tree held in the tag_block at antr_tag+0x68
+ * (element stride 0x40). A 64-entry int16 work queue holds node indices;
+ * read_index consumes, write_index appends first-child (+0x20) and
+ * next-sibling (+0x22) links, both terminated by -1. The parent matrix of a
+ * non-root node comes from node_matrices[node->field_24] (stride 0x34); node 0
+ * uses the root basis built by matrix4x3_from_forward_up_position.
+ *
+ * Confirmed: cdecl, 6 stack args at [EBP+8..+0x1c]; frame SUB ESP,0xf4 =
+ *            64*2 queue + 13*4 base matrix + 13*4 scratch matrix + 3 dwords.
+ * Confirmed: CALL 0x1ba140 tag_get(0x616e7472, [EBP+8]) — PUSH EAX then
+ *            PUSH 0x616e7472; PUSH ESI at 0x120a4c is a register save, not an
+ *            argument, and ADD ESP,0x18 at 0x120a77 is the COMBINED cleanup
+ *            for tag_get (8) + matrix4x3_from_forward_up_position (16).
+ * Confirmed: CALL 0x10a110 argument order from push order
+ *            (0x120a5e..0x120a69): [EBP+0x1c], [EBP+0x18], [EBP+0x14],
+ *            LEA [EBP-0x74] — so out=base_matrix, position=[EBP+0x14],
+ *            forward=[EBP+0x18], up=[EBP+0x1c] per the kb.json decl.
+ * Confirmed: CALL 0x109500 (rotation_matrix, node_orientations + index*0x20);
+ *            CALL 0x109850 matrix4x3_multiply pushes ESI(node_matrices +
+ *            index*0x34), EDX(rotation_matrix), EDI(parent_matrix), so
+ *            a=parent_matrix, b=rotation_matrix, out=node_matrices[index].
+ *            ADD ESP,0x14 at 0x120b01 is the COMBINED cleanup for both (8+12).
+ * Confirmed: node index is int16 and is sign-extended (MOVSX ESI,DI at
+ *            0x120aab) before both the *0x20 and *0x34 scalings.
+ * Confirmed: -1 sentinel lives in DI (OR EDI,0xffffffff at 0x120afe) and is
+ *            also the value pushed to system_exit on the assert paths.
+ * Confirmed: loop latch is CMP word ptr [EBP-0x8],SI at 0x120b80 — a 16-bit
+ *            compare of read_index against write_index.
+ * Confirmed: asserts at 0x120b21 (line 0x4e2) and 0x120b5f (line 0x4e8),
+ *            both "write_index<MAXIMUM_NODES_PER_MODEL" with halt=true.
+ */
+void animation_graph_node_matrices_from_orientations(
+  int animation_graph_tag_index, float *node_matrices, float *node_orientations,
+  float *position, float *forward, float *up)
+{
+  short node_indices[64];
+  float base_matrix[13];
+  float rotation_matrix[13];
+  int *node_block;
+  int read_index;
+  int write_index;
+  char *antr_tag;
+  char *node;
+  short node_index;
+  float *parent_matrix;
+
+  antr_tag = (char *)tag_get(0x616e7472, animation_graph_tag_index);
+  matrix4x3_from_forward_up_position(base_matrix, position, forward, up);
+  read_index = 0;
+  node_block = (int *)(antr_tag + 0x68);
+  if (*node_block > 0) {
+    write_index = 1;
+    node_indices[0] = 0;
+    do {
+      node_index = node_indices[(short)read_index];
+      read_index = read_index + 1;
+      node = (char *)tag_block_get_element(node_block, (int)node_index, 0x40);
+      if (node_index == 0) {
+        parent_matrix = base_matrix;
+      } else {
+        parent_matrix =
+          (float *)((char *)node_matrices + *(short *)(node + 0x24) * 0x34);
+      }
+      FUN_00109500(rotation_matrix, (float *)((char *)node_orientations +
+                                              (int)node_index * 0x20));
+      matrix4x3_multiply(
+        parent_matrix, rotation_matrix,
+        (float *)((char *)node_matrices + (int)node_index * 0x34));
+      if (*(short *)(node + 0x20) != -1) {
+        if ((short)write_index >= 0x40) {
+          display_assert("write_index<MAXIMUM_NODES_PER_MODEL",
+                         "c:\\halo\\SOURCE\\models\\model_animations.c", 0x4e2,
+                         1);
+          system_exit(-1);
+        }
+        node_indices[(short)write_index] = *(short *)(node + 0x20);
+        write_index = write_index + 1;
+      }
+      if (*(short *)(node + 0x22) != -1) {
+        if ((short)write_index >= 0x40) {
+          display_assert("write_index<MAXIMUM_NODES_PER_MODEL",
+                         "c:\\halo\\SOURCE\\models\\model_animations.c", 0x4e8,
+                         1);
+          system_exit(-1);
+        }
+        node_indices[(short)write_index] = *(short *)(node + 0x22);
+        write_index = write_index + 1;
+      }
+    } while ((short)read_index != (short)write_index);
+  }
+}
+
 /* animation_graph_get_animation_by_name (0x120cb0) — Look up an animation by
  * name in an 'antr' (model_animations) tag's animation block.
  *
@@ -858,8 +987,8 @@ void animation_frame_get_xy_translation(void *animation, short frame_index,
  * Confirmed: returns the signed 16-bit index in AX at 0x120fc0.
  */
 int16_t model_animation_choose_random(int update_kind,
-                                  int animation_graph_tag_index,
-                                  int16_t animation_index)
+                                      int animation_graph_tag_index,
+                                      int16_t animation_index)
 {
   char *antr_tag;
   float random_value;
@@ -867,7 +996,8 @@ int16_t model_animation_choose_random(int update_kind,
 
 #ifdef HALO_RNG_TRACE
   if (update_kind == 1)
-    RNG_TRACE_EX(RNG_TRACE_KIND_ANIM_CHOOSE, (unsigned int)(unsigned short)animation_index,
+    RNG_TRACE_EX(RNG_TRACE_KIND_ANIM_CHOOSE,
+                 (unsigned int)(unsigned short)animation_index,
                  __builtin_return_address(0));
 #endif
 #line 862
@@ -1484,6 +1614,140 @@ void FUN_00121d60(void *mode_tag, void *animation, int animation_index,
     }
   } else {
     FUN_00123aa0(mode_tag, out_node_data);
+  }
+}
+
+/* replacement_animation_apply (0x122060) — Apply a replacement (type 2)
+ * animation's per-node rotation/translation/scale channels onto a node
+ * transform array.
+ *
+ * Structural sibling of FUN_00121d60, restricted to animations whose type
+ * (animation+0x20) is 2 and to a frame_index inside [0, animation+0x22).
+ * For each node the three per-channel bitmask arrays are reloaded every 32
+ * nodes and consumed one bit at a time:
+ *   +0x5c[]: translation channel present
+ *   +0x6c[]: rotation channel present
+ *   +0x7c[]: scale channel present
+ * When the animation is not compressed (FUN_00120620 == 0) the values are
+ * read sequentially out of the frame data returned by FUN_00120500; when it
+ * is compressed each present channel is evaluated from the keyframe streams
+ * with a per-channel running component index.
+ *
+ * Output stride is 0x20 per node: +0x00 rotation quaternion (4 floats),
+ * +0x10 translation (3 floats), +0x1c scale (1 float).
+ *
+ * Confirmed: cdecl, 3 args, void return (MOV ESP,EBP epilogue at 0x12222d).
+ * Confirmed: CALL FUN_00120620(animation@<esi>) at 0x12208f — no stack args,
+ * result byte stored to [EBP+0xb]. Confirmed: CALL FUN_00120500 at 0x122099
+ * and 0x1221f5 (2 args: animation, frame_index). Confirmed: CALL
+ * quaternion_decompress_8byte at 0x12211d (2 args: src_shorts, dest_floats).
+ * Confirmed: CALL FUN_00121330 at 0x122108, animation_get_node_orientations
+ * at 0x12215c, overlay_animation_apply_continuous_scaled at 0x1221b7 — each 5
+ * args pushed out,node,count,frame,animation with the float frame lowered as
+ * PUSH <dummy>; FILD [EBP-0x20]; FSTP [ESP] (frame = (float)(int)frame_index).
+ * Confirmed: node stride 0x20 via MOVSX EDI,BX; SHL EDI,0x5 at 0x1220ba.
+ * Confirmed: mask block index is a 16-bit arithmetic shift (MOV AX,BX; SAR
+ * AX,0x5; MOVSX EAX,AX at 0x1220c7). Confirmed: uncompressed advances are 8
+ * bytes (rotation), 0xc bytes (translation), 4 bytes (scale). Confirmed:
+ * assert line 0x187 at 0x12221b followed by system_exit(-1).
+ */
+void replacement_animation_apply(void *animation, short frame_index,
+                                 void *node_data)
+{
+  char *anim;
+  char compressed;
+  int *data;
+  int frame_data;
+  int out_node;
+  int block_index;
+  int rotation_count;
+  int translation_count;
+  int scale_count;
+  short node_index;
+  unsigned int translation_flags;
+  unsigned int rotation_flags;
+  unsigned int scale_flags;
+
+  anim = (char *)animation;
+
+  if (*(short *)(anim + 0x20) == 2) {
+    node_index = 0;
+    if (frame_index >= node_index && frame_index < *(short *)(anim + 0x22)) {
+      compressed = FUN_00120620((int)anim);
+      data = (int *)FUN_00120500(animation, frame_index);
+      rotation_count = 0;
+      translation_count = 0;
+      scale_count = 0;
+
+      if (0 < *(short *)(anim + 0x2c)) {
+        do {
+          out_node = (int)node_data + (int)node_index * 0x20;
+          if ((node_index & 0x1f) == 0) {
+            block_index = (int)(short)(node_index >> 5);
+            translation_flags =
+              *(unsigned int *)(anim + block_index * 4 + 0x5c);
+            rotation_flags = *(unsigned int *)(anim + block_index * 4 + 0x6c);
+            scale_flags = *(unsigned int *)(anim + block_index * 4 + 0x7c);
+          }
+
+          if ((rotation_flags & 1) != 0) {
+            if (compressed != 0) {
+              FUN_00121330(animation, (float)(int)frame_index,
+                           (unsigned short)rotation_count, node_index,
+                           (void *)out_node);
+              rotation_count = rotation_count + 1;
+            } else {
+              quaternion_decompress_8byte((short *)data, (float *)out_node);
+              data = (int *)((char *)data + 8);
+            }
+          }
+          rotation_flags = rotation_flags >> 1;
+
+          if ((translation_flags & 1) != 0) {
+            if (compressed != 0) {
+              animation_get_node_orientations(
+                animation, (float)(int)frame_index,
+                (unsigned short)translation_count, node_index,
+                (void *)(out_node + 0x10));
+              translation_count = translation_count + 1;
+            } else {
+              *(int *)(out_node + 0x10) = data[0];
+              *(int *)(out_node + 0x14) = data[1];
+              *(int *)(out_node + 0x18) = data[2];
+              data = (int *)((char *)data + 0xc);
+            }
+          }
+          translation_flags = translation_flags >> 1;
+
+          if ((scale_flags & 1) != 0) {
+            if (compressed != 0) {
+              overlay_animation_apply_continuous_scaled(
+                animation, (float)(int)frame_index, (unsigned short)scale_count,
+                node_index, (void *)(out_node + 0x1c));
+              scale_count = scale_count + 1;
+            } else {
+              *(int *)(out_node + 0x1c) = data[0];
+              data = (int *)((char *)data + 4);
+            }
+          }
+          scale_flags = scale_flags >> 1;
+
+          node_index = node_index + 1;
+        } while (node_index < *(short *)(anim + 0x2c));
+      }
+
+      if (compressed == 0) {
+        frame_data = (int)FUN_00120500(animation, frame_index);
+        if ((int)data - frame_data != (int)*(short *)(anim + 0x24)) {
+          display_assert("compressed || ((byte *)data-(byte "
+                         "*)animation_get_frame_data(animation, "
+                         "frame_index)==animation->frame_size)",
+                         "c:\\halo\\SOURCE\\models\\model_animations.c", 0x187,
+                         1);
+          system_exit(-1);
+        }
+      }
+    }
   }
 }
 
