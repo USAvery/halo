@@ -11068,6 +11068,21 @@
       "score": 88.3,
       "source": "src/halo/bungie_net/thread_win32.c"
     },
+    "FUN_00081480": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 92.3,
+      "addr": "0x81480",
+      "end": "0x815be",
+      "kind": "auto",
+      "n_r": 111,
+      "opnd_percent": 73.3,
+      "raw_mnemonic_pct": 92.3,
+      "ref": "synth",
+      "ref_sha": "e101450782cbbd22",
+      "score": 92.3,
+      "source": "src/halo/bungie_net/thread_win32.c"
+    },
     "FUN_000815f0": {
       "abi_model": "raw",
       "abi_model_items": 0,
