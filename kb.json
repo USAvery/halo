@@ -39319,7 +39319,7 @@
     },
     {
      "addr": "0x804e0",
-     "decl": "void FUN_000804e0(int buffer, unsigned short buffer_size, unsigned int *key /* @<esi> */);",
+     "decl": "unsigned short *FUN_000804e0(int buffer, unsigned short buffer_size, unsigned int *key /* @<esi> */);",
      "ported": true,
      "source_path": "src/halo/networking/message_header.c"
     },
@@ -39336,8 +39336,9 @@
     },
     {
      "addr": "0x80620",
-     "decl": "void complete_key_exchange(void);",
-     "comment": "[NAME: complete_key_exchange — name_source=2276-symbol-dump method=exact_address tier=confirmed (T1), cea-apply-unified 2026-09-14]"
+     "decl": "bool FUN_00080620(int *endpoint, unsigned char *msgptr, unsigned int *prime, unsigned int *secret, unsigned int *private_key);",
+     "ported": true,
+     "source_path": "src/halo/networking/message_header.c"
     },
     {
      "addr": "0x807d0",

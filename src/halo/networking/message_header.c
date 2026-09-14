@@ -117,10 +117,13 @@ void FUN_00080470(int buffer, unsigned short buffer_size,
  * TEST ESI at entry, tested against assert text "key") into an 8-byte stack
  * buffer, then forwards buffer and buffer_size unchanged to
  * key_agreement_build_message with message type 1 and the packed buffer as
- * data. Return value is discarded (binary-proven: no test of EAX after the
- * CALL). Asserts and halts if key is NULL. */
-void FUN_000804e0(int buffer, unsigned short buffer_size,
-                  unsigned int *key /* @<esi> */)
+ * data. 0x804e0 itself does not touch EAX after the CALL, so
+ * key_agreement_build_message's message pointer passes through unmodified
+ * (implicit-EAX return); 0x80620 consumes it (MOV ESI,EAX at 0x80762), so the
+ * return type is declared explicitly rather than relying on a void function
+ * happening to leave EAX intact. Asserts and halts if key is NULL. */
+unsigned short *FUN_000804e0(int buffer, unsigned short buffer_size,
+                             unsigned int *key /* @<esi> */)
 {
   unsigned int packed_data[2];
 
@@ -129,7 +132,7 @@ void FUN_000804e0(int buffer, unsigned short buffer_size,
   packed_data[0] = key[0];
   packed_data[1] = key[1];
 
-  key_agreement_build_message(1, packed_data, buffer, buffer_size);
+  return key_agreement_build_message(1, packed_data, buffer, buffer_size);
 }
 
 /* ========================================================================
@@ -164,6 +167,97 @@ int key_agreement_peek_packet_type(unsigned char *msgptr,
     return 1;
   }
   return 0;
+}
+
+/* 0x80620 - Handle an inbound key-agreement message (key_agreement.c, line
+ * 0x105 assert "msgptr && prime && secret && private_key").
+ *
+ * Validates the 2-byte message header's class field ((header >> 2) & 3) == 3,
+ * derives the encoded payload size ((header >> 4) - 2) and reads the trailing
+ * packet-type byte at msgptr[(header >> 4) - 1], then decodes the payload
+ * (msgptr + 2) through decode_packet_group bound to key_agreement_group.
+ *
+ * packet_type 0 (peer sent the group parameters): the decoded packet holds
+ * p at dwords [0..1] and g at dwords [2..3]; a fresh secret exponent is drawn
+ * per limb with FUN_00081410(0xff, p[i] - 2) (the same draw shape as
+ * 0x81190 in thread_win32.c), FUN_00081250 computes our public key into
+ * dwords [6..7] of the same 32-byte decoded buffer (binary-proven: LEA
+ * [EBP-0x18] is decoded_buffer + 0x18), that public key is packed into an
+ * outgoing message via FUN_000804e0 and sent; on a full send the shared
+ * secret is derived from the peer public key at dwords [4..5].
+ *
+ * packet_type 1 (peer replied with just its public key): the 8-byte decoded
+ * packet is the peer public key and the shared secret is derived directly
+ * against the caller-supplied prime.
+ *
+ * Returns true only on a completed exchange, false on any validation,
+ * decode, allocation or short-send failure (binary-proven: MOV AL,1 on the
+ * two success exits, XOR AL,AL on the shared failure exit).
+ *
+ * The message header is read BEFORE byte_swap_message_header runs
+ * (binary-proven: MOV DI,word ptr [ESI] at 0x8076b precedes the CALL at
+ * 0x80775), so the length compared against send_endpoint's return is the
+ * host-order size.
+ *
+ * 0x334780 is an unnamed 0x200-byte global message buffer (no symbol or
+ * string evidence for a name). */
+bool FUN_00080620(int *endpoint, unsigned char *msgptr, unsigned int *prime,
+                  unsigned int *secret, unsigned int *private_key)
+{
+  unsigned int decoded[8];
+  unsigned int decoded_key[2];
+  short packet_version;
+  short packet_size;
+  short packet_type;
+  unsigned short header;
+  unsigned short *msg;
+  short msg_size;
+
+  packet_version = 1;
+
+  assert_halt_msg_at(
+    "msgptr && prime && secret && private_key",
+    "c:\\halo\\SOURCE\\bungie_net\\common\\key_agreement.c", 0x105,
+    msgptr != (unsigned char *)0 && prime != (unsigned int *)0 &&
+      secret != (unsigned int *)0 && private_key != (unsigned int *)0);
+
+  header = *(unsigned short *)msgptr;
+  packet_size = (short)((unsigned short)(header >> 4) - 2);
+  if (((header >> 2) & 3) != 3) {
+    return false;
+  }
+
+  packet_type = (short)(signed char)msgptr[(unsigned short)(header >> 4) - 1];
+
+  switch (packet_type) {
+  case 0:
+    if (FUN_0011aa40((int)key_agreement_group, decoded, (char *)(msgptr + 2),
+                     &packet_size, &packet_type, &packet_version, 0)) {
+      secret[0] = (unsigned int)FUN_00081410(0xff, (int)(decoded[0] - 2));
+      secret[1] = (unsigned int)FUN_00081410(0xff, (int)(decoded[1] - 2));
+      FUN_00081250(&decoded[0], secret, &decoded[2], &decoded[6]);
+      msg = FUN_000804e0(0x334780, 0x200, &decoded[6]);
+      if (msg != (unsigned short *)0) {
+        msg_size = (short)(*msg >> 4);
+        byte_swap_message_header(msg, 1);
+        if (send_endpoint(endpoint, (const char *)msg, msg_size) == msg_size) {
+          FUN_00081300(&decoded[4], &decoded[0], secret, private_key);
+          return true;
+        }
+      }
+    }
+    break;
+  case 1:
+    if (FUN_0011aa40((int)key_agreement_group, decoded_key,
+                     (char *)(msgptr + 2), &packet_size, &packet_type,
+                     &packet_version, 0)) {
+      FUN_00081300(decoded_key, prime, secret, private_key);
+      return true;
+    }
+    break;
+  }
+
+  return false;
 }
 
 /* 0x807d0 - XOR a message buffer against a bouncing keystream.
@@ -660,8 +754,8 @@ void FUN_00080f00(uint16_t *result)
  *  - display_assert args at 0x8106a: __FILE__ 0x265da0 =
  *    "c:\halo\SOURCE\bungie_net\common\public_key_crypt.c", line 0x5f.
  */
-uint32_t FUN_00080fc0(uint32_t exponent /* @<eax> */, uint32_t base /* @<ecx> */,
-                  uint32_t modulus /* @<edx> */)
+uint32_t FUN_00080fc0(uint32_t exponent /* @<eax> */,
+                      uint32_t base /* @<ecx> */, uint32_t modulus /* @<edx> */)
 {
   math64_qword_t s;
   math64_qword_t b;
@@ -700,7 +794,7 @@ uint32_t FUN_00080fc0(uint32_t exponent /* @<eax> */, uint32_t base /* @<ecx> */
  * MOV EAX,EBX / MOV ECX,EDI register shuffle immediately before the
  * original JMP 0x80fc0 tail call. */
 uint32_t FUN_00081090(uint32_t p /* @<esi> */, uint32_t x /* @<ebx> */,
-                  uint32_t g /* @<edi> */)
+                      uint32_t g /* @<edi> */)
 {
   assert_halt_msg_at("p>2",
                      "c:\\halo\\SOURCE\\bungie_net\\common\\public_key_crypt.c",
