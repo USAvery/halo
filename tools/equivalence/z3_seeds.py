@@ -27,6 +27,35 @@ except ImportError:
     _Z3_AVAILABLE = False
 
 
+
+#: Deterministic solver budgets, in z3 "rlimit" units -- an internal work
+#: counter, not a clock.  Every site here used to be bounded by
+#: `solver.set('timeout', ms)` alone, which made results depend on machine
+#: load: a query that finds a model in 400 ms on an idle box returns `unknown`
+#: at 500 ms on a busy one, and the seeds that model would have produced are
+#: silently never generated.  That surfaced as `concolic_seeds` 25 vs 0 and
+#: `seeds` 80 vs 85 on byte-identical inputs, and raising batch_verify's
+#: --jobs makes it worse.
+#:
+#: Calibrated 2026-09-14 over 117 solver calls across 25 randomly chosen
+#: targets, measuring per-check rlimit DELTAS (the `rlimit count` statistic is
+#: cumulative per solver, so absolute readings overstate a single query):
+#:
+#:     site                 n    ms_p50   ms_max   rl_p50    rl_max
+#:     z3_seeds:158        45      0.24     10.7    11,527   4,970,201
+#:     z3_seeds:166        45      0.22      0.4       243         412
+#:     concolic_z3:460     11     15.51    160.1 1,093,344   4,969,248
+#:     z3_seeds:205         7      0.24      0.4     4,863      13,376
+#:     z3_equiv:286         2   3532.21   7060.0 20,159,372  35,793,643
+#:
+#: Budgets sit above each site's observed maximum so nothing that succeeds
+#: today starts getting cut.  The wall-clock timeout stays, but only as a
+#: backstop against genuine non-termination, and is raised well clear of the
+#: rlimit so it can no longer be what decides a normal query -- rlimit binds
+#: first, identically on every machine and under any load.
+SOLVER_RLIMIT = 10_000_000
+SOLVER_TIMEOUT_BACKSTOP_MS = 30_000
+
 def _extract_cmp_branch_pairs(code: bytes) -> list[dict]:
     """Disassemble code and extract CMP/TEST + Jcc pairs.
 
@@ -150,7 +179,8 @@ def _solve_cmp_pair(pair: dict) -> list:
             return results
 
         solver = z3.Solver()
-        solver.set('timeout', 500)
+        solver.set('rlimit', SOLVER_RLIMIT)
+        solver.set('timeout', SOLVER_TIMEOUT_BACKSTOP_MS)
 
         # Taken direction
         solver.push()
@@ -199,7 +229,8 @@ def _solve_cmp_pair(pair: dict) -> list:
             return results
 
         solver = z3.Solver()
-        solver.set('timeout', 500)
+        solver.set('rlimit', SOLVER_RLIMIT)
+        solver.set('timeout', SOLVER_TIMEOUT_BACKSTOP_MS)
         solver.push()
         solver.add(cond)
         if solver.check() == z3.sat:

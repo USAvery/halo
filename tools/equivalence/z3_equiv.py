@@ -41,6 +41,12 @@ class EquivResult:
     reason: str = ""
 
 
+
+#: Budget for a full equivalence query, in z3 rlimit units. Observed maximum
+#: was 35.8M over the 2026-09-14 calibration; 50M leaves headroom without
+#: letting a pathological query run unbounded. `timeout_ms` is the backstop.
+EQUIV_RLIMIT = 50_000_000
+
 def _count_instructions(code: bytes) -> int:
     import capstone
     md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
@@ -184,7 +190,7 @@ def prove_equivalence(
     oracle_code: bytes,
     lifted_code: bytes,
     abi: dict,
-    timeout_ms: int = 10_000,
+    timeout_ms: int = 120_000,
 ) -> EquivResult:
     """Attempt to formally prove two functions produce identical outputs.
 
@@ -280,6 +286,10 @@ def prove_equivalence(
         return EquivResult(not_applicable=True, reason="no outputs to compare (void, no pointer params)")
 
     solver = z3.Solver()
+    # Equivalence queries are the heaviest in the harness (measured 3.5-7.1 s,
+    # 20-36M rlimit), so they get their own budget well above that ceiling.
+    # See z3_seeds.SOLVER_RLIMIT for why this is rlimit and not the clock.
+    solver.set("rlimit", EQUIV_RLIMIT)
     solver.set("timeout", timeout_ms)
     solver.add(z3.Or(*diffs))
 

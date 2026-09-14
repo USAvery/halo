@@ -70,7 +70,10 @@ from concolic import _JCC_IDS, _is_spurious_address
 MAX_BRANCHES = 8          # uncovered branches to attempt a solve for
 MAX_PATH_INSNS = 4000     # instructions to walk before giving up on a path
 MAX_INJECT_ADDRS = 6      # globals written by a single solved injection
-SOLVER_TIMEOUT_MS = 5000  # per-branch solver budget
+from z3_seeds import SOLVER_RLIMIT
+
+#: Backstop only -- SOLVER_RLIMIT decides when a branch solve gives up.
+SOLVER_TIMEOUT_MS = 60_000
 
 
 @dataclass
@@ -443,6 +446,10 @@ def solve_uncovered(code: bytes, code_base: int, visited_pcs: dict,
             # every global it touched, which injects gratuitous changes and
             # invites divergences that have nothing to do with the branch.
             solver = z3.Optimize()
+            # See z3_seeds.SOLVER_RLIMIT: rlimit is the real budget, the
+            # timeout only a backstop, so a loaded box cannot change which
+            # branches get solved.
+            solver.set("rlimit", SOLVER_RLIMIT)
             solver.set("timeout", timeout_ms)
             for c in constraints:
                 solver.add(c)
