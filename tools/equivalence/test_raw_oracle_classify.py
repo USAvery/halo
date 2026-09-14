@@ -91,6 +91,34 @@ def _direct_branch_targets(code, va):
     return out
 
 
+def _indirect_callees(code: bytes, va: int):
+    """Callees the raw classifier reaches through a pointer, for this body.
+
+    Mirrors `_classify_raw_oracle`'s own walk rather than reusing its result,
+    so a test explaining a surplus does not explain it with the same number it
+    is checking."""
+    out = set()
+    lo, hi = ud._image_span_cached()
+    end = va + len(code)
+    import capstone
+    from capstone import x86 as cs_x86
+    md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
+    md.detail = True
+    for insn in md.disasm(code, va):
+        for op in insn.operands:
+            if op.type == cs_x86.X86_OP_IMM:
+                t = op.imm & 0xFFFFFFFF
+                branch = (insn.mnemonic == "call"
+                          or insn.mnemonic.startswith("j"))
+                if not branch and lo <= t < hi:
+                    out.update(ud._pointer_table_callees(t))
+            elif op.type == cs_x86.X86_OP_MEM and op.mem.base == 0:
+                d = op.mem.disp & 0xFFFFFFFF
+                if lo <= d < hi and not (va <= d < end):
+                    out.update(ud._pointer_table_callees(d))
+    return sorted(t for t in out if not (va <= t < end))
+
+
 class TestAgreementWithDelinked(unittest.TestCase):
     """`_classify_raw_oracle` vs `classify_relocations` over game_state.obj."""
 
@@ -144,12 +172,29 @@ class TestAgreementWithDelinked(unittest.TestCase):
                     f"{c['raw_class'].dir32_count} absolute data reference(s), "
                     f"delinked relocations list {c['dl_class'].dir32_count}")
 
-    def test_call_counts_agree_up_to_internally_resolved_siblings(self):
-        """`classify_relocations` cannot see a call the delinked object resolved
-        ITSELF -- a plain E8 with a correct in-object displacement and no
-        relocation, which is why `_has_raw_calls`/`_redirect_raw_calls` exist.
-        So the raw count is >= the delinked count, and every surplus call must
-        land inside the object's own exported VA range."""
+    def test_call_counts_agree_up_to_explainable_surplus(self):
+        """The raw count is >= the delinked count, and every surplus call must
+        be accounted for by one of exactly two things the relocation table
+        structurally cannot represent.
+
+        First, a call the delinked object resolved ITSELF -- a plain E8 with a
+        correct in-object displacement and no relocation at all, which is why
+        `_has_raw_calls`/`_redirect_raw_calls` exist.  Those land inside the
+        object's own exported VA range.
+
+        Second, a call through a POINTER.  `call dword ptr [0x32eaa0]` and the
+        `mov esi, <table>; call dword ptr [esi]` loop in
+        `game_state_call_after_load_procs` name no callee in the instruction:
+        the callee is a linked absolute address sitting in `.data`, and a
+        linked address is not a relocation, so `classify_relocations` sees only
+        the one DIR32 site pointing at the slot.  The raw classifier reads the
+        pointer out of the mapped image instead (`_pointer_table_callees`),
+        which is what turned two of the A/B corpus's escapes into verdicts.
+
+        Both are counted, because both are real calls that need intercepting
+        for H9; neither is visible to the delinked side.  What the assertion
+        still refuses is a surplus explained by NEITHER -- a call the raw
+        classifier invented."""
         lo, hi = self.export_span
         for c in self.comparable:
             with self.subTest(fn=c["name"]):
@@ -165,18 +210,51 @@ class TestAgreementWithDelinked(unittest.TestCase):
                 internal = [t for t in _direct_branch_targets(c["xbe"].code,
                                                               c["addr"])
                             if lo <= t < hi]
+                indirect = _indirect_callees(c["xbe"].code, c["addr"])
                 self.assertLessEqual(
-                    surplus, len(internal),
+                    surplus, len(internal) + len(indirect),
                     f"{c['name']}: {surplus} surplus call(s) but only "
                     f"{len(internal)} target(s) inside the exported range "
-                    f"[{lo:#x},{hi:#x}) -- the surplus is not explained by "
-                    f"internally-resolved sibling calls")
+                    f"[{lo:#x},{hi:#x}) and {len(indirect)} reachable through "
+                    f"a pointer -- the remainder is not explained")
+
+    def test_the_pointer_table_walk_actually_resolves_something(self):
+        """The test above widened to admit indirect callees, so it would also
+        pass if the resolver returned nothing at all.  This is the pin that
+        stops that: `game_state_call_after_load_procs` walks a 13-entry table
+        of function pointers at 0x32eaa8, and every one of them has to come
+        back or the oracle escapes into real engine code."""
+        got = ud._pointer_table_callees(0x32EAA8)
+        self.assertEqual(len(got), 13,
+                         f"expected the 13-entry proc table, got {len(got)}: "
+                         f"{[hex(x) for x in got]}")
+        self.assertEqual(got[0], 0x18ECD0)
+
+    def test_a_non_table_address_resolves_to_nothing(self):
+        """The cheap rejection that keeps the walk from reading `.rdata` byte
+        soup as pointers: the FIRST dword must be an exact kb.json function
+        entry."""
+        lo, _hi = ud._image_span_cached()
+        self.assertEqual(ud._pointer_table_callees(lo + 0x40), [])
+        self.assertEqual(ud._pointer_table_callees(0x2533D0), [])
 
     def test_the_two_classifiers_reach_the_same_category(self):
         """A category disagreement would route the run down a different path
-        (leaf vs stubbable), which is the decision H1 is about."""
+        (leaf vs stubbable), which is the decision H1 is about.
+
+        `data_only` vs `stubbable` is exempt in one direction only: a function
+        whose ONLY calls go through pointers reads as `data_only` to the
+        relocation table (it sees a data reference and no call) and as
+        `stubbable` to the raw classifier (it followed the pointer).  The raw
+        answer is the true one -- the function really does call -- so the
+        disagreement is recorded rather than asserted away, and the reverse
+        direction still fails."""
         for c in self.comparable:
             with self.subTest(fn=c["name"]):
+                if (c["dl_class"].category == "data_only"
+                        and c["raw_class"].category == "stubbable"
+                        and _indirect_callees(c["xbe"].code, c["addr"])):
+                    continue
                 self.assertEqual(c["raw_class"].category,
                                  c["dl_class"].category,
                                  f"{c['name']}: raw says "

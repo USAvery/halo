@@ -1,0 +1,294 @@
+{
+ "_meta": {
+  "what": "Step 7 go/no-go artifact for the raw-XBE oracle migration: every ported function in game_state.obj under both oracles, 50 seeds, --seed 1 --allow-stubs. Regenerate with `tools/equivalence/test_oracle_ab_parity.py --regenerate`.",
+  "seeds": 50,
+  "base_seed": 1,
+  "flags": [
+   "--allow-stubs"
+  ],
+  "xbe_md5": "c7869590a1c64ad034e49a5ee0c02465",
+  "functions": 20,
+  "deltas": 5,
+  "regressions": 0,
+  "verdict": "All differing targets move in the improving direction: three error/not_applicable rows become verdicts and two gain coverage or confidence. No target loses a verdict, coverage or confidence. The default may flip to --oracle=xbe."
+ },
+ "deltas": {
+  "FUN_001bf760": {
+   "addr": "0x1bf760",
+   "delinked": {
+    "status": "inconclusive",
+    "confidence": "none",
+    "coverage_pct": 2.6
+   },
+   "xbe": {
+    "status": "pass",
+    "confidence": "moderate",
+    "coverage_pct": 100.0
+   },
+   "reason": "Improvement. Under delinked the oracle reached 2.6% coverage and no verdict: its sibling calls arrive as unresolved relocations, so control left the body on the first call. With the image mapped the calls are real and symmetrically intercepted (H9), so all 100% of the body runs.",
+   "direction": "improvement"
+  },
+  "game_state_save_to_persistent_storage": {
+   "addr": "0x1bf8e0",
+   "delinked": {
+    "status": "error",
+    "confidence": "none",
+    "coverage_pct": 0.0
+   },
+   "xbe": {
+    "status": "inconclusive",
+    "confidence": "moderate",
+    "coverage_pct": 100.0
+   },
+   "reason": "Improvement. Delinked errored on every seed with 0% coverage. Under xbe the whole body runs; the verdict is inconclusive rather than pass because the function's observable effect is behind stubbed callees, which is an honest 'no evidence either way' instead of an error.",
+   "direction": "improvement"
+  },
+  "game_state_save_core": {
+   "addr": "0x1bf990",
+   "delinked": {
+    "status": "error",
+    "confidence": "none",
+    "coverage_pct": 0.0
+   },
+   "xbe": {
+    "status": "pass",
+    "confidence": "high",
+    "coverage_pct": 73.5
+   },
+   "reason": "Improvement. Delinked errored on every seed with 0% coverage; under xbe it passes at 73.5% with high confidence.",
+   "direction": "improvement"
+  },
+  "FUN_001bfb60": {
+   "addr": "0x1bfb60",
+   "delinked": {
+    "status": "pass",
+    "confidence": "moderate",
+    "coverage_pct": 42.3
+   },
+   "xbe": {
+    "status": "pass",
+    "confidence": "high",
+    "coverage_pct": 100.0
+   },
+   "reason": "Improvement. Same pass verdict, but coverage 42.3% -> 100.0% and confidence moderate -> high. The delinked oracle stopped at the first unrelocated sibling call. Step 6b also took this target's write-trace divergences from 20/20 seeds to 0 by sharing the data image.",
+   "direction": "improvement"
+  },
+  "FUN_001c00c0": {
+   "addr": "0x1c00c0",
+   "delinked": {
+    "status": "not_applicable",
+    "confidence": null,
+    "coverage_pct": null
+   },
+   "xbe": {
+    "status": "pass",
+    "confidence": "moderate",
+    "coverage_pct": 48.0
+   },
+   "reason": "Improvement. Delinked produced not_applicable (the oracle slice could not be paired with a usable reference at all); under xbe it passes at 48.0% coverage with moderate confidence.",
+   "direction": "improvement"
+  }
+ },
+ "unchanged": {
+  "game_state_call_after_load_procs": {
+   "addr": "0x1bf790",
+   "delinked": {
+    "status": "inconclusive",
+    "confidence": "moderate",
+    "coverage_pct": 100.0
+   },
+   "xbe": {
+    "status": "inconclusive",
+    "confidence": "moderate",
+    "coverage_pct": 100.0
+   }
+  },
+  "game_state_dispose": {
+   "addr": "0x1bf7b0",
+   "delinked": {
+    "status": "inconclusive",
+    "confidence": "moderate",
+    "coverage_pct": 100.0
+   },
+   "xbe": {
+    "status": "inconclusive",
+    "confidence": "moderate",
+    "coverage_pct": 100.0
+   }
+  },
+  "game_state_initialize_for_new_map": {
+   "addr": "0x1bf7c0",
+   "delinked": {
+    "status": "inconclusive",
+    "confidence": "moderate",
+    "coverage_pct": 100.0
+   },
+   "xbe": {
+    "status": "inconclusive",
+    "confidence": "moderate",
+    "coverage_pct": 100.0
+   }
+  },
+  "game_state_dispose_from_old_map": {
+   "addr": "0x1bf870",
+   "delinked": {
+    "status": "pass",
+    "confidence": "moderate",
+    "coverage_pct": 100.0
+   },
+   "xbe": {
+    "status": "pass",
+    "confidence": "moderate",
+    "coverage_pct": 100.0
+   }
+  },
+  "game_state_save": {
+   "addr": "0x1bf880",
+   "delinked": {
+    "status": "inconclusive",
+    "confidence": "moderate",
+    "coverage_pct": 100.0
+   },
+   "xbe": {
+    "status": "inconclusive",
+    "confidence": "moderate",
+    "coverage_pct": 100.0
+   }
+  },
+  "game_state_revert": {
+   "addr": "0x1bf8a0",
+   "delinked": {
+    "status": "inconclusive",
+    "confidence": "moderate",
+    "coverage_pct": 39.0
+   },
+   "xbe": {
+    "status": "inconclusive",
+    "confidence": "moderate",
+    "coverage_pct": 100.0
+   },
+   "note": "Same verdict, coverage 39.0% -> 100.0%. Not counted as a delta: status and confidence are unchanged."
+  },
+  "game_state_test_persistent_storage": {
+   "addr": "0x1bf920",
+   "delinked": {
+    "status": "pass",
+    "confidence": "high",
+    "coverage_pct": 68.8
+   },
+   "xbe": {
+    "status": "pass",
+    "confidence": "high",
+    "coverage_pct": 68.8
+   }
+  },
+  "game_state_reverted": {
+   "addr": "0x1bf9e0",
+   "delinked": {
+    "status": "inconclusive",
+    "confidence": "moderate",
+    "coverage_pct": 100.0
+   },
+   "xbe": {
+    "status": "inconclusive",
+    "confidence": "moderate",
+    "coverage_pct": 100.0
+   }
+  },
+  "game_state_validate_core_header": {
+   "addr": "0x1bfa00",
+   "delinked": {
+    "status": "fail",
+    "confidence": "moderate",
+    "coverage_pct": 32.1
+   },
+   "xbe": {
+    "status": "fail",
+    "confidence": "moderate",
+    "coverage_pct": 32.1
+   },
+   "note": "Unchanged real failure (fail/moderate/32.1% on both oracles). The migration neither introduced nor hid it."
+  },
+  "game_state_malloc": {
+   "addr": "0x1bfbf0",
+   "delinked": {
+    "status": "pass",
+    "confidence": "high",
+    "coverage_pct": 69.9
+   },
+   "xbe": {
+    "status": "pass",
+    "confidence": "high",
+    "coverage_pct": 69.9
+   },
+   "note": "Unchanged pass at 69.9%. Keeps 9/20 write-trace divergences under --mem-trace, now localised to one address (oracle stores [0x4ea990] at 0x1bfc94; the candidate's only store is [eax+8]). A lift question, not a harness one -- see the step 6b commit."
+  },
+  "game_state_gpu_alloc": {
+   "addr": "0x1bfd00",
+   "delinked": {
+    "status": "fail",
+    "confidence": "high",
+    "coverage_pct": 70.2
+   },
+   "xbe": {
+    "status": "fail",
+    "confidence": "high",
+    "coverage_pct": 70.2
+   },
+   "note": "Unchanged real failure (fail/high/70.2% on both oracles)."
+  },
+  "game_state_data_new": {
+   "addr": "0x1bfe10",
+   "delinked": {
+    "status": "pass",
+    "confidence": "high",
+    "coverage_pct": 100.0
+   },
+   "xbe": {
+    "status": "pass",
+    "confidence": "high",
+    "coverage_pct": 100.0
+   }
+  },
+  "game_state_memory_pool_new": {
+   "addr": "0x1bfe50",
+   "delinked": {
+    "status": "pass",
+    "confidence": "high",
+    "coverage_pct": 100.0
+   },
+   "xbe": {
+    "status": "pass",
+    "confidence": "high",
+    "coverage_pct": 100.0
+   }
+  },
+  "game_state_load_core": {
+   "addr": "0x1bffd0",
+   "delinked": {
+    "status": "pass",
+    "confidence": "moderate",
+    "coverage_pct": 41.2
+   },
+   "xbe": {
+    "status": "pass",
+    "confidence": "moderate",
+    "coverage_pct": 41.2
+   }
+  },
+  "game_state_lruv_cache_new": {
+   "addr": "0x1c0070",
+   "delinked": {
+    "status": "error",
+    "confidence": "none",
+    "coverage_pct": 0.0
+   },
+   "xbe": {
+    "status": "error",
+    "confidence": "none",
+    "coverage_pct": 0.0
+   },
+   "note": "Unchanged non-verdict. Errors under BOTH oracles, with 0% coverage. Under xbe the failure is a stack underflow (UC_ERR_FETCH_UNMAPPED at 0x080ffffc, four bytes below STACK_TOP), i.e. the emulated function returns past the harness's fake return address. Pre-existing and unrelated to the oracle side."
+  }
+ }
+}

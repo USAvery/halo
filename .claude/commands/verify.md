@@ -47,6 +47,14 @@ Score mode:
 4. If the check fails, restore only that candidate edit. Do not retain neutral or regressive score experiments.
 
 Equivalence mode:
+0. **No delink is needed.** The oracle is a VA range of the pristine
+   `halo-patched/cachebeta.xbe` mapped at its real addresses
+   (`--oracle=xbe`, the default). Its only prerequisites are that image and a
+   committed bound in `tools/verify/function_bounds.json`; check the bound
+   with `rtk jq '."0x<addr>"' tools/verify/function_bounds.json` and
+   regenerate with `tools/verify/function_bounds.py` if it is missing. Do not
+   run a Ghidra delink for an equivalence check. `--oracle=delinked` exists
+   only to reproduce a pre-migration verdict and is scheduled for removal.
 1. Use regular seeded/mem-trace equivalence first for leaf, data-only, or stubbable targets.
 2. If coverage/confidence is weak because globals are zero-filled, capture selected live xemu memory with `tools/equivalence/state_snapshot.py` or `tools/equivalence/capture_snapshot_from_diff.py`, then rerun with `--state-snapshot artifacts/snapshots/<name>.json`.
 3. Prefer QMP virtual `memsave`; use `capture_snapshot_from_diff.py --backend xbdm` when xemu is reachable through XBDM but not QMP. Physical `pmemsave` reads the wrong bytes on this setup. Do not use QEMU `savevm`/`loadvm` for oracle testing because it restores old loaded-XBE code pages.
@@ -56,7 +64,10 @@ Golden and dual-oracle modes:
 2. Use `dual-oracle` when a target has a harness case that calls original and candidate inside the same initialized engine state.
 3. A dual-oracle case should compare return values, mutated input/output buffers, selected globals, structured debug output, and assertion/crash status.
 
-Delink mode:
+Delink mode (objdiff only -- NOT a prerequisite for equivalence or VC71):
+0. Both scoring lanes now derive their references from the pristine XBE plus
+   `function_bounds.json`. Delink for objdiff's side-by-side object view, not
+   to unblock a verify run.
 1. Resolve `<target>` to object/source in `kb.json` using `rtk jq`.
 2. Run Ghidra MCP preflight before any ghidra-live export.
 3. Prefer `batch_delink.py --object <object>` for object exports.

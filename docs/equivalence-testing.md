@@ -479,7 +479,7 @@ restore and checkout tools can rewrite mtimes without changing inputs.
 The run prints what it did, and `summary.json` carries
 `fresh_executions`, `reused_results`, `stale_or_invalidated_results`, and
 `discovered_candidates`. A scheduled run also enables `--discover`, which
-includes newly ported functions that have a delinked oracle even when they are
+includes newly ported functions an oracle can be built for even when they are
 not yet in `leaf_cache.json`. These counters make a reused-only batch visible
 instead of presenting carry-forward data as a fresh measurement.
 

@@ -182,7 +182,11 @@ Notes:
 - Low match: inspect objdiff/XDK output for branch shape, memory access offsets, and missing side effects.
 - Behavior/runtime failure: prefer XBDM state probes before xemu unless no console is reachable.
 
-## Delink workflow
+## Delink workflow (objdiff only)
+
+Not a prerequisite for VC71 scoring or for the equivalence lane — both derive
+their references from the pristine XBE plus `tools/verify/function_bounds.json`.
+Delink for objdiff's side-by-side object view.
 
 Before running delink comparison, verify:
 
@@ -300,10 +304,15 @@ rtk jq '."0x<addr>"' tools/verify/function_bounds.json
 
 If missing (kb.json gained functions since the table was generated), regenerate
 with `rtk python3 tools/verify/function_bounds.py` and commit the updated table
-— the scoring reference is derived from it. Delinked COFF exports
-(`mcp__ghidra-live__export_delinked_object`) are still required for the
-**equivalence lane** (unicorn/z3 execute the oracle object) and for objdiff —
-not for VC71 scoring.
+— the scoring reference is derived from it. **`function_bounds.json` is now the
+bounds authority for the equivalence lane too**, so a missing entry means the
+target SKIPs there as well as scoring low; check before either lane.
+
+Delinked COFF exports (`mcp__ghidra-live__export_delinked_object`) are required
+only for **objdiff**. Neither VC71 scoring nor the equivalence lane consumes
+them: the equivalence oracle is a VA range of the pristine `cachebeta.xbe`
+mapped at its real addresses (`--oracle=xbe`, the default since the step-7
+parity gate). Do not delink to unblock a `/verify equivalence` run.
 
 ### Permuter (`/verify permute`)
 Last-mile match optimizer. Use ONLY when VC71 match is in **[85, 98]%**. The
@@ -319,6 +328,14 @@ Unicorn-Engine behavioral differential with seeded inputs, coverage tracking,
 and concolic feedback. Use when byte-match is weak evidence: FPU-heavy code,
 hashes/serializers, or structurally capped lifts (e.g. SEH wrappers stuck at
 ~55%). Works for both leaf and non-leaf functions:
+- **Oracle:** the pristine `halo-patched/cachebeta.xbe`, mapped at real VAs
+  into both Unicorn instances, bounded by `tools/verify/function_bounds.json`.
+  No delink, no Ghidra, no relocation synthesis. Prerequisites are that image
+  (md5 `c7869590a1c64ad034e49a5ee0c02465`, enforced by
+  `xbe_image.assert_pristine`) and a committed bound for the target address.
+  `--oracle=delinked` reproduces a pre-migration verdict and is scheduled for
+  removal; the A/B evidence for the switch is
+  `tools/equivalence/oracle_migration_expected_deltas.json`.
 - **Pure leaves:** `rtk python3 tools/equivalence/unicorn_diff.py <target> --seeds 100`
 - **Non-leaf or FPU-heavy:** `rtk python3 tools/equivalence/unicorn_diff.py <target> --seeds 100 --allow-stubs --float-tolerance 32`.
   `--allow-stubs` stubs known callees (csmemcpy, fabs, _chkstk, etc.) and seeds
@@ -353,6 +370,14 @@ hashes/serializers, or structurally capped lifts (e.g. SEH wrappers stuck at
   **Interpret confidence:** `high` = strong evidence; `moderate` = concolic
   improved coverage but returns monotonic; `weak` = only early-exit path tested,
   needs investigation or live memory replay.
+- **Two counters worth reading before you believe a verdict.**
+  `unresolved_dir32` is the number of candidate data sites still pointing at a
+  private slot instead of the shared image — each one is a place a
+  `--mem-trace` divergence could be an address mismatch rather than a real
+  one. `domain_skipped` is the number of seeds where BOTH sides escaped the
+  function body to the same address: no evidence either way, so they are
+  neither passes nor errors. A low `passed` count next to a high
+  `domain_skipped` means the seed domain is wrong, not the lift.
 
 ### Hazard scan — checks and their lift-learnings sections
 XCALL (§1), buffer-alias (§2), intrinsics (table), duplicate-args (§3),

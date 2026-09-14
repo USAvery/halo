@@ -74,8 +74,12 @@ class TestTheModeReachesTheArtifact(unittest.TestCase):
             self.skipTest("delinked/game_state.obj absent")
         self.assertEqual(_run(LEAF, "delinked")["oracle"], "delinked")
 
-    def test_the_default_is_delinked(self):
-        """The flip happens in step 7, behind a committed parity artifact."""
+    def test_the_default_is_xbe(self):
+        """Flipped in step 7 behind tools/equivalence/
+        oracle_migration_expected_deltas.json: every ported function in
+        game_state.obj under both oracles, five deltas, all improvements, no
+        regressions.  `test_oracle_ab_parity.py` keeps that artifact and this
+        default tied together."""
         py = str(_PY) if _PY.exists() else sys.executable
         with tempfile.TemporaryDirectory() as td:
             out = Path(td) / "r.json"
@@ -85,7 +89,7 @@ class TestTheModeReachesTheArtifact(unittest.TestCase):
                 capture_output=True, text=True, cwd=str(_ROOT), timeout=180)
             self.assertEqual(
                 json.loads(out.read_text(encoding="utf-8"))["oracle"],
-                "delinked")
+                "xbe")
 
 
 class TestBothOraclesAgreeOnTheLeaf(unittest.TestCase):

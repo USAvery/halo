@@ -107,14 +107,21 @@ def input_fingerprint() -> str:
     return digest.hexdigest()
 
 
-def candidate_fingerprint(base_fingerprint: str, candidate: dict) -> str:
-    """Add the target identity to the shared source/build fingerprint."""
+def candidate_fingerprint(base_fingerprint: str, candidate: dict,
+                          oracle: str = "xbe") -> str:
+    """Add the target identity to the shared source/build fingerprint.
+
+    The oracle is part of the identity, not of the target: a verdict produced
+    against a delinked COFF is not evidence about the raw-XBE oracle, or the
+    reverse, so `--skip-existing` must not carry one forward as the other.
+    """
     identity = {
         "addr": candidate.get("addr", ""),
         "name": candidate.get("name", ""),
         "class": candidate.get("class", ""),
         "obj": candidate.get("obj", ""),
         "decl": candidate.get("decl", ""),
+        "oracle": oracle,
     }
     payload = json.dumps(identity, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256((base_fingerprint + "\0" + payload).encode("utf-8")).hexdigest()
@@ -176,6 +183,42 @@ def reusable_results(output_dir: Path, fingerprints: dict[str, str],
 
 
 DELINKED_DIR = ROOT / "delinked"
+FUNCTION_BOUNDS = ROOT / "tools" / "verify" / "function_bounds.json"
+
+_BOUNDS_ADDRS = None
+
+
+def _bounds_addrs() -> set:
+    """Addresses `function_bounds.json` gives a COMMITTED bound for.
+
+    This is the raw-XBE oracle's availability question, and it is a different
+    question from the delinked one below.  A delinked oracle had to be
+    exported, per object, by a Ghidra session on one developer's machine; a
+    raw-XBE oracle needs only a committed bound and the pristine image, both of
+    which every checkout has.  That is why the discovery corpus grows from
+    ~20 functions to ~8000 with this change, and why `--max-new-per-run`
+    exists.
+
+    Entries whose bound was COMPUTED at run time rather than recorded are
+    excluded by construction: only what is in the file counts, and the file is
+    the authority (`_meta.xbe_md5` ties it to this exact binary).
+    """
+    global _BOUNDS_ADDRS
+    if _BOUNDS_ADDRS is None:
+        addrs = set()
+        try:
+            raw = json.loads(FUNCTION_BOUNDS.read_text(encoding="utf-8"))
+        except Exception:
+            raw = {}
+        for k in raw:
+            if k.startswith("_"):
+                continue
+            try:
+                addrs.add(int(k, 16))
+            except ValueError:
+                continue
+        _BOUNDS_ADDRS = addrs
+    return _BOUNDS_ADDRS
 
 
 def _has_delinked_ref(addr_str: str, obj_name: str) -> bool:
@@ -209,14 +252,31 @@ def _has_delinked_ref(addr_str: str, obj_name: str) -> bool:
     return False
 
 
+def _has_oracle_ref(addr_str: str, obj_name: str, oracle: str = "xbe") -> bool:
+    """Whether an oracle of the given kind can be built for this address.
+
+    Kept as one function over both lanes rather than swapped wholesale,
+    because discovery has to answer for whichever oracle the run will actually
+    use.  Under `xbe` a delinked export is irrelevant and its absence must not
+    skip a target; under `delinked` a committed bound is irrelevant and its
+    presence must not queue a target that cannot be run.
+    """
+    if oracle == "delinked":
+        return _has_delinked_ref(addr_str, obj_name)
+    try:
+        return int(addr_str, 16) in _bounds_addrs()
+    except ValueError:
+        return False
+
+
 def load_candidates(leaf_only: bool = False, classes: set = None,
-                    discover: bool = False):
+                    discover: bool = False, oracle: str = "xbe"):
     """Find ported functions that can be verified.
 
     Default mode: only functions already in leaf_cache.json.
-    Discovery mode (--discover): all ported functions with a delinked oracle,
-    regardless of leaf_cache presence.  Cached entries still get their class
-    label; uncached ones are tagged 'uncached'.
+    Discovery mode (--discover): all ported functions for which an oracle of
+    kind `oracle` can be built, regardless of leaf_cache presence.  Cached
+    entries still get their class label; uncached ones are tagged 'uncached'.
     """
     if classes is None:
         classes = {"leaf", "data_only", "stubbable"}
@@ -252,7 +312,8 @@ def load_candidates(leaf_only: bool = False, classes: set = None,
             entry = cache_by_int.get(addr_int)
 
             if discover:
-                if not entry and not _has_delinked_ref(addr_str, obj_name):
+                if not entry and not _has_oracle_ref(addr_str, obj_name,
+                                                     oracle):
                     continue
                 cls = (entry.get("class", "uncached") if isinstance(entry, dict)
                        else entry) if entry else "uncached"
@@ -382,7 +443,7 @@ def summarize_by_object(rows: list[dict]) -> dict:
 def run_verify(name: str, output_dir: Path, seeds: int = 50, timeout: int = 60,
                float_tolerance: int = 0, skip_esp: bool = False,
                update_leaf_cache: bool = False,
-               input_fingerprint: str = "") -> dict:
+               input_fingerprint: str = "", oracle: str = "xbe") -> dict:
     """Run unicorn_diff on a single function. Returns structured result.
 
     update_leaf_cache: when True, let unicorn_diff persist its class/confidence/
@@ -401,6 +462,7 @@ def run_verify(name: str, output_dir: Path, seeds: int = 50, timeout: int = 60,
         "--z3-equiv",
         "--allow-stubs",
         "--mem-trace",
+        "--oracle", oracle,
         "--output-json", str(result_json),
     ]
     if not update_leaf_cache:
@@ -509,7 +571,25 @@ def main():
                         help=("Maximum age for reusable results in hours "
                               f"(default: {DEFAULT_MAX_AGE_HOURS:g}; 0 disables age limit)"))
     parser.add_argument("--discover", action="store_true",
-                        help="Test all ported functions with delinked refs, not just leaf_cache entries")
+                        help="Test all ported functions an oracle can be built "
+                             "for, not just leaf_cache entries. Under the "
+                             "default --oracle=xbe that is every address with "
+                             "a committed bound in function_bounds.json "
+                             "(~8000), not the handful of locally delinked "
+                             "objects, so pair it with --max-new-per-run")
+    parser.add_argument("--oracle", choices=("delinked", "xbe"), default="xbe",
+                        help="Reference side for every target in the run "
+                             "(default: xbe). Also selects what --discover "
+                             "counts as an available oracle, and takes part "
+                             "in the result fingerprint.")
+    parser.add_argument("--max-new-per-run", type=int, default=0, metavar="N",
+                        help="Execute at most N targets that have no reusable "
+                             "result (0 = unlimited). Reused results are "
+                             "never counted against it. Use with "
+                             "--skip-existing to grow the corpus at a "
+                             "controlled rate instead of dispatching "
+                             "thousands of newly discovered targets into a "
+                             "fixed wall-clock budget.")
     parser.add_argument("--targets", type=Path, default=None,
                         help="JSON list of function names/addresses to restrict to "
                              "(runs in file order; implies --discover so uncached targets are included)")
@@ -522,7 +602,7 @@ def main():
     # An explicit target list may include uncached functions, so force discovery.
     discover = args.discover or bool(args.targets)
     candidates = load_candidates(leaf_only=args.leaf_only, classes=classes,
-                                 discover=discover)
+                                 discover=discover, oracle=args.oracle)
 
     if args.targets:
         addr_rank, name_rank = load_targets(args.targets)
@@ -566,7 +646,7 @@ def main():
 
     base_fingerprint = input_fingerprint()
     fingerprints = {
-        c["name"]: candidate_fingerprint(base_fingerprint, c)
+        c["name"]: candidate_fingerprint(base_fingerprint, c, args.oracle)
         for c in candidates
     }
     discovered_candidates = sum(1 for c in candidates if c.get("discovered"))
@@ -584,11 +664,35 @@ def main():
                   f"{len(existing)} reused")
     if discovered_candidates:
         print(f"Discovered {discovered_candidates} newly ported candidate(s) "
-              "with delinked references")
+              f"with an available {args.oracle} oracle")
+
+    if args.max_new_per_run > 0:
+        # Rationing FRESH work, not candidates: a target with a reusable
+        # result costs nothing to keep, and dropping it would throw away the
+        # reuse --skip-existing exists to get.  Order is the candidate order,
+        # so successive runs walk forward through the corpus rather than
+        # re-attempting the same prefix.
+        kept, fresh = [], 0
+        for c in candidates:
+            if c["name"] in existing:
+                kept.append(c)
+                continue
+            if fresh < args.max_new_per_run:
+                kept.append(c)
+                fresh += 1
+        deferred = len(candidates) - len(kept)
+        if deferred:
+            print(f"--max-new-per-run {args.max_new_per_run}: executing "
+                  f"{fresh} new target(s), deferring {deferred} to a later run")
+        candidates = kept
+        fingerprints = {c["name"]: fingerprints[c["name"]] for c in candidates}
+        discovered_candidates = sum(1 for c in candidates
+                                    if c.get("discovered"))
 
     csv_rows = []
     results = {"pass": 0, "fail": 0, "error": 0, "not_applicable": 0,
-               "z3_proven": 0, "total": len(candidates)}
+               "z3_proven": 0, "total": len(candidates),
+               "oracle": args.oracle}
     failures = []
     error_failures = []
     proven = []
@@ -695,6 +799,7 @@ def main():
                               float_tolerance=args.float_tolerance,
                               skip_esp=args.skip_esp,
                               update_leaf_cache=args.update_leaf_cache,
+                    oracle=args.oracle,
                               input_fingerprint=fingerprints[c["name"]]): (i, c)
                     for i, c in compute
                 }

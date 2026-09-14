@@ -58,10 +58,24 @@ BIPED_SIBLING_RESOLVE=1 rtk python3 tools/equivalence/unicorn_diff.py <target> \
    (e.g. `0x5064e4` → little-endian pointer to your synthetic scenario).
    Large indexed tables need the identity-reloc feature (regions covering
    `DAT_/FLOAT_<addr>` are patched to their REAL VA — commit 2976262a).
+   Under `--oracle=xbe` you need far fewer of these: the pristine image is
+   mapped into BOTH instances, so every `.rdata`/`.data` global the original
+   initialises already holds its real load-time bytes at its real address,
+   and a snapshot region is only needed for state the LOADER does not set up
+   (BSS, heap, tag data). Seed those; do not re-seed what the image supplies.
 5. **`LIFTED-CRASH eip=0x1ffffc`** = unpatched rel32 to a defined intra-object
    sibling. Set `BIPED_SIBLING_RESOLVE=1`.
-6. **Sibling asymmetry:** the oracle (per-function delinked obj) STUBS a
-   callee that the candidate (full clang obj) has DEFINED and runs for real.
+6. **Sibling asymmetry:** LARGELY RETIRED by the raw-XBE oracle (default
+   `--oracle=xbe`). The oracle is now a VA range of the pristine
+   `cachebeta.xbe` with the whole image mapped, so a sibling call has real
+   bytes and is intercepted symmetrically with the candidate's stub — direct
+   `E8` calls, `call [ptr]` through a function-pointer global, and
+   `call [reg]` over a pointer table alike. If you still see this, you are
+   either on `--oracle=delinked` or looking at a callee the candidate defines
+   and the oracle's intercept set missed; check the `oracle interception: N
+   callee VA(s)` line first. Historically: the oracle (per-function delinked
+   obj) STUBS a callee that the candidate (full clang obj) has DEFINED and
+   runs for real.
    Symptoms: `call-seq diverged`, or branches disagree because the real
    sibling read your synthetic state and returned something else than the
    stub. Fix by making the synthetic state valid for REAL semantics (e.g.

@@ -164,12 +164,30 @@ class TestThePatchIsWrittenSafely(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         src = (_HERE / "unicorn_diff.py").read_text(encoding="utf-8")
-        cls.block = src[src.index("    _intercept_sites = {}"):
-                        src.index("elif section_code is not None")]
+        # The loop moved out of the `entry_va is not None` branch in step 7:
+        # since the data image is shared, the CANDIDATE can reach image code
+        # too (through an identity-relocated pointer), so it needs the same
+        # JMPs.  It now sits after the entry-point decision and keys off
+        # `entry_point`, which is the oracle's real VA or CODE_BASE.
+        cls.block = src[src.index("    for _cva, _sent in (intercept_vas or {}"):
+                        src.index("    # Pre-map pages for indirect call")]
         cls.src = src
 
+    def test_it_runs_for_both_instances(self):
+        """A JMP in the oracle's copy of the image and not the candidate's
+        would make the two sides call different things: the candidate would
+        run the real callee natively while the oracle hit a stub.  That was
+        `game_state_save`, escaping to 0x1bf760 on the LIFTED side after the
+        oracle side was fixed."""
+        self.assertNotIn("if entry_va is not None", self.block)
+        for site in ("intercept_vas=oracle_intercept_map",):
+            self.assertGreaterEqual(self.src.count(site), 3,
+                                    "the intercept map must reach the "
+                                    "candidate's _run_function calls too")
+
     def test_it_never_patches_over_the_code_under_test(self):
-        self.assertIn("if entry_va <= _cva < entry_va + len(code):", self.block)
+        self.assertIn("if entry_point <= _cva < entry_point + len(code):",
+                      self.block)
 
     def test_it_never_patches_outside_the_mapped_image(self):
         self.assertIn("if not (_image_lo <= _cva < _image_hi - 5):", self.block)
@@ -181,7 +199,7 @@ class TestThePatchIsWrittenSafely(unittest.TestCase):
         """A site in `_intercept_sites` is a hole in the H5 escape guard.  One
         that was never written is a hole with no JMP behind it, so a genuine
         escape to that address would read as interception."""
-        self.assertIn("except unicorn.UcError:\n                continue",
+        self.assertIn("except unicorn.UcError:\n            continue",
                       self.block)
         self.assertLess(self.block.index("except unicorn.UcError"),
                         self.block.index("_intercept_sites[_cva] = _sent"))

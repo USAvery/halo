@@ -7,11 +7,20 @@ on:
       - 'src/**'
       - 'kb.json'
       - 'tools/equivalence/**'
+      # The raw-XBE oracle's authorities. function_bounds.json decides where
+      # every oracle function starts and ends and xbe_reference.py reads it,
+      # so a change to either changes every verdict -- but neither is under
+      # tools/equivalence/, so without these lines editing the oracle's bounds
+      # would not even trigger this workflow.
+      - 'tools/verify/function_bounds.json'
+      - 'tools/verify/xbe_reference.py'
   pull_request:
     paths:
       - 'src/**'
       - 'kb.json'
       - 'tools/equivalence/**'
+      - 'tools/verify/function_bounds.json'
+      - 'tools/verify/xbe_reference.py'
   schedule:
     # Nightly at 00:00 UTC (midnight). This is the first nightly job; the
     # Progress Report workflow chains off this run's completion (workflow_run)
@@ -47,11 +56,20 @@ jobs:
 
       - name: Link local assets
         run: |
-          # delinked/ contains tracked reference objects, so replace the
-          # checkout directory rather than nesting a delinked/delinked link.
+          # Replace the checkout directories rather than nesting a
+          # delinked/delinked link.  halo-patched is REQUIRED (it carries the
+          # pristine cachebeta.xbe the oracle reads); delinked is optional
+          # since the default oracle became the raw XBE, and is linked only so
+          # an explicit --oracle=delinked run can still reproduce a
+          # pre-migration verdict.
           rm -rf -- delinked halo-patched
-          ln -sf ${{ env.DELINKED_DIR }} delinked
           ln -sf ${{ env.XBE_DIR }} halo-patched
+          if [ -d "${{ env.DELINKED_DIR }}" ]; then
+            ln -sf ${{ env.DELINKED_DIR }} delinked
+          else
+            echo "::notice::no delinked/ on this runner; the raw-XBE oracle "\
+                 "does not need it"
+          fi
 
       - name: Build PR candidate
         run: |
@@ -65,9 +83,24 @@ jobs:
       - name: Verify prerequisites
         run: |
           ${{ env.VENV_PYTHON }} -c "import unicorn, capstone; print('ok')"
-          test -d delinked
           test -f halo-patched/cachebeta.xbe
           test -f build/halo
+          # The load-bearing check of the whole lane.  The oracle must read the
+          # PRISTINE cachebeta.xbe; loading the PATCHED default.xbe would make
+          # oracle == candidate in every region already ported and pass
+          # everything silently.  Verified here as well as at run time
+          # (xbe_image.assert_pristine) so a wrong image fails the job with a
+          # readable message instead of 5000 suspiciously green verdicts.
+          echo "c7869590a1c64ad034e49a5ee0c02465  halo-patched/cachebeta.xbe" \
+            | md5sum -c -
+          test -f tools/verify/function_bounds.json
+          ${{ env.VENV_PYTHON }} - <<'PY'
+          import json
+          meta = json.load(open("tools/verify/function_bounds.json")).get("_meta", {})
+          assert meta.get("xbe_md5") == "c7869590a1c64ad034e49a5ee0c02465", meta
+          print(f"bounds table: {meta.get('entries')} entries, md5 matches")
+          PY
+
 
       - name: Run regression tests
         run: |
@@ -98,8 +131,10 @@ jobs:
           # See the regression job: a directory target would otherwise create
           # a nested symlink instead of exposing the host-only references.
           rm -rf -- delinked halo-patched
-          ln -sf ${{ env.DELINKED_DIR }} delinked
           ln -sf ${{ env.XBE_DIR }} halo-patched
+          if [ -d "${{ env.DELINKED_DIR }}" ]; then
+            ln -sf ${{ env.DELINKED_DIR }} delinked
+          fi
 
       - name: Build PR candidate
         run: |
@@ -111,9 +146,24 @@ jobs:
         run: |
           ${{ env.VENV_PYTHON }} -c "import unicorn, capstone, z3; print('ok')"
           which llvm-objdump
-          test -d delinked
           test -f halo-patched/cachebeta.xbe
           test -f build/halo
+          # The load-bearing check of the whole lane.  The oracle must read the
+          # PRISTINE cachebeta.xbe; loading the PATCHED default.xbe would make
+          # oracle == candidate in every region already ported and pass
+          # everything silently.  Verified here as well as at run time
+          # (xbe_image.assert_pristine) so a wrong image fails the job with a
+          # readable message instead of 5000 suspiciously green verdicts.
+          echo "c7869590a1c64ad034e49a5ee0c02465  halo-patched/cachebeta.xbe" \
+            | md5sum -c -
+          test -f tools/verify/function_bounds.json
+          ${{ env.VENV_PYTHON }} - <<'PY'
+          import json
+          meta = json.load(open("tools/verify/function_bounds.json")).get("_meta", {})
+          assert meta.get("xbe_md5") == "c7869590a1c64ad034e49a5ee0c02465", meta
+          print(f"bounds table: {meta.get('entries')} entries, md5 matches")
+          PY
+
 
       - name: Determine mode
         id: mode
@@ -121,11 +171,18 @@ jobs:
           MODE="${{ github.event.inputs.mode || 'batch' }}"
           echo "mode=$MODE" >> "$GITHUB_OUTPUT"
           EXTRA_FLAGS=""
-          # Nightly runs include newly ported functions with delinked
-          # references. Manual batch mode remains cache-focused; use discover
+          # Nightly runs include newly ported functions an oracle can be
+          # built for. Manual batch mode remains cache-focused; use discover
           # explicitly when you want the same queue outside the schedule.
           if [ "$MODE" = "discover" ] || [ "${{ github.event_name }}" = "schedule" ]; then
-            EXTRA_FLAGS="--discover"
+            # --max-new-per-run is not optional here.  Discovery under the
+            # raw-XBE oracle offers every address with a committed bound
+            # instead of only the locally delinked objects, so an uncapped
+            # cold run would dispatch thousands of fresh targets into a
+            # 105-minute budget and time out with most of them unmeasured.
+            # Reused results are free and are not counted against the cap, so
+            # the corpus grows ~150 functions a night and then holds.
+            EXTRA_FLAGS="--discover --max-new-per-run 150"
           fi
           echo "extra_flags=$EXTRA_FLAGS" >> "$GITHUB_OUTPUT"
 
@@ -155,7 +212,12 @@ jobs:
         uses: actions/cache@v4
         with:
           path: artifacts/batch_verify
-          key: batch-verify-${{ hashFiles('kb.json', 'src/**', 'tools/equivalence/**') }}
+          # function_bounds.json and xbe_reference.py are in the key for the
+          # same reason they are in `paths:`: they decide every oracle's
+          # extent. Outside the key, editing the bounds table would leave
+          # every function holding a verdict measured against a different
+          # oracle.
+          key: batch-verify-${{ hashFiles('kb.json', 'src/**', 'tools/equivalence/**', 'tools/verify/function_bounds.json', 'tools/verify/xbe_reference.py') }}
 
       # No continue-on-error: with --fail-on-new the job fails ONLY on a
       # divergence absent from the committed baseline, so a red run now means

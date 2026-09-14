@@ -22,6 +22,10 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 TARGETS_FILE = Path(__file__).resolve().parent / "regression_targets.json"
 UNICORN_DIFF = ROOT / "tools" / "equivalence" / "unicorn_diff.py"
 
+# Mirrors `unicorn_diff.py --oracle`'s default.  Pinned by
+# test_oracle_ab_parity.py so the two cannot drift apart silently.
+DEFAULT_ORACLE = "xbe"
+
 
 def load_targets(filter_name=None):
     data = json.loads(TARGETS_FILE.read_text(encoding="utf-8"))
@@ -31,16 +35,85 @@ def load_targets(filter_name=None):
     return targets
 
 
+FUNCTION_BOUNDS = ROOT / "tools" / "verify" / "function_bounds.json"
+
+_BOUNDS_ADDRS = None
+
+
+def _bounds_addrs():
+    """Addresses `function_bounds.json` gives a committed bound for."""
+    global _BOUNDS_ADDRS
+    if _BOUNDS_ADDRS is None:
+        out = set()
+        try:
+            raw = json.loads(FUNCTION_BOUNDS.read_text(encoding="utf-8"))
+        except Exception:
+            raw = {}
+        for k in raw:
+            if k.startswith("_"):
+                continue
+            try:
+                out.add(int(k, 16))
+            except ValueError:
+                continue
+        _BOUNDS_ADDRS = out
+    return _BOUNDS_ADDRS
+
+
+def _oracle_mode(target):
+    """The oracle this target will actually run under.
+
+    A target's own `flags` win, because a few entries pin an oracle
+    deliberately; otherwise it is `unicorn_diff`'s default.  Reading the
+    default out of the flag list rather than hardcoding it means the
+    prerequisite check cannot drift away from the run it is checking for.
+    """
+    flags = target.get("flags", [])
+    for f in flags:
+        if f.startswith("--oracle="):
+            return f.split("=", 1)[1]
+        if f == "--oracle":
+            i = flags.index(f)
+            if i + 1 < len(flags):
+                return flags[i + 1]
+    return DEFAULT_ORACLE
+
+
 def check_prerequisites(target):
-    delinked_dir = ROOT / "delinked"
-    obj_path = delinked_dir / target["obj"]
-    if obj_path.exists():
-        pass
+    """Why this target cannot be run here, or None.
+
+    The two oracles have different prerequisites and the wrong check is worse
+    than none: before the raw-XBE migration this function asked only about
+    `delinked/`, which is gitignored and holds one object, so on any other
+    checkout all 72 targets reported SKIP and the gate passed by testing
+    nothing.  Under `--oracle=xbe` the prerequisite is a committed bound plus
+    the pristine image, which every checkout has.
+    """
+    oracle = _oracle_mode(target)
+    if oracle == "delinked":
+        delinked_dir = ROOT / "delinked"
+        obj_path = delinked_dir / target["obj"]
+        if not obj_path.exists():
+            addr = target.get("addr", "").replace("0x", "")
+            found = any(addr and addr in d.stem
+                        for d in delinked_dir.glob("*.obj"))
+            if not found:
+                return (f"missing delinked oracle for {target['name']} "
+                        f"(checked {target['obj']} and *{addr}*.obj)")
     else:
-        addr = target.get("addr", "").replace("0x", "")
-        found = any(addr and addr in d.stem for d in delinked_dir.glob("*.obj"))
-        if not found:
-            return f"missing delinked oracle for {target['name']} (checked {target['obj']} and *{addr}*.obj)"
+        xbe = ROOT / "halo-patched" / "cachebeta.xbe"
+        if not xbe.exists():
+            return ("missing the pristine oracle image "
+                    "halo-patched/cachebeta.xbe")
+        try:
+            addr_int = int(target.get("addr", ""), 16)
+        except ValueError:
+            addr_int = None
+        if addr_int is None or addr_int not in _bounds_addrs():
+            return (f"no committed bound for {target['name']} at "
+                    f"{target.get('addr', '?')} in "
+                    f"tools/verify/function_bounds.json -- regenerate with "
+                    f"tools/verify/function_bounds.py")
 
     flags = target.get("flags", [])
     for i, flag in enumerate(flags):
@@ -128,7 +201,7 @@ def main():
         return 0
 
     seed_override = 5 if args.quick else None
-    passed = failed = skipped = errors = artifacts = 0
+    passed = failed = skipped = errors = artifacts = untriaged = 0
     t0 = time.time()
 
     print(f"Running {len(targets)} regression target(s)...")
@@ -144,9 +217,16 @@ def main():
         status, detail = run_target(t, seed_override)
         seeds_used = seed_override or t.get("seeds", 20)
         artifact = t.get("known_artifact")
+        triage = t.get("triage_pending")
 
         if status == "pass":
-            if artifact:
+            if triage:
+                # Same rule as known_artifact: the marker outliving its reason
+                # would excuse a future real regression on this target.
+                print(f"  PASS! {_label(t):<24} {seeds_used} seeds — passes "
+                      f"despite triage_pending; remove the marker: {triage}")
+                failed += 1
+            elif artifact:
                 # A target marked as a known harness artifact is expected NOT
                 # to produce a verdict.  If it passes, the artifact is gone and
                 # the marker must be removed -- otherwise a future real
@@ -164,6 +244,17 @@ def main():
             print(f"  ARTF  {_label(t):<24} {artifact}")
             print(f"        ({status}: {detail})")
             artifacts += 1
+        elif triage:
+            # Deliberately NOT `known_artifact`.  That marker asserts the
+            # harness is at fault, and asserting it without evidence is how a
+            # real lift bug gets filed away as noise.  `triage_pending` claims
+            # only what is actually known: this target's verdict is new -- the
+            # raw-XBE oracle made it runnable where the delinked lane skipped
+            # it -- and nobody has read it yet.  It is reported on its own
+            # line, every run, so it stays visible instead of going quiet.
+            print(f"  TRGE  {_label(t):<24} {triage}")
+            print(f"        ({status}: {detail})")
+            untriaged += 1
         elif status == "fail":
             print(f"  FAIL  {_label(t):<24} {seeds_used} seeds — {detail}")
             failed += 1
@@ -174,7 +265,12 @@ def main():
     elapsed = time.time() - t0
     print()
     print(f"Done in {elapsed:.1f}s: {passed} passed, {failed} failed, "
-          f"{errors} errors, {artifacts} known artifacts, {skipped} skipped")
+          f"{errors} errors, {artifacts} known artifacts, "
+          f"{untriaged} awaiting triage, {skipped} skipped")
+    if untriaged:
+        print("  Targets awaiting triage are NOT excused failures -- they are "
+              "unread findings. Triage them and either fix the lift or "
+              "re-label the row.")
 
     return 1 if (failed > 0 or errors > 0) else 0
 

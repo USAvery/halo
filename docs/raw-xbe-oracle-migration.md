@@ -1,7 +1,44 @@
-# Raw-XBE oracle migration (context for investigation)
+# Raw-XBE oracle migration
 
-Status: **NOT started.** This document exists to make that investigation
-cheaper to pick up later — it does not itself change any code.
+Status: **steps 1-7 of 10 landed; `--oracle=xbe` is the default.**
+
+| Step | What | State |
+|---|---|---|
+| 1 | `tools/equivalence/xbe_image.py`, one shared loader | done |
+| 2 | `tools/equivalence/memmap.py`, layout moved out of the image span | done |
+| 3 | oracle-side plumbing, unreachable | done |
+| 4 | `--oracle={delinked,xbe}`, default `delinked` | done |
+| 5 | globals seeded from the XBE, not only from the capture | done |
+| 6a | oracle callees intercepted by patching the image | done |
+| 6b | the data image shared with the candidate | done |
+| 7 | A/B parity artifact, default flipped to `xbe` | done |
+| 8 | regenerate the derived caches (`leaf_cache.json`) | pending |
+| 9 | retire the allowlist in reviewed batches | pending |
+| 10 | delete the delinked oracle | pending |
+
+The go/no-go evidence is
+`tools/equivalence/oracle_migration_expected_deltas.json`: every ported
+function in `game_state.obj` under both oracles, 50 seeds, fixed base seed.
+Five rows differ, all in the improving direction (three `error`/
+`not_applicable` rows become verdicts, two gain coverage or confidence), and
+none regresses. `tools/equivalence/test_oracle_ab_parity.py` keeps that
+artifact honest and tied to the default.
+
+Two things the migration surfaced that the plan did not predict:
+
+- **Indirect calls are the hard part, not relocations.** With the image
+  mapped, function-pointer globals hold real pointers, so the oracle makes
+  calls that no relocation table ever described. `game_state_save` calls
+  `[0x32eaa0]`; `game_state_call_after_load_procs` walks a 13-entry table at
+  `0x32eaa8` through `call [esi]`. Both escaped into real engine code until
+  `_pointer_table_callees` resolved them into the H9 intercept set. Five of
+  those 13 pointers are real functions listed in neither `kb.json` nor
+  `function_bounds.json`, which is why the entry test is "exact function
+  entry for the FIRST dword, `.text` for the rest".
+- **Enabling the gate is itself a finding.** `regression_test.py` asked only
+  whether `delinked/` had an object. `delinked/` is gitignored and holds one,
+  so all 72 targets reported SKIP and the gate passed by testing nothing. It
+  now runs 71 pass / 1 awaiting triage.
 
 ## The idea
 
@@ -58,8 +95,10 @@ byte-match scoring on 2026-08-09 (see Precedent below).
 `tools/verify/xbe_reference.py` is the model to imitate:
 
 - `_xbe()` (line ~146) lazily loads the pristine XBE once via
-  `check_delinked_bounds.load_xbe()`, which parses XBE sections into a
-  VA→file-offset map.
+  `check_delinked_bounds.load_xbe()` (in `tools/audit/`, not `tools/verify/` —
+  this document had the path wrong), which parses XBE sections into a
+  VA→file-offset map. As of step 1 that parser is a shim over the shared
+  `tools/equivalence/xbe_image.py`.
 - `_bounds()` / `bounds_entry()` (line ~186) load the **committed**
   `tools/verify/function_bounds.json` table — the single authority for where
   a function ends. Recomputing bounds at run time is kept only as a fallback
@@ -117,5 +156,5 @@ these exact helpers rather than reimplementing XBE parsing.
 ## Related memory
 
 [[reference_unicorn_z3_raw_xbe_oracle_followup]] (the original approved
-follow-up, still NOT started as of this writing),
+follow-up; steps 1-7 have since landed),
 [[reference_equiv_oracle_reloc_gap]], [[reference_delinked_ref_bounding]].

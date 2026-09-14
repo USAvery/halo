@@ -113,6 +113,7 @@ stubs.py.
 import argparse
 import json
 import re
+import re as _re_mod
 import os
 import re
 import struct
@@ -1380,19 +1381,6 @@ def _run_function(code: bytes, abi: dict, arg_values: list,
     if entry_va is not None:
         uc.mem_write(entry_va, code)
         entry_point = entry_va
-        for _cva, _sent in (intercept_vas or {}).items():
-            if entry_va <= _cva < entry_va + len(code):
-                # The target calls itself, or its bound swallowed the callee.
-                # Patching here would overwrite the code under test.
-                continue
-            if not (_image_lo <= _cva < _image_hi - 5):
-                continue
-            _rel = (_sent - (_cva + 5)) & 0xFFFFFFFF
-            try:
-                uc.mem_write(_cva, b"\xe9" + _rel.to_bytes(4, "little"))
-            except unicorn.UcError:
-                continue
-            _intercept_sites[_cva] = _sent
     elif section_code is not None and len(section_code) <= CODE_SIZE:
         combined = bytearray(section_code)
         combined[func_offset:func_offset + len(code)] = code
@@ -1401,6 +1389,28 @@ def _run_function(code: bytes, abi: dict, arg_values: list,
     else:
         uc.mem_write(CODE_BASE, code)
         entry_point = CODE_BASE
+
+    # H9 interception, in whichever instance mapped the image -- which since
+    # step 6b is BOTH.  The candidate is not exempt: its identity-relocated
+    # DIR32 sites read the image's real function pointers, so
+    # `call dword ptr [main_lost_map]` reaches real engine code on the
+    # candidate side too, and a JMP written only into the oracle's copy would
+    # make the two sides call different things.  The sentinel behind a given
+    # symbol is shared, so patching both keeps one intercept set for the
+    # comparison rather than one per side.
+    for _cva, _sent in (intercept_vas or {}).items():
+        if entry_point <= _cva < entry_point + len(code):
+            # The target calls itself, or its bound swallowed the callee.
+            # Patching here would overwrite the code under test.
+            continue
+        if not (_image_lo <= _cva < _image_hi - 5):
+            continue
+        _rel = (_sent - (_cva + 5)) & 0xFFFFFFFF
+        try:
+            uc.mem_write(_cva, b"\xe9" + _rel.to_bytes(4, "little"))
+        except unicorn.UcError:
+            continue
+        _intercept_sites[_cva] = _sent
 
     # Pre-map pages for indirect call targets: hardcoded absolute addresses
     # in the function code that match known stub targets (FUN_XXXXXXXX).
@@ -2085,6 +2095,121 @@ def _oracle_bound_unreliable(addr: int) -> Optional[str]:
     return None
 
 
+_PTR_TABLE_LIMIT = 256
+
+
+def _pointer_table_callees(slot_va: int, limit: int = _PTR_TABLE_LIMIT):
+    """Consecutive dwords at `slot_va` that are exact kb.json function entries.
+
+    A direct `E8 rel32` names its callee in the instruction, so the intercept
+    set (H9) falls out of the disassembly.  An INDIRECT call names only a
+    pointer, and until the pristine image was mapped that pointer held nothing:
+    the delinked oracle's unrelocated word read as zero, the data-exec guard
+    "recovered" with EAX=0, and the call simply never happened.  With the image
+    mapped the pointer is real, the oracle makes the call for real -- and while
+    the candidate still stubs its equivalent callee, that is "lift vs
+    lift+entire engine" again, which is what H9 exists to prevent.
+
+    Two shapes turn up in `game_state.obj` alone and both are resolved here:
+
+      * a single slot -- `game_state_save` opens with
+        `call dword ptr [0x32eaa0]`, whose slot holds 0x1bf760, a sibling in
+        the same object.
+      * a TABLE walked through a register --
+        `game_state_call_after_load_procs` is
+        `mov esi, 0x32eaa8; mov edi, 0xd; call dword ptr [esi]; add esi, 4;
+        dec edi; jne` over 13 function pointers.  The call site names no
+        address at all, so the table has to be read from the pointer the
+        function loads.
+
+    Hence "a run of dwords", not "one dword": the run is what makes the second
+    shape work without inferring the loop's trip count from `edi`.  Reading
+    further than the loop actually walks is harmless -- an intercepting JMP
+    only matters if control reaches it -- whereas reading too few leaves a live
+    callee escaping into real engine code.
+
+    The two dword tests are deliberately NOT the same test.
+
+    The FIRST dword must land exactly on a kb.json function entry.  That is the
+    expensive claim and it is what keeps this cheap and safe on the common
+    case: a plain `push <format string>` probes one dword, fails, and stops, so
+    no `.rdata` byte soup is ever mistaken for a table.
+
+    Later dwords only have to point into `.text`.  Requiring a function entry
+    there truncates real tables: of the 13 pointers at 0x32eaa8, five
+    (0xb9880, 0x17ca90, 0x1939e0, 0x1bfbd0, 0x877e0) are in neither kb.json
+    nor `function_bounds.json` -- they are real engine functions this project
+    has simply never listed -- and stopping at the first of them left nine
+    callees escaping.  Inside a table whose head is a confirmed function
+    pointer, a `.text` address in the next slot IS evidence of a call target;
+    demanding a second, independent attestation of something we can already
+    see is what produced the wrong answer.  The run still stops at the first
+    dword that is not `.text` at all, which is how the 13-entry table ends
+    (slot 13 holds 0).
+
+    Over-reading is the safe direction and under-reading is not: an
+    intercepting JMP only matters if control reaches it, so a spurious entry
+    costs an unused sentinel, while a missing entry is a live escape into real
+    engine code and a lost verdict.
+    """
+    img = _xbe_globals_image()
+    if img is None:
+        return []
+    import xbe_image
+    raw, secs = img
+    funcs = _kb_func_addr_set()
+    out = []
+    for k in range(limit):
+        word = xbe_image.read_va_raw(raw, secs, slot_va + 4 * k, 4)
+        if not word or len(word) < 4:
+            break                    # BSS or past raw_size: no pointer there
+        target = int.from_bytes(word, "little")
+        if k == 0:
+            if target not in funcs:
+                break
+        elif _xbe_section_name_at(target) != ".text":
+            break
+        out.append(target)
+    return out
+
+
+_ESCAPE_EIP_RE = _re_mod.compile(r"oracle_escaped eip=(0x[0-9a-fA-F]+)")
+
+
+def _symmetric_escape(orc_err, lft_err):
+    """The EIP both sides escaped to, when they escaped to the SAME one.
+
+    An escape is the absence of evidence: control left the function body, so
+    nothing about the rest of the run says anything about the lift.  When only
+    one side escapes that absence is itself a finding -- the two sides took
+    different paths -- and it is scored as an error.  When BOTH escape to the
+    same address, there is no finding at all: the seed drove identical control
+    flow off the end of both bodies, which is a statement about the SEED, not
+    about the candidate.
+
+    This is not hypothetical bookkeeping.  Under the raw-XBE oracle the
+    concolic phase reaches inputs the delinked lane never could, and
+    `actor_action_replace_prop` takes 25 of its 45 seeds to
+    `oracle_escaped eip=0x1` on both sides at once: the solver picked a value
+    for a field the function then calls through.  Counting those as errors
+    turned a 20/20 pass into a red gate while every seed that carried
+    information agreed.
+
+    Requiring the same EIP is what keeps this from excusing real divergence:
+    two sides escaping to DIFFERENT addresses have taken different paths and
+    are still errors.
+    """
+    if not orc_err or not lft_err:
+        return None
+    mo = _ESCAPE_EIP_RE.search(str(orc_err))
+    ml = _ESCAPE_EIP_RE.search(str(lft_err))
+    if not mo or not ml:
+        return None
+    if int(mo.group(1), 16) != int(ml.group(1), 16):
+        return None
+    return int(mo.group(1), 16)
+
+
 def _classify_raw_oracle(code: bytes, va: int):
     """`stubs.RelocClassification` for raw XBE bytes, which carry no relocations.
 
@@ -2141,6 +2266,11 @@ def _classify_raw_oracle(code: bytes, va: int):
     rel32_ext = 0
     dir32_ext = 0
     external = []
+    # Callees reached through a pointer rather than named by an instruction.
+    # Held apart from `external` and folded in once at the end: a table is
+    # read per SITE, so the same callee can be found several times, and the
+    # stub budget counts callees, not sightings.
+    indirect = set()
 
     try:
         import capstone
@@ -2170,6 +2300,7 @@ def _classify_raw_oracle(code: bytes, va: int):
                         continue        # a size/count, not an address
                     dir32_ext += 1
                     external.append("DAT_%08x" % target)
+                    indirect.update(_pointer_table_callees(target))
             elif op.type == cs_x86.X86_OP_MEM:
                 if op.mem.base != 0:
                     continue
@@ -2177,6 +2308,13 @@ def _classify_raw_oracle(code: bytes, va: int):
                 if lo <= disp < hi and not (va <= disp < end):
                     dir32_ext += 1
                     external.append("DAT_%08x" % disp)
+                    indirect.update(_pointer_table_callees(disp))
+
+    for _target in sorted(indirect):
+        if va <= _target < end:
+            continue                # the function's own entry, in its own table
+        rel32_ext += 1
+        external.append("FUN_%08x" % _target)
 
     if decoded != len(code):
         # A tail that does not decode means the bound is wrong or the range is
@@ -3445,6 +3583,9 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
     failed = 0
     seq_detail_logged = 0  # cap call-seq dumps; see the emit site below
     errors = 0
+    # Seeds where BOTH sides escaped to the same address: no evidence either
+    # way, so neither a pass nor an error.  See `_symmetric_escape`.
+    domain_skipped = 0
     error_details = []
     first_diff = None
     trace_diff_count = 0
@@ -3554,13 +3695,21 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
                                          memory_overrides=snapshot_overrides,
                                          max_insn=_max_insn,
                                          stub_arg_tracer=cand_tracer,
-                                         image=oracle_image)
+                                         image=oracle_image,
+                                         intercept_vas=oracle_intercept_map)
         except Exception as exc:
             log(f"  {seed_label} LIFTED-ERROR: {exc}")
             error_details.append(f"{seed_label} LIFTED-ERROR: {exc}")
             errors += 1
             continue
 
+        _sym = _symmetric_escape(oracle_state.error, lifted_state.error)
+        if _sym is not None:
+            log(f"  {seed_label} DOMAIN-SKIP: both sides escaped to "
+                f"{_sym:#x}; the seed leaves the function's domain, so it is "
+                f"scored as neither a pass nor an error")
+            domain_skipped += 1
+            continue
         if oracle_state.error:
             log(f"  {seed_label} ORACLE-CRASH: {oracle_state.error}")
             error_details.append(f"{seed_label} ORACLE-CRASH: {oracle_state.error}")
@@ -3838,7 +3987,8 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
                                     collect_mem_trace=enable_trace,
                                     memory_overrides=merged_overrides,
                                     max_insn=_max_insn,
-                                    image=oracle_image)
+                                    image=oracle_image,
+                                    intercept_vas=oracle_intercept_map)
                             except Exception as exc:
                                 msg = f"{sl} LIFTED-ERROR: {exc}"
                                 log(f"  {msg}")
@@ -3846,6 +3996,12 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
                                 errors += 1
                                 continue
 
+                            _sym = _symmetric_escape(orc_s.error, lft_s.error)
+                            if _sym is not None:
+                                log(f"  {sl} DOMAIN-SKIP: both sides escaped "
+                                    f"to {_sym:#x}")
+                                domain_skipped += 1
+                                continue
                             if orc_s.error or lft_s.error:
                                 if orc_s.error:
                                     msg = f"{sl} ORACLE-CRASH: {orc_s.error}"
@@ -3927,6 +4083,10 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
     total_seeds = len(seeds) + concolic_seeds_run
     log(f"=== RESULTS: {passed} passed, {failed} failed, {errors} errors "
         f"/ {total_seeds} seeds ===")
+    if domain_skipped:
+        log(f"  domain-skipped: {domain_skipped} seed(s) drove BOTH sides out "
+            f"of the function body to the same address (no evidence either "
+            f"way; not counted as passes or errors)")
 
     if trace_diff_count and not quiet:
         log(f"  mem-trace: {trace_diff_count} seed(s) with write-trace divergences")
@@ -4037,6 +4197,10 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
         # shared image.  A confidence input: each one is a place a --mem-trace
         # divergence could be an address mismatch instead of a real one.
         unresolved_dir32=unresolved_dir32,
+        # Seeds that carried no information because both sides escaped
+        # identically.  Reported so a low `passed` count can be read against
+        # the number of seeds that actually said anything.
+        domain_skipped=domain_skipped,
     )
     if merged_global_reads:
         reads = []
@@ -4329,14 +4493,17 @@ def main():
     parser.add_argument("--allow-stubs", action="store_true",
                         help="Enable non-leaf emulation with callee stubbing and DIR32 patching")
     parser.add_argument("--oracle", choices=("delinked", "xbe"),
-                        default="delinked",
-                        help="Reference side: 'delinked' (a Ghidra-delinked "
-                             "COFF, relocatable, needs relocation synthesis) "
-                             "or 'xbe' (a VA range of the pristine "
-                             "cachebeta.xbe mapped at its real addresses, "
-                             "nothing to relocate). Default: delinked, until "
-                             "the A/B parity artifact is committed. See "
-                             "docs/raw-xbe-oracle-migration.md")
+                        default="xbe",
+                        help="Reference side: 'xbe' (a VA range of the "
+                             "pristine cachebeta.xbe mapped at its real "
+                             "addresses, nothing to relocate) or 'delinked' "
+                             "(a Ghidra-delinked COFF, relocatable, needs "
+                             "relocation synthesis). Default: xbe, behind "
+                             "tools/equivalence/"
+                             "oracle_migration_expected_deltas.json. "
+                             "'delinked' is retained only to reproduce a "
+                             "pre-migration verdict and is scheduled for "
+                             "removal. See docs/raw-xbe-oracle-migration.md")
     parser.add_argument("--oracle-native-callees", action="store_true",
                         help="--oracle=xbe only: let the oracle execute a "
                              "callee IN PLACE, at its real VA, instead of "
