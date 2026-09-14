@@ -1144,7 +1144,8 @@ def _run_function(code: bytes, abi: dict, arg_values: list,
                   auto_map_unmapped: bool = False,
                   image=None,
                   entry_va: int = None,
-                  native_callee_ranges=None) -> "state.CPUState":
+                  native_callee_ranges=None,
+                  intercept_vas: dict = None) -> "state.CPUState":
     """Run a function in a fresh Unicorn instance.
 
     Returns a CPUState with captured registers and scratch memory.
@@ -1189,6 +1190,15 @@ def _run_function(code: bytes, abi: dict, arg_values: list,
         DELIBERATELY allowed to execute natively, i.e. callees the candidate
         also runs for real.  Anything outside the target body, the stub
         sentinels and these ranges trips the H5 guard.
+    intercept_vas: `{callee VA: sentinel}` (H9).  A 5-byte `E9 <rel32>` is
+        written at each VA inside the image, so every call reaching that
+        callee -- from the target body, from a sibling, direct or tail --
+        lands on the same sentinel the candidate's call site was patched to.
+        The patch targets the CALLEE, not the call site, because raw image
+        bytes carry no relocation to rewrite: the call is a finished E8 with a
+        correct displacement into real code.  Without it the oracle runs the
+        engine natively while the candidate hits return-0 trampolines, which
+        compares "lift" against "lift plus engine" (H9).
     """
     import unicorn
     from unicorn import Uc, UC_ARCH_X86, UC_MODE_32
@@ -1307,9 +1317,23 @@ def _run_function(code: bytes, abi: dict, arg_values: list,
     # image at the function's real VA.  The bytes are normally identical to what
     # map_image already wrote; the write is what lets a caller hand in a PATCHED
     # oracle body (the symmetric-interception JMPs of hazard H9).
+    _intercept_sites = {}
     if image is not None:
         uc.mem_write(entry_va, code)
         entry_point = entry_va
+        for _cva, _sent in (intercept_vas or {}).items():
+            if entry_va <= _cva < entry_va + len(code):
+                # The target calls itself, or its bound swallowed the callee.
+                # Patching here would overwrite the code under test.
+                continue
+            if not (_image_lo <= _cva < _image_hi - 5):
+                continue
+            _rel = (_sent - (_cva + 5)) & 0xFFFFFFFF
+            try:
+                uc.mem_write(_cva, b"\xe9" + _rel.to_bytes(4, "little"))
+            except unicorn.UcError:
+                continue
+            _intercept_sites[_cva] = _sent
     elif section_code is not None and len(section_code) <= CODE_SIZE:
         combined = bytearray(section_code)
         combined[func_offset:func_offset + len(code)] = code
@@ -1470,6 +1494,17 @@ def _run_function(code: bytes, abi: dict, arg_values: list,
     _eip_guard = [image is not None]
     _eip_lo, _eip_hi = entry_point, entry_point + len(code)
     _native_ranges = tuple(native_callee_ranges or ())
+    # The ARENA, not the sentinel addresses.  A sentinel is only the FIRST
+    # instruction of what runs there: a trampoline is several instructions
+    # (`mov eax,imm32; ret`), and a real-code stub is a whole function body.
+    # Allowing only the exact sentinel addresses made the guard fire on the
+    # second byte of the very first trampoline the oracle jumped to
+    # (eip=0x40000002), reporting an escape for the interception working.
+    # Same expression as the arena mem_map above, so the two cannot drift.
+    _stub_lo = _stub_hi = 0
+    if stub_addrs:
+        _stub_lo = min(stub_addrs) & ~0xFFFF
+        _stub_hi = (max(stub_addrs) & ~0xFFFF) + 0x20000
     _ring = None
     if os.environ.get("BIPED_RING_TRACE") == "1":
         from collections import deque
@@ -1483,13 +1518,16 @@ def _run_function(code: bytes, abi: dict, arg_values: list,
         if address not in visited_pcs:
             visited_pcs[address] = size
         if _eip_guard[0] and not (_eip_lo <= address < _eip_hi):
-            if (address not in stub_addrs
+            if (not (_stub_lo <= address < _stub_hi)
+                    and address not in _intercept_sites
                     and not any(lo <= address < hi
                                 for lo, hi in _native_ranges)):
                 escape_reason[0] = (
                     f"oracle_escaped eip={address:#x} -- outside the target "
-                    f"body [{_eip_lo:#x},{_eip_hi:#x}), the stub sentinels "
-                    f"and the declared native-callee ranges")
+                    f"body [{_eip_lo:#x},{_eip_hi:#x}), the stub arena "
+                    f"[{_stub_lo:#x},{_stub_hi:#x}), "
+                    f"the H9 interception JMPs and the declared "
+                    f"native-callee ranges")
                 uc.emu_stop()
                 return
         # Executing inside a page we auto-mapped for DATA is never legitimate:
@@ -1892,6 +1930,33 @@ def _xbe_oracle_slice(addr: int, name: str):
         bound_kind=kind,
         bound_provenance=prov,
     ), None
+
+
+def _xbe_function_extent(addr: int):
+    """COMMITTED `(lo, hi)` VA range for a function, or None.
+
+    `function_bounds.json` is the authority and the only accepted source.
+    `xbe_reference.function_extent` will happily COMPUTE a bound at run time
+    for an address the table does not list -- that is right for a scoring
+    reference, where a computed bound is better than none, and wrong here: this
+    range widens the H5 escape guard's allowed set, so a guess turns a missed
+    escape into a silent 48k-instruction run through unrelated engine code
+    instead of a reported reason.  So `provenance` must say "table"; anything
+    else refuses.  Same rule `_oracle_bound_unreliable` applies to the target
+    itself.
+    """
+    sys.path.insert(0, str(_REPO_ROOT / "tools" / "verify"))
+    try:
+        import xbe_reference
+        ext = xbe_reference.function_extent(addr)
+    except Exception:
+        return None
+    if ext is None:
+        return None
+    end, _kind, prov = ext[0], ext[1], ext[2]
+    if prov != "table":
+        return None
+    return (addr, end) if end > addr else None
 
 
 def _oracle_bound_unreliable(addr: int) -> Optional[str]:
@@ -2401,7 +2466,8 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
              stub_arg_trace: bool = True,
              stub_conv_check: bool = True,
              value_corpus: Optional[Path] = None,
-             oracle: str = "delinked") -> int:
+             oracle: str = "delinked",
+             oracle_native_callees: bool = False) -> int:
     """Run the differential test.  Returns 0 if all pass, 1 if any diverge.
 
     `oracle` selects the reference side:
@@ -2792,6 +2858,14 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
     # alike). Narrowed to the oracle/candidate intersection once both stub
     # maps exist; must stay bound for the leaf path, which never builds them.
     comparable_stub_sentinels = None
+    # {callee VA: sentinel} for the raw-XBE oracle's symmetric interception
+    # (H9).  Stays empty for the delinked oracle, which intercepts by
+    # rewriting its own relocated call sites instead.  Both of these are set
+    # inside the stub block below and read by the oracle's _run_function calls,
+    # so they must be initialised BEFORE it and not again after -- a later
+    # `= None` would silently discard --oracle-native-callees' ranges.
+    oracle_intercept_map = {}
+    oracle_native_ranges = None
     oracle_code_patched = oracle_slice.code
     lifted_code_patched = lifted_slice.code
     if not is_leaf and allow_stubs:
@@ -2993,6 +3067,54 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
                 include_defined=_sibling_resolve,
                 force_redirect_names=_intercept_names)
 
+        # --- Raw-XBE oracle: intercept the CALLEE, not the call site (H9) ---
+        #
+        # The delinked oracle gets its sentinels from patch_rel32_calls, which
+        # needs one relocation per call.  Raw image bytes have none: every call
+        # is a finished E8 with a correct displacement into real code.  Left
+        # alone the oracle therefore runs the whole engine natively while the
+        # candidate hits return-0 trampolines, which compares "lift" against
+        # "lift plus engine" and makes every verdict a false divergence.
+        #
+        # So the patch goes at the CALLEE's real entry VA -- `E9 <rel32>` to a
+        # sentinel -- which catches every route into it: a call from the target
+        # body, a call from a sibling the oracle also executes, a tail jump.
+        # Rewriting call SITES could not do that; there is no relocation list
+        # naming them, and a sibling's sites are not in the target's bytes at
+        # all.
+        #
+        # SYMBOL identity is what pairs the sides up, not address identity: a
+        # callee the candidate already stubs reuses that same sentinel, so the
+        # stub-arg differential lines the two call sequences up.  A callee the
+        # candidate never calls gets a FRESH sentinel rather than running for
+        # real, because the point is symmetry -- an oracle-only call becomes a
+        # visible one-sided stub record, which `comparable_stub_sentinels`
+        # already knows how to report, instead of an escape into the image.
+        #
+        # The call targets come out of `_classify_raw_oracle`'s
+        # `external_symbols`, which is where the disassembly that found them
+        # already lives -- re-scanning here would be a second, drifting copy of
+        # the operand rules that classifier documents at length.
+        oracle_intercept_map = {}
+        if _oracle_xbe and orc_cls is not None:
+            from stubs import STUB_BASE as _SB, STUB_SLOT as _SS
+            for _ext in orc_cls.external_symbols:
+                _m = re.match(r'FUN_([0-9a-fA-F]{8})$', _ext)
+                if not _m:
+                    continue          # DAT_ ref, or the undecoded-tail marker
+                _cva = int(_m.group(1), 16)
+                _name = _canonicalize_callee_key("FUN_%08x" % _cva)
+                _key = _name.lstrip("_")
+                _sent = shared_stub_sentinels.get(_key)
+                if _sent is None:
+                    _sent = _SB + len(shared_stub_sentinels) * _SS
+                    shared_stub_sentinels[_key] = _sent
+                orc_stub_map[_sent] = _name
+                oracle_intercept_map[_cva] = _sent
+            if oracle_intercept_map:
+                info(f"  oracle interception: {len(oracle_intercept_map)} "
+                     f"callee VA(s) patched to sentinels")
+
         combined_stub_map = dict(orc_stub_map)
         combined_stub_map.update(lft_stub_map)
         # A stub-arg record exists only for an INTERCEPTED call, and the two
@@ -3059,6 +3181,37 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
                 globals_seeds.update(stub_mgr._extra_rdata_seeds)
                 info(f"  real callees: {stub_mgr._real_code_count} loaded, "
                      f"{len(stub_mgr._callee_dir32_slots)} callee globals seeded")
+            # --oracle-native-callees: drop the H9 patch for a callee the
+            # CANDIDATE also runs for real, and declare its VA range native so
+            # the H5 guard lets the oracle execute it in place.  Symmetry is
+            # preserved by only doing it where the candidate is native too --
+            # the flag cannot be used to let the oracle run code the candidate
+            # stubs, which is the asymmetry H9 exists to prevent.  Off by
+            # default: the candidate's native callee body is DELINKED bytes at
+            # a sentinel while the oracle's is image bytes at its real VA, so
+            # the two are only as equivalent as the delink is faithful, and
+            # that is the artifact this migration is removing.
+            if oracle_native_callees and oracle_intercept_map:
+                _native = []
+                _kept = {}
+                for _cva, _sent in oracle_intercept_map.items():
+                    _stub = stub_mgr._stubs.get(_sent)
+                    if _stub is None or not _stub.has_real_code:
+                        _kept[_cva] = _sent
+                        continue
+                    _ext = _xbe_function_extent(_cva)
+                    if _ext is None:
+                        # No committed bound: the range would be a guess, and
+                        # an over-wide native range is a blind spot in the
+                        # escape guard, not a convenience.
+                        _kept[_cva] = _sent
+                        continue
+                    _native.append((_cva, _ext))
+                oracle_intercept_map = _kept
+                if _native:
+                    oracle_native_ranges = tuple(_native)
+                    info(f"  oracle native callees: {len(_native)} range(s) "
+                         f"left unpatched (candidate runs them for real too)")
             if stub_mgr.convention_mismatches:
                 # Both oracle and candidate stubs honor the declared (wrong)
                 # convention, so the differential is blind to this — but the
@@ -3221,7 +3374,6 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
     # coverage/gap computation below keys off that instead of CODE_BASE.
     oracle_image = None
     oracle_entry_va = None
-    oracle_native_ranges = None
     if _oracle_xbe:
         import xbe_image
         xbe_image.assert_pristine()
@@ -3284,7 +3436,8 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
                                          max_insn=_max_insn,
                                          image=oracle_image,
                                          entry_va=oracle_entry_va,
-                                         native_callee_ranges=oracle_native_ranges)
+                                         native_callee_ranges=oracle_native_ranges,
+                                         intercept_vas=oracle_intercept_map)
         except Exception as exc:
             log(f"  {seed_label} ORACLE-ERROR: {exc}")
             error_details.append(f"{seed_label} ORACLE-ERROR: {exc}")
@@ -3568,7 +3721,8 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
                                     max_insn=_max_insn,
                                     image=oracle_image,
                                     entry_va=oracle_entry_va,
-                                    native_callee_ranges=oracle_native_ranges)
+                                    native_callee_ranges=oracle_native_ranges,
+                                    intercept_vas=oracle_intercept_map)
                             except Exception as exc:
                                 msg = f"{sl} ORACLE-ERROR: {exc}"
                                 log(f"  {msg}")
@@ -4080,6 +4234,17 @@ def main():
                              "nothing to relocate). Default: delinked, until "
                              "the A/B parity artifact is committed. See "
                              "docs/raw-xbe-oracle-migration.md")
+    parser.add_argument("--oracle-native-callees", action="store_true",
+                        help="--oracle=xbe only: let the oracle execute a "
+                             "callee IN PLACE, at its real VA, instead of "
+                             "diverting it to a sentinel -- but only where "
+                             "the candidate also runs that callee for real "
+                             "(--real-callees) and the callee has a committed "
+                             "bound. Off by default: the candidate's native "
+                             "body is delinked bytes at a sentinel while the "
+                             "oracle's is image bytes in place, so the two "
+                             "agree only as far as the delink is faithful, "
+                             "which is the artifact this lane is removing.")
     parser.add_argument("--rich-stub-returns", action="store_true",
                         help="Return scratch pointers (not 0) from stubbed pointer-returning "
                              "accessors so callers get past their NULL check. Raises coverage, "
@@ -4228,6 +4393,7 @@ def main():
         stub_conv_check=not args.no_stub_conv_check,
         value_corpus=args.value_corpus,
         oracle=args.oracle,
+        oracle_native_callees=args.oracle_native_callees,
     ))
 
 
