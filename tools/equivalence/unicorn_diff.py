@@ -113,6 +113,7 @@ stubs.py.
 """
 
 import argparse
+import hashlib
 import json
 import re
 import re as _re_mod
@@ -742,6 +743,29 @@ def _bss_seed_entries(raw: bytes, secs):
         entries.append((addr, data))
     _BSS_SEED_CACHE[key] = (secs, entries)
     return entries
+
+
+#: Bump when the concolic phase changes in a way that could make it find
+#: something on a target where it previously found nothing. A stale memo would
+#: otherwise keep skipping the phase that just got smarter.
+CONCOLIC_MEMO_VERSION = 1
+
+
+def concolic_memo_key(oracle_code: bytes, lifted_code: bytes) -> str:
+    """Identity of the concolic problem for one target.
+
+    Deliberately NARROW: the phase's outcome depends on this target's own
+    oracle and lifted bytes, not on kb.json or the rest of src/. batch_verify's
+    reuse fingerprint is global, so it is busted by any commit anywhere -- too
+    coarse to decide whether a *particular* target's concolic result still
+    holds.
+    """
+    h = hashlib.sha256()
+    h.update(b"concolic-memo-v%d\x00" % CONCOLIC_MEMO_VERSION)
+    h.update(oracle_code)
+    h.update(b"\x00")
+    h.update(lifted_code)
+    return h.hexdigest()[:32]
 
 
 def _seed_capture_over_bss(uc, raw: bytes, secs) -> int:
@@ -2685,6 +2709,7 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
              mem_trace: bool = False,
              state_snapshot: Optional[Path] = None,
              no_concolic: bool = False,
+             concolic_skip_key: str = "",
              real_callees: bool = False,
              max_insn: int = None,
              stub_arg_trace: bool = True,
@@ -3940,7 +3965,18 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
     # --- Concolic Phase 2: coverage-guided memory injection ---
     phase1_coverage = coverage_pct
     concolic_seeds_run = 0
-    if (coverage_pct < 60 and not no_concolic and passed > 0
+    memo_key = concolic_memo_key(oracle_code_patched, lifted_code_patched)
+    # The phase runs on ~4% of targets but dominates their wall clock (6.9 s of
+    # an 11 s run on actor_action_allow_cover_seeking). Corpus-wide it gains
+    # coverage on 8% of those and nothing at all on the other 92%. Since
+    # 17f9a1365 made solver budgets deterministic, "gained nothing" is a fact
+    # about the target rather than about how loaded the box was, so a caller
+    # that saw zero gain for these exact bytes can tell us to skip it.
+    memo_skip = bool(concolic_skip_key) and concolic_skip_key == memo_key
+    if memo_skip:
+        log("  concolic: skipped — no coverage gain recorded for these bytes "
+            f"(memo {memo_key[:12]})")
+    if (coverage_pct < 60 and not no_concolic and not memo_skip and passed > 0
             and use_stubs and merged_global_reads):
         try:
             from concolic import (disassemble_branches, find_uncovered,
@@ -4244,6 +4280,12 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
         ]
     if concolic_seeds_run:
         extra["phase1_coverage_pct"] = round(phase1_coverage, 1)
+    # Published whether or not the phase ran, so a caller can carry the verdict
+    # forward. `_concolic_gain_pct` is None when it never ran and so says
+    # nothing either way.
+    extra["_concolic_memo_key"] = memo_key
+    extra["_concolic_gain_pct"] = (round(coverage_pct - phase1_coverage, 2)
+                                   if concolic_seeds_run else None)
 
     # A Z3 proof and a seed divergence cannot both be right. Surface the
     # contradiction explicitly rather than letting the "fail" verdict quietly
@@ -4685,6 +4727,15 @@ def main():
     parser.add_argument("--halorec-frame", default=None, metavar="SEL",
                         help="Frame selector for --from-halorec: index (int), 'first', 'last', "
                              "0.0-1.0 fraction, 't=SECONDS', or 'handle=0xHANDLE' (default: last)")
+    parser.add_argument("--concolic-skip-key", default="",
+                        metavar="KEY",
+                        help="Skip the concolic phase when the target's memo "
+                             "key equals KEY. Callers pass the "
+                             "_concolic_memo_key from a previous result whose "
+                             "_concolic_gain_pct was 0, so the phase is not "
+                             "re-run for bytes it is already known not to help. "
+                             "A key mismatch (the bytes changed) runs it "
+                             "normally.")
     parser.add_argument("--no-concolic", action="store_true",
                         help="Disable automatic concolic Phase 2 when coverage is low")
     parser.add_argument("--value-corpus", type=Path, default=None, metavar="PATH",
@@ -4801,6 +4852,7 @@ def main():
         mem_trace=args.mem_trace,
         state_snapshot=args.state_snapshot,
         no_concolic=args.no_concolic,
+        concolic_skip_key=args.concolic_skip_key,
         real_callees=args.real_callees,
         max_insn=args.max_insn,
         stub_arg_trace=not args.no_stub_arg_trace,

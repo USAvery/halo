@@ -225,7 +225,7 @@ jobs:
       # all, so the nightly reported green through any regression.
       - name: Run batch verification
         env:
-          # 8 workers on the 16-core self-hosted box. A sweep is startup-bound,
+          # 10 workers on the 16-core self-hosted box. A sweep is startup-bound,
           # not compute-bound, so it scales nearly linearly with --jobs (80
           # targets: 123 s at -j3, 54 s at -j10) and -j3 left 13 cores idle.
           #
@@ -243,7 +243,7 @@ jobs:
           ${{ env.VENV_PYTHON }} tools/equivalence/batch_verify.py \
             --seeds 50 \
             --timeout 120 \
-            --jobs 8 \
+            --jobs 10 \
             --max-wall-minutes 105 \
             --csv \
             --skip-existing \

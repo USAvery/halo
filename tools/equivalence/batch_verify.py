@@ -580,6 +580,32 @@ def _close_forkservers():
         server.close()
 
 
+def _prior_useless_concolic_key(result_json: Path) -> str:
+    """The memo key from a previous run whose concolic phase gained nothing.
+
+    Returns "" whenever the previous result is missing, unreadable, predates
+    the memo, or recorded a phase that DID help -- in every one of those cases
+    the phase must run, so the safe answer is the one that runs it.
+
+    Only meaningful because 17f9a1365 replaced the solvers' wall-clock timeouts
+    with deterministic rlimit budgets. Under the old budgets "gained nothing"
+    could just mean the box was busy that night, and carrying that verdict
+    forward would suppress a phase that would have succeeded.
+    """
+    try:
+        prior = json.loads(result_json.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return ""
+    key = prior.get("_concolic_memo_key")
+    gain = prior.get("_concolic_gain_pct")
+    if not isinstance(key, str) or not key:
+        return ""
+    # None means the phase never ran, so nothing was learned about it.
+    if not isinstance(gain, (int, float)) or gain > 0.05:
+        return ""
+    return key
+
+
 def run_verify(name: str, output_dir: Path, seeds: int = 50, timeout: int = 60,
                float_tolerance: int = 0, skip_esp: bool = False,
                update_leaf_cache: bool = False,
@@ -591,6 +617,15 @@ def run_verify(name: str, output_dir: Path, seeds: int = 50, timeout: int = 60,
     default keeps the regression-batch behavior of NOT touching the cache.
     """
     result_json = output_dir / f"{name}.json"
+    # Read the previous verdict BEFORE unlinking it: if the concolic phase ran
+    # on these exact oracle+lifted bytes and gained no coverage, tell
+    # unicorn_diff to skip it this time. The bytes are identified by
+    # _concolic_memo_key, which is narrow (this target only) where the reuse
+    # fingerprint below is global -- a commit anywhere busts the fingerprint
+    # and forces a re-run, but it does not change whether concolic helps THIS
+    # function. Corpus-wide the phase runs on 4% of targets and gains nothing
+    # on 92% of those, while costing most of their wall clock.
+    concolic_skip_key = _prior_useless_concolic_key(result_json)
     try:
         result_json.unlink()
     except FileNotFoundError:
@@ -605,6 +640,8 @@ def run_verify(name: str, output_dir: Path, seeds: int = 50, timeout: int = 60,
         "--oracle", oracle,
         "--output-json", str(result_json),
     ]
+    if concolic_skip_key:
+        cmd.extend(["--concolic-skip-key", concolic_skip_key])
     if not update_leaf_cache:
         cmd.append("--no-leaf-cache")
     if float_tolerance > 0:
