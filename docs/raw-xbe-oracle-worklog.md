@@ -460,6 +460,30 @@ The 2 `still_errors` are `system_calloc` (an allocator, relabeled permanently) a
 111 of 379 allowlist rows (29%) are now scoped to `delinked`, leaving 268 active
 excuses under `--oracle=xbe`.
 
+### Scoping the vacuous early-exit entries, 125 rows (Hazard H10)
+
+Hazard H10 predicted that zero-filled BSS and globals would cause entry NULL guards
+to exit monotonically across every seed without state-snapshot initialization.
+118 unmappable retry rows and 7 renamed rows exhibited this exact behavior.
+
+`unicorn_diff.py` now tracks per-seed oracle visited PCs across both Phase 1 random
+seeds and Phase 2 concolic seeds. When running under `--oracle=xbe`, if all seeds execute
+an identical path (`len(oracle_seed_paths) <= 1`) and coverage is `< 100.0%`, the run is
+classified as `status = "not_applicable"`, `reason = "oracle_vacuous_early_exit: ..."`
+(exit code 2). Functions with 100.0% coverage remain `inconclusive` (preserving parity
+with `oracle_migration_expected_deltas.json`).
+
+All 125 vacuous rows in `batch_verify_allowlist.json` were scoped with `"oracle": "delinked"`
+and annotated with their retry verdicts. This retired an additional 125 excuses from the
+raw-XBE lane:
+
+| Allowlist State | Rows | Share of 379 |
+|---|---|---|
+| Scoped to `delinked` (retired from XBE lane) | 236 | 62% |
+| Active under `--oracle=xbe` | 143 | 38% |
+
+Pinned by `tools/equivalence/test_vacuous_early_exit.py` (3 tests).
+
 ### Two harness fixes found during triage
 
 1. `abi.py` parameter parsing used `\(([^)]*)\)\s*;?\s*$` which failed on function
@@ -570,5 +594,6 @@ pristine XBE and the bounds table. It needs no Ghidra.
 | `test_oracle_ab_parity.py` | 13 | The 5 delta rows reproduce live |
 | `test_escape_guard.py` | 21 | The marker discipline |
 | `test_leaf_cache_schema.py` | 15 | Canonical keys, the `_meta` stamp, the z3 floor |
+| `test_vacuous_early_exit.py` | 3 | Hazard H10 monotonic exit classification vs 100% coverage |
 
-`run_all_tests.py` reports 28 passed, 1 skipped, 0 failed.
+`run_all_tests.py` reports 28 passed, 3 skipped, 0 failed across 31 suites.
