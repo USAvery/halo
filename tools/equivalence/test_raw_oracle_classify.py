@@ -461,15 +461,38 @@ class TestRunFunctionImagePlumbing(unittest.TestCase):
         self.assertIn("xbe_image.image_pages(_img_secs)", self.src)
 
 
-class TestNothingReachesTheNewPathYet(unittest.TestCase):
-    def test_no_caller_passes_image(self):
-        """Step 3 is plumbing only; the `--oracle` flag lands in step 4.  Until
-        it does, `run_all_tests.py` and `regression_test.py` must be
-        unchanged-green because the new code is unreachable."""
+class TestOracleModeIsWired(unittest.TestCase):
+    """Step 4 made the step-3 plumbing reachable.  What this class pins is that
+    it is reachable ONLY through `oracle="xbe"`, so a delinked run cannot
+    accidentally take the new path."""
+
+    @classmethod
+    def setUpClass(cls):
         src = (_HERE / "unicorn_diff.py").read_text(encoding="utf-8")
-        body = src[src.index("def run_diff("):]
-        self.assertNotIn("image=", body)
-        self.assertNotIn("_xbe_oracle_slice(", body)
+        cls.body = src[src.index("def run_diff("):]
+
+    def test_run_diff_takes_an_oracle_mode_defaulting_to_delinked(self):
+        import inspect
+        sig = inspect.signature(ud.run_diff)
+        self.assertIn("oracle", sig.parameters)
+        self.assertEqual(sig.parameters["oracle"].default, "delinked")
+
+    def test_an_unknown_mode_is_refused(self):
+        with self.assertRaises(ValueError):
+            ud.run_diff("whatever", oracle="ghidra")
+
+    def test_every_new_path_is_behind_the_flag(self):
+        for needle in ("_xbe_oracle_slice(addr_int, func_name)",
+                       "_oracle_bound_unreliable(addr_int)",
+                       "image=oracle_image"):
+            with self.subTest(needle=needle):
+                self.assertIn(needle, self.body)
+        # `oracle_image` is the only thing handed to _run_function as `image`,
+        # and it stays None unless the flag is set.
+        self.assertIn("oracle_image = None", self.body)
+        self.assertRegex(self.body,
+                         r"if _oracle_xbe:\s*\n\s*import xbe_image\s*\n\s*"
+                         r"xbe_image\.assert_pristine\(\)")
 
 
 if __name__ == "__main__":

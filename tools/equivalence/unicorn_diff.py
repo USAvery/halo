@@ -1162,6 +1162,14 @@ def _run_function(code: bytes, abi: dict, arg_values: list,
             for page in range(start_page, end_page, 0x10000):
                 if page in _override_mapped:
                     continue
+                if page in _image_pages:
+                    # H11.  The page is already mapped with the XBE's real
+                    # bytes.  Zero-filling it and stamping known_globals.json
+                    # over it would replace ground truth with a cross-build
+                    # live capture (see known_globals.json's own _warning).
+                    # The snapshot write below still lands, which is the point.
+                    _override_mapped.add(page)
+                    continue
                 try:
                     uc.mem_map(page, 0x10000)
                     uc.mem_write(page, b'\x00' * 0x10000)
@@ -2152,14 +2160,29 @@ def _classify_confidence(coverage_pct: float, output_varied: bool,
     return "weak"
 
 
-def _record_confidence(addr, confidence: str, coverage_pct: float) -> None:
-    """Persist confidence and coverage to leaf_cache.json, per-key BEST-OF.
+def _record_confidence(addr, confidence: str, coverage_pct: float,
+                       oracle: str = "delinked") -> None:
+    """Persist confidence and coverage to leaf_cache.json, per-key BEST-OF
+    WITHIN ONE ORACLE.
 
     A re-measurement must never DOWNGRADE a recorded entry. Coverage varies run
     to run (stub availability, snapshot state, concolic luck), and the previous
     unconditional overwrite silently replaced good measurements with worse ones
     -- e.g. 0x6c high/86.3 -> weak/75.0 and 0xa83a0 100.0 -> 73.4, both from
     routine cron sweeps.
+
+    Best-of is only meaningful between two measurements of the SAME thing, and
+    the two oracles do not measure the same thing (hazard H8).  `func_size`
+    changes from a delinked slice length to a bounds-table length, so coverage
+    shifts for every target -- sometimes up, as with the lone RET at 0x1bf760
+    that the delinked export inflates to 38 bytes and scores 2.6% on.  Kept
+    best-of across oracles, an inflated pre-migration number would permanently
+    shadow an honest post-migration one, and nothing in the file would say
+    which oracle produced any given row.
+
+    So each entry records the oracle that measured it, and a measurement from a
+    DIFFERENT oracle replaces the row outright instead of competing with it.
+    Entries with no `oracle` key predate the flag and are treated as delinked.
 
     The write is also skipped when nothing actually changes. The equivalence
     cron (run_local_equiv.sh) runs in the MAIN worktree, so an unconditional
@@ -2183,7 +2206,8 @@ def _record_confidence(addr, confidence: str, coverage_pct: float) -> None:
     if isinstance(existing, dict):
         old_cov = existing.get("coverage_pct")
         old_conf = existing.get("confidence")
-        if isinstance(old_cov, (int, float)):
+        same_oracle = existing.get("oracle", "delinked") == oracle
+        if same_oracle and isinstance(old_cov, (int, float)):
             better = (coverage_pct > old_cov
                       or (coverage_pct == old_cov
                           and _CONFIDENCE_RANK.get(confidence, -1)
@@ -2193,8 +2217,10 @@ def _record_confidence(addr, confidence: str, coverage_pct: float) -> None:
         entry = dict(existing)
         entry["confidence"] = confidence
         entry["coverage_pct"] = coverage_pct
+        entry["oracle"] = oracle
     else:
-        entry = {"confidence": confidence, "coverage_pct": coverage_pct}
+        entry = {"confidence": confidence, "coverage_pct": coverage_pct,
+                 "oracle": oracle}
     if data.get(norm) == entry:
         return
     data[norm] = entry
@@ -2212,17 +2238,25 @@ def _record_confidence(addr, confidence: str, coverage_pct: float) -> None:
 # Self-test
 # ---------------------------------------------------------------------------
 
-SELF_TEST_FUNC = "vector3d_scale_add"
+# The smoke target has to be testable under BOTH oracles, which is a narrower
+# requirement than it sounds: it needs a committed function_bounds.json entry
+# AND a delinked export on this host, and `delinked/` currently holds one whole
+# object.  So it comes from game_state.obj and is picked for being a pure leaf
+# -- no calls, no absolute data references -- because a non-leaf would need the
+# symmetric interception that lands in step 6.
+SELF_TEST_FUNC = "game_state_dispose_from_old_map"
+SELF_TEST_FUNC_XBE = SELF_TEST_FUNC
 
 
-def _run_self_test(verbose: bool = False) -> int:
-    """Run a smoke test against vector3d_scale_add.
+def _run_self_test(verbose: bool = False, oracle: str = "delinked") -> int:
+    """Run a smoke test against SELF_TEST_FUNC.
 
     Returns 0 on success, 1 on failure.
     """
-    print(f"[self-test] Running against '{SELF_TEST_FUNC}' ...")
-    return run_diff(SELF_TEST_FUNC, num_seeds=20, base_seed=0xC0FFEE,
-                    verbose=verbose, save_log=False)
+    target = SELF_TEST_FUNC_XBE if oracle == "xbe" else SELF_TEST_FUNC
+    print(f"[self-test] Running against '{target}' (oracle={oracle}) ...")
+    return run_diff(target, num_seeds=20, base_seed=0xC0FFEE,
+                    verbose=verbose, save_log=False, oracle=oracle)
 
 
 # ---------------------------------------------------------------------------
@@ -2245,8 +2279,29 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
              max_insn: int = None,
              stub_arg_trace: bool = True,
              stub_conv_check: bool = True,
-             value_corpus: Optional[Path] = None) -> int:
-    """Run the differential test.  Returns 0 if all pass, 1 if any diverge."""
+             value_corpus: Optional[Path] = None,
+             oracle: str = "delinked") -> int:
+    """Run the differential test.  Returns 0 if all pass, 1 if any diverge.
+
+    `oracle` selects the reference side:
+
+      "delinked"  a Ghidra-delinked COFF from `delinked/`.  Relocatable, so
+                  every reference outside its own bytes -- globals, switch
+                  tables, sibling functions, internal labels -- arrives as an
+                  unresolved relocation this harness synthesizes by hand.
+      "xbe"       a VA range of the pristine `halo-patched/cachebeta.xbe`,
+                  mapped at its REAL virtual addresses.  Nothing was ever
+                  unlinked from its neighbours, so there is nothing to
+                  relocate; see docs/raw-xbe-oracle-migration.md.
+
+    The default stays "delinked" until the A/B parity artifact of step 7 is
+    committed.  Every emitted JSON records which was used, so no downstream
+    artifact is ambiguous about it.
+    """
+    if oracle not in ("delinked", "xbe"):
+        raise ValueError(f"unknown oracle mode {oracle!r}; "
+                         f"expected 'delinked' or 'xbe'")
+    _oracle_xbe = (oracle == "xbe")
 
     # In --allow-stubs mode each callee stub executes real oracle code, consuming
     # many more instructions than a 2-byte trampoline.  Use a higher default limit.
@@ -2277,6 +2332,9 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
                exit_code: int, **extra) -> int:
         payload = {
             "target": func_name,
+            # Stamped so every downstream artifact is self-describing: a
+            # verdict means something different under each oracle.
+            "oracle": oracle,
             "status": status,
             "applicable": applicable,
             "reason": reason,
@@ -2374,7 +2432,7 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
     if not build_path and entry.get("_obj_source"):
         build_path = _find_build_obj_for_source(entry["_obj_source"])
 
-    if not delinked_path:
+    if not delinked_path and not _oracle_xbe:
         # Try matching address to a FUN_XXXXXXXX name in delinked/
         addr_int_for_search = int(addr, 16) if addr.startswith("0x") else None
         if addr_int_for_search is not None:
@@ -2393,7 +2451,7 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
                 except Exception:
                     pass
 
-    if not delinked_path:
+    if not delinked_path and not _oracle_xbe:
         log(f"ERROR: cannot find delinked .obj for '{obj_name}'")
         log(f"  Searched delinked/ for {obj_name}.obj")
         return finish("not_applicable", False, "missing_delinked_reference", 2)
@@ -2412,7 +2470,12 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
             log(f"  Run: python3 tools/build/build.py -q --target halo")
             return finish("not_applicable", False, "missing_build_object", 2)
 
-    info(f"  delinked: {delinked_path}")
+    if _oracle_xbe:
+        import xbe_image
+        info(f"  oracle  : {xbe_image.PRISTINE_XBE.name} at real VAs "
+             f"(md5 {xbe_image.PRISTINE_MD5})")
+    else:
+        info(f"  delinked: {delinked_path}")
     if not build_compiled_on_demand:
         info(f"  build   : {build_path}")
 
@@ -2422,66 +2485,82 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
     addr_int = int(addr, 16) if addr.startswith("0x") else int(addr, 16)
     delinked_sym = f"FUN_{addr_int:08x}"
 
-    # Prefer per-function delinked refs — they isolate callees as external
-    # stubs, avoiding intra-object call resolution issues.
-    per_func_ref = _per_function_ref(func_name)
-    if per_func_ref:
-        try:
+    oracle_bound_kind = None
+    oracle_bound_provenance = None
+    if _oracle_xbe:
+        # No pairing heuristic, no chunk search, no symbol-name fallbacks: the
+        # oracle is the bytes at this address in the one true XBE, bounded by
+        # the committed tools/verify/function_bounds.json.
+        oracle_slice, _ox_err = _xbe_oracle_slice(addr_int, func_name)
+        if oracle_slice is None:
+            log(f"ERROR: no XBE oracle bytes for {func_name} @ {addr}: {_ox_err}")
+            return finish("not_applicable", False, "oracle_xbe_no_bytes", 2)
+        oracle_bound_kind = oracle_slice.bound_kind
+        oracle_bound_provenance = oracle_slice.bound_provenance
+        per_func_ref = None
+        info(f"  oracle bound: {addr}..{addr_int + len(oracle_slice.code):#x} "
+             f"({oracle_bound_kind}, {oracle_bound_provenance})")
+    else:
+        # Prefer per-function delinked refs — they isolate callees as external
+        # stubs, avoiding intra-object call resolution issues.
+        per_func_ref = _per_function_ref(func_name)
+        if per_func_ref:
             try:
-                oracle_slice = extract_function(str(per_func_ref), delinked_sym)
+                try:
+                    oracle_slice = extract_function(str(per_func_ref), delinked_sym)
+                except CoffParseError:
+                    # A kb-renamed function (e.g. glow_trailing_particle_new)
+                    # exports its real name — not FUN_<addr> — in the per-function
+                    # delinked ref, so fall back to the kb function name.
+                    oracle_slice = extract_function(str(per_func_ref), func_name)
+                delinked_path = per_func_ref
+                info(f"  (using per-function delinked ref: {per_func_ref.name})")
             except CoffParseError:
-                # A kb-renamed function (e.g. glow_trailing_particle_new)
-                # exports its real name — not FUN_<addr> — in the per-function
-                # delinked ref, so fall back to the kb function name.
-                oracle_slice = extract_function(str(per_func_ref), func_name)
-            delinked_path = per_func_ref
-            info(f"  (using per-function delinked ref: {per_func_ref.name})")
-        except CoffParseError:
-            per_func_ref = None  # fall through to main delinked
-    if not per_func_ref:
-        try:
-            oracle_slice = extract_function(str(delinked_path), delinked_sym)
-        except CoffParseError as e:
-            # Try without leading underscore / with function name
+                per_func_ref = None  # fall through to main delinked
+        if not per_func_ref:
             try:
-                oracle_slice = extract_function(str(delinked_path), func_name)
-            except CoffParseError as e2:
-                per_func_ref2 = _per_function_ref(func_name)
-                if per_func_ref2:
-                    try:
-                        oracle_slice = extract_function(str(per_func_ref2), delinked_sym)
-                        delinked_path = per_func_ref2
-                    except CoffParseError as e3:
-                        log(f"ERROR extracting oracle: {e}")
-                        log(f"  (also tried '{func_name}': {e2})")
-                        log(f"  (also tried split ref '{per_func_ref2.name}': {e3})")
-                        return finish("not_applicable", False, "oracle_extract_failed", 2)
-                else:
-                    base_stem = delinked_path.stem
-                    chunked_match = None
-                    for chunked in delinked_path.parent.glob(f"{base_stem}_*.obj"):
+                oracle_slice = extract_function(str(delinked_path), delinked_sym)
+            except CoffParseError as e:
+                # Try without leading underscore / with function name
+                try:
+                    oracle_slice = extract_function(str(delinked_path), func_name)
+                except CoffParseError as e2:
+                    per_func_ref2 = _per_function_ref(func_name)
+                    if per_func_ref2:
                         try:
-                            result = subprocess.run(
-                                ["llvm-objdump", "-t", str(chunked)],
-                                capture_output=True, text=True
-                            )
-                            if delinked_sym in result.stdout or delinked_sym.upper() in result.stdout:
-                                chunked_match = chunked
-                                break
-                        except Exception:
-                            pass
-                    if chunked_match:
-                        try:
-                            oracle_slice = extract_function(str(chunked_match), delinked_sym)
-                            delinked_path = chunked_match
+                            oracle_slice = extract_function(str(per_func_ref2), delinked_sym)
+                            delinked_path = per_func_ref2
                         except CoffParseError as e3:
                             log(f"ERROR extracting oracle: {e}")
-                            log(f"  (also tried chunked '{chunked_match.name}': {e3})")
+                            log(f"  (also tried '{func_name}': {e2})")
+                            log(f"  (also tried split ref '{per_func_ref2.name}': {e3})")
                             return finish("not_applicable", False, "oracle_extract_failed", 2)
                     else:
-                        log(f"ERROR extracting oracle: {e}")
-                        log(f"  (also tried '{func_name}': {e2})")
-                        return finish("not_applicable", False, "oracle_extract_failed", 2)
+                        base_stem = delinked_path.stem
+                        chunked_match = None
+                        for chunked in delinked_path.parent.glob(f"{base_stem}_*.obj"):
+                            try:
+                                result = subprocess.run(
+                                    ["llvm-objdump", "-t", str(chunked)],
+                                    capture_output=True, text=True
+                                )
+                                if delinked_sym in result.stdout or delinked_sym.upper() in result.stdout:
+                                    chunked_match = chunked
+                                    break
+                            except Exception:
+                                pass
+                        if chunked_match:
+                            try:
+                                oracle_slice = extract_function(str(chunked_match), delinked_sym)
+                                delinked_path = chunked_match
+                            except CoffParseError as e3:
+                                log(f"ERROR extracting oracle: {e}")
+                                log(f"  (also tried chunked '{chunked_match.name}': {e3})")
+                                return finish("not_applicable", False, "oracle_extract_failed", 2)
+                        else:
+                            log(f"ERROR extracting oracle: {e}")
+                            log(f"  (also tried '{func_name}': {e2})")
+                            return finish("not_applicable", False, "oracle_extract_failed", 2)
 
     try:
         lifted_slice = extract_function(str(build_path), func_name)
@@ -2516,7 +2595,14 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
                 return True
         return False
 
-    oracle_text = load_text_section(str(delinked_path)) if _has_raw_calls(oracle_slice.code, oracle_slice.relocs) else None
+    # `oracle_text` exists to give a delinked slice its surrounding .text so
+    # intra-object calls with real displacements land somewhere.  The image
+    # already IS that surrounding code, at the right addresses, so there is
+    # nothing to load.
+    oracle_text = (None if _oracle_xbe else
+                   (load_text_section(str(delinked_path))
+                    if _has_raw_calls(oracle_slice.code, oracle_slice.relocs)
+                    else None))
 
     if not oracle_slice.code:
         log("ERROR: oracle code is empty")
@@ -2533,14 +2619,27 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
     # so it must not reach the seed loop.  Re-export the delinked object over a
     # range that covers the function (see the delinked-reference precondition in
     # CLAUDE.md) to make the target testable.
-    truncated = slice_looks_truncated(oracle_slice)
-    if truncated:
-        log(f"ERROR: delinked reference does not cover {func_name}: {truncated}")
-        log(f"  oracle slice is {len(oracle_slice.code)} byte(s) at section offset "
-            f"0x{oracle_slice.section_offset:x} and runs to the end of the section;")
-        log(f"  the lifted body is {len(lifted_slice.code)} bytes.")
-        log(f"  Re-export {delinked_path.name} over a range covering this function.")
-        return finish("not_applicable", False, "oracle_truncated", 2)
+    if _oracle_xbe:
+        # H2.  `slice_looks_truncated` only fires on `reached_section_end`,
+        # which a raw slice never sets, so the same question -- does the
+        # reference actually cover the function -- is asked of the committed
+        # bounds table instead.
+        unreliable = _oracle_bound_unreliable(addr_int)
+        if unreliable:
+            log(f"ERROR: XBE bound for {func_name} is not usable: {unreliable}")
+            log(f"  the lifted body is {len(lifted_slice.code)} bytes.")
+            return finish("not_applicable", False, "oracle_bound_unreliable", 2,
+                          oracle_bound_kind=oracle_bound_kind,
+                          oracle_bound_provenance=oracle_bound_provenance)
+    else:
+        truncated = slice_looks_truncated(oracle_slice)
+        if truncated:
+            log(f"ERROR: delinked reference does not cover {func_name}: {truncated}")
+            log(f"  oracle slice is {len(oracle_slice.code)} byte(s) at section offset "
+                f"0x{oracle_slice.section_offset:x} and runs to the end of the section;")
+            log(f"  the lifted body is {len(lifted_slice.code)} bytes.")
+            log(f"  Re-export {delinked_path.name} over a range covering this function.")
+            return finish("not_applicable", False, "oracle_truncated", 2)
 
     # --- Check for external relocations ---
     #
@@ -2997,8 +3096,37 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
     oracle_write_digests = set()
     merged_global_reads = {}
     merged_auto_mapped_pages = set()
-    oracle_func_base = (CODE_BASE + oracle_slice.section_offset) if oracle_text else CODE_BASE
+    # The oracle's code lives at its real VA under --oracle=xbe, so every
+    # coverage/gap computation below keys off that instead of CODE_BASE.
+    oracle_image = None
+    oracle_entry_va = None
+    oracle_native_ranges = None
+    if _oracle_xbe:
+        import xbe_image
+        xbe_image.assert_pristine()
+        oracle_image = xbe_image.load_xbe()
+        oracle_entry_va = addr_int
+        oracle_func_base = addr_int
+    else:
+        oracle_func_base = (CODE_BASE + oracle_slice.section_offset) if oracle_text else CODE_BASE
     oracle_func_end = oracle_func_base + len(oracle_code_patched)
+
+    # H12.  `globals_seeds` is one dict of ABSOLUTE addresses shared by both
+    # sides.  Under --oracle=xbe the oracle reads those globals out of the
+    # image, which is ground truth, so a seed at an in-image address would
+    # overwrite the real load-time value with a slot value or a cross-build
+    # known-globals capture (H11).  The candidate keeps the full set: its
+    # globals are slots, and a slot at an in-image address is how identity
+    # relocation points it at the real thing.
+    orc_globals_seeds = lft_globals_seeds = globals_seeds
+    if _oracle_xbe and globals_seeds:
+        _img_lo, _img_hi = _image_span_cached()
+        orc_globals_seeds = {a: d for a, d in globals_seeds.items()
+                             if not (_img_lo <= a < _img_hi)}
+        _dropped = len(globals_seeds) - len(orc_globals_seeds)
+        if _dropped:
+            info(f"  oracle seeds: {_dropped} in-image seed(s) withheld; the "
+                 f"image supplies those bytes")
     enable_trace = mem_trace or (use_stubs and not is_leaf)
     # Stub-arg tracing is enabled when --allow-stubs is on AND --no-stub-arg-trace
     # was not given AND there are actual stub addresses to trace.
@@ -3026,13 +3154,16 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
                                          verbose=verbose, map_globals=use_stubs,
                                          auto_map_unmapped=True,
                                          stub_manager=stub_manager,
-                                         globals_seeds=globals_seeds,
+                                         globals_seeds=orc_globals_seeds,
                                          section_code=oracle_text,
                                          func_offset=oracle_slice.section_offset,
                                          collect_mem_trace=enable_trace,
                                          memory_overrides=snapshot_overrides,
                                          stub_arg_tracer=oracle_tracer,
-                                         max_insn=_max_insn)
+                                         max_insn=_max_insn,
+                                         image=oracle_image,
+                                         entry_va=oracle_entry_va,
+                                         native_callee_ranges=oracle_native_ranges)
         except Exception as exc:
             log(f"  {seed_label} ORACLE-ERROR: {exc}")
             error_details.append(f"{seed_label} ORACLE-ERROR: {exc}")
@@ -3046,7 +3177,7 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
                                          verbose=verbose, map_globals=use_stubs,
                                          auto_map_unmapped=True,
                                          stub_manager=stub_manager,
-                                         globals_seeds=globals_seeds,
+                                         globals_seeds=lft_globals_seeds,
                                          lifted=True,
                                          collect_mem_trace=enable_trace,
                                          memory_overrides=snapshot_overrides,
@@ -3308,12 +3439,15 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
                                     oracle_code_patched, abi, seed_vec,
                                     verbose=verbose, map_globals=True,
                                     stub_manager=stub_manager,
-                                    globals_seeds=globals_seeds,
+                                    globals_seeds=orc_globals_seeds,
                                     section_code=oracle_text,
                                     func_offset=oracle_slice.section_offset,
                                     collect_mem_trace=enable_trace,
                                     memory_overrides=merged_overrides,
-                                    max_insn=_max_insn)
+                                    max_insn=_max_insn,
+                                    image=oracle_image,
+                                    entry_va=oracle_entry_va,
+                                    native_callee_ranges=oracle_native_ranges)
                             except Exception as exc:
                                 msg = f"{sl} ORACLE-ERROR: {exc}"
                                 log(f"  {msg}")
@@ -3326,7 +3460,7 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
                                     lifted_code_patched, abi, seed_vec,
                                     verbose=verbose, map_globals=True,
                                     stub_manager=stub_manager,
-                                    globals_seeds=globals_seeds,
+                                    globals_seeds=lft_globals_seeds,
                                     lifted=True,
                                     collect_mem_trace=enable_trace,
                                     memory_overrides=merged_overrides,
@@ -3502,7 +3636,8 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
 
     if record_leaf:
         # target_addr, NOT addr -- see the capture near the top of run_diff.
-        _record_confidence(target_addr, confidence, round(coverage_pct, 1))
+        _record_confidence(target_addr, confidence, round(coverage_pct, 1),
+                           oracle=oracle)
 
     extra = dict(
         passed=passed, failed=failed, errors=errors,
@@ -3815,6 +3950,15 @@ def main():
                         help="Attempt Z3 formal equivalence proof before Unicorn testing")
     parser.add_argument("--allow-stubs", action="store_true",
                         help="Enable non-leaf emulation with callee stubbing and DIR32 patching")
+    parser.add_argument("--oracle", choices=("delinked", "xbe"),
+                        default="delinked",
+                        help="Reference side: 'delinked' (a Ghidra-delinked "
+                             "COFF, relocatable, needs relocation synthesis) "
+                             "or 'xbe' (a VA range of the pristine "
+                             "cachebeta.xbe mapped at its real addresses, "
+                             "nothing to relocate). Default: delinked, until "
+                             "the A/B parity artifact is committed. See "
+                             "docs/raw-xbe-oracle-migration.md")
     parser.add_argument("--rich-stub-returns", action="store_true",
                         help="Return scratch pointers (not 0) from stubbed pointer-returning "
                              "accessors so callers get past their NULL check. Raises coverage, "
@@ -3934,7 +4078,7 @@ def main():
         return 0
 
     if args.self_test:
-        sys.exit(_run_self_test(verbose=args.verbose))
+        sys.exit(_run_self_test(verbose=args.verbose, oracle=args.oracle))
 
     if not args.func_name:
         parser.print_help()
@@ -3962,6 +4106,7 @@ def main():
         stub_arg_trace=not args.no_stub_arg_trace,
         stub_conv_check=not args.no_stub_conv_check,
         value_corpus=args.value_corpus,
+        oracle=args.oracle,
     ))
 
 
