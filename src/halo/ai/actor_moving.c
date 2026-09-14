@@ -602,7 +602,7 @@ bool actor_aim_jump(int actor_handle, int a2, char param_3, float param_4,
  * Confirmed: tag_get('obje', obj_tag_id) then tag_get('coll', objtag[0x7c])
  *   at 0x2ae9d/0x2aeab; collision tag block at coll[0x280] drives the per-
  *   element loop.
- * Confirmed: FUN_0001aae0 writes center[3] (&[EBP-0x20]) + obj_radius
+ * Confirmed: object_get_bounding_sphere writes center[3] (&[EBP-0x20]) + obj_radius
  *   (&[EBP-0x10]); matrix_transform_point writes out[3]; node==0xffff uses
  *   world matrix, else node matrix (0x2af0b branch). scale_term =
  *   marker[0x1c] * matrix[0]. obj_radius ([EBP-0x10]) is distinct from the
@@ -668,7 +668,7 @@ void FUN_0002ade0(int actor_handle)
       continue;
     }
 
-    FUN_0001aae0(object_handle, center, &obj_radius);
+    object_get_bounding_sphere(object_handle, center, &obj_radius);
     object_get_world_matrix(object_handle, world_matrix);
 
     maxdist = 0.0f;

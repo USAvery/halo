@@ -5155,7 +5155,7 @@ void FUN_00195b10(void)
  * render_structure_diffuse_texture: thin render-orchestration wrapper (string
  * ref "render_structure_diffuse_texture" @0x3281b0).  Profiles the scope, and
  * when the map has a valid diffuse/lightmap pass (byte at 0x4d8eb0 != 0) it
- * brackets a scope enter/exit pair (FUN_00162790 / FUN_00160950, reached in the
+ * brackets a scope enter/exit pair (FUN_00162790 / _rasterizer_environment_diffuse_textures_end, reached in the
  * original via 1-instr JMP thunks at 0x17cd20/0x17cd40) around the per-surface
  * diffuse-texture draw walk (FUN_00195790).
  *
@@ -5178,7 +5178,7 @@ void FUN_00195bc0(void)
     FUN_00162790();
     FUN_00195790((int *)0x5937d4, *(unsigned short *)0x5937d0, *(int *)0x4d8eb4,
                  (void *)0, (void *)FUN_0017cd30, (void *)0, 0);
-    FUN_00160950();
+    _rasterizer_environment_diffuse_textures_end();
   }
 
   if (*(char *)0x449ef1 != 0 && *(char *)0x3281b8 != 0) {
@@ -5558,7 +5558,7 @@ void FUN_00195f30(int object_handle, float *position, float radius,
  *     @eax = material_offsets ([EBP-4]) plus 6 stack args (surface_count,
  *     material_index, 0, FUN_0017cc70 surface-draw cb, 0, 0) -- shared
  *     ADD ESP,0x1C = 1+6 stack args; rasterizer_widget_set_tint_factor
- *     (@0x196139) gated on gel_buffer != 0; FUN_00160930() (HUD end) via
+ *     (@0x196139) gated on gel_buffer != 0; _rasterizer_environment_diffuse_light_end() (HUD end) via
  *     1-instr JMP thunk @0x17cc80.
  *   - radius is a float passed by value (raw dword push); position is float*.
  * All calls cdecl, args pushed right-to-left.
@@ -5597,7 +5597,7 @@ void FUN_00196060(int object_handle, float *position, float radius,
     if (gel_buffer != 0) {
       rasterizer_widget_set_tint_factor(material_index);
     }
-    FUN_00160930();
+    _rasterizer_environment_diffuse_light_end();
     if (*(char *)0x449ef1 != 0 && *(char *)0x32ab80 != 0) {
       profile_exit_private((void *)0x32ab78);
     }

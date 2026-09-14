@@ -1332,7 +1332,7 @@ typedef struct {
   int16_t field_3c6;                                 /* +0x3c6  discarded-firing-position ring cursor, MOVSX word @0x24c09/0x24c17/0x24c26 */
   /* +0x3c8  four-entry discarded-firing-position ring. Stride 4 comes from the
    * `index += 4` byte walk in actor_clear_discarded_firing_positions and the
-   * `% 4` cursor wrap in FUN_00024be0; the record boundary itself is unproven,
+   * `% 4` cursor wrap in actor_discard_firing_position; the record boundary itself is unproven,
    * only the two written halves are named. */
   struct {
     char field_00;                                   /* +0x00   the param_3 flag stored alongside the index */

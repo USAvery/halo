@@ -119,7 +119,7 @@ short FUN_00075380(void *bitmap /* @<eax> */)
     }
   }
 
-  FUN_00074fb0(pixel_data, bitmap_data);
+  extract_mipmaps_to_bitmap(pixel_data, bitmap_data);
 
   if (*(short *)(bitmap_data + 0xa) == 1) {
     pixel_size = bitmap_get_pixel_data_size(bitmap_data);

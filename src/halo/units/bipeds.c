@@ -1409,7 +1409,7 @@ char biped_fix_position(int unit_handle, int seat_handle,
   *(int16_t *)0x4761d8 = (int16_t)(depth + 1);
   *(int16_t *)(0x5a8c80 + depth * 2) = 7;
 
-  /* Branch structure preserved from disasm (0x1a14aa): call FUN_0001aae0 only
+  /* Branch structure preserved from disasm (0x1a14aa): call object_get_bounding_sphere only
    * when a seat is involved, jumping straight to the epilogue when both handles
    * are NONE. */
   if (unit_handle == -1) {
@@ -1420,7 +1420,7 @@ char biped_fix_position(int unit_handle, int seat_handle,
   }
   if (seat_handle != -1) {
   call_aae0:
-    FUN_0001aae0(seat_handle, (float *)center, (float *)&from_seat);
+    object_get_bounding_sphere(seat_handle, (float *)center, (float *)&from_seat);
   }
   {
     from_seat = (unit_handle == -1);
@@ -1819,7 +1819,7 @@ int biped_find_pathfinding_surface_index(int unit_handle, vector3_t *pos)
  *
  * Confirmed: object_get_and_verify_type(unit_handle, 1); tag_get('bipd', ...)
  * (result discarded). normalize3d(unit+0x24); fallback = global forward axis;
- * unit+0x30 = global up axis. FUN_0001aae0 gets vehicle center+radius.
+ * unit+0x30 = global up axis. object_get_bounding_sphere gets vehicle center+radius.
  * 2.0f arg pushed as 0x40000000.
  */
 void biped_exit_seat_end(int unit_handle, int seat_handle)
@@ -1846,7 +1846,7 @@ void biped_exit_seat_end(int unit_handle, int seat_handle)
   fixed =
     biped_fix_position(unit_handle, seat_handle, (float *)0, 0, 2.0f, 1, 0, 1);
   if (fixed == 0) {
-    FUN_0001aae0(seat_handle, center, &radius);
+    object_get_bounding_sphere(seat_handle, center, &radius);
     fixed =
       biped_fix_position(unit_handle, seat_handle, center, 0, radius, 1, 0, 0);
     if (fixed == 0) {

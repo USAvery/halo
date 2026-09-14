@@ -1285,7 +1285,7 @@ void FUN_00057030(int param_1, char param_2)
  * FUN_000570d0 — assign command list to all actors in an encounter
  * (ai_command_list). Logs "[thread]: ai_command_list [enc] [index]", then
  * iterates actors via ai_index_actor_iterator_new/ai_index_actor_iterator_next,
- * calling FUN_00016e70(actor_handle, param_2, buf) and if it returns true,
+ * calling action_obey_command_list_setup(actor_handle, param_2, buf) and if it returns true,
  * actor_action_change(actor_handle, 0xb, buf). Actor handle is at
  * local_1c+0x10. 0x570d0 / encounters.obj
  */
@@ -1306,7 +1306,7 @@ void FUN_000570d0(int param_1, int16_t param_2)
   ai_index_actor_iterator_new(param_1, local_1c);
   iVar3 = ai_index_actor_iterator_next(local_1c);
   while (iVar3 != 0) {
-    if (FUN_00016e70(*(int *)(local_1c + 0x10), param_2, local_a0))
+    if (action_obey_command_list_setup(*(int *)(local_1c + 0x10), param_2, local_a0))
       actor_action_change(*(int *)(local_1c + 0x10), 0xb, (int)local_a0);
     iVar3 = ai_index_actor_iterator_next(local_1c);
   }
@@ -1316,7 +1316,7 @@ void FUN_000570d0(int param_1, int16_t param_2)
  * FUN_00057190 — assign command list to actor via unit
  * (ai_command_list_by_unit). Logs "[thread]: ai_command_list_by_unit <unit>
  * [index]". If param_1 != -1 and the unit has a biped/vehicle actor
- * (field_0x1a4), calls FUN_00016e70 and actor_action_change if it succeeds.
+ * (field_0x1a4), calls action_obey_command_list_setup and actor_action_change if it succeeds.
  * 0x57190 / encounters.obj
  */
 void FUN_00057190(int param_1, int16_t param_2)
@@ -1332,7 +1332,7 @@ void FUN_00057190(int param_1, int16_t param_2)
     iVar3 = (int)object_try_and_get_and_verify_type(param_1, 3);
     if (iVar3 != 0 && *(int *)((char *)iVar3 + 0x1a4) != -1) {
       datum_get(actor_data, *(int *)((char *)iVar3 + 0x1a4));
-      if (FUN_00016e70(*(int *)((char *)iVar3 + 0x1a4), param_2, local_88))
+      if (action_obey_command_list_setup(*(int *)((char *)iVar3 + 0x1a4), param_2, local_88))
         actor_action_change(*(int *)((char *)iVar3 + 0x1a4), 0xb,
                             (int)local_88);
     }
@@ -1343,7 +1343,7 @@ void FUN_00057190(int param_1, int16_t param_2)
  * FUN_00057230 — advance command list for all actors in an encounter.
  * Logs "[thread]: ai_command_list_advance [encounter]", then iterates
  * encounter actors via ai_index_actor_iterator_new/ai_index_actor_iterator_next
- * and calls FUN_00017090(actor_handle) for each. Actor handle is at
+ * and calls action_obey_advance_command_list(actor_handle) for each. Actor handle is at
  * local_1c+0x10. 0x57230 / encounters.obj
  */
 void FUN_00057230(int param_1)
@@ -1362,7 +1362,7 @@ void FUN_00057230(int param_1)
   ai_index_actor_iterator_new(param_1, local_1c);
   iVar2 = ai_index_actor_iterator_next(local_1c);
   while (iVar2 != 0) {
-    FUN_00017090(*(int *)(local_1c + 0x10));
+    action_obey_advance_command_list(*(int *)(local_1c + 0x10));
     iVar2 = ai_index_actor_iterator_next(local_1c);
   }
 }
@@ -1371,7 +1371,7 @@ void FUN_00057230(int param_1)
  * FUN_000572c0 — advance command list for the actor attached to a unit.
  * Logs "[thread]: ai_command_list_advance_by_unit <some unit>". If
  * param_1 != -1 and the object has an actor at field_0x1a4 (or 0x1a8),
- * calls FUN_00017090 on that actor handle.
+ * calls action_obey_advance_command_list on that actor handle.
  * 0x572c0 / encounters.obj
  */
 void FUN_000572c0(int param_1)
@@ -1386,11 +1386,11 @@ void FUN_000572c0(int param_1)
     iVar2 = (int)object_try_and_get_and_verify_type(param_1, 3);
     if (iVar2 != 0) {
       if (*(int *)((char *)iVar2 + 0x1a4) != -1) {
-        FUN_00017090(*(int *)((char *)iVar2 + 0x1a4));
+        action_obey_advance_command_list(*(int *)((char *)iVar2 + 0x1a4));
         return;
       }
       if (*(int *)((char *)iVar2 + 0x1a8) != -1)
-        FUN_00017090(*(int *)((char *)iVar2 + 0x1a8));
+        action_obey_advance_command_list(*(int *)((char *)iVar2 + 0x1a8));
     }
   }
 }

@@ -48,7 +48,7 @@ void FUN_0017cd80(void)
 /* 0x17cd90: bare JMP 0x160980.  Reached by a single CALL at 0x13a72f. */
 void FUN_0017cd90(void)
 {
-  FUN_00160980();
+  _rasterizer_environment_specular_lights_end();
 }
 
 /* 0x17cda0: bare JMP 0x163c40.  Reached by a single CALL at 0x195c6e. */

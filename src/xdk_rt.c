@@ -54,7 +54,7 @@ __attribute__((naked)) void _CIpow(void) {
  * original MSVC runtime does (cachebeta.xbe 0x1d90e0).  A bare `ret` left the frame
  * UNALLOCATED: a function's locals/spills aliased live ESP and were clobbered by the
  * next argument push (NULL+0x99 fault in actor_has_accessible_firing_position
- * 0x25a00; corrupted firing-position/aim records in FUN_00025c10 0x25c10).
+ * 0x25a00; corrupted firing-position/aim records in actor_select_firing_position 0x25c10).
  * Byte-faithful to 0x1d90e0; Xbox fully commits the thread stack, so no probing. */
 __attribute__((naked)) void _chkstk(void) {
     __asm__(

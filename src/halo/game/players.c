@@ -13767,7 +13767,7 @@ void FUN_000c0a30(int16_t function_index, int thread_datum, char init)
  * spelled as an `unsigned short` load, not `record[1]`, or the 32-bit dword
  * would be forwarded instead.  FUN_000570d0's kb.json decl already carries
  * (int, int16_t) — its param_2 is the AI command-list index it logs with
- * "%s: ai_command_list %s %d" and hands to FUN_00016e70 — so no decl widening
+ * "%s: ai_command_list %s %d" and hands to action_obey_command_list_setup — so no decl widening
  * was needed for it.
  *
  * ABI: frame is PUSH EBP; MOV EBP,ESP; PUSH ESI ... POP ESI; POP EBP; RET (no

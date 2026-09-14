@@ -537,7 +537,7 @@ float actor_compute_prop_target_weight(int actor_handle, int clump_item_handle)
       }
     } else {
       /* Actor has a weapon in hand */
-      char *weapon_tag = FUN_000210f0(actor_handle);
+      char *weapon_tag = actor_get_weapon_definition(actor_handle);
       char *actv_tag2 =
         actor_combat_get_firing_variant_definition(actor_handle);
 

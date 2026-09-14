@@ -132,7 +132,7 @@ int TIFFReadRGBAImage(void *tif, unsigned long rwidth, unsigned long rheight,
   stoponerr = stop;
   Map = 0;
   BWmap = 0;
-  ok = FUN_0006c080(tif, rwidth, height, raster + (rheight - height) * rwidth);
+  ok = gt(tif, rwidth, height, raster + (rheight - height) * rwidth);
   /* Line numbers are the original tif_getimage.c __LINE__ stamps (0x7d/0x7f
    * at 0x6c568 and 0x6c581); this file's own line numbers are meaningless
    * here, so they are written literally rather than via __LINE__. */

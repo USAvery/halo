@@ -2205,7 +2205,7 @@ void FUN_000d6cc0(int param_1)
   float position[3];
   /* Save the local_player_index up front (original: u1 = param_1 @0xd6cc6).
    * The case-1 (object waypoint) branch below reuses param_1's stack slot as a
-   * throwaway scratch for FUN_0001aae0's radius out-param, so param_1 itself is
+   * throwaway scratch for object_get_bounding_sphere's radius out-param, so param_1 itself is
    * clobbered. The original keeps the real index in u1 and uses it for
    * FUN_000d6660 and game_engine_render_nav_points; the prior lift dropped that
    * save and reused the clobbered param_1, tripping the players.c#133
@@ -2246,7 +2246,7 @@ void FUN_000d6cc0(int param_1)
         i2 = (int)object_try_and_get_and_verify_type(*(int *)pu6, -1);
         if (i2 == 0)
           goto skip;
-        FUN_0001aae0(*(int *)pu6, position, (float *)&param_1);
+        object_get_bounding_sphere(*(int *)pu6, position, (float *)&param_1);
         break;
       case 2:
         game_engine_get_goal_position((int *)position, (short)*(int *)pu6);
@@ -2335,7 +2335,7 @@ void FUN_000d6e50(int param_1)
           pu6[-1] = 0xffff;
           goto next;
         }
-        FUN_0001aae0(obj_handle, target_pos, l_1c);
+        object_get_bounding_sphere(obj_handle, target_pos, l_1c);
         break;
       case 2:
         game_engine_get_goal_position((int *)target_pos,

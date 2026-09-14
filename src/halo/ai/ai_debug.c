@@ -2778,9 +2778,9 @@ float *ai_debug_drawstack(void)
  *           convention for object-pointer fields with no recovered struct
  *           (see the object+0x2d4 "owner handle" cast earlier in this file).
  *   0x4b6a1 weapon != NULL && *(int*)(weapon+0x2d4) == object_handle (i.e.
- *           the weapon's owner is this unit) selects the FUN_0001aae0 path;
+ *           the weapon's owner is this unit) selects the object_get_bounding_sphere path;
  *           otherwise biped_get_camera_height_and_offset.
- *   0x4b6b8 FUN_0001aae0(weapon_handle, center, &camera_height); the
+ *   0x4b6b8 object_get_bounding_sphere(weapon_handle, center, &camera_height); the
  *           height_offset out-param is not touched by this callee and is set
  *           to 0.0f explicitly right after (0x4b6c0), matching decompile.
  *   0x4b6d6 biped_get_camera_height_and_offset(object_handle, (vector3_t*)
@@ -2825,7 +2825,7 @@ void ai_debug_highlight_unit(int object_handle, void *color, char draw_flag)
   weapon_handle = *(int32_t *)((char *)unit + 0xcc);
   weapon = object_try_and_get_and_verify_type(weapon_handle, 3);
   if (weapon != NULL && *(int32_t *)((char *)weapon + 0x2d4) == object_handle) {
-    FUN_0001aae0(weapon_handle, center, &camera_height);
+    object_get_bounding_sphere(weapon_handle, center, &camera_height);
     height_offset = 0.0f;
   } else {
     biped_get_camera_height_and_offset(object_handle, (vector3_t *)center,

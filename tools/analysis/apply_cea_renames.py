@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """
-apply_cea_renames.py — single apply path for every CEA-derived function-name
-proposal (rename_mapping.json's line-containment rows plus the three
-cea_propagation corpora), applied to kb.json and the matching src/ call
-sites, with honest per-row provenance.
+apply_cea_renames.py — single apply path for CEA-derived function-name
+proposals and same-build symbol dumps, applied to kb.json and matching src/
+call sites, with honest per-row provenance.
 
 Background: two distinct evidence pipelines produce FUN_<addr8> -> name
 proposals for this binary, and neither is ground truth:
@@ -17,7 +16,7 @@ proposals for this binary, and neither is ground truth:
     derived from the decompiled 0563 halocea corpus, not our PDB.
     name_source = "halocea".
 
-Per the naming-confidence skill's "Cross-build corpora" section, cross-build
+Per the naming-confidence skill's "Cross-build corpora" section, CEA cross-build
 evidence — a different build's PDB, or a different build's decompiled
 corpus — never self-justifies a T1 name; both pipelines here are capped at
 T2 regardless of the row's own confidence tier (confirmed / high_confidence
@@ -35,6 +34,11 @@ Two kb.json storage shapes hold function records:
   - kb["objects"][*]["functions"][*]   (the vast majority)
   - kb["0x<addr>"] top-level entries    (a legacy minority, ~87 total)
 Both are handled uniformly.
+
+Same-build symbol dumps use --symbol-dump. Their text/RVA rows are direct
+evidence for this binary and are tagged name_source=2276-symbol-dump, T1.
+Only leading-underscore function symbols are imported; sub_ placeholders are
+ignored.
 
 Subcommands:
   plan                         Compute and print the batch plan (no writes).
@@ -95,10 +99,12 @@ by round-tripping the file unmodified and diffing: zero bytes differ).
 """
 
 import argparse
+import copy
 import json
 import os
 import re
 import sys
+import tempfile
 from collections import Counter, defaultdict
 from datetime import date
 
@@ -121,6 +127,15 @@ METHOD_TO_SOURCE = {
     "callgraph_propagation": "halocea",
     "anchored_window": "halocea",
     "exact_string": "halocea",
+    "exact_address": "2276-symbol-dump",
+}
+
+METHOD_EVIDENCE_TIER = {
+    "line_containment": "T2",
+    "callgraph_propagation": "T2",
+    "anchored_window": "T2",
+    "exact_string": "T2",
+    "exact_address": "T1",
 }
 
 # When two+ mapping files agree on the same address and new_name, this order
@@ -151,8 +166,14 @@ def load_kb():
 
 
 def save_kb(kb):
-    with open(KB_PATH, "w", encoding="utf-8") as f:
-        json.dump(kb, f, indent=1, ensure_ascii=False)
+    fd, temp_path = tempfile.mkstemp(prefix=".kb.json.", dir=os.path.dirname(KB_PATH))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(kb, f, indent=1, ensure_ascii=False)
+        os.replace(temp_path, KB_PATH)
+    finally:
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
 
 
 def load_mapping_rows(paths):
@@ -165,6 +186,31 @@ def load_mapping_rows(paths):
         rel = os.path.relpath(path, REPO_ROOT)
         for row in file_rows:
             rows.append(dict(row, _mapping_file=rel))
+    return rows
+
+
+def load_symbol_dump_rows(paths):
+    """Read text/RVA symbol dumps for the target binary into mapping rows."""
+    rows = []
+    for path in paths:
+        with open(path, encoding="utf-8") as f:
+            for line_number, line in enumerate(f, 1):
+                columns = line.rstrip("\n").split("\t")
+                if len(columns) < 3 or not columns[0].startswith("_"):
+                    continue
+                raw_name = columns[0]
+                new_name = raw_name[1:]
+                # Map exports occasionally render argument text in the symbol.
+                # They cannot safely become C identifiers without separate evidence.
+                if not re.fullmatch(r"[A-Za-z_]\w*", new_name):
+                    continue
+                rows.append({
+                    "addr": format(int(columns[2], 16), "08x"),
+                    "new_name": new_name,
+                    "method": "exact_address",
+                    "tier": "confirmed",
+                    "_mapping_file": path,
+                })
     return rows
 
 
@@ -211,6 +257,28 @@ def build_addr_index(kb):
     idx = defaultdict(list)
     for addr, rec in iter_kb_records(kb):
         idx[addr].append(rec)
+    return idx
+
+
+def build_live_addr_index(kb):
+    """Index objects[].functions, the records KnowledgeBase.deserialize uses."""
+    idx = defaultdict(list)
+    for obj in kb.get("objects", []):
+        for rec in obj.get("functions", []):
+            addr = rec.get("addr", "")
+            if addr:
+                idx[addr].append(rec)
+    return idx
+
+
+def build_live_addr_owner_index(kb):
+    """Map each build-visible function address to its owning object."""
+    idx = {}
+    for obj in kb.get("objects", []):
+        for rec in obj.get("functions", []):
+            addr = rec.get("addr", "")
+            if addr:
+                idx[addr] = obj["name"]
     return idx
 
 
@@ -283,6 +351,8 @@ def compute_candidates(kb, rows):
     kb record still literally contains FUN_<addr8>, and rows whose address
     isn't in kb at all."""
     addr_index = build_addr_index(kb)
+    live_addr_index = build_live_addr_index(kb)
+    live_addr_owner_index = build_live_addr_owner_index(kb)
     candidates = []
     not_found = []
     for row in rows:
@@ -298,6 +368,14 @@ def compute_candidates(kb, rows):
         if not recs:
             not_found.append(row)
             continue
+        # Direct 2276 symbols are applied only when a build-visible record
+        # still uses the placeholder. Legacy-only records must not rename
+        # source out from under the declarations consumed by the build.
+        if row["method"] == "exact_address":
+            live_recs = live_addr_index.get(kb_addr, ())
+            if not any(old_name in r.get("decl", "") or old_name in r.get("name", "")
+                       for r in live_recs):
+                continue
         # A candidate if ANY record at this address (either shape) still
         # carries the FUN_ placeholder; apply_batch_rows renames every
         # matching record, not just one, so dual-shape addresses stay in sync.
@@ -308,6 +386,7 @@ def compute_candidates(kb, rows):
                 "method": method, "source": METHOD_TO_SOURCE[method],
                 "mapping_file": row["_mapping_file"], "tier": row["tier"],
                 "new_name": row["new_name"],
+                "object": live_addr_owner_index.get(kb_addr),
             })
     return candidates, not_found
 
@@ -398,9 +477,17 @@ def compute_batches(kept, token_to_files):
         else:
             zero_ref.append(c)
 
-    dsu = DSU(len(with_ref))
+    exact_by_object = defaultdict(list)
+    ungrouped = []
+    for c in with_ref:
+        if c["method"] == "exact_address" and c["object"]:
+            exact_by_object[c["object"]].append(c)
+        else:
+            ungrouped.append(c)
+
+    dsu = DSU(len(ungrouped))
     file_to_indices = defaultdict(list)
-    for i, c in enumerate(with_ref):
+    for i, c in enumerate(ungrouped):
         for f in c["_files"]:
             file_to_indices[f].append(i)
     for indices in file_to_indices.values():
@@ -408,9 +495,10 @@ def compute_batches(kept, token_to_files):
             dsu.union(indices[0], i)
 
     components = defaultdict(list)
-    for i in range(len(with_ref)):
-        components[dsu.find(i)].append(with_ref[i])
+    for i in range(len(ungrouped)):
+        components[dsu.find(i)].append(ungrouped[i])
 
+    exact_batches = sorted(exact_by_object.values(), key=lambda group: group[0]["object"])
     comp_list = sorted(components.values(), key=len, reverse=True)
 
     packed = []
@@ -423,12 +511,14 @@ def compute_batches(kept, token_to_files):
     if current:
         packed.append(current)
 
-    batches = [zero_ref] + packed
+    batches = [zero_ref] + exact_batches + packed
     return batches
 
 
-def compute_plan(kb, mapping_paths, min_tier="high_confidence", exclude_addrs=()):
+def compute_plan(kb, mapping_paths, min_tier="high_confidence", exclude_addrs=(),
+                 symbol_dump_paths=()):
     rows = load_mapping_rows(mapping_paths)
+    rows.extend(load_symbol_dump_rows(symbol_dump_paths))
     rows_by_file = Counter(r["_mapping_file"] for r in rows)
     supported_rows, unsupported_rows = split_unsupported(rows)
     candidates, not_found = compute_candidates(kb, supported_rows)
@@ -461,7 +551,8 @@ def compute_plan(kb, mapping_paths, min_tier="high_confidence", exclude_addrs=()
 
 def cmd_plan(args):
     kb = load_kb()
-    plan = compute_plan(kb, args.mapping, args.min_tier, args.exclude)
+    plan = compute_plan(kb, args.mapping, args.min_tier, args.exclude,
+                        args.symbol_dump)
 
     print("Mapping rows loaded:")
     for path, count in plan["rows_by_file"].items():
@@ -538,11 +629,12 @@ def cmd_plan(args):
 # =============================================================================
 
 def apply_batch_rows(kb, batch_rows, token_to_files, dry_run):
-    """Mutate kb records in place (unless dry_run) and rewrite src files
-    (unless dry_run). Returns (row_results, touched_files). The evidence
-    plate is always computed (even under --dry-run) so a dry run shows
-    exactly what would be written; only the actual mutation/write is
-    gated on `not dry_run`."""
+    """Prepare kb/source updates without writing files.
+
+    cmd_apply commits the prepared changes only after all rows pass guards.
+    Keeping this function write-free prevents a failed metadata save from
+    leaving source tokens renamed under stale FUN_ declarations.
+    """
     file_edits = defaultdict(list)  # path -> [(old_name, new_name), ...]
     row_results = []
     tag = batch_tag()
@@ -556,7 +648,7 @@ def apply_batch_rows(kb, batch_rows, token_to_files, dry_run):
         source = c["source"]
         token_re = re.compile(r'\b' + re.escape(old_name) + r'\b')
         plate = (f"[NAME: {new_name} — name_source={source} method={method} "
-                 f"tier={tier} (T2), {tag}]")
+                 f"tier={tier} ({METHOD_EVIDENCE_TIER[method]}), {tag}]")
 
         # Rename every record sharing this address (objects[] copy AND any
         # legacy top-level duplicate), not just one, so a dual-shape address
@@ -599,7 +691,7 @@ def apply_batch_rows(kb, batch_rows, token_to_files, dry_run):
             "files": touched, "records_touched": records_touched,
         })
 
-    touched_files = []
+    file_updates = {}
     for path, pairs in file_edits.items():
         with open(path, encoding="utf-8") as f:
             content = f.read()
@@ -607,17 +699,16 @@ def apply_batch_rows(kb, batch_rows, token_to_files, dry_run):
         for old_name, new_name in pairs:
             new_content = re.sub(r'\b' + re.escape(old_name) + r'\b', new_name, new_content)
         if new_content != content:
-            touched_files.append(path)
-            if not dry_run:
-                with open(path, "w", encoding="utf-8") as f:
-                    f.write(new_content)
+            file_updates[path] = (content, new_content)
 
-    return row_results, sorted(touched_files)
+    return row_results, file_updates
 
 
 def cmd_apply(args):
     kb = load_kb()
-    plan = compute_plan(kb, args.mapping, args.min_tier, args.exclude)
+    original_kb = copy.deepcopy(kb)
+    plan = compute_plan(kb, args.mapping, args.min_tier, args.exclude,
+                        args.symbol_dump)
     batches = plan["batches"]
 
     if args.batch < 0 or args.batch >= len(batches):
@@ -628,7 +719,7 @@ def cmd_apply(args):
     print(f"Batch {args.batch}: {len(batch_rows)} rows"
           f"{' (DRY RUN)' if args.dry_run else ''}")
 
-    row_results, touched_files = apply_batch_rows(kb, batch_rows, plan["token_to_files"], args.dry_run)
+    row_results, file_updates = apply_batch_rows(kb, batch_rows, plan["token_to_files"], args.dry_run)
 
     for r in sorted(row_results, key=lambda x: x["addr"]):
         print(f"  {r['addr']}: {r['old_name']} -> {r['new_name']} "
@@ -638,13 +729,23 @@ def cmd_apply(args):
         print(f"    {r['plate']}")
 
     print(f"\nRows applied: {len(row_results)}")
-    print(f"Distinct src files touched: {len(touched_files)}")
-    for f in touched_files:
+    print(f"Distinct src files touched: {len(file_updates)}")
+    for f in sorted(file_updates):
         print(f"  {os.path.relpath(f, REPO_ROOT)}")
 
     if not args.dry_run:
-        save_kb(kb)
-        print("\nkb.json written.")
+        try:
+            save_kb(kb)
+            for path, (_old_content, new_content) in file_updates.items():
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write(new_content)
+        except OSError:
+            for path, (old_content, _new_content) in file_updates.items():
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write(old_content)
+            save_kb(original_kb)
+            raise
+        print("\nkb.json and source written.")
     else:
         print("\nDry run — no files written.")
 
@@ -659,6 +760,8 @@ def add_common_args(p):
                     help="Minimum row tier to apply (default: high_confidence)")
     p.add_argument("--exclude", action="append", default=[], dest="exclude", metavar="ADDR",
                     help="Address to drop from consideration (repeatable)")
+    p.add_argument("--symbol-dump", action="append", default=[], metavar="PATH",
+                    help="Same-build text/RVA symbol dump (repeatable)")
 
 
 def main():
@@ -675,7 +778,7 @@ def main():
 
     args = parser.parse_args()
     if args.command in ("plan", "apply"):
-        args.mapping = args.mapping or [DEFAULT_MAPPING_PATH]
+        args.mapping = args.mapping or ([] if args.symbol_dump else [DEFAULT_MAPPING_PATH])
     if args.command == "plan":
         return cmd_plan(args)
     elif args.command == "apply":

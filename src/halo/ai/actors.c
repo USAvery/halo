@@ -1110,7 +1110,7 @@ void FUN_000379f0(int actor_handle)
  * Sibling of FUN_00038000. Preamble: datum_get, handle_initial_action,
  * handle_pending_command_list, handle_surprise(1), deny_transition check.
  * If deny=false: panic helpers including panic_from_surprise (absent from
- * FUN_00038000), panic_transition(1,0,9), combat_transition, FUN_00020990
+ * FUN_00038000), panic_transition(1,0,9), combat_transition, actor_action_handle_danger_avoidance
  * (no grenade_throwing). Switch identical to FUN_00038000. */
 void FUN_00037b50(int actor_handle)
 {
@@ -1133,7 +1133,7 @@ void FUN_00037b50(int actor_handle)
     actor_action_handle_panic_from_burning_to_death(actor_handle);
     actor_action_handle_panic_transition(actor_handle, 1, 0, 9);
     actor_action_handle_combat_transition(actor_handle);
-    FUN_00020990(actor_handle);
+    actor_action_handle_danger_avoidance(actor_handle);
   }
   switch (((actor_t *)actor)->state_action) {
   case 3:
@@ -1211,7 +1211,7 @@ void FUN_00037b50(int actor_handle)
  * If actor+0x378==0: panic_from_attached_projectiles,
  * panic_from_attached_melee_attackers, panic_transition(9,0,0xb).
  * Then: combat_transition, active_cover_seeking(0,0), vehicle_entry,
- * vehicle_exit, grenade_throwing, FUN_00020990.
+ * vehicle_exit, grenade_throwing, actor_action_handle_danger_avoidance.
  * Case 6: if actor+0xa4!=0 && actor+0xa5==0 && actor+0xa6==0: FPU compare
  * tag+0x2e0 (or 0x2e4 if actor+0x6e<4) vs actor+0x1bc; updates actor+0xa4/0xa8.
  * Then can_stop_guarding(3,6) → combat_status(result,0).
@@ -1248,7 +1248,7 @@ void FUN_00037d50(int actor_handle)
     actor_action_handle_vehicle_entry(actor_handle);
     actor_action_handle_vehicle_exit(actor_handle);
     actor_action_handle_grenade_throwing(actor_handle);
-    FUN_00020990(actor_handle);
+    actor_action_handle_danger_avoidance(actor_handle);
   }
   switch (((actor_t *)actor)->state_action) {
   case 3:
@@ -1344,7 +1344,7 @@ void FUN_00037d50(int actor_handle)
  * handle_surprise(1), deny_transition check.  If deny=false: panic helpers
  * (from_damage, from_attached_projectiles, from_attached_melee_attackers,
  * from_burning_to_death), handle_panic_transition(1,0,9),
- * handle_combat_transition, handle_grenade_throwing, FUN_00020990.
+ * handle_combat_transition, handle_grenade_throwing, actor_action_handle_danger_avoidance.
  *
  * Switch physical layout (from jump table at 0x381c8, EAX=value-3):
  *   3,10 → 0x38087; 6 → 0x380ba; 4 → 0x380d7; 5,7,8 → 0x380f2;
@@ -1379,7 +1379,7 @@ void FUN_00038000(int actor_handle)
     actor_action_handle_panic_transition(actor_handle, 1, 0, 9);
     actor_action_handle_combat_transition(actor_handle);
     actor_action_handle_grenade_throwing(actor_handle);
-    FUN_00020990(actor_handle);
+    actor_action_handle_danger_avoidance(actor_handle);
   }
   switch (((actor_t *)actor)->state_action) {
   case 3:
@@ -1457,7 +1457,7 @@ void FUN_00038000(int actor_handle)
  * result unused (cache warm), handle_initial_action,
  * handle_pending_command_list, handle_surprise(actor_handle,4), deny_transition
  * check. If deny=false: handle_berserking_from_damage,
- * handle_berserk_transition(3), handle_combat_transition, FUN_00020990.
+ * handle_berserk_transition(3), handle_combat_transition, actor_action_handle_danger_avoidance.
  *
  * Switch physical layout (EAX = ((actor_t *)actor)->state_action-3, range
  * 0–0xa): 3,10 → 0x38279; 4 → 0x382ac; 6 → 0x382c3; 5,7,8 → 0x382e0; 0xb →
@@ -1488,7 +1488,7 @@ void FUN_00038200(int actor_handle)
     actor_action_handle_berserking_from_damage(actor_handle);
     actor_action_handle_berserk_transition(actor_handle, 3);
     actor_action_handle_combat_transition(actor_handle);
-    FUN_00020990(actor_handle);
+    actor_action_handle_danger_avoidance(actor_handle);
   }
   switch (((actor_t *)actor)->state_action) {
   case 3:
@@ -1600,7 +1600,7 @@ char FUN_00038370(int actor_handle)
 
   /* Early exit: actor is busy or in flood-specific suppressed state */
   if (unit_is_busy(((actor_t *)actor)->field_018) ||
-      FUN_0002a3d0(actor_handle) || ((actor_t *)actor)->field_06a < 3) {
+      actor_path_has_path(actor_handle) || ((actor_t *)actor)->field_06a < 3) {
   exit_1:
     ((actor_t *)actor)->field_362 = 0;
     return 1;
@@ -1842,8 +1842,8 @@ return_current:
  * handle_surprise(1), deny_transition. If deny==false: full panic chain
  * (surprise, damage, attached projectiles, melee, burning), panic_transition
  * (actor_handle,1,cVar_203,7), combat_transition, vehicle_entry/exit,
- * grenade_throwing, FUN_00020990. Switch cases 3/10, 4, 5/7/8, 6, 9, 11, 12,
- * 13. Case 4 checks bVar_247 and actor+0xa8 before FUN_00015020(a8); case 9
+ * grenade_throwing, actor_action_handle_danger_avoidance. Switch cases 3/10, 4, 5/7/8, 6, 9, 11, 12,
+ * 13. Case 4 checks bVar_247 and actor+0xa8 before action_flee_blind_panic(a8); case 9
  * checks actor+0xa5/0xa6. Cases 12/13 share evasion/converging tail. */
 void FUN_00038880(int actor_handle)
 {
@@ -1873,7 +1873,7 @@ void FUN_00038880(int actor_handle)
     actor_action_handle_vehicle_entry(actor_handle);
     actor_action_handle_vehicle_exit(actor_handle);
     actor_action_handle_grenade_throwing(actor_handle);
-    FUN_00020990(actor_handle);
+    actor_action_handle_danger_avoidance(actor_handle);
   }
   switch (((actor_t *)actor)->state_action) {
   case 3:
@@ -1896,7 +1896,7 @@ void FUN_00038880(int actor_handle)
     if (bVar_247 != '\0') {
       tmp = (int)(short)((actor_t *)actor)->field_0a8;
       if (tmp > 0) {
-        cVar1 = FUN_00015020(tmp);
+        cVar1 = action_flee_blind_panic(tmp);
         if (cVar1 == '\0') {
           actor[0xab] = 1;
         }
@@ -1988,7 +1988,7 @@ void FUN_00038b10(int actor_handle)
     actor_action_handle_combat_targeting(actor_handle);
     actor_action_handle_berserk_transition(actor_handle, 3);
     actor_action_handle_combat_transition(actor_handle);
-    FUN_00020990(actor_handle);
+    actor_action_handle_danger_avoidance(actor_handle);
   }
   switch (((actor_t *)actor)->state_action) {
   case 3:
@@ -2857,7 +2857,7 @@ void FUN_00039c80(int actor_handle, int object_handle, float speed,
  * variant). Preamble: datum_get, tag_get(0x61637472), initial_action,
  * pending_command_list, handle_surprise(1), deny_transition. If deny==false:
  * full panic chain + combat_transition
- * + active_cover_seeking(1,1) + vehicle_entry/exit + FUN_00020990.
+ * + active_cover_seeking(1,1) + vehicle_entry/exit + actor_action_handle_danger_avoidance.
  * Switch on actor+0x6c: cases 3/10 → combat_status+failure+evasion;
  * case 6 → FPU pursuit-speed check then can_stop_guarding+combat_status;
  * case 4 → aa-check/done_fleeing; cases 5/7/8 → combat_status+exit_pursuit;
@@ -2889,7 +2889,7 @@ void FUN_00039f30(int actor_handle)
     actor_action_handle_active_cover_seeking(actor_handle, 1, 1);
     actor_action_handle_vehicle_entry(actor_handle);
     actor_action_handle_vehicle_exit(actor_handle);
-    FUN_00020990(actor_handle);
+    actor_action_handle_danger_avoidance(actor_handle);
   }
   switch (((actor_t *)actor)->state_action) {
   case 3:
@@ -2968,7 +2968,7 @@ void FUN_00039f30(int actor_handle)
  * pending_command_list, handle_surprise(1), deny_transition. If deny==false:
  * panic_from_damage, panic_from_attached (2x), panic_from_burning,
  * panic_transition(1,0,0xe), berserking_from_damage, berserk_transition(type),
- * combat_transition, vehicle_entry/exit, grenade_throwing, FUN_00020990. Type =
+ * combat_transition, vehicle_entry/exit, grenade_throwing, actor_action_handle_danger_avoidance. Type =
  * actor[0x20a]>2?5:3. Switch on actor+0x6c cases: 3/10 →
  * status+failure+evasion; 6 → stop_guarding; 4 → aa/done_fleeing; 5/7/8 →
  * status+exit_pursuit; 9 → a5/a6 flags; 11 → status(9e,a1); 12 →
@@ -2999,7 +2999,7 @@ void FUN_0003a190(int actor_handle)
     actor_action_handle_vehicle_entry(actor_handle);
     actor_action_handle_vehicle_exit(actor_handle);
     actor_action_handle_grenade_throwing(actor_handle);
-    FUN_00020990(actor_handle);
+    actor_action_handle_danger_avoidance(actor_handle);
   }
   switch (((actor_t *)actor)->state_action) {
   case 3:
@@ -3123,7 +3123,7 @@ void FUN_0003a3b0(int actor_handle)
 /* FUN_0003a480 (0x3a480) — actor action state-machine tick (combat-only,
  * no berserking/panic). Preamble: datum_get, initial_action,
  * pending_command_list, handle_surprise(1), deny_transition. If deny==false:
- * handle_combat_transition + FUN_00020990 only. Switch on actor+0x6c:
+ * handle_combat_transition + actor_action_handle_danger_avoidance only. Switch on actor+0x6c:
  * cases 3/10 → combat_status+failure+evasion; case 6 → guard check;
  * case 4 → aa-check+done_fleeing or combat_status(1,1);
  * cases 5/7/8 → pursuit; case 11 → combat_status(9e,a1); case 13 → a280;
@@ -3144,7 +3144,7 @@ void FUN_0003a480(int actor_handle)
   cVar1 = actor_action_deny_transition(actor_handle);
   if (cVar1 == '\0') {
     actor_action_handle_combat_transition(actor_handle);
-    FUN_00020990(actor_handle);
+    actor_action_handle_danger_avoidance(actor_handle);
   }
   switch (((actor_t *)actor)->state_action) {
   case 3:
@@ -6323,7 +6323,7 @@ void actor_swarm_unit_died(int actor_handle, int unit_handle)
  *       if valid encounter and action type in [2,3] → return 1;
  *       if action type in [4,5] and actor_get_action_priority_flag returned 3 →
  * return 1.
- *   - FUN_0002a3d0(actor_handle) checks byte at actor+0x4a8 (non-zero =
+ *   - actor_path_has_path(actor_handle) checks byte at actor+0x4a8 (non-zero =
  * vehicle?): if mode==3 and actor+0x6c==6 and biped+0x62==1 → return 1. if
  * mode==5 and encounter+0x12e!=0 → return 1.
  *   - Increment word[actor+0x14] (idle ticks); if > 0x3b (59): deactivate and
@@ -6343,7 +6343,7 @@ void actor_swarm_unit_died(int actor_handle, int unit_handle)
  * Confirmed: actor_set_dormant(actor_handle, flag) cdecl 2 args — ADD ESP,0x8.
  * Confirmed: actor_get_action_priority_flag(actor_handle) cdecl 1 arg → short action
  * type in AX. Return stored in DI; compared as 16-bit (CMP DI,0x2 / CMP
- * DI,0x3). Confirmed: FUN_0002a3d0(actor_handle) cdecl 1 arg → byte at
+ * DI,0x3). Confirmed: actor_path_has_path(actor_handle) cdecl 1 arg → byte at
  * actor+0x4a8. Confirmed: mode==3 path: CMP word[ESI+0x6c],6; CMP
  * word[EBX+0x62],1 (biped rec). EBX = DAT_005ab270 datum_get result (biped
  * record), set at 0x3daf7. Confirmed: mode==5 path: datum_get(DAT_005ab23c,
@@ -6361,7 +6361,7 @@ void actor_swarm_unit_died(int actor_handle, int unit_handle)
  * handle (int). Inferred: encounter+0x12e = scripted flag (char);
  * encounter+0x60 = active (char); encounter+0x127 = some exclusion flag (char);
  * encounter+0x24 = type/state short. Inferred: actor+0x4a8 = in-vehicle or
- * mounted flag (byte, read by FUN_0002a3d0). Inferred: actor+0x46c = activation
+ * mounted flag (byte, read by actor_path_has_path). Inferred: actor+0x46c = activation
  * mode (short); 3=biped-ride, 5=encounter-board. Inferred: actor+0x470 =
  * secondary encounter handle (int) used with mode==5. */
 /* 0x3d3d0 — Set or restore actor dormancy state and fields +0x6a/+0x6c.
@@ -6868,7 +6868,7 @@ char FUN_0003d9f0(int actor_handle)
   }
 
   /* Check in-vehicle / mounted flag */
-  in_vehicle = FUN_0002a3d0(actor_handle);
+  in_vehicle = actor_path_has_path(actor_handle);
   if (in_vehicle != 0) {
     if (((actor_t *)actor)->field_46c == 3) {
       /* Biped-ride mode: check biped action state */
@@ -7991,9 +7991,9 @@ void FUN_0003ec80(int actor_handle /* @<esi> */)
   FUN_0003bbf0(actor_handle);
   actor_action_control(actor_handle);
   actor_communication_update(actor_handle);
-  FUN_00014540(actor_handle);
+  actor_conversation_control(actor_handle);
   actor_destination_update(actor_handle);
-  FUN_0002a2b0(actor_handle);
+  actor_look_affect_movement(actor_handle);
   actor_move_update(actor_handle);
   actor_look_update(actor_handle);
   actor_combat_update(actor_handle);

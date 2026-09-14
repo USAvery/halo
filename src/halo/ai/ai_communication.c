@@ -816,7 +816,7 @@ int16_t actor_communication_team(int actor_handle)
  *     trailing `CMP ESI,-1;JZ` at 0x43316 is provably dead on this path
  *     (only reachable here with ESI!=-1) but is kept as a literal condition
  *     rather than silently dropped.
- *   - Same look_buf convention as FUN_00014540/FUN_00043360 in this file:
+ *   - Same look_buf convention as actor_conversation_control/FUN_00043360 in this file:
  *     short[8] { int16_t type; int16_t pad; int data[3]; }; only
  *     look_buf[0] and *(int*)&look_buf[2] are ever written.
  *   - FUN_00027a60(EBX, [EBP+8], [EBP+0xc], &look_buf) at 0x43346: args
@@ -875,7 +875,7 @@ void FUN_000432b0(int prop_handle, int actor_handle, int object_handle,
  *   function's prologue, so EDI/ESI/BX are @<reg> parameters, not locals.
  * Confirmed: object_try_and_get_and_verify_type(ESI, -1) at 0x43378/0x4337d
  *   (cdecl, 2 args); NULL-result branch at 0x43380/0x43382.
- * Confirmed: look_buf layout matches the FUN_00014540 convention (this
+ * Confirmed: look_buf layout matches the actor_conversation_control convention (this
  *   file's actor_looking.c, 0x14540): short[8] buffer, [0]=type tag,
  *   *(int*)&buf[2]=data[0]. Here only buf[0]=6 (MOV word [EBP-0x10],0x6 at
  *   0x4338e) and *(int*)&buf[2]=ESI (MOV dword [EBP-0xc],ESI at 0x43394) are

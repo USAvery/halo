@@ -101,10 +101,11 @@ double pow(double x, double y);
 #define CALL_FUN_00184e50(a) XCALL(0x184e50, short *(*)(int))(a)
 #define CALL_FUN_00181900(a) XCALL(0x181900, void (*)(int))(a)
 #define CALL_FUN_00181670(a) XCALL(0x181670, void (*)(void *))(a)
-#define CALL_FUN_00089240(a, b) XCALL(0x89240, void (*)(int, void *))(a, b)
+#define CALL_first_person_camera_fake(a, b) \
+  XCALL(0x89240, void (*)(int, void *))(a, b)
 #define CALL_FUN_00085b60(a, b, c) \
   XCALL(0x85b60, void (*)(int, unsigned short, int))(a, b, c)
-#define CALL_FUN_00085c80(a, b, c) \
+#define CALL_dead_camera_update(a, b, c) \
   XCALL(0x85c80, void (*)(int, void *, void *))(a, b, c)
 /* FUN_00138fd0 and FUN_00138f70 now in kb.json with proper declarations. */
 #define CALL_FUN_00180570(a, b) XCALL(0x180570, void (*)(int, void *))(a, b)
@@ -696,7 +697,7 @@ void FUN_000853c0(int param_1, unsigned short *param_2, unsigned int *param_3)
   case 2:
     iVar9 = CALL_FUN_0013d640(*(int *)0x2ee5d4, 3);
     if (iVar9 != 0) {
-      CALL_FUN_00089240(*(int *)0x2ee5d4, param_3);
+      CALL_first_person_camera_fake(*(int *)0x2ee5d4, param_3);
     }
     break;
   case 3:
@@ -705,7 +706,7 @@ void FUN_000853c0(int param_1, unsigned short *param_2, unsigned int *param_3)
       if (*(char *)0x2ee5a1 != '\0') {
         CALL_FUN_00085b60(param_1, *param_2, *(int *)0x2ee5d4);
       }
-      CALL_FUN_00085c80(param_1, param_2, param_3);
+      CALL_dead_camera_update(param_1, param_2, param_3);
     }
     break;
   }
@@ -4237,7 +4238,7 @@ void FUN_0013a740(int param_1, int param_2, float *param_3)
 }
 
 /* 0x13aa10: gather the light markers that illuminate an object.  Computes the
- * object's bounding sphere (center local_2c, radius local_8) via FUN_0001aae0,
+ * object's bounding sphere (center local_2c, radius local_8) via object_get_bounding_sphere,
  * then iterates the object's cluster set (object_get_first_cluster /
  * object_get_next_cluster over iter_state local_10).  For each cluster it calls
  * FUN_00139c20 to select the strongest point lights into the caller's marker
@@ -4257,7 +4258,7 @@ void FUN_0013aa10(int param_1, int param_2)
   short i;
   int light;
 
-  FUN_0001aae0(param_1, center, &radius);
+  object_get_bounding_sphere(param_1, center, &radius);
   count = (short *)(param_2 + 0x40);
   *count = 0;
 

@@ -38,7 +38,7 @@ int actor_combat_check_mode(int actor_handle /* @<eax> */, short mode)
  * duration in ticks (actor+0x5f4). cdecl: actor_handle in arg1 (EDI at the
  * call site), ticks is the truncated float result the caller pushes (arg2).
  * The field at +0x5f4 is a short, so the duration is narrowed. */
-void FUN_00021010(int actor_handle, int ticks)
+void actor_combat_fire_wildly(int actor_handle, int ticks)
 {
   char *actor = (char *)datum_get(*(void **)0x6325a4, actor_handle);
 
@@ -52,7 +52,7 @@ void FUN_00021010(int actor_handle, int ticks)
  * when the request is smaller, leaves the field unchanged (a no-op
  * self-assignment in the original codegen); otherwise it stores the new
  * value (narrowed to short). */
-void FUN_00021040(int actor_handle, int ticks)
+void actor_combat_disable_bursts(int actor_handle, int ticks)
 {
   char *actor = (char *)datum_get(*(void **)0x6325a4, actor_handle);
 
@@ -133,7 +133,7 @@ void actor_combat_get_burst_parameters(int actor_handle /* @<eax> */,
 /* 0x21350 — Round a float to the nearest integer using the FPU's current
  * rounding mode (FLD; FISTP). cdecl helper, single float argument, returns
  * the rounded value in EAX. */
-int FUN_00021350(float value)
+int fast_ftol(float value)
 {
   return x87_round_to_int(value);
 }
@@ -368,7 +368,7 @@ char actor_combat_find_grenade_target(int actor_handle, float *out_pos,
   return result;
 }
 
-char FUN_00021ae0(int actor_handle, float range, float param3,
+char actor_combat_check_collateral_damage(int actor_handle, float range, float param3,
                   float *encounter_pos, short *out_count)
 {
   int actor;
@@ -501,7 +501,7 @@ char FUN_00021ae0(int actor_handle, float range, float param3,
 
 /* 0x22010 — Check whether the current fire target is still valid.
  * Only applies when mode==3 (prop targeting). Checks prop data
- * and falls back to FUN_00021ae0 distance-based search. */
+ * and falls back to actor_combat_check_collateral_damage distance-based search. */
 int actor_combat_check_fire_target(int actor_handle /* @<edi> */, short mode)
 {
   char *actor = (char *)datum_get(*(void **)0x6325a4, actor_handle);
@@ -530,12 +530,12 @@ int actor_combat_check_fire_target(int actor_handle /* @<edi> */, short mode)
 
   {
     short result = 0;
-    FUN_00021ae0(actor_handle, 6.0f, 0.0f, (float *)(prop + 0xbc), &result);
+    actor_combat_check_collateral_damage(actor_handle, 6.0f, 0.0f, (float *)(prop + 0xbc), &result);
     return result >= 3;
   }
 }
 
-/* FUN_00022390 (0x22390) — Update actor combat aiming state each tick.
+/* actor_start_burst (0x22390) — Update actor combat aiming state each tick.
  * Checks/clears fire-ok flag, determines moving and in-combat status,
  * computes fire timer from burst parameters, rate-of-fire modifier from
  * weapon damage, applies prop suppression, then calculates the aim
@@ -548,7 +548,7 @@ int actor_combat_check_fire_target(int actor_handle /* @<edi> */, short mode)
  * small MSVC<->clang idiom diffs (branch encodings, register allocation)
  * accumulated over the function's length, not one defect. Verified 2026-06-23
  * [[project_sub80_vc71_audit_2026-06-23]]. */
-void FUN_00022390(int actor_handle)
+void actor_start_burst(int actor_handle)
 {
   char *actor;
   char *actv;
@@ -864,7 +864,7 @@ void FUN_00022390(int actor_handle)
  * (prop+0x24) is 2 or 3 the prop's object datum (prop+0x18) becomes the return
  * value, and when the type is outside [0,1] a seed aim point is built from
  * prop+0xbc/0xc0/0xc4 (with a Z bias of *0x2549d4) and fed to the helper
- * FUN_00022b40 (actor_handle in EBX, &aim point in ESI).
+ * actor_combat_retarget_grenade (actor_handle in EBX, &aim point in ESI).
  *
  * It then runs the ballistic firing solution (actor_combat_compute_ballistic_
  * solution), and if the actor currently has no live grenade target
@@ -900,7 +900,7 @@ int actor_aim_grenade(int actor_handle, void *aim_params, float *out_aim_vector)
   int result; /* [ebp-0x4] prop datum / -1             */
   char *prop;
   short prop_type;
-  float aim_vec[3]; /* contiguous buffer for FUN_00022b40 (ESI)   */
+  float aim_vec[3]; /* contiguous buffer for actor_combat_retarget_grenade (ESI)   */
   float speed;
   float planar_mag;
   float t;
@@ -917,7 +917,7 @@ int actor_aim_grenade(int actor_handle, void *aim_params, float *out_aim_vector)
       aim_vec[0] = *(float *)(prop + 0xbc);
       aim_vec[1] = *(float *)(prop + 0xc0);
       aim_vec[2] = *(float *)(prop + 0xc4) + *(float *)0x2549d4;
-      FUN_00022b40(actor_handle, aim_vec);
+      actor_combat_retarget_grenade(actor_handle, aim_vec);
     }
   }
 

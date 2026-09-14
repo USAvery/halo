@@ -132,7 +132,7 @@ void FUN_0018b080(void)
  * sphere against the render frustum globals at 0x5065a4. During a cinematic,
  * objects whose flag bit 0x400000 (object+0x4) is set report FLT_MAX
  * (0x2548fc) — always-visible override. Otherwise fetches the bounding
- * sphere (FUN_0001aae0) and tail-returns
+ * sphere (object_get_bounding_sphere) and tail-returns
  * render_frustum_sphere_diameter_in_pixels(). Register ABI: object handle in
  * ESI; float return in ST(0). Callers (3, all in FUN_0018c100) load ESI from
  * the PVS record's first dword. kb.json previously misnamed this
@@ -149,7 +149,7 @@ float FUN_0018b130(int object_handle)
       return *(float *)0x2548fc; /* FLT_MAX */
     }
   }
-  FUN_0001aae0(object_handle, center, &radius);
+  object_get_bounding_sphere(object_handle, center, &radius);
   return render_frustum_sphere_diameter_in_pixels((void *)0x5065a4, center,
                                                   radius);
 }
@@ -249,7 +249,7 @@ void FUN_0018b190(void *render_data, void *parent_model_effect,
                                   object_handle, -1) +
                                 4) &
               0x400000) == 0)) {
-          FUN_0001aae0(object_handle, center, &radius);
+          object_get_bounding_sphere(object_handle, center, &radius);
           dist = render_frustum_sphere_diameter_in_pixels((void *)0x5065a4,
                                                           center, radius);
         } else {
@@ -457,7 +457,7 @@ char FUN_0018b830(void *ctx, float fade)
   char *obj;
 
   fade_local = fade;
-  FUN_0001aae0(*(int *)ctx, center, &radius);
+  object_get_bounding_sphere(*(int *)ctx, center, &radius);
   perpendicular3d((float *)(*(int *)((char *)ctx + 4) + 0x5c), perp);
   /* length result discarded (FSTP ST0 in the original) */
   normalize3d(perp);

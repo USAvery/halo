@@ -1938,7 +1938,7 @@ int FUN_0006a260(void *tif_)
      * TIFFWriteDirectory jumps there too. Only the taken-and-failed path falls
      * through into `xor eax,eax`, which is exactly what the short-circuit
      * form expresses. */
-    if ((tif->field_0a.b & 2) && !FUN_000680a0(tif)) {
+    if ((tif->field_0a.b & 2) && !TIFFWriteDirectory(tif)) {
       return 0;
     }
   }
@@ -2198,7 +2198,7 @@ unsigned long FUN_0006a310(void *tif, unsigned long h)
  * up immediately before the CALL with no pushes at all:
  *   0x6c1c7  mov esi, dword ptr [ebp-0x10]
  *   0x6c1ca  call 0x6a3b0
- * (FUN_0006c080, the only xref.) The `*1` scale makes it a byte pointer, i.e.
+ * (gt, the only xref.) The `*1` scale makes it a byte pointer, i.e.
  * upstream's `TIFFRGBValue *Map` -- the greyscale ramp, spelled `map` here to
  * match FUN_0006af80's parameter and to stay clear of this TU's `Map` macro,
  * which is a DIFFERENT object (0x3340c8, upstream's BWmap, the table this
