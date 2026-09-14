@@ -1540,7 +1540,7 @@ short hud_find_nav_point_by_name(const char *param_1)
 
 /* hud_get_nav_point_data (0xd5f40)
  * Returns pointer to a player's nav point data (0x30 bytes per player). */
-int hud_get_nav_point_data(short param_1)
+__declspec(noinline) int hud_get_nav_point_data(short param_1)
 {
   if (param_1 < 0 || param_1 >= 4) {
     display_assert("local_player_index>=0&&local_player_index<MAXIMUM_NUMBER_"
@@ -2480,7 +2480,7 @@ void FUN_000d7240(int slot)
 /* unit_hud_get_slot (0xd7280)
  * Returns pointer to a player's unit HUD slot.
  * ABI: @esi=local_player_index */
-int FUN_000d7280(short local_player_index)
+__declspec(noinline) int FUN_000d7280(short local_player_index)
 {
   if (local_player_index < 0 || local_player_index >= 4) {
     display_assert("local_player_index>=0 && "

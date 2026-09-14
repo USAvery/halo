@@ -1095,7 +1095,7 @@
       ],
       "oracle": "delinked"
     },
-    "FUN_000c4ff0": {
+    "hs_evaluate_script_doc": {
       "statuses": [
         "*"
       ],
@@ -1121,7 +1121,7 @@
       ],
       "oracle": "delinked"
     },
-    "FUN_000c7ca0": {
+    "hs_parse_parenthesized_expression": {
       "statuses": [
         "*"
       ],

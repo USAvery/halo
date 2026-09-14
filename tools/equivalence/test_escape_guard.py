@@ -245,7 +245,7 @@ class TestTriagePendingDiscipline(unittest.TestCase):
     def test_the_untriaged_set_is_named(self):
         pending = sorted(t["name"] for t in self.targets
                          if t.get("triage_pending"))
-        self.assertEqual(pending, ["FUN_000d7cd0"],
+        self.assertEqual(pending, [],
                          "the triage_pending set changed; a growing set means "
                          "findings are accumulating unread -- update this pin "
                          "in the same commit as the decision")

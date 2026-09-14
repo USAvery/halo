@@ -87,7 +87,7 @@ void FUN_000d8b90(char show)
 
 /* FUN_000d8bc0 (0xd8bc0) — per-local-player weapon-HUD state accessor.
  * Returns &globals[local_player_index] at stride 0x28.  Index in ESI. */
-void *FUN_000d8bc0(int16_t local_player_index /* @<esi> */)
+__declspec(noinline) void *FUN_000d8bc0(int16_t local_player_index /* @<esi> */)
 {
   if (local_player_index < 0 || local_player_index >= 4) {
     display_assert("local_player_index>=0 && "
@@ -105,7 +105,7 @@ void *FUN_000d8bc0(int16_t local_player_index /* @<esi> */)
 
 /* FUN_000d8c30 (0xd8c30) — per-local-player accessor into a second globals
  * region: &globals[local_player_index+2] at stride 0x50.  Index in ESI. */
-void *FUN_000d8c30(int16_t local_player_index /* @<esi> */)
+__declspec(noinline) void *FUN_000d8c30(int16_t local_player_index /* @<esi> */)
 {
   if (local_player_index < 0 || local_player_index >= 4) {
     display_assert("local_player_index>=0 && "
