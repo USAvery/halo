@@ -20,6 +20,190 @@
  * cachebeta.xbe v01.10.12.2276, FUN_000f4ea0 @ 0x000f4ea0 (items.obj).
  */
 
+/*
+ * ui_widget_game_data_input_functions.c
+ *
+ * TU: c:\halo\SOURCE\interface\ui_widget_game_data_input_functions.c
+ *   (recovered from the __FILE__ assert string at 0x288938, lines 0x944-0x95f).
+ *   kb.json maps this address to items.obj, so the lift lives here.
+ *
+ * Refreshes the three visible list items of the 'player color picker' spinner
+ * list widget.  FUN_000f3690 fills a 3-entry window of list indices (previous,
+ * current, next; -1 = no entry).  For each live index the matching child list
+ * item is fetched, its two children (text box = color name, container = color
+ * swatch) are asserted, and the palette byte at
+ * (widget + 0x40)[index] is written into both children's 16-bit color fields
+ * (name widget + 0x40, pic widget + 0x50).
+ *
+ * Widget instance fields used (all unproven beyond the accesses here):
+ *   +0x00 int   tag index of the widget definition ('DeLa')
+ *   +0x34 int   first child widget instance
+ *   +0x2c int   next sibling widget instance
+ *   +0x40 int   color-picker: list-item palette byte array; text box: color
+ * word +0x50 short container: color word Widget definition ('DeLa') fields:
+ *   +0x000 short widget type (0 = container, 1 = text box, 2 = spinner list)
+ *   +0x3e0 int   child count
+ *
+ * cachebeta.xbe v01.10.12.2276, FUN_000f4b60 @ 0x000f4b60 (items.obj).
+ */
+
+void FUN_000f4b60(void *widget)
+{
+  short *definition;
+  void *item_definition;
+  int *list_item;
+  int *name_widget;
+  int *pic_widget;
+  int indices[3];
+  int i;
+  unsigned char color;
+
+  assert_halt_msg_at(
+    "no list items associated with color picker!",
+    "c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c", 0x944,
+    *(int *)((char *)widget + 0x40) != 0);
+
+  definition = (short *)tag_get(0x44654c61 /* 'DeLa' */, *(int *)widget);
+  assert_halt_msg_at(
+    "expected a spinner list for 'player color picker' widget",
+    "c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c", 0x949,
+    *definition == 2);
+  assert_halt_msg_at(
+    "expected 3 children (list items) for 'player color picker' widget",
+    "c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c", 0x94a,
+    *(int *)((char *)definition + 0x3e0) == 3);
+
+  FUN_000f3690(indices, widget);
+
+  for (i = 0; i < 3; i++) {
+    if (indices[i] == -1) {
+      return;
+    }
+
+    list_item = (int *)widget_instance_get_nth_child(widget, i);
+    name_widget = (int *)*(int *)((char *)list_item + 0x34);
+    pic_widget = (int *)*(int *)((char *)name_widget + 0x2c);
+
+    item_definition = tag_get(0x44654c61 /* 'DeLa' */, *list_item);
+    assert_halt_msg_at(
+      "expected 2 children in player color picker list item (name, pic)",
+      "c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+      0x95b, *(int *)((char *)item_definition + 0x3e0) == 2);
+
+    definition = (short *)tag_get(0x44654c61 /* 'DeLa' */, *name_widget);
+    assert_halt_msg_at(
+      "expected a text box widget for the list item's first child (color name)",
+      "c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+      0x95d, *definition == 1);
+
+    definition = (short *)tag_get(0x44654c61 /* 'DeLa' */, *pic_widget);
+    assert_halt_msg_at(
+      "expected a container widget for the list item's second child (color "
+      "pic)",
+      "c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+      0x95f, *definition == 0);
+
+    color = *(unsigned char *)(*(int *)((char *)widget + 0x40) + indices[i]);
+    *(unsigned short *)((char *)name_widget + 0x40) = color;
+    *(unsigned short *)((char *)pic_widget + 0x50) = color;
+  }
+}
+
+/*
+ * ui_widget_game_data_input_functions.c
+ *
+ * TU: c:\halo\SOURCE\interface\ui_widget_game_data_input_functions.c
+ *   (recovered from the __FILE__ assert string at 0x288938, lines 0x9bf-0x9d8).
+ *   kb.json maps this address to items.obj, so the lift lives here.
+ *
+ * Refreshes the three visible list items of the 'level select' spinner list
+ * widget.  Same shape as FUN_000f4b60 above: FUN_000f3690 fills a 3-entry
+ * window of list indices (-1 = no entry), and for each live index the matching
+ * child list item is fetched and its three children (text box = map name,
+ * container = map pic, text box = map description) are asserted.  The list
+ * index itself, truncated to 16 bits, is written into each child's 16-bit
+ * field (name +0x40, pic +0x50, desc +0x40) -- unlike the color picker, there
+ * is no palette indirection here.
+ *
+ * Widget instance fields used (all unproven beyond the accesses here):
+ *   +0x00 int   tag index of the widget definition ('DeLa')
+ *   +0x34 int   first child widget instance
+ *   +0x2c int   next sibling widget instance
+ *   +0x40 short text box: value word
+ *   +0x50 short container: value word
+ * Widget definition ('DeLa') fields:
+ *   +0x000 short widget type (0 = container, 1 = text box, 2 = spinner list)
+ *   +0x3e0 int   child count
+ *
+ * cachebeta.xbe v01.10.12.2276, FUN_000f4cf0 @ 0x000f4cf0 (items.obj).
+ */
+
+void FUN_000f4cf0(void *widget)
+{
+  short *definition;
+  void *item_definition;
+  int *list_item;
+  int *name_widget;
+  int *pic_widget;
+  int *desc_widget;
+  int indices[3];
+  int i;
+  unsigned short index_word;
+
+  definition = (short *)tag_get(0x44654c61 /* 'DeLa' */, *(int *)widget);
+  assert_halt_msg_at(
+    "expected a spinner list for 'level select' widget",
+    "c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c", 0x9bf,
+    *definition == 2);
+  assert_halt_msg_at(
+    "expected 3 children (list items) for 'level select' widget",
+    "c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c", 0x9c0,
+    *(int *)((char *)definition + 0x3e0) == 3);
+
+  FUN_000f3690(indices, widget);
+
+  for (i = 0; i < 3; i++) {
+    if (indices[i] == -1) {
+      return;
+    }
+
+    list_item = (int *)widget_instance_get_nth_child(widget, i);
+    name_widget = (int *)*(int *)((char *)list_item + 0x34);
+    pic_widget = (int *)*(int *)((char *)name_widget + 0x2c);
+    desc_widget = (int *)*(int *)((char *)pic_widget + 0x2c);
+
+    item_definition = tag_get(0x44654c61 /* 'DeLa' */, *list_item);
+    assert_halt_msg_at(
+      "expected 3 children in solo level list item (name, pic, desc)",
+      "c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+      0x9d2, *(int *)((char *)item_definition + 0x3e0) != 0);
+
+    definition = (short *)tag_get(0x44654c61 /* 'DeLa' */, *name_widget);
+    assert_halt_msg_at(
+      "expected a text box widget for the list item's first child (map name)",
+      "c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+      0x9d4, *definition == 1);
+
+    definition = (short *)tag_get(0x44654c61 /* 'DeLa' */, *pic_widget);
+    assert_halt_msg_at(
+      "expected a container widget for the list item's second child (map pic)",
+      "c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+      0x9d6, *definition == 0);
+
+    definition = (short *)tag_get(0x44654c61 /* 'DeLa' */, *desc_widget);
+    assert_halt_msg_at(
+      "expected a text box widget for the list item's third child (map "
+      "description)",
+      "c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+      0x9d8, *definition == 1);
+
+    index_word = (unsigned short)indices[i];
+    *(unsigned short *)((char *)name_widget + 0x40) = index_word;
+    *(unsigned short *)((char *)pic_widget + 0x50) = index_word;
+    *(unsigned short *)((char *)desc_widget + 0x40) = index_word;
+  }
+}
+
 void FUN_000f4ea0(int scenario_tag_index)
 {
   void *scenario;

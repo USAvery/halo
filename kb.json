@@ -7093,7 +7093,8 @@
     },
     {
      "addr": "0x86360",
-     "decl": "void director_save_camera(void);"
+     "decl": "void director_save_camera(void);",
+     "ported": true
     },
     {
      "addr": "0x86410",
@@ -7227,7 +7228,8 @@
     },
     {
      "addr": "0x88050",
-     "decl": "void editor_camera_set_scripted(void);"
+     "decl": "void editor_camera_set_scripted(unsigned char enable);",
+     "ported": true
     },
     {
      "addr": "0x88200",
@@ -7744,8 +7746,9 @@
     },
     {
      "addr": "0xdb250",
-     "decl": "void should_draw_object(void);",
-     "comment": "[NAME: should_draw_object — name_source=2276-symbol-dump method=exact_address tier=confirmed (T1), cea-apply-unified 2026-09-14]"
+     "decl": "char FUN_000db250(int object_handle@<esi>);",
+     "file": "src/halo/interface/event_manager.c",
+     "ported": true
     },
     {
      "addr": "0xdb330",
@@ -7885,7 +7888,8 @@
     },
     {
      "addr": "0x199420",
-     "decl": "void file_reference_create(void);"
+     "decl": "file_ref_t *file_reference_create(file_ref_t *info, int16_t location);",
+     "ported": true
     },
     {
      "addr": "0x1995c0",
@@ -14055,12 +14059,13 @@
     },
     {
      "addr": "0xf4b60",
-     "decl": "void player_profile_color_picker_update(void);",
-     "comment": "[NAME: player_profile_color_picker_update — name_source=2276-symbol-dump method=exact_address tier=confirmed (T1), cea-apply-unified 2026-09-14]"
+     "decl": "void FUN_000f4b60(void *widget);",
+     "ported": true
     },
     {
      "addr": "0xf4cf0",
-     "decl": "void FUN_000f4cf0(void);"
+     "decl": "void FUN_000f4cf0(void *widget);",
+     "ported": true
     },
     {
      "addr": "0xf4ea0",
@@ -28203,8 +28208,7 @@
     },
     {
      "addr": "0xf3690",
-     "decl": "void spinner_list_3wide_determine_displayed_item_indices(void);",
-     "comment": "[NAME: spinner_list_3wide_determine_displayed_item_indices — name_source=2276-symbol-dump method=exact_address tier=confirmed (T1), cea-apply-unified 2026-09-14]"
+     "decl": "void FUN_000f3690(int *out_indices@<eax>, void *widget@<ecx>);"
     },
     {
      "addr": "0xf3740",
