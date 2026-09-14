@@ -1364,6 +1364,63 @@ void FUN_000fcaf0(int weapon_handle, int magazine_index)
   }
 }
 
+/* Begin a magazine chamber/charge cycle (0xfcbd0).
+ *
+ * Confirmed: magazine_index arrives in EAX (MOV EBX,EAX at 0xfcbd6, used as
+ * MOVSX ECX,BX for the tag-block index and as the @<bx> argument after
+ * ADD EBX,3); weapon_handle is the single stack argument at [EBP+8].
+ * Confirmed: calls object_get_and_verify_type(weapon_handle, 4) twice —
+ * the first result (EDI) supplies the tag index, the second (EAX) is the
+ * object the three state bytes are read from.
+ * Confirmed: calls FUN_000fb370(weapon_obj@<edi>, magazine_index@<si>) and
+ * the returned pointer (ESI) is the magazine state block.
+ * Confirmed: guard is *state == 0 || *state == 2, then bytes +0x211, +0x235
+ * and +0x1e8 must all be zero; tag_get/tag_block_get_element run only inside
+ * that guard (unlike the sibling at 0xfc990, which hoists them).
+ * Confirmed: weapon_set_animation_state(weapon_handle, 0,
+ * magazine_index+3 @<bx>) precedes weapon_start_effect(mag_def[0x54], 0, 0,
+ * weapon_handle@<eax>); the two float arguments are PUSH 0x0 slots.
+ * Confirmed: *state = 3 (MOV word ptr [ESI],0x3), then
+ * FLD [EDI+0x1c] / FMUL [0x253394] / CALL _ftol2 / MOV [ESI+2],AX —
+ * 0x253394 is TICKS_PER_SECOND (30.0f), stored as int16_t.
+ * Unknown: the semantic meaning of magazine state 3 and of mag_def+0x1c.
+ */
+void FUN_000fcbd0(int16_t magazine_index, int weapon_handle)
+{
+  char *weapon_obj;
+  int16_t *magazine_state;
+  char *object;
+  char *tag_data;
+  char *mag_def;
+  int state;
+
+  weapon_obj = (char *)object_get_and_verify_type(weapon_handle, 4);
+  magazine_state = (int16_t *)FUN_000fb370((void *)weapon_obj, magazine_index);
+
+  state = *magazine_state;
+  switch (state) {
+  case 0:
+  case 2: {
+    object = (char *)object_get_and_verify_type(*(volatile int *)&weapon_handle, 4);
+    if (*(object + 0x211) == 0 && *(object + 0x235) == 0 &&
+        *(object + 0x1e8) == 0) {
+      tag_data = (char *)tag_get(0x77656170, *(int *)weapon_obj);
+      mag_def = (char *)tag_block_get_element(tag_data + 0x4f0,
+                                              (int)magazine_index, 0x70);
+      weapon_set_animation_state(weapon_handle, 0,
+                                 (int16_t)(magazine_index + 3));
+      weapon_start_effect(*(int *)(mag_def + 0x54), 0, 0, weapon_handle);
+      *magazine_state = 3;
+      magazine_state[1] =
+        (int16_t)(int)(*(float *)(mag_def + 0x1c) * TICKS_PER_SECOND);
+    }
+    break;
+  }
+  default:
+    break;
+  }
+}
+
 /* Mark one weapon trigger as blocked/locked-out (0xfce60).
  *
  * Confirmed: weapon_handle in EAX, trigger_index in SI (register args, no

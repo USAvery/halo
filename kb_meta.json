@@ -4347,6 +4347,10 @@
       "kind": "function",
       "status": "ported"
     },
+    "0x86360": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0x86410": {
       "kind": "function",
       "status": "ported"
@@ -4416,6 +4420,10 @@
       "status": "ported"
     },
     "0x87f20": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x88050": {
       "kind": "function",
       "status": "ported"
     },
@@ -17327,6 +17335,10 @@
       "kind": "function",
       "status": "ported"
     },
+    "0x199420": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0x1994a0": {
       "kind": "function",
       "status": "ported",
@@ -17344,7 +17356,15 @@
         "file_close at 0x19a930 identified by error string 'file_close' in its decompilation."
       ]
     },
+    "0x1995c0": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0x199620": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x1996d0": {
       "kind": "function",
       "status": "ported"
     },
@@ -17373,6 +17393,10 @@
       "status": "ported"
     },
     "0x1999f0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x199a60": {
       "kind": "function",
       "status": "ported"
     },
@@ -17443,7 +17467,15 @@
       "kind": "function",
       "status": "ported"
     },
+    "0x19aad0": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0x19ab50": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x19ac00": {
       "kind": "function",
       "status": "ported"
     },

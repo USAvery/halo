@@ -6339,7 +6339,6 @@
   "0xfc8e0": "real weapon_get_field_of_view(int weapon_handle, real base_field_of_view, uint16_t zoom_level);",
   "0xfc930": "char weapon_prevents_melee_attack(int weapon_handle);",
   "0xfcaf0": "void FUN_000fcaf0(int weapon_handle, int magazine_index);",
-  "0xfcbd0": "void FUN_000fcbd0(void);",
   "0xfcc90": "void FUN_000fcc90(void);",
   "0xfcd10": "void FUN_000fcd10(void);",
   "0xfcdd0": "void FUN_000fcdd0(void);",
@@ -10030,7 +10029,8 @@
     "0x2258a4": "int __stdcall send(void *xnet@<ecx>, unsigned int socket, const char *buf, int len, int flags);",
     "0x002258a4": "int __stdcall send(void *xnet@<ecx>, unsigned int socket, const char *buf, int len, int flags);",
     "0xdb250": "char FUN_000db250(int object_handle@<esi>);",
-    "0xf3690": "void FUN_000f3690(int *out_indices@<eax>, void *widget@<ecx>);"
+    "0xf3690": "void FUN_000f3690(int *out_indices@<eax>, void *widget@<ecx>);",
+    "0xfcbd0": "void FUN_000fcbd0(int16_t magazine_index@<ax>, int weapon_handle);"
   },
   "0x57330": "short FUN_00057330(int16_t scenario_index@<eax>, void *record@<esi>, int field_1a8_val, int child_handle, int reserved);",
   "0x1631d0": "void FUN_001631d0(void);"

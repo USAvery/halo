@@ -7897,7 +7897,9 @@
     },
     {
      "addr": "0x1996d0",
-     "decl": "void file_reference_copy(void);"
+     "decl": "file_ref_t *file_reference_copy(file_ref_t *destination, file_ref_t *source);",
+     "name": "file_reference_copy",
+     "ported": true
     },
     {
      "addr": "0x1997f0",
@@ -7913,7 +7915,9 @@
     },
     {
      "addr": "0x199a60",
-     "decl": "void directory_create_or_delete_contents(const char *directory_name);"
+     "decl": "void directory_create_or_delete_contents(const char *directory_name);",
+     "name": "directory_create_or_delete_contents",
+     "ported": true
     },
     {
      "addr": "0x199b20",
@@ -7932,7 +7936,8 @@
     },
     {
      "addr": "0x19a020",
-     "decl": "void file_compare_last_modification_dates(void);"
+     "decl": "int file_compare_last_modification_dates(const void *date1, const void *date2);",
+     "ported": true
     },
     {
      "addr": "0x19a040",
@@ -7966,7 +7971,8 @@
     },
     {
      "addr": "0x19a400",
-     "decl": "void file_read_only(void);"
+     "decl": "bool file_read_only(file_ref_t *info);",
+     "ported": true
     },
     {
      "addr": "0x19a450",
@@ -8020,7 +8026,8 @@
     },
     {
      "addr": "0x19aad0",
-     "decl": "void file_set_eof(void);"
+     "decl": "bool file_set_eof(file_ref_t *info, int offset);",
+     "ported": true
     },
     {
      "addr": "0x19ab50",
@@ -8029,7 +8036,8 @@
     },
     {
      "addr": "0x19ac00",
-     "decl": "bool file_write(file_ref_t *info, int size, const void *buffer);"
+     "decl": "bool file_write(file_ref_t *info, int size, const void *buffer);",
+     "ported": true
     },
     {
      "addr": "0x19acb0",
@@ -8038,15 +8046,18 @@
     },
     {
      "addr": "0x19acf0",
-     "decl": "void file_write_to_position(void);"
+     "decl": "bool file_write_to_position(file_ref_t *info, int offset, int size, const void *buffer);",
+     "ported": true
     },
     {
      "addr": "0x19ad30",
-     "decl": "void file_get_last_modification_date(void);"
+     "decl": "bool file_get_last_modification_date(file_ref_t *info, void *date);",
+     "ported": true
     },
     {
      "addr": "0x19adf0",
-     "decl": "void file_get_size(void);"
+     "decl": "bool file_get_size(file_ref_t *info, uint32_t *size);",
+     "ported": true
     },
     {
      "addr": "0x19aed0",
@@ -33934,8 +33945,9 @@
     },
     {
      "addr": "0xfcbd0",
-     "decl": "void weapon_magazine_start_chamber(void);",
-     "comment": "[NAME: weapon_magazine_start_chamber — name_source=2276-symbol-dump method=exact_address tier=confirmed (T1), cea-apply-unified 2026-09-14]"
+     "decl": "void FUN_000fcbd0(int16_t magazine_index@<ax>, int weapon_handle);",
+     "ported": true,
+     "source_path": "src/halo/items/weapons.c"
     },
     {
      "addr": "0xfcc90",

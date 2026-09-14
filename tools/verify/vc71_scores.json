@@ -26743,6 +26743,21 @@
       "score": 82.1,
       "source": "src/halo/items/weapons.c"
     },
+    "FUN_000fcbd0": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 89.7,
+      "addr": "0xfcbd0",
+      "end": "0xfcc8b",
+      "kind": "auto",
+      "n_r": 67,
+      "opnd_percent": 82.4,
+      "raw_mnemonic_pct": 89.7,
+      "ref": "synth",
+      "ref_sha": "a0bee9d721d230ac",
+      "score": 89.7,
+      "source": "src/halo/items/weapons.c"
+    },
     "FUN_000fce60": {
       "abi_model": "regparam_stripped_saves",
       "abi_model_items": 4,
@@ -59476,17 +59491,17 @@
     "directory_create_or_delete_contents": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 13.3,
+      "abi_modeled_mnemonic_pct": 100.0,
       "addr": "0x199a60",
       "end": "0x199b18",
       "kind": "auto",
       "n_r": 55,
-      "opnd_percent": 10.0,
-      "raw_mnemonic_pct": 13.3,
+      "opnd_percent": 92.7,
+      "raw_mnemonic_pct": 100.0,
       "ref": "synth",
       "ref_sha": "95be112bb14b5b4e",
-      "score": 13.3,
-      "source": "src/halo/unported_thunks.c"
+      "score": 100.0,
+      "source": "src/halo/tag_files/files.c"
     },
     "display_assert": {
       "abi_model": "raw",
@@ -61303,6 +61318,21 @@
       "score": 90.5,
       "source": "src/halo/tag_files/files.c"
     },
+    "file_compare_last_modification_dates": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 100.0,
+      "addr": "0x19a020",
+      "end": "0x19a037",
+      "kind": "auto",
+      "n_r": 11,
+      "opnd_percent": 100.0,
+      "raw_mnemonic_pct": 100.0,
+      "ref": "synth",
+      "ref_sha": "45776040c1a23e14",
+      "score": 100.0,
+      "source": "src/halo/tag_files/files.c"
+    },
     "file_create": {
       "abi_model": "raw",
       "abi_model_items": 0,
@@ -61393,6 +61423,21 @@
       "score": 20.0,
       "source": "src/halo/unported_thunks.c"
     },
+    "file_get_last_modification_date": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 99.3,
+      "addr": "0x19ad30",
+      "end": "0x19adee",
+      "kind": "auto",
+      "n_r": 74,
+      "opnd_percent": 94.0,
+      "raw_mnemonic_pct": 99.3,
+      "ref": "synth",
+      "ref_sha": "f5cb5fddb6e48bf6",
+      "score": 99.3,
+      "source": "src/halo/tag_files/files.c"
+    },
     "file_get_position": {
       "abi_model": "raw",
       "abi_model_items": 0,
@@ -61406,6 +61451,21 @@
       "ref": "synth",
       "ref_sha": "183a1c17f148709e",
       "score": 100.0,
+      "source": "src/halo/tag_files/files.c"
+    },
+    "file_get_size": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 98.1,
+      "addr": "0x19adf0",
+      "end": "0x19aec1",
+      "kind": "auto",
+      "n_r": 77,
+      "opnd_percent": 85.2,
+      "raw_mnemonic_pct": 98.1,
+      "ref": "synth",
+      "ref_sha": "3e1991721d44ce9c",
+      "score": 98.1,
       "source": "src/halo/tag_files/files.c"
     },
     "file_open": {
@@ -61468,6 +61528,21 @@
       "score": 100.0,
       "source": "src/halo/tag_files/files.c"
     },
+    "file_read_only": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 100.0,
+      "addr": "0x19a400",
+      "end": "0x19a44b",
+      "kind": "auto",
+      "n_r": 29,
+      "opnd_percent": 96.6,
+      "raw_mnemonic_pct": 100.0,
+      "ref": "synth",
+      "ref_sha": "7ae539d75cbda840",
+      "score": 100.0,
+      "source": "src/halo/tag_files/files.c"
+    },
     "file_reference_add_directory": {
       "abi_model": "raw",
       "abi_model_items": 0,
@@ -61483,18 +61558,18 @@
       "score": 100.0,
       "source": "src/halo/tag_files/files.c"
     },
-    "file_reference_create": {
+    "file_reference_copy": {
       "abi_model": "raw",
       "abi_model_items": 0,
       "abi_modeled_mnemonic_pct": 100.0,
-      "addr": "0x199420",
-      "end": "0x199496",
+      "addr": "0x1996d0",
+      "end": "0x1996f4",
       "kind": "auto",
-      "n_r": 40,
-      "opnd_percent": 95.0,
+      "n_r": 16,
+      "opnd_percent": 93.8,
       "raw_mnemonic_pct": 100.0,
       "ref": "synth",
-      "ref_sha": "17543024ed749abb",
+      "ref_sha": "d1ccc24b8ca5be21",
       "score": 100.0,
       "source": "src/halo/tag_files/files.c"
     },
@@ -61603,6 +61678,21 @@
       "score": 84.4,
       "source": "src/halo/tag_files/files.c"
     },
+    "file_set_eof": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 92.5,
+      "addr": "0x19aad0",
+      "end": "0x19ab41",
+      "kind": "auto",
+      "n_r": 48,
+      "opnd_percent": 92.5,
+      "raw_mnemonic_pct": 92.5,
+      "ref": "synth",
+      "ref_sha": "8f7bdc438ef34560",
+      "score": 92.5,
+      "source": "src/halo/tag_files/files.c"
+    },
     "file_set_position": {
       "abi_model": "raw",
       "abi_model_items": 0,
@@ -61621,17 +61711,32 @@
     "file_write": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 11.4,
+      "abi_modeled_mnemonic_pct": 100.0,
       "addr": "0x19ac00",
       "end": "0x19aca1",
       "kind": "auto",
       "n_r": 65,
-      "opnd_percent": 8.6,
-      "raw_mnemonic_pct": 11.4,
+      "opnd_percent": 98.5,
+      "raw_mnemonic_pct": 100.0,
       "ref": "synth",
       "ref_sha": "f816a62f5f041caa",
-      "score": 11.4,
-      "source": "src/halo/unported_thunks.c"
+      "score": 100.0,
+      "source": "src/halo/tag_files/files.c"
+    },
+    "file_write_to_position": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 92.9,
+      "addr": "0x19acf0",
+      "end": "0x19ad2a",
+      "kind": "auto",
+      "n_r": 28,
+      "opnd_percent": 92.9,
+      "raw_mnemonic_pct": 92.9,
+      "ref": "synth",
+      "ref_sha": "9b2e8c5c02c43348",
+      "score": 92.9,
+      "source": "src/halo/tag_files/files.c"
     },
     "find_best_starting_location_index": {
       "abi_model": "raw",
