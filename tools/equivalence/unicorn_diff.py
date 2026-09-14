@@ -711,6 +711,35 @@ def _seed_known_globals(uc, base: int, size: int):
     _seed_xbe_initialized(uc, base, size)
 
 
+def _seed_capture_over_bss(uc, raw: bytes, secs) -> int:
+    """Seed the live capture into the mapped image, BSS addresses only.
+
+    The complement of `_seed_xbe_initialized`.  That one fills a synthetic page
+    with the image's bytes; this one fills the image's uninitialised holes with
+    the capture's bytes.  Between them every global in the span has the best
+    evidence available for it, and neither ever overwrites the other's
+    territory: file-backed addresses are left exactly as `map_image` wrote
+    them, which is what H11 protects.
+
+    Returns the number of addresses seeded.  Called for BOTH instances, so the
+    two sides see identical values -- a capture seeded on one side only would
+    be a divergence the harness manufactured.
+    """
+    import xbe_image
+    n = 0
+    for addr, data in _KNOWN_GLOBAL_BYTES.items():
+        if xbe_image.read_va_raw(raw, secs, addr, len(data)):
+            continue                     # the image backs it; leave it alone
+        if xbe_image.section_at(secs, addr) is None:
+            continue                     # outside the span; not our page
+        try:
+            uc.mem_write(addr, data)
+            n += 1
+        except Exception:
+            pass
+    return n
+
+
 def _seed_xbe_initialized(uc, base: int, size: int):
     """Write the XBE's initialised bytes for whatever part of `[base, base+size)`
     the image file backs.
@@ -956,9 +985,16 @@ def _xbe_addrs_at_sites(sites) -> dict:
     return out
 
 
+def _in_image_span(addr: int) -> bool:
+    """True when `addr` lies in the pristine XBE's page-aligned image span."""
+    lo, hi = _image_span_cached()
+    return bool(lo) and lo <= addr < hi
+
+
 def _build_globals_seeds(*slot_maps: dict,
                          snapshot_overrides: dict = None,
-                         sym_addr_hints: dict = None) -> dict:
+                         sym_addr_hints: dict = None,
+                         image_mapped: bool = False) -> dict:
     """Build {slot_address: bytes} from DIR32 slot mappings + _KNOWN_GLOBAL_BYTES
     + optional state-snapshot overrides.
 
@@ -1009,9 +1045,19 @@ def _build_globals_seeds(*slot_maps: dict,
                 # Seeding with the VALUE here (as the non-dllimport branches do)
                 # would make the second deref read whatever garbage lives at
                 # that value-as-address, which is wrong.
+                # `image_mapped` makes the last condition unnecessary in
+                # principle and load-bearing in practice: with the whole image
+                # mapped, the storage at ANY in-span address exists, so the
+                # slot can always point at it -- no byte evidence required.
+                # Without it a BSS global with no capture entry (e.g.
+                # game_state_globals at 0x4ea990, .data past raw_size) left the
+                # slot at zero, and the candidate then wrote through a NULL
+                # pointer while the oracle wrote to 0x4ea990: one address set
+                # each, and a --mem-trace divergence on every seed.
                 if (snap is not None
                         or orig_addr in _KNOWN_GLOBAL_BYTES
-                        or _xbe_global_bytes(orig_addr, 4) is not None):
+                        or _xbe_global_bytes(orig_addr, 4) is not None
+                        or (image_mapped and _in_image_span(orig_addr))):
                     seeds[slot_addr] = _struct.pack("<I", orig_addr)
             elif snap is not None:
                 # Direct value reference (DAT_X).  Seed up to 8 bytes so a
@@ -1232,8 +1278,6 @@ def _run_function(code: bytes, abi: dict, arg_values: list,
     _image_lo = _image_hi = None
     _image_pages = frozenset()
     if image is not None:
-        if entry_va is None:
-            raise ValueError("_run_function(image=...) requires entry_va")
         import xbe_image
         _img_raw, _img_secs = image
         # ONE coalesced page-aligned map plus a write per section: XBE sections
@@ -1241,7 +1285,22 @@ def _run_function(code: bytes, abi: dict, arg_values: list,
         # overlap and fail.
         _image_lo, _image_hi = xbe_image.map_image(uc, _img_raw, _img_secs)
         _image_pages = frozenset(xbe_image.image_pages(_img_secs))
-    else:
+        # Image where the image knows, capture where it does not -- the same
+        # layering `_seed_known_globals` applies to a page the harness maps
+        # itself, applied here to the pre-mapped image.
+        #
+        # It has to happen HERE and not there, because H11 makes the callers of
+        # `_seed_known_globals` skip image pages outright: the capture must
+        # never land on top of real .rdata/.data.  But a BSS address has no
+        # real bytes to protect, and `map_image` leaves it at load-time zero.
+        # Without this, mapping the image into the CANDIDATE would take away
+        # the capture it used to get from the auto-map path and replace it with
+        # zeros -- a NULL-guard early-out on every seed, which is H10.
+        _seed_capture_over_bss(uc, _img_raw, _img_secs)
+    if entry_va is None:
+        # The candidate always runs from CODE_BASE, image or no image: its code
+        # is a clang .obj, not part of the XBE.  Mapping both is what makes the
+        # DATA image shared -- see the `image` docstring.
         uc.mem_map(CODE_BASE, CODE_SIZE)
     uc.mem_map(STACK_BASE, STACK_SIZE)
     uc.mem_map(SCRATCH_BASE, SCRATCH_SIZE)
@@ -1318,7 +1377,7 @@ def _run_function(code: bytes, abi: dict, arg_values: list,
     # map_image already wrote; the write is what lets a caller hand in a PATCHED
     # oracle body (the symmetric-interception JMPs of hazard H9).
     _intercept_sites = {}
-    if image is not None:
+    if entry_va is not None:
         uc.mem_write(entry_va, code)
         entry_point = entry_va
         for _cva, _sent in (intercept_vas or {}).items():
@@ -2866,6 +2925,7 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
     # `= None` would silently discard --oracle-native-callees' ranges.
     oracle_intercept_map = {}
     oracle_native_ranges = None
+    unresolved_dir32 = 0
     oracle_code_patched = oracle_slice.code
     lifted_code_patched = lifted_slice.code
     if not is_leaf and allow_stubs:
@@ -2921,14 +2981,46 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
         oracle_code_patched = _relocate_text_label_refs(
             oracle_slice, oracle_code_patched, oracle_text is not None)
         lft_globals_base = GLOBALS_BASE + len(orc_data_slots) * 256
+        # Under --oracle=xbe both instances map the pristine image, so a
+        # candidate DIR32 whose real address is in the span is pointed AT that
+        # address rather than at a private slot.  Both sides then read and
+        # write one address set, which is what makes --mem-trace mean anything
+        # (two disjoint sets are 100% false positives) and what lets a
+        # pointer-returning function's EAX be compared at all.
+        _lft_image_span = _image_span_cached() if _oracle_xbe else None
         lifted_code_patched, lft_data_slots, lft_rdata_seeds = patch_dir32_relocs(
             lifted_slice.code, lifted_slice.relocs, lft_defined,
             globals_base=lft_globals_base,
             return_slots=True, rdata_map=lft_rdata,
-            snapshot_regions=snapshot_overrides)
+            snapshot_regions=snapshot_overrides,
+            image_span=_lft_image_span)
         lifted_code_patched = bytes(lifted_code_patched)
         lifted_code_patched = _relocate_text_label_refs(
             lifted_slice, lifted_code_patched, False)
+
+        # A candidate DIR32 that still holds a private SLOT after identity
+        # relocation is a site where the two sides do not share storage: the
+        # oracle reads and writes the real address, the candidate a 256-byte
+        # stand-in seeded from whatever evidence we had.  Every such site is a
+        # place --mem-trace can report a divergence that is only an address
+        # mismatch, so the count is a confidence input, not a failure.
+        # Two kinds of slot are excluded because they are correct, not
+        # unresolved:
+        #   `__imp_X`  is SUPPOSED to keep a slot -- the extra dereference
+        #              resolves through it to the real address.
+        #   an rdata_map symbol is the candidate's OWN constant (a string
+        #              literal like ??_C@_01NOFIACDB@w?$AA@), which lives in
+        #              its .obj and not in the image at all; its slot is
+        #              seeded from the real section bytes, and a read of it
+        #              cannot produce a write-trace divergence.
+        unresolved_dir32 = 0
+        if _oracle_xbe:
+            unresolved_dir32 = sum(1 for _s in lft_data_slots
+                                   if not _s.startswith("__imp_")
+                                   and _s not in lft_rdata)
+            if unresolved_dir32:
+                info(f"  unresolved dir32: {unresolved_dir32} candidate "
+                     f"site(s) kept a private slot (no real address resolved)")
 
         # The candidate's slots sit above the oracle's, so with enough oracle
         # slots the candidate arena runs past GLOBALS_BASE+GLOBALS_SIZE. Tell
@@ -2961,7 +3053,8 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
         globals_seeds.update(_build_globals_seeds(
             orc_data_slots, lft_data_slots,
             snapshot_overrides=snapshot_overrides,
-            sym_addr_hints=orc_addr_hints))
+            sym_addr_hints=orc_addr_hints,
+            image_mapped=_oracle_xbe))
         globals_seeds.update(orc_rdata_seeds)
         globals_seeds.update(lft_rdata_seeds)
         # Seed MSVC two-level switch index-maps at their original VA so the
@@ -3384,22 +3477,26 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
         oracle_func_base = (CODE_BASE + oracle_slice.section_offset) if oracle_text else CODE_BASE
     oracle_func_end = oracle_func_base + len(oracle_code_patched)
 
-    # H12.  `globals_seeds` is one dict of ABSOLUTE addresses shared by both
-    # sides.  Under --oracle=xbe the oracle reads those globals out of the
-    # image, which is ground truth, so a seed at an in-image address would
-    # overwrite the real load-time value with a slot value or a cross-build
-    # known-globals capture (H11).  The candidate keeps the full set: its
-    # globals are slots, and a slot at an in-image address is how identity
-    # relocation points it at the real thing.
+    # H12.  `globals_seeds` is one dict of ABSOLUTE addresses handed to both
+    # sides.  Once the image is mapped, an in-image address already holds the
+    # right bytes -- the file's where the file backs it, the capture's over the
+    # BSS holes (`_seed_capture_over_bss`) -- so a seed there would overwrite
+    # ground truth with a slot value.  Withheld from BOTH sides under
+    # --oracle=xbe, because under step 6b both instances map the image.
+    #
+    # What survives the filter is the slot seeds at GLOBALS_BASE, which is
+    # outside the span by construction (test_memmap pins that), so the
+    # candidate's unresolved DIR32 slots keep working exactly as before.
     orc_globals_seeds = lft_globals_seeds = globals_seeds
     if _oracle_xbe and globals_seeds:
         _img_lo, _img_hi = _image_span_cached()
-        orc_globals_seeds = {a: d for a, d in globals_seeds.items()
-                             if not (_img_lo <= a < _img_hi)}
-        _dropped = len(globals_seeds) - len(orc_globals_seeds)
+        _filtered = {a: d for a, d in globals_seeds.items()
+                     if not (_img_lo <= a < _img_hi)}
+        orc_globals_seeds = lft_globals_seeds = _filtered
+        _dropped = len(globals_seeds) - len(_filtered)
         if _dropped:
-            info(f"  oracle seeds: {_dropped} in-image seed(s) withheld; the "
-                 f"image supplies those bytes")
+            info(f"  seeds: {_dropped} in-image seed(s) withheld from both "
+                 f"sides; the shared image supplies those bytes")
     enable_trace = mem_trace or (use_stubs and not is_leaf)
     # Stub-arg tracing is enabled when --allow-stubs is on AND --no-stub-arg-trace
     # was not given AND there are actual stub addresses to trace.
@@ -3456,7 +3553,8 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
                                          collect_mem_trace=enable_trace,
                                          memory_overrides=snapshot_overrides,
                                          max_insn=_max_insn,
-                                         stub_arg_tracer=cand_tracer)
+                                         stub_arg_tracer=cand_tracer,
+                                         image=oracle_image)
         except Exception as exc:
             log(f"  {seed_label} LIFTED-ERROR: {exc}")
             error_details.append(f"{seed_label} LIFTED-ERROR: {exc}")
@@ -3739,7 +3837,8 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
                                     lifted=True,
                                     collect_mem_trace=enable_trace,
                                     memory_overrides=merged_overrides,
-                                    max_insn=_max_insn)
+                                    max_insn=_max_insn,
+                                    image=oracle_image)
                             except Exception as exc:
                                 msg = f"{sl} LIFTED-ERROR: {exc}"
                                 log(f"  {msg}")
@@ -3934,6 +4033,10 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
         heap_value_diffs=len(heap_value_diffs),
         heap_oracle_only=len(heap_oracle_only),
         heap_lifted_only=len(heap_lifted_only),
+        # Candidate DIR32 sites still backed by a private slot rather than the
+        # shared image.  A confidence input: each one is a place a --mem-trace
+        # divergence could be an address mismatch instead of a real one.
+        unresolved_dir32=unresolved_dir32,
     )
     if merged_global_reads:
         reads = []

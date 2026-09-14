@@ -419,18 +419,26 @@ class TestRunFunctionImagePlumbing(unittest.TestCase):
             self.assertIn(p, sig.parameters)
             self.assertIsNone(sig.parameters[p].default)
 
-    def test_entry_va_is_required_with_image(self):
-        self.assertIn('raise ValueError("_run_function(image=...) requires '
-                      'entry_va")', self.src)
+    def test_entry_va_decides_where_the_code_runs(self):
+        """`image` and `entry_va` were one decision until step 6b made the
+        image SHARED: the candidate maps it for its data and still runs its own
+        clang bytes at CODE_BASE, so `image` no longer implies `entry_va`.
+        What must stay true is that the two are independent in exactly this
+        way -- `entry_va` alone decides where the code goes."""
+        self.assertIn("    if entry_va is not None:\n        uc.mem_write("
+                      "entry_va, code)", self.src)
+        self.assertNotIn('raise ValueError("_run_function(image=...) requires '
+                         'entry_va")', self.src)
 
-    def test_code_base_is_not_mapped_under_the_image(self):
+    def test_code_base_is_mapped_exactly_when_the_code_runs_there(self):
         """H4's premise: the FXSAVE stub had to move off CODE_BASE because the
-        raw oracle stops mapping it."""
+        raw ORACLE stops mapping it.  That still holds -- the oracle is the
+        side with an entry_va -- but the candidate maps both."""
         self.assertRegex(
             self.src,
             r"_image_lo, _image_hi = xbe_image\.map_image\(uc, _img_raw, "
-            r"_img_secs\)(?:.|\n)*?else:\s*\n\s*uc\.mem_map\(CODE_BASE, "
-            r"CODE_SIZE\)")
+            r"_img_secs\)(?:.|\n)*?if entry_va is None:(?:.|\n)*?"
+            r"uc\.mem_map\(CODE_BASE, CODE_SIZE\)")
         self.assertIn("fxsave_stub_addr = TRAMP_BASE", self.src)
 
     def test_both_pre_map_passes_skip_the_image(self):

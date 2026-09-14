@@ -684,7 +684,8 @@ def patch_dir32_relocs(code: bytes, relocs: list, defined_symbols: set,
                        globals_base: int = GLOBALS_BASE,
                        return_slots: bool = False,
                        rdata_map: dict = None,
-                       snapshot_regions: dict = None):
+                       snapshot_regions: dict = None,
+                       image_span: tuple = None):
     """Rewrite DIR32 relocations to point into the globals memory region.
 
     Each unique external DIR32 symbol gets a 256-byte slot in the globals
@@ -694,10 +695,21 @@ def patch_dir32_relocs(code: bytes, relocs: list, defined_symbols: set,
     Symbols in rdata_map (intra-object cross-section references like .rdata
     constants) also get globals slots, seeded with actual section data.
 
-    snapshot_regions ({addr: bytes} from a --state-snapshot) enables IDENTITY
-    relocation: a DAT_/PTR_/FLOAT_<addr> symbol whose encoded XBE address
-    falls inside a snapshot region is patched to its REAL address instead of
-    a slot.  The region bytes are mapped into emulator memory verbatim, so
+    snapshot_regions ({addr: bytes} from a --state-snapshot) and image_span
+    ((lo, hi) when the pristine XBE is mapped at its real VAs) both enable
+    IDENTITY relocation: a DAT_/PTR_/FLOAT_<addr> symbol whose encoded XBE
+    address is MAPPED is patched to its REAL address instead of a slot.
+    Snapshot membership was the original trigger and image membership is the
+    same claim with a different source -- "the storage at that address exists
+    in this instance" -- which is why they share one predicate rather than two.
+    Under --oracle=xbe both sides map the image, so identity-relocating the
+    candidate is what makes --mem-trace compare one address set instead of two
+    disjoint ones.
+
+    `__imp_`-prefixed symbols are NEVER identity-relocated.  Those slots carry
+    an extra dereference (`mov eax,[slot]; mov eax,[eax]`), so the slot must
+    hold the global's ADDRESS; pointing the site at the global itself would
+    make the second deref read the global's VALUE as a pointer.  The region bytes are mapped into emulator memory verbatim, so
     the oracle then reads the same full-size data the candidate reads via
     absolute immediates — required for indexed tables larger than the 8-byte
     slot seed window (e.g. the 2304-byte wind noise table at 0x5057c4, whose
@@ -717,17 +729,21 @@ def patch_dir32_relocs(code: bytes, relocs: list, defined_symbols: set,
     if rdata_map is None:
         rdata_map = {}
 
-    def _snapshot_identity_addr(sym_name):
-        if not snapshot_regions:
-            return None
+    def _identity_addr(sym_name):
+        """The symbol's REAL address when that address is mapped, else None."""
+        if sym_name.startswith("__imp_"):
+            return None                  # double-deref; must keep its slot
         m = _re.match(r'(?:DAT|PTR|PTR_DAT|FLOAT)_([0-9a-fA-F]{4,})$',
                       sym_name)
         if not m:
             return None
         orig = int(m.group(1), 16)
-        for base, data in snapshot_regions.items():
-            if base <= orig < base + len(data):
-                return orig
+        if snapshot_regions:
+            for base, data in snapshot_regions.items():
+                if base <= orig < base + len(data):
+                    return orig
+        if image_span is not None and image_span[0] <= orig < image_span[1]:
+            return orig
         return None
 
     for r in relocs:
@@ -742,7 +758,7 @@ def patch_dir32_relocs(code: bytes, relocs: list, defined_symbols: set,
             continue
 
         if not is_rdata_ref:
-            _ident = _snapshot_identity_addr(sym)
+            _ident = _identity_addr(sym)
             if _ident is not None:
                 off = r.virtual_address
                 if off + 4 <= len(patched):
