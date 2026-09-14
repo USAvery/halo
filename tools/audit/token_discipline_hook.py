@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shlex
 import sys
 from datetime import datetime
@@ -163,6 +164,76 @@ _IGNORED_HEADS = (
 _WRAPPER_HEADS = ("rtk", "sudo", "time", "command", "nohup", "env", "exec")
 _SEPARATORS = ("&&", "||", ";", "|", "&", "\n")
 
+# Matches a heredoc introducer: `<<`, optionally `-`, optional whitespace,
+# then a quoted or bare delimiter. Deliberately does not match `<<<`
+# (here-strings) because the delimiter alternatives all require a quote or a
+# word character immediately after, which a third `<` fails.
+_HEREDOC_RE = re.compile(
+    r"<<(-?)\s*(?:'([^']+)'|\"([^\"]+)\"|([A-Za-z_][A-Za-z0-9_]*))"
+)
+
+
+def _normalize_newlines(command: str) -> str:
+    """Turn bare top-level newlines into `;` so a multi-line Bash-tool
+    command (two unrelated commands on separate lines, with no `&&`/`;`
+    between them — a common shape for this harness) segments correctly.
+    shlex.split() otherwise treats `\\n` as plain whitespace and the whole
+    script parses as one segment headed by the first line's command.
+    Newlines inside quotes are left alone; a trailing `\\` line-continuation
+    joins the two lines instead of splitting them.
+    """
+    out = []
+    in_single = in_double = False
+    i, n = 0, len(command)
+    while i < n:
+        c = command[i]
+        if c == "'" and not in_double:
+            in_single = not in_single
+            out.append(c)
+        elif c == '"' and not in_single:
+            in_double = not in_double
+            out.append(c)
+        elif c == "\\" and not in_single and i + 1 < n and command[i + 1] == "\n":
+            out.append(" ")
+            i += 1
+        elif c == "\n" and not in_single and not in_double:
+            # Surrounded by spaces: shlex has no notion of `;` as a
+            # delimiter on its own, so a bare `;` glues onto the adjacent
+            # word instead of tokenizing as its own separator.
+            out.append(" ; ")
+        else:
+            out.append(c)
+        i += 1
+    return "".join(out)
+
+
+def _strip_heredocs(command: str) -> str:
+    """Blank out heredoc bodies before tokenizing.
+
+    shlex.split() treats newlines as plain whitespace, so `cat <<'EOF' ...
+    EOF > file` never gets a segment boundary between the introducer and its
+    body: every prose word in the body would otherwise be parsed as a
+    filename argument to `cat` and recorded as a phantom repeat-read.
+    """
+    lines = command.split("\n")
+    out = []
+    i, n = 0, len(lines)
+    while i < n:
+        line = lines[i]
+        out.append(line)
+        i += 1
+        m = _HEREDOC_RE.search(line)
+        if not m:
+            continue
+        dash = m.group(1)
+        delim = m.group(2) or m.group(3) or m.group(4)
+        while i < n:
+            body = lines[i]
+            i += 1
+            if (body.strip() if dash else body) == delim:
+                break
+    return "\n".join(out)
+
 
 def _split_segments(tokens: list) -> list:
     """Split a flat token list into command segments on shell separators."""
@@ -200,6 +271,25 @@ def _looks_like_path(tok: str) -> bool:
     return True
 
 
+_OUTPUT_REDIRECTS = (">", ">>", "1>", "1>>", "2>", "2>>", "&>", "&>>")
+
+
+def _drop_output_redirects(args: list) -> list:
+    """Remove `> file` / `>> file` (and stderr/combined variants): the file
+    named there is what the command WRITES, never something it reads."""
+    out = []
+    skip_next = False
+    for a in args:
+        if skip_next:
+            skip_next = False
+            continue
+        if a in _OUTPUT_REDIRECTS:
+            skip_next = True
+            continue
+        out.append(a)
+    return out
+
+
 def _int_or_none(tok: str):
     try:
         return int(tok)
@@ -235,6 +325,7 @@ def parse_bash_command(command: str) -> dict:
     result = {"reads": [], "searches": 0}
     if not command or not command.strip():
         return result
+    command = _normalize_newlines(_strip_heredocs(command))
     try:
         tokens = shlex.split(command, comments=False, posix=True)
     except ValueError:
@@ -245,7 +336,7 @@ def parse_bash_command(command: str) -> dict:
         if not seg:
             continue
         head = os.path.basename(seg[0])
-        args = seg[1:]
+        args = _drop_output_redirects(seg[1:])
         if head in _IGNORED_HEADS:
             continue
         if head in _SEARCH_HEADS:

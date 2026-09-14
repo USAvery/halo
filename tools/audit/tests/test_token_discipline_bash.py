@@ -109,6 +109,40 @@ class IgnoredCommandTest(unittest.TestCase):
         self.assertEqual(_parse(""), {"reads": [], "searches": 0})
 
 
+class HeredocTest(unittest.TestCase):
+    def test_cat_heredoc_body_is_not_parsed_as_paths(self):
+        out = _parse(
+            "cat <<'EOF' > docs/notes.md\n"
+            "NEW section on the raw XBE oracle and how to break early\n"
+            "rtk proxy is used to bypass the filter\n"
+            "EOF"
+        )
+        self.assertEqual(out["reads"], [])
+        self.assertEqual(out["searches"], 0)
+
+    def test_command_after_heredoc_still_parses(self):
+        out = _parse(
+            "cat <<'EOF' > docs/notes.md\n"
+            "body text here\n"
+            "EOF\n"
+            "sed -n '1,10p' src/foo.c"
+        )
+        self.assertEqual(out["reads"], [("src/foo.c", 1, 10)])
+
+    def test_unquoted_delimiter_heredoc(self):
+        out = _parse("cat <<EOF\nsome words\nEOF")
+        self.assertEqual(out["reads"], [])
+
+    def test_dash_heredoc_allows_indented_delimiter(self):
+        out = _parse("cat <<-EOF\n  indented body\n  EOF")
+        self.assertEqual(out["reads"], [])
+
+    def test_heredoc_output_redirect_target_is_not_a_read(self):
+        # `> file` after the heredoc introducer is the file being WRITTEN.
+        out = _parse("cat <<'EOF' > docs/notes.md\nbody text\nEOF")
+        self.assertEqual(out["reads"], [])
+
+
 class CompoundTest(unittest.TestCase):
     def test_mixed_segments(self):
         out = _parse("rtk grep foo src/ && sed -n '1,10p' src/foo.c "

@@ -295,23 +295,24 @@ void *data_iterator_next(data_iter_t *iterator)
 
 int data_next_index(data_t *data, int prev_index)
 {
-  int16_t *datum;
-  int16_t index;
+  int result;
+  short *datum;
 
-  index = (int16_t)(prev_index + 1);
+  result = NONE;
+  prev_index++;
   data_verify(data);
   assert_halt(data->valid);
 
-  if (index >= 0 && index < data->current_count) {
-    datum = (int16_t *)((char *)data->data + data->size * index);
-    while (index < data->current_count) {
+  if ((short)prev_index >= 0 && (short)prev_index < data->current_count) {
+    datum = (short *)((char *)data->data + (int)(short)prev_index * data->size);
+    while ((short)prev_index < data->current_count) {
       if (*datum != 0)
-        return (int)*datum << 16 | (int)index;
-      index++;
-      datum = (int16_t *)((char *)datum + data->size);
+        return (int)*datum << 16 | (short)prev_index;
+      prev_index++;
+      datum = (short *)((char *)datum + data->size);
     }
   }
-  return NONE;
+  return result;
 }
 
 /* Find the previous valid element before datum, or before the end if datum==-1.
@@ -320,33 +321,32 @@ int data_next_index(data_t *data, int prev_index)
  */
 unsigned int data_prev_index(data_t *data, int datum)
 {
-  short *psVar1;
-  short sVar2;
-  unsigned int uVar3;
+  short index;
+  short *datum_ptr;
+  unsigned int result = NONE;
 
   data_verify(data);
   if (!data->valid) {
     display_assert("data->valid", "c:\\halo\\SOURCE\\memory\\data.c", 0x14f, 1);
     system_exit(-1);
   }
-  if (datum == -1) {
-    uVar3 = (unsigned int)(unsigned short)(data->current_count - 1);
+
+  if (datum == NONE) {
+    index = data->current_count - 1;
   } else {
-    uVar3 = datum - 1;
+    index = (short)(datum - 1);
   }
-  sVar2 = (short)uVar3;
-  if (sVar2 >= 0 && sVar2 < data->current_count) {
-    psVar1 = (short *)((int)sVar2 * data->size + (int)data->data);
+
+  if (index >= 0 && index < data->current_count) {
+    datum_ptr = (short *)((char *)data->data + (int)index * data->size);
     do {
-      sVar2 = (short)uVar3;
-      if (*psVar1 != 0) {
-        return (int)*psVar1 << 16 | (int)sVar2;
+      if (*datum_ptr != 0) {
+        return (int)*datum_ptr << 16 | (short)index;
       }
-      psVar1 = (short *)((int)psVar1 - data->size);
-      uVar3--;
-    } while (sVar2 >= 0);
+      datum_ptr = (short *)((char *)datum_ptr - data->size);
+    } while (index-- >= 0);
   }
-  return -1;
+  return result;
 }
 
 /* Compact the data array: removes gaps by copying all live elements
