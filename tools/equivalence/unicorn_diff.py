@@ -3651,6 +3651,7 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
     heap_lifted_only = set()   # addresses written only by candidate
     _heap_compare_on = os.environ.get("BIPED_HEAP_COMPARE") == "1"
     all_visited_pcs = {}
+    oracle_seed_paths = set()
     oracle_returns = set()
     oracle_scratch_digests = set()
     oracle_write_digests = set()
@@ -3785,6 +3786,10 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
             continue
 
         # Collect coverage data and global reads from oracle execution
+        seed_pcs = frozenset(pc for pc in oracle_state.visited_pcs
+                             if oracle_func_base <= pc < oracle_func_end)
+        if seed_pcs:
+            oracle_seed_paths.add(seed_pcs)
         for pc, sz in oracle_state.visited_pcs.items():
             if oracle_func_base <= pc < oracle_func_end and pc not in all_visited_pcs:
                 all_visited_pcs[pc] = sz
@@ -4083,6 +4088,11 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
                                 errors += 1
                                 continue
 
+                            c_seed_pcs = frozenset(
+                                pc for pc in orc_s.visited_pcs
+                                if oracle_func_base <= pc < oracle_func_end)
+                            if c_seed_pcs:
+                                oracle_seed_paths.add(c_seed_pcs)
                             for pc, sz in orc_s.visited_pcs.items():
                                 if (oracle_func_base <= pc < oracle_func_end
                                         and pc not in all_visited_pcs):
@@ -4281,11 +4291,17 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
     if concolic_seeds_run:
         extra["phase1_coverage_pct"] = round(phase1_coverage, 1)
     # Published whether or not the phase ran, so a caller can carry the verdict
-    # forward. `_concolic_gain_pct` is None when it never ran and so says
-    # nothing either way.
+    # forward. Three cases, and the middle one is why this is not a one-liner:
+    #   - it ran      -> the measured gain
+    #   - memo skip   -> re-publish 0.0, the verdict we were handed. Reporting
+    #                    None here would erase the memo on its first use and
+    #                    the phase would run again on the very next sweep.
+    #   - never ran   -> None: nothing is known either way, so re-run it.
     extra["_concolic_memo_key"] = memo_key
-    extra["_concolic_gain_pct"] = (round(coverage_pct - phase1_coverage, 2)
-                                   if concolic_seeds_run else None)
+    if concolic_seeds_run:
+        extra["_concolic_gain_pct"] = round(coverage_pct - phase1_coverage, 2)
+    else:
+        extra["_concolic_gain_pct"] = 0.0 if memo_skip else None
 
     # A Z3 proof and a seed divergence cannot both be right. Surface the
     # contradiction explicitly rather than letting the "fail" verdict quietly
@@ -4355,6 +4371,23 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
                               f"return(s), no scratch or memory variation "
                               f"across {passed} seeds")
     if vacuous_reason:
+        # Hazard H10: under --oracle=xbe, zero-filled globals or uninitialized
+        # state can cause every seed to execute the exact same entry-point guard
+        # directly to ret (<10% floor, or an unexercised branch with no output
+        # variation). The zero-fill raw-XBE harness cannot test this function
+        # without --state-snapshot; report not_applicable rather than inconclusive.
+        if _oracle_xbe and len(oracle_seed_paths) <= 1 and coverage_pct < 100.0:
+            early_exit_reason = (
+                f"oracle_vacuous_early_exit: {coverage_pct:.1f}% coverage, "
+                f"identical entry-point path across {passed} seeds"
+            )
+            log("")
+            log(f"  NOT APPLICABLE: {early_exit_reason}")
+            log("      Every seed exited via the identical entry-point guard in the "
+                "zero-fill harness -- the raw XBE oracle cannot test this function "
+                "without --state-snapshot.")
+            return finish("not_applicable", False, early_exit_reason, 2, **extra)
+
         log("")
         log(f"  INCONCLUSIVE: {vacuous_reason}")
         log("      Every seed agreed because the differential never observed "
