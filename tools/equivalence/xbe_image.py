@@ -19,6 +19,7 @@ patched `halo-patched/default.xbe`: loading the patched build as the oracle
 would silently make oracle == candidate in every region we have already ported
 and pass everything.  `assert_pristine()` is the guard.
 """
+import bisect
 import hashlib
 import struct
 from pathlib import Path
@@ -175,13 +176,50 @@ def read_va_raw(raw: bytes, secs, va: int, size: int) -> bytes:
     return raw[s.raw_off + delta:s.raw_off + delta + min(size, avail)]
 
 
+#: `{id(secs): (secs, sorted_sections, starts)}`.  The section list is kept in
+#: the value so the id can never be recycled onto a different list while the
+#: entry is live.  Bounded by the number of distinct section lists a process
+#: builds (one, in practice).
+_SECTION_INDEX = {}
+
+
+def _section_index(secs):
+    """`(sorted_sections, starts)` for `secs`, or `None` when they overlap.
+
+    `section_at` used to normalize and linear-scan all 24 sections on every
+    call, and the harness calls it hundreds of thousands of times per run
+    (`_seed_capture_over_bss` alone is 7k addresses per emulator instance).
+    Normalizing once and bisecting is the same answer for a non-overlapping
+    section table; a table WITH overlaps would make bisect pick the last
+    section starting at or before `va` where the scan picks the first one in
+    list order, so that case falls back to the scan rather than guessing.
+    """
+    key = id(secs)
+    hit = _SECTION_INDEX.get(key)
+    if hit is not None and hit[0] is secs:
+        return hit[1]
+    norm = sorted((as_section(s) for s in secs), key=lambda s: s.va)
+    disjoint = all(a.va + a.vsize <= b.va for a, b in zip(norm, norm[1:]))
+    entry = (norm, [s.va for s in norm]) if disjoint else None
+    _SECTION_INDEX[key] = (secs, entry)
+    return entry
+
+
 def section_at(secs, va: int) -> Optional[Section]:
     """The section containing `va`, or None.  Accepts every section shape."""
-    for raw_s in secs:
-        s = as_section(raw_s)
-        if s.va <= va < s.va + s.vsize:
-            return s
-    return None
+    index = _section_index(secs)
+    if index is None:
+        for raw_s in secs:
+            s = as_section(raw_s)
+            if s.va <= va < s.va + s.vsize:
+                return s
+        return None
+    norm, starts = index
+    i = bisect.bisect_right(starts, va) - 1
+    if i < 0:
+        return None
+    s = norm[i]
+    return s if va < s.va + s.vsize else None
 
 
 def image_span(secs) -> tuple:

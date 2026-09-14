@@ -225,10 +225,15 @@ jobs:
       # all, so the nightly reported green through any regression.
       - name: Run batch verification
         env:
-          # 3 workers on the 15 GB self-hosted box: cap per-child RSS at 3 GB so
-          # aggregate peak (jobs * limit = 9 GB) leaves headroom for the runner,
-          # build tools, and desktop agents instead of exhausting the host.
-          HALO_EQUIV_MEM_LIMIT_GB: "3"
+          # 8 workers on the 16-core self-hosted box. A sweep is startup-bound,
+          # not compute-bound, so it scales nearly linearly with --jobs (80
+          # targets: 123 s at -j3, 54 s at -j10) and -j3 left 13 cores idle.
+          #
+          # jobs * limit is NOT the expected footprint -- the limit is a
+          # watchdog for a runaway --mem-trace, and measured peak across every
+          # child of a -j8 run was 1.17 GB TOTAL (~70 MB each). 2 GB per child
+          # still fires long before a leak can reach the host's 15 GB.
+          HALO_EQUIV_MEM_LIMIT_GB: "2"
         run: |
           # timeout 120 (not lower): --jobs parallelism alone brings a cold run to
           # ~40 min, far under the 105-min wall budget, so the per-function ceiling
@@ -238,7 +243,7 @@ jobs:
           ${{ env.VENV_PYTHON }} tools/equivalence/batch_verify.py \
             --seeds 50 \
             --timeout 120 \
-            --jobs 3 \
+            --jobs 8 \
             --max-wall-minutes 105 \
             --csv \
             --skip-existing \

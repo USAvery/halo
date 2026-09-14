@@ -20,9 +20,13 @@ import json
 import math
 import os
 import re
+import atexit
 import signal
+import socket
 import subprocess
 import sys
+import tempfile
+import threading
 import time
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -52,6 +56,13 @@ def _child_rss_bytes(pid: int) -> int:
             return int(fh.read().split()[1]) * _PAGE_SIZE
     except (OSError, ValueError, IndexError):
         return 0
+
+#: Wall-clock seconds one target took, recorded on every result. A sweep
+#: without it is unattributable after the fact: the 12.1-hour run of 2026-09-13
+#: could not say whether its time went to a handful of pathological targets or
+#: was spread evenly, and those call for different fixes. Excluded from the
+#: reuse fingerprint -- it describes the run, not the inputs.
+WALL_FIELD = "_batch_wall_seconds"
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 KB_JSON = ROOT / "kb.json"
@@ -463,6 +474,112 @@ def summarize_by_object(rows: list[dict]) -> dict:
     return {obj: dict(counts) for obj, counts in sorted(by_object.items())}
 
 
+# ---------------------------------------------------------------------------
+# Pre-warmed fork server (see tools/equivalence/forkserver.py).
+#
+# Spawning `python unicorn_diff.py` per target costs ~1.5 s of imports and
+# data parsing before a single instruction is emulated -- on a 4000-target
+# sweep, over an hour of pure startup. The fork server pays it once and forks
+# a pristine child per target instead. Same isolation (own session, own
+# address space), same watchdogs; only the startup is shared.
+# ---------------------------------------------------------------------------
+# One server PER WORKER THREAD, not one shared. A server handles a connection
+# to completion -- fork, then `waitpid` -- before accepting the next, so a
+# single shared one serializes every `--jobs` worker behind it (measured: 80
+# targets at -j3 went from 123 s to 303 s). It cannot simply accept
+# concurrently either: it has to stay thread-free, because `fork()` from a
+# multithreaded process copies whatever locks the other threads were holding.
+# One single-threaded server per worker keeps both properties.
+_FORKSERVERS = threading.local()
+_FORKSERVER_REGISTRY = []
+_FORKSERVER_LOCK = threading.Lock()
+
+
+class _ForkServer:
+    """Client handle for one warmed `forkserver.py` process."""
+
+    def __init__(self):
+        self._dir = tempfile.mkdtemp(prefix="halo-equiv-fs-")
+        self.sock_path = os.path.join(self._dir, "fs.sock")
+        self.proc = subprocess.Popen(
+            [sys.executable, str(ROOT / "tools" / "equivalence" / "forkserver.py"),
+             self.sock_path],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            cwd=str(ROOT), text=True, start_new_session=True)
+        line = self.proc.stdout.readline()
+        if line.strip() != "READY":
+            self.close()
+            raise RuntimeError("fork server failed to start")
+
+    def submit(self, argv):
+        """Fork one child for `argv`. Returns `(pid, connection)`.
+
+        The caller owns the watchdog loop and reads the exit status off the
+        connection, so a timeout kill and a clean exit take the same path.
+        """
+        conn = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        conn.settimeout(30)
+        conn.connect(self.sock_path)
+        conn.sendall((json.dumps({"argv": list(argv)}) + "\n").encode("utf-8"))
+        hello = _recv_line(conn)
+        if "pid" not in hello:
+            conn.close()
+            raise RuntimeError(hello.get("error", "fork server refused the request"))
+        return hello["pid"], conn
+
+    def close(self):
+        try:
+            self.proc.terminate()
+            self.proc.wait(timeout=5)
+        except Exception:
+            try:
+                self.proc.kill()
+            except Exception:
+                pass
+        for path in (self.sock_path, self._dir):
+            try:
+                os.unlink(path) if path == self.sock_path else os.rmdir(path)
+            except OSError:
+                pass
+
+
+def _recv_line(conn) -> dict:
+    """Read one newline-delimited JSON object from `conn`."""
+    buf = b""
+    while b"\n" not in buf:
+        chunk = conn.recv(65536)
+        if not chunk:
+            return {}
+        buf += chunk
+    return json.loads(buf.split(b"\n", 1)[0].decode("utf-8"))
+
+
+def _get_forkserver():
+    """This thread's fork server, started on first use.
+
+    Returns None if it cannot start, in which case the caller falls back to a
+    plain subprocess -- a slower batch, never a wrong one.
+    """
+    server = getattr(_FORKSERVERS, "server", None)
+    if server is None:
+        try:
+            server = _ForkServer()
+            with _FORKSERVER_LOCK:
+                _FORKSERVER_REGISTRY.append(server)
+        except Exception:
+            server = False
+        _FORKSERVERS.server = server
+    return server or None
+
+
+@atexit.register
+def _close_forkservers():
+    with _FORKSERVER_LOCK:
+        servers, _FORKSERVER_REGISTRY[:] = list(_FORKSERVER_REGISTRY), []
+    for server in servers:
+        server.close()
+
+
 def run_verify(name: str, output_dir: Path, seeds: int = 50, timeout: int = 60,
                float_tolerance: int = 0, skip_esp: bool = False,
                update_leaf_cache: bool = False,
@@ -506,42 +623,101 @@ def run_verify(name: str, output_dir: Path, seeds: int = 50, timeout: int = 60,
         except Exception:
             pass
 
+    t_start = time.time()
     try:
         # Own process group so we can kill the whole child tree; output is
         # discarded (batch reads result_json), so DEVNULL avoids a pipe stall.
-        proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL,
-                                stderr=subprocess.DEVNULL, cwd=str(ROOT),
-                                start_new_session=True)
-        deadline = time.time() + timeout
-        reason = None
-        while True:
-            try:
-                proc.wait(timeout=0.5)
-                break
-            except subprocess.TimeoutExpired:
-                pass
-            if time.time() > deadline:
-                _kill(proc)
-                reason = "timeout"
-                break
-            if limit_bytes and _child_rss_bytes(proc.pid) > limit_bytes:
-                _kill(proc)
-                reason = "mem-limit"
-                break
+        server = None if os.environ.get("HALO_EQUIV_NO_FORKSERVER") else _get_forkserver()
+        if server is not None:
+            reason, returncode = _wait_forked(server, cmd[2:], timeout, limit_bytes)
+        else:
+            proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL,
+                                    stderr=subprocess.DEVNULL, cwd=str(ROOT),
+                                    start_new_session=True)
+            deadline = time.time() + timeout
+            reason = None
+            while True:
+                try:
+                    proc.wait(timeout=0.5)
+                    break
+                except subprocess.TimeoutExpired:
+                    pass
+                if time.time() > deadline:
+                    _kill(proc)
+                    reason = "timeout"
+                    break
+                if limit_bytes and _child_rss_bytes(proc.pid) > limit_bytes:
+                    _kill(proc)
+                    reason = "mem-limit"
+                    break
+            returncode = proc.returncode
         if reason:
-            return {"status": "error", "reason": reason, "target": name}
+            return {"status": "error", "reason": reason, "target": name,
+                    WALL_FIELD: round(time.time() - t_start, 3)}
         if result_json.exists():
             result = json.loads(result_json.read_text(encoding="utf-8"))
             result[CACHE_SCHEMA_FIELD] = CACHE_SCHEMA
             result[FINGERPRINT_FIELD] = input_fingerprint
             result[VERIFIED_AT_FIELD] = time.time()
+            result[WALL_FIELD] = round(time.time() - t_start, 3)
             result_json.write_text(json.dumps(result, indent=2) + "\n",
                                    encoding="utf-8")
             return result
-        return {"status": "error", "reason": f"exit={proc.returncode}",
-                "target": name}
+        return {"status": "error", "reason": f"exit={returncode}",
+                "target": name, WALL_FIELD: round(time.time() - t_start, 3)}
     except Exception as e:
-        return {"status": "error", "reason": str(e), "target": name}
+        return {"status": "error", "reason": str(e), "target": name,
+                WALL_FIELD: round(time.time() - t_start, 3)}
+
+
+def _wait_forked(server, argv, timeout: int, limit_bytes: int):
+    """Run one target on the fork server under the same watchdogs as a Popen.
+
+    Returns `(reason, returncode)`; `reason` is None on a normal exit. The
+    child is a grandchild of this process, so it cannot be `waitpid`-ed here
+    -- the server does that and sends the status back. Killing still works
+    directly: the child called `setsid`, so its pgid is its pid.
+    """
+    pid, conn = server.submit(argv)
+    deadline = time.time() + timeout
+    reason = None
+    # The status line is accumulated ACROSS poll timeouts: a short recv that
+    # returned half of it must not be thrown away on the next tick.
+    buf = b""
+    try:
+        conn.settimeout(0.5)
+        while True:
+            try:
+                chunk = conn.recv(65536)
+                if not chunk:
+                    return reason, 1       # server died mid-run
+                buf += chunk
+                if b"\n" in buf:
+                    done = json.loads(buf.split(b"\n", 1)[0].decode("utf-8"))
+                    return reason, done.get("exit", 1)
+            except socket.timeout:
+                pass
+            if reason is None and time.time() > deadline:
+                reason = "timeout"
+                _killpg(pid)
+            elif reason is None and limit_bytes and _child_rss_bytes(pid) > limit_bytes:
+                reason = "mem-limit"
+                _killpg(pid)
+    finally:
+        try:
+            conn.close()
+        except OSError:
+            pass
+
+
+def _killpg(pid: int):
+    try:
+        os.killpg(os.getpgid(pid), signal.SIGKILL)
+    except (OSError, ProcessLookupError):
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except (OSError, ProcessLookupError):
+            pass
 
 
 def main():

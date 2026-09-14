@@ -714,6 +714,36 @@ def _seed_known_globals(uc, base: int, size: int):
     _seed_xbe_initialized(uc, base, size)
 
 
+#: `{id(secs): (secs, entries)}` -- the section list is held so the id cannot be
+#: recycled onto a different list.  One entry per process in practice.
+_BSS_SEED_CACHE = {}
+
+
+def _bss_seed_entries(raw: bytes, secs):
+    """The capture entries the image does NOT back, computed once.
+
+    Which of `_KNOWN_GLOBAL_BYTES`' ~7k addresses land in a section's BSS tail
+    is a pure function of the image, and the image is loaded once per process.
+    `_seed_capture_over_bss` runs once per emulator instance -- twice per seed
+    -- so recomputing the filter there put ~700k `read_va_raw` calls on the
+    critical path of a 50-seed run and dominated its wall clock.
+    """
+    key = id(secs)
+    hit = _BSS_SEED_CACHE.get(key)
+    if hit is not None and hit[0] is secs:
+        return hit[1]
+    import xbe_image
+    entries = []
+    for addr, data in _KNOWN_GLOBAL_BYTES.items():
+        if xbe_image.read_va_raw(raw, secs, addr, len(data)):
+            continue                     # the image backs it; leave it alone
+        if xbe_image.section_at(secs, addr) is None:
+            continue                     # outside the span; not our page
+        entries.append((addr, data))
+    _BSS_SEED_CACHE[key] = (secs, entries)
+    return entries
+
+
 def _seed_capture_over_bss(uc, raw: bytes, secs) -> int:
     """Seed the live capture into the mapped image, BSS addresses only.
 
@@ -728,13 +758,8 @@ def _seed_capture_over_bss(uc, raw: bytes, secs) -> int:
     two sides see identical values -- a capture seeded on one side only would
     be a divergence the harness manufactured.
     """
-    import xbe_image
     n = 0
-    for addr, data in _KNOWN_GLOBAL_BYTES.items():
-        if xbe_image.read_va_raw(raw, secs, addr, len(data)):
-            continue                     # the image backs it; leave it alone
-        if xbe_image.section_at(secs, addr) is None:
-            continue                     # outside the span; not our page
+    for addr, data in _bss_seed_entries(raw, secs):
         try:
             uc.mem_write(addr, data)
             n += 1

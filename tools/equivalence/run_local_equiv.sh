@@ -42,11 +42,17 @@ case "$MODE" in
       BASE="--baseline artifacts/batch_verify/summary.json"
     # The GitHub nightly already runs the complete suite. Keep an explicit
     # local full run bounded so it cannot starve the self-hosted runner when
-    # it is used for diagnosis. Three 3-GiB workers fit within this WSL VM
-    # while leaving room for the runner, build tools, and desktop agents.
-    HALO_EQUIV_MEM_LIMIT_GB="${HALO_EQUIV_MEM_LIMIT_GB:-3}" \
+    # it is used for diagnosis.
+    #
+    # 8 workers, not 3: the box has 16 cores and a sweep is startup-bound, not
+    # compute-bound, so it scales nearly linearly (80 targets: 123 s at -j3,
+    # 54 s at -j10). The per-child limit is a runaway watchdog, not a budget --
+    # measured peak across ALL children of a -j8 run was 1.17 GB total, ~70 MB
+    # each, so 2 GiB is still three orders of magnitude of headroom before the
+    # watchdog can fire on anything but a genuine leak.
+    HALO_EQUIV_MEM_LIMIT_GB="${HALO_EQUIV_MEM_LIMIT_GB:-2}" \
     "$PY" tools/equivalence/batch_verify.py \
-      --seeds 50 --timeout 120 --jobs 3 --max-wall-minutes 105 --csv --skip-existing \
+      --seeds 50 --timeout 120 --jobs 8 --max-wall-minutes 105 --csv --skip-existing \
       --allowlist tools/equivalence/batch_verify_allowlist.json \
       --skip-allowlisted \
       $BASE --output-dir artifacts/batch_verify >>"$LOG" 2>&1

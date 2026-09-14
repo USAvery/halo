@@ -28,7 +28,8 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from concolic import generate_memory_injections, load_value_corpus
 
-A = 0x26C118  # a plausible non-spurious global address
+A = 0x2CA118  # a plausible non-spurious global: inside .data (>= 0x2c84c0)
+              # and outside the 0x500000-0x600000 oracle GLOBALS window.
 
 
 def test_load_normalizes():
