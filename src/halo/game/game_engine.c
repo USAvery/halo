@@ -2859,7 +2859,7 @@ void ticks_to_unicode_time_string(int param_1, int param_2, wchar_t *param_3)
 
 /* Set the weapon spawn configuration for a player. */
 
-void game_engine_flag_reset(int param_1, int param_2)
+__declspec(noinline) void game_engine_flag_reset(int param_1, int param_2)
 
 {
   int weapon;

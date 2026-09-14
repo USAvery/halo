@@ -224,6 +224,11 @@ def _value_for_branch(jcc_id: int, cmp_imm: int, untaken_is_target: bool,
     return candidates
 
 
+#: Virtual address of `.data` in cachebeta.xbe -- the first writable byte of
+#: the image.  Everything below it is .text, the XDK sections, or .rdata.
+DATA_SECTION_VA = 0x2C84C0
+
+
 def _is_spurious_address(addr: int) -> bool:
     """Reject injection targets that cause false positives.
 
@@ -231,9 +236,13 @@ def _is_spurious_address(addr: int) -> bool:
     are auto-mapped artifacts, not real game data.  The GLOBALS region
     (0x500000-0x600000) holds DIR32-relocated oracle slots — injecting there
     changes oracle behavior without a matching effect on the lifted code,
-    which reads constants at original XBE addresses.
+    which reads constants at original XBE addresses.  Anything below
+    `DATA_SECTION_VA` is code or read-only data: the engine never writes
+    there, so an injected value describes no state the game can reach.
     """
     if addr < 0x10000:
+        return True
+    if addr < DATA_SECTION_VA:
         return True
     if addr >= 0x80000000:
         return True

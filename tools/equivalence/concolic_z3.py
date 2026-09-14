@@ -128,12 +128,19 @@ class _SymbolicGlobals:
     observed: dict = field(default_factory=dict)  # addr -> int
 
 
+#: See `concolic.DATA_SECTION_VA` -- imported rather than restated so the two
+#: injection filters can never drift apart.
+from concolic import DATA_SECTION_VA
+
+
 def _reject_reason(addr: int, size: int) -> Optional[str]:
     """Why this observed read cannot be an injection target, or None."""
     if size not in (1, 2, 4):
         return "odd-size"
     if addr < 0x10000:
         return "null-page"
+    if addr < DATA_SECTION_VA:
+        return "code-or-rdata"
     if addr >= 0x80000000:
         return "kernel-range"
     if 0x500000 <= addr < 0x600000:

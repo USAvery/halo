@@ -944,13 +944,13 @@ int16_t FUN_0019c0a0(void *state)
   switch ((unsigned short)c) {
   case 0:
     *(int16_t *)(s + 0x14) = 0;
-    return *(volatile int16_t *)(s + 0x14);
+    break;
   case 9:
     *(int16_t *)(s + 0x14) = 3;
-    return *(volatile int16_t *)(s + 0x14);
+    break;
   case 0xd:
     *(int16_t *)(s + 0x14) = 1;
-    return *(volatile int16_t *)(s + 0x14);
+    break;
   case 0x7c:
     c2 = *(int16_t *)(*(int *)(s + 0x8) + (int)pos * 2);
     pos = (short)(pos + 1);
@@ -958,14 +958,13 @@ int16_t FUN_0019c0a0(void *state)
     if (c2 == 0x6e) {
       *(int16_t *)(s + 0x12) = 0xd;
       *(int16_t *)(s + 0x14) = 1;
-      return *(volatile int16_t *)(s + 0x14);
     }
-    /* fall through */
+    break;
   default:
     *(int16_t *)(s + 0x14) = 6;
     break;
   }
-  return *(volatile int16_t *)(s + 0x14);
+  return *(int16_t *)(s + 0x14);
 }
 
 /*
