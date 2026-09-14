@@ -192,8 +192,7 @@ void game_allegiance_set(int16_t *entry, char friendship, char force)
 {
   int16_t team_a;
   int16_t team_b;
-  int bit_ab;
-  int bit_ba;
+  char *base;
 
   /* early out: if not forced and friendship hasn't changed, do nothing */
   if (!force && *((char *)entry + 0xa) == friendship)
@@ -204,39 +203,45 @@ void game_allegiance_set(int16_t *entry, char friendship, char force)
 
   team_a = entry[0];
   team_b = entry[1];
+  base = game_allegiance_globals;
 
   if (team_a < 10 && team_b < 10) {
-    bit_ab = (int)team_a * 10 + (int)team_b;
-    bit_ba = (int)team_b * 10 + (int)team_a;
-
     /* update incidents bitfield at +0x94 */
     if (!force) {
       /* not forced: set incident bits for both team orderings */
-      *(uint32_t *)(game_allegiance_globals + 0x94 + (bit_ab >> 5) * 4) |=
-        1 << (bit_ab & 0x1f);
-      *(uint32_t *)(game_allegiance_globals + 0x94 + (bit_ba >> 5) * 4) |=
-        1 << (bit_ba & 0x1f);
+      *(uint32_t *)(base + 0x94 +
+        (((int)team_a * 10 + (int)team_b) >> 5) * 4) |=
+        1 << (((int)team_a * 10 + (int)team_b) & 0x1f);
+      *(uint32_t *)(base + 0x94 +
+        (((int)entry[1] * 10 + (int)entry[0]) >> 5) * 4) |=
+        1 << (((int)entry[1] * 10 + (int)entry[0]) & 0x1f);
     } else {
       /* forced: clear incident bits for both team orderings */
-      *(uint32_t *)(game_allegiance_globals + 0x94 + (bit_ab >> 5) * 4) &=
-        ~(1 << (bit_ab & 0x1f));
-      *(uint32_t *)(game_allegiance_globals + 0x94 + (bit_ba >> 5) * 4) &=
-        ~(1 << (bit_ba & 0x1f));
+      *(uint32_t *)(base + 0x94 +
+        (((int)entry[0] * 10 + (int)entry[1]) >> 5) * 4) &=
+        ~(1 << (((int)entry[0] * 10 + (int)entry[1]) & 0x1f));
+      *(uint32_t *)(base + 0x94 +
+        (((int)entry[1] * 10 + (int)entry[0]) >> 5) * 4) &=
+        ~(1 << (((int)entry[1] * 10 + (int)entry[0]) & 0x1f));
     }
 
     /* update hostility bitfield at +0xa4 */
     if (!friendship) {
       /* hostile: set hostility bits for both team orderings */
-      *(uint32_t *)(game_allegiance_globals + 0xa4 + (bit_ab >> 5) * 4) |=
-        1 << (bit_ab & 0x1f);
-      *(uint32_t *)(game_allegiance_globals + 0xa4 + (bit_ba >> 5) * 4) |=
-        1 << (bit_ba & 0x1f);
+      *(uint32_t *)(base + 0xa4 +
+        (((int)entry[0] * 10 + (int)entry[1]) >> 5) * 4) |=
+        1 << (((int)entry[0] * 10 + (int)entry[1]) & 0x1f);
+      *(uint32_t *)(base + 0xa4 +
+        (((int)entry[1] * 10 + (int)entry[0]) >> 5) * 4) |=
+        1 << (((int)entry[1] * 10 + (int)entry[0]) & 0x1f);
     } else {
       /* friendly: clear hostility bits for both team orderings */
-      *(uint32_t *)(game_allegiance_globals + 0xa4 + (bit_ab >> 5) * 4) &=
-        ~(1 << (bit_ab & 0x1f));
-      *(uint32_t *)(game_allegiance_globals + 0xa4 + (bit_ba >> 5) * 4) &=
-        ~(1 << (bit_ba & 0x1f));
+      *(uint32_t *)(base + 0xa4 +
+        (((int)entry[0] * 10 + (int)entry[1]) >> 5) * 4) &=
+        ~(1 << (((int)entry[0] * 10 + (int)entry[1]) & 0x1f));
+      *(uint32_t *)(base + 0xa4 +
+        (((int)entry[1] * 10 + (int)entry[0]) >> 5) * 4) &=
+        ~(1 << (((int)entry[1] * 10 + (int)entry[0]) & 0x1f));
     }
   }
 
@@ -300,12 +305,11 @@ void game_allegiance_create(int16_t team_a, char is_player, int16_t team_b,
   count = globals[0];
   entry = globals + 1;
 
-  for (i = 0; i < count; i++) {
+  for (i = 0; i < count; i++, entry += 9) {
     if ((entry[0] == team_a && entry[1] == team_b) ||
         (entry[1] == team_a && entry[0] == team_b)) {
       break;
     }
-    entry += 9;
   }
 
   if (i >= count) {
@@ -352,12 +356,14 @@ bool game_allegiance_remove(int16_t team_a, int16_t team_b)
   int16_t count;
   int16_t *entry;
   int16_t *globals;
+  bool found;
 
+  found = false;
   globals = (int16_t *)game_allegiance_globals;
   count = globals[0];
   entry = globals + 1;
 
-  for (i = 0; i < count; i++) {
+  for (i = 0; i < count; i++, entry += 9) {
     if ((entry[0] == team_a && entry[1] == team_b) ||
         (entry[1] == team_a && entry[0] == team_b)) {
       game_allegiance_set(entry, 1, 1);
@@ -367,11 +373,11 @@ bool game_allegiance_remove(int16_t team_a, int16_t team_b)
         int16_t *last = globals + 1 + globals[0] * 9;
         *(struct allegiance_entry_raw *)entry = *(struct allegiance_entry_raw *)last;
       }
-      return true;
+      found = true;
+      break;
     }
-    entry += 9;
   }
-  return false;
+  return found;
 }
 
 /**
@@ -390,7 +396,9 @@ bool game_allegiance_bump(int16_t team_a, int16_t team_b, int16_t action,
   int16_t delta;
   int16_t *entry;
   int16_t *globals;
+  bool result;
 
+  result = false;
   globals = (int16_t *)game_allegiance_globals;
   count = globals[0];
   entry = globals + 1;
@@ -419,22 +427,23 @@ bool game_allegiance_bump(int16_t team_a, int16_t team_b, int16_t action,
           entry[8] = entry[3];
         }
         if (entry[2] == -1) {
-          return false;
+          break;
         }
         if (entry[7] < entry[2]) {
-          return false;
+          break;
         }
         game_allegiance_set(entry, 1, 0);
         if (out_changed != NULL) {
           *out_changed = (*((char *)entry + 0xc) == 0);
         }
-        return true;
+        result = true;
+        break;
       }
       i++;
       entry += 9;
     } while (i < count);
   }
-  return false;
+  return result;
 }
 
 int FUN_000a8110(int param_1, int param_2)

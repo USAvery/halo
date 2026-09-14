@@ -544,10 +544,10 @@ void antenna_debug_data_draw_beams(void *tag_def, void *rec)
       t = 1.0f;
     }
 
-    build_sprites_begin((uint32_t *)sprite_build_data, (int16_t)count,
+    build_sprites_begin((uint32_t *)sprite_build_data, (int16_t)*tag_block,
                         *(uint32_t *)((char *)tag_def + 0x2c), 0x326b30, 0);
 
-    for (i = 0; i < count; i++) {
+    for (i = 0; i < *tag_block; i++) {
       char *elem;
       char *te;
       float delta[3];
@@ -802,7 +802,7 @@ void antenna_debug_data_update_all(float delta_time)
 
       if (*(int *)((char *)rec + 0xc) != -1 &&
           *(int16_t *)((char *)rec + 6) < 5) {
-        clamped_dt = (delta_time <= 0.06666667f) ? delta_time : 0.06666667f;
+        clamped_dt = (0.06666667f >= delta_time) ? delta_time : 0.06666667f;
         antenna_debug_data_simulate_rope(rec, tag_def, clamped_dt);
       }
     }

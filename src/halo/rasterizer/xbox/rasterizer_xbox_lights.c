@@ -558,11 +558,12 @@ void FUN_00169fd0(int *sun_entry)
   float y0r;
   float x1r;
   float y1r;
-  int viewport_width;
+  volatile long viewport_width;
   int viewport_height;
   int pass;
   int target;
   char success;
+  uint32_t *new_var;
 
   if (*(int *)0x476ab0 == 0) {
     display_assert("global_d3d_device", kLightsFile, 0x247, 1);
@@ -671,7 +672,8 @@ void FUN_00169fd0(int *sun_entry)
   D3DDevice_SetRenderState_Simple(0x40304, 0);
   *(uint32_t *)0x1fb784 = 0;
   D3DDevice_SetRenderState_Simple(0x40300, 0);
-  *(uint32_t *)0x1fb788 = 0;
+  new_var = (uint32_t *)0x1fb788;
+  *new_var = 0;
   D3DDevice_SetRenderState_ZEnable(0);
   D3DDevice_SetRenderState_ZBias(0);
   csmemset((void *)0x5a5ac0, 0, 0xf0);
