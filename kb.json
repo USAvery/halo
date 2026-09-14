@@ -8130,8 +8130,8 @@
     },
     {
      "addr": "0xdcaf0",
-     "decl": "void first_person_weapon_get(void);",
-     "comment": "[NAME: first_person_weapon_get — name_source=2276-symbol-dump method=exact_address tier=confirmed (T1), cea-apply-unified 2026-09-14]"
+     "decl": "void *FUN_000dcaf0(int16_t local_player_index@<esi>);",
+     "ported": true
     },
     {
      "addr": "0xdcbd0",
@@ -8140,8 +8140,8 @@
     },
     {
      "addr": "0xdcdc0",
-     "decl": "void first_person_weapon_index_from_unit_index(void);",
-     "comment": "[NAME: first_person_weapon_index_from_unit_index — name_source=2276-symbol-dump method=exact_address tier=confirmed (T1), cea-apply-unified 2026-09-14]"
+     "decl": "int16_t FUN_000dcdc0(int unit_handle@<edi>);",
+     "ported": true
     },
     {
      "addr": "0xdce80",
@@ -8156,7 +8156,7 @@
     },
     {
      "addr": "0xdd190",
-     "decl": "void first_person_weapon_get_marker_by_name(void);"
+     "decl": "int16_t first_person_weapon_get_marker_by_name(int object_handle, void *marker_name, void *out_markers, int max_count);"
     },
     {
      "addr": "0xdd260",
@@ -8176,16 +8176,18 @@
     },
     {
      "addr": "0xddb90",
-     "decl": "void first_person_weapon_get_marker_by_name_render(void);"
+     "decl": "int16_t first_person_weapon_get_marker_by_name_render(int object_handle, void *marker_name, void *out_markers, int max_count);",
+     "ported": true
     },
     {
      "addr": "0xde0e0",
-     "decl": "void first_person_weapon_new_unit(void);",
-     "comment": "[NAME: first_person_weapon_new_unit — name_source=2276-symbol-dump method=exact_address tier=confirmed (T1), cea-apply-unified 2026-09-14]"
+     "decl": "void FUN_000de0e0(int local_player_index@<esi>, int param_2);",
+     "ported": true
     },
     {
      "addr": "0xde360",
-     "decl": "void first_person_weapon_message_from_unit(int unit_handle, int message_type);"
+     "decl": "void first_person_weapon_message_from_unit(int unit_handle, int message_type);",
+     "ported": true
     },
     {
      "addr": "0xde3f0",
