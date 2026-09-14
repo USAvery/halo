@@ -513,12 +513,13 @@
         "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
       ]
     },
-    "FUN_000425c0": {
+    "ai_handle_spatial_effect": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_names.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: no longer errors, but returns inconclusive/vacuous_coverage -- the crash this row names is gone and no verdict replaces it. Kept: retiring it would trade an honest infra excuse for a permanently grey row. Retire once the H10 vacuous-exit detector reports not_applicable on its own merits."
       ]
     },
     "FUN_001c6170": {
@@ -713,12 +714,13 @@
         "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
       ]
     },
-    "FUN_0019a490": {
+    "file_create": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_names.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: fail/divergence. The oracle no longer crashes, so THIS ROW'S REASON IS FALSE -- but the replacement verdict is a divergence, which is not the infra problem the row was written for. Kept only to avoid reddening the gate on an unread finding; it is a triage item, not an excuse. Delete it with the triage decision."
       ]
     },
     "file_delete": {
@@ -817,20 +819,22 @@
         "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
       ]
     },
-    "FUN_000a9fd0": {
+    "game_engine_test_flag": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_names.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: no longer errors, but returns inconclusive/vacuous_output -- the crash this row names is gone and no verdict replaces it. Kept: retiring it would trade an honest infra excuse for a permanently grey row. Retire once the H10 vacuous-exit detector reports not_applicable on its own merits."
       ]
     },
-    "FUN_000a9ff0": {
+    "game_engine_test_trait": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_names.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: no longer errors, but returns inconclusive/vacuous_output -- the crash this row names is gone and no verdict replaces it. Kept: retiring it would trade an honest infra excuse for a permanently grey row. Retire once the H10 vacuous-exit detector reports not_applicable on its own merits."
       ]
     },
     "FUN_000abfd0": {
@@ -873,12 +877,13 @@
         "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
       ]
     },
-    "FUN_000ad140": {
+    "game_show_score": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_names.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: no longer errors, but returns inconclusive/vacuous_output -- the crash this row names is gone and no verdict replaces it. Kept: retiring it would trade an honest infra excuse for a permanently grey row. Retire once the H10 vacuous-exit detector reports not_applicable on its own merits."
       ]
     },
     "game_engine_postspawn_player_update": {
@@ -1457,12 +1462,13 @@
         "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
       ]
     },
-    "FUN_0012d5b0": {
+    "network_game_server_get_oldest_client_update_received": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_names.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: no longer errors, but returns inconclusive/vacuous_output -- the crash this row names is gone and no verdict replaces it. Kept: retiring it would trade an honest infra excuse for a permanently grey row. Retire once the H10 vacuous-exit detector reports not_applicable on its own merits."
       ]
     },
     "sort_dumps": {
@@ -2081,36 +2087,31 @@
         "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
       ]
     },
-    "FUN_00114630": {
+    "inflate_blocks_free": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_names.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: still error/emulation_error. The excuse stands. `emulation_error` alone does not say which side failed, so the next step is capturing the Unicorn message, not deleting the row."
       ]
     },
-    "FUN_001146e0": {
+    "inflate_codes_new": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_names.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: still error/emulation_error. The excuse stands. `emulation_error` alone does not say which side failed, so the next step is capturing the Unicorn message, not deleting the row."
       ]
     },
-    "FUN_00114f60": {
+    "inflate_codes_free": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
-      ]
-    },
-    "FUN_00117250": {
-      "statuses": [
-        "*"
-      ],
-      "reasons": [
-        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run"
+        "oracle-unmappable: reference crashes in zero-fill Unicorn harness (unmapped callee code page / missing reloc); needs --state-snapshot to run",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_names.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: still error/emulation_error. The excuse stands. `emulation_error` alone does not say which side failed, so the next step is capturing the Unicorn message, not deleting the row."
       ]
     },
     "FUN_001173f0": {
@@ -2193,12 +2194,13 @@
         "non-terminating within instruction budget (assert->stub loop); needs live-state or higher budget"
       ]
     },
-    "FUN_00140750": {
+    "objects_disconnect_from_structure_bsp": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "non-terminating within instruction budget (assert->stub loop); needs live-state or higher budget"
+        "non-terminating within instruction budget (assert->stub loop); needs live-state or higher budget",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_names.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: no longer errors, but returns inconclusive/vacuous_output -- the crash this row names is gone and no verdict replaces it. Kept: retiring it would trade an honest infra excuse for a permanently grey row. Retire once the H10 vacuous-exit detector reports not_applicable on its own merits."
       ]
     },
     "objects_reconnect_to_structure_bsp": {
@@ -2257,12 +2259,13 @@
         "non-terminating within instruction budget (assert->stub loop); needs live-state or higher budget"
       ]
     },
-    "ai_profile_change_render_spray": {
+    "FUN_00054a80": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "non-terminating within instruction budget (assert->stub loop); needs live-state or higher budget"
+        "non-terminating within instruction budget (assert->stub loop); needs live-state or higher budget",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_names.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: still error/emulation_error. The excuse stands. `emulation_error` alone does not say which side failed, so the next step is capturing the Unicorn message, not deleting the row."
       ]
     },
     "FUN_000551e0": {
@@ -2537,14 +2540,6 @@
         "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
       ]
     },
-    "FUN_0010bdc0": {
-      "statuses": [
-        "*"
-      ],
-      "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
-    },
     "angles_to_vector": {
       "statuses": [
         "*"
@@ -2698,22 +2693,6 @@
       ]
     },
     "FUN_001ab6e0": {
-      "statuses": [
-        "*"
-      ],
-      "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
-    },
-    "FUN_001ab730": {
-      "statuses": [
-        "*"
-      ],
-      "reasons": [
-        "no-delinked-ref: oracle_extract_failed could not be extracted for diff (registration/export gap)"
-      ]
-    },
-    "FUN_001ab770": {
       "statuses": [
         "*"
       ],
@@ -3057,12 +3036,13 @@
         "non-terminating within instruction budget (INSN-LIMIT oracle=1000001); leaked into divergence bucket. Harness limit, not a lift bug."
       ]
     },
-    "FUN_000b1f00": {
+    "king_initialize_for_new_map": {
       "statuses": [
         "*"
       ],
       "reasons": [
-        "harness artifact, not a lift bug (adjudicated 2026-07-08 vs live KotH snapshot). Oracle assert-string reloc s_king_globals.hill_point_count_!=_0026d5d4 is un-emulatable (logged as trace-end); candidate stub-string is emulatable (logged as display_assert). Calls 0..80 byte-identical across all seeds. 0x456c38==0 in both because find_netgame_flags (2nd-level callee in b1180) is stubbed->0 and --real-callees does not recurse. Live gameplay reads hill_point_count=4, proving the real path returns 1. Faithful port; VC71/source is the evidence."
+        "harness artifact, not a lift bug (adjudicated 2026-07-08 vs live KotH snapshot). Oracle assert-string reloc s_king_globals.hill_point_count_!=_0026d5d4 is un-emulatable (logged as trace-end); candidate stub-string is emulatable (logged as display_assert). Calls 0..80 byte-identical across all seeds. 0x456c38==0 in both because find_netgame_flags (2nd-level callee in b1180) is stubbed->0 and --real-callees does not recurse. Live gameplay reads hill_point_count=4, proving the real path returns 1. Faithful port; VC71/source is the evidence.",
+        "RETRIED artifacts/equivalence/allowlist_retry_xbe_names.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: no longer errors, but returns inconclusive/vacuous_output -- the crash this row names is gone and no verdict replaces it. Kept: retiring it would trade an honest infra excuse for a permanently grey row. Retire once the H10 vacuous-exit detector reports not_applicable on its own merits."
       ]
     }
   }

@@ -381,7 +381,27 @@ def load_targets(path: Path):
     return addr_rank, name_rank
 
 
-def load_allowlist(path: Path) -> dict[str, set[str]]:
+def load_allowlist(path: Path, oracle: str = "") -> dict[str, set[str]]:
+    """Allowlist entries that apply to `oracle` (all of them when unset).
+
+    An entry may carry `"oracle": "delinked"` to say its excuse belongs to one
+    lane.  Most of this file does: 245 `oracle-unmappable` rows say the
+    reference crashed on an unmapped callee page or a relocation that resolved
+    to nothing, and 71 `oracle_extract_failed` rows say there was no delinked
+    object to build an oracle from.  Neither can happen with the pristine
+    image mapped at real VAs, so under `--oracle=xbe` those entries excuse
+    nothing and the target must be re-run.
+
+    An entry with no `oracle` key applies to every oracle -- that is the
+    back-compatible reading and the right default for the timeout,
+    `deflate_state*` seed-domain and `lifted_extract_failed` categories, which
+    are oracle-independent.
+
+    Scoping is what makes retirement reviewable: the entry stays in the file
+    with its written reason and its lane, rather than being deleted on the
+    theory that the migration must have fixed it.  See
+    tools/equivalence/retry_allowlisted.py for the evidence side.
+    """
     if not path:
         return {}
     raw = load_json(path)
@@ -401,6 +421,9 @@ def load_allowlist(path: Path) -> dict[str, set[str]]:
         elif isinstance(value, list):
             allowlist[name] = {str(item) for item in value}
         elif isinstance(value, dict):
+            scope = value.get("oracle")
+            if oracle and scope and scope != oracle:
+                continue
             allowlist[name] = set(values(value.get("statuses", [])))
             allowlist[name].update(values(value.get("reasons", [])))
         else:
@@ -622,7 +645,7 @@ def main():
             (rc for rc in ranked if rc[1] is not None), key=lambda rc: rc[1])]
 
     if args.skip_allowlisted and args.allowlist:
-        allowlist = load_allowlist(args.allowlist)
+        allowlist = load_allowlist(args.allowlist, args.oracle)
         before = len(candidates)
         candidates = [c for c in candidates
                       if c["name"] not in allowlist and c["addr"] not in allowlist]
@@ -704,7 +727,7 @@ def main():
     def _write_summary():
         elapsed = time.time() - t0
         fresh_executions = len(rows) - skipped
-        allowlist = load_allowlist(args.allowlist)
+        allowlist = load_allowlist(args.allowlist, args.oracle)
         allowlisted = [row for row in rows if is_allowlisted(row, allowlist)]
         current_failure_rows = [row for row in rows
                                 if row["status"] in FAIL_STATUSES
