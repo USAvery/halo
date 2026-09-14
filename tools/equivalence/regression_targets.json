@@ -2,6 +2,57 @@
   "description": "Curated high-risk ported functions for fast regression testing. Run with: python3 tools/equivalence/regression_test.py",
   "targets": [
     {
+      "addr": "0x119520",
+      "name": "data_dispose",
+      "obj": "data.obj",
+      "seeds": 20,
+      "flags": [
+        "--allow-stubs"
+      ],
+      "reason": "core data-pool disposal; raw-XBE oracle, 100% high-confidence coverage"
+    },
+    {
+      "addr": "0x1196d0",
+      "name": "datum_delete",
+      "obj": "data.obj",
+      "seeds": 20,
+      "flags": [
+        "--allow-stubs"
+      ],
+      "reason": "core datum-pool deletion; raw-XBE oracle, 65.8% high-confidence coverage"
+    },
+    {
+      "addr": "0x1198f0",
+      "name": "data_next_index[valid-pool]",
+      "obj": "data.obj",
+      "seeds": 20,
+      "flags": [
+        "--state-snapshot", "tools/equivalence/regression_snapshots/data_next_index_first.json",
+        "--allow-stubs", "--real-callees", "--mem-trace", "--no-concolic"
+      ],
+      "reason": "valid synthetic data_t pool: first, inactive-slot skip, and NONE sentinel paths"
+    },
+    {
+      "addr": "0x183c00",
+      "name": "rasterizer_text_draw_cached_char",
+      "obj": "rasterizer_text.obj",
+      "seeds": 20,
+      "flags": [
+        "--allow-stubs"
+      ],
+      "reason": "cached-character rendering: 20/20 raw-XBE passes, 100% high-confidence coverage"
+    },
+    {
+      "addr": "0x1bd8e0",
+      "name": "cache_files_precache_map_loaded",
+      "obj": "cache_files_windows.obj",
+      "seeds": 20,
+      "flags": [
+        "--allow-stubs"
+      ],
+      "reason": "map-precache lookup: 20/20 raw-XBE passes, 100% high-confidence coverage"
+    },
+    {
       "addr": "0x130580",
       "name": "FUN_00130580",
       "obj": "network_server_message_handler.obj",

@@ -1,0 +1,11 @@
+{
+  "description": "data_next_index: first, skipped, and end-of-pool paths",
+  "build_label": "synthetic-valid-data-pool",
+  "regions": {
+    "0x700100": "111100000000000022220000"
+  },
+  "arg_overrides": {
+    "data": "0000000000000000000000000000000000000000000000000000000000000000030004000100000040744064000003000000000000017000",
+    "prev_index": [-1, 2]
+  }
+}
