@@ -44,25 +44,37 @@ OBJ_ROOT = REPO / "build" / "CMakeFiles" / "halo.dir"
 # ---------------------------------------------------------------------------
 
 
+_XBE_IMAGE = None
+
+
+def _xbe_image():
+    """Import the shared XBE parser lazily (it lives in a sibling tool dir)."""
+    global _XBE_IMAGE
+    if _XBE_IMAGE is None:
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "equivalence"))
+        import xbe_image
+        _XBE_IMAGE = xbe_image
+    return _XBE_IMAGE
+
+
 def load_xbe(path):
-    raw = path.read_bytes()
-    base = struct.unpack_from("<I", raw, 0x104)[0]
-    nsec = struct.unpack_from("<I", raw, 0x11C)[0]
-    hdr = struct.unpack_from("<I", raw, 0x120)[0] - base
-    sections = []
-    for i in range(nsec):
-        off = hdr + i * 0x38
-        va, vs, ra, rs = struct.unpack_from("<IIII", raw, off + 4)
-        sections.append((va, vs, ra, rs))
-    return raw, sections
+    """`(raw, [(va, vsize, raw_off, raw_size), ...])` -- the 4-tuple shape.
+
+    Delegates to `tools/equivalence/xbe_image.py`, the single XBE section
+    parser.  Unlike the 3-tuple form in `check_delinked_bounds`, this one
+    carries `raw_size`, so a caller can tell real bytes from the BSS tail.
+    """
+    return _xbe_image().load_xbe_legacy4(path)
 
 
 def read_va(raw, sections, va, size):
-    for sva, svs, sra, srs in sections:
-        if sva <= va < sva + svs:
-            off = sra + (va - sva)
-            return raw[off:off + min(size, srs - (va - sva))]
-    return b""
+    """Bytes at a virtual address.
+
+    Now zero-fills past a section's `raw_size` instead of returning a short
+    read, matching what the loader puts in memory.  No behavioural change for
+    this module's callers, which read `.text` (where raw_size == vsize).
+    """
+    return _xbe_image().read_va(raw, sections, va, size)
 
 
 # ---------------------------------------------------------------------------

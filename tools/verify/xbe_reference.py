@@ -55,8 +55,15 @@ WHAT THIS DOES NOT FIX
     argue with instead of silent drift.  A disagreement between the synthesized
     and delinked reference is still a signal about the BOUND, not proof that
     either side's bytes are wrong.
-  * The equivalence lane.  `unicorn_diff` actually EXECUTES the oracle, so it
-    needs real relocations.  Ghidra stays necessary there.
+  * Nothing about the equivalence lane, yet -- but the reason given here
+    originally ("`unicorn_diff` actually EXECUTES the oracle, so it needs real
+    relocations; Ghidra stays necessary there") was wrong, and is being
+    undone.  Relocations are needed only because a delinked COFF is
+    RELOCATABLE.  Map the pristine image at its real virtual addresses instead
+    and every absolute reference is already correct -- nothing was ever
+    unlinked from its neighbours.  See docs/raw-xbe-oracle-migration.md; the
+    shared parser and image mapper live in tools/equivalence/xbe_image.py, and
+    `function_bytes` below is the byte source that lane will use.
 
 Usage:
     xbe_reference.py emit --addr 0x10a480 --name FUN_0010a480 -o out.obj

@@ -45,39 +45,33 @@ def _is_code_ref(sym_name: str, addr: int) -> bool:
 
 
 def _load_xbe_sections() -> list:
-    sections = []
-    with open(XBE_PATH, "rb") as f:
-        f.seek(0x104)
-        base_addr = struct.unpack("<I", f.read(4))[0]
-        f.seek(0x11C)
-        section_count = struct.unpack("<I", f.read(4))[0]
-        section_header_addr = struct.unpack("<I", f.read(4))[0]
-        f.seek(section_header_addr - base_addr)
-        for _ in range(section_count):
-            sh = f.read(56)
-            name = sh[:8].rstrip(b"\x00").decode("ascii", errors="replace")
-            vaddr = struct.unpack_from("<I", sh, 4)[0]
-            vsize = struct.unpack_from("<I", sh, 8)[0]
-            raw_addr = struct.unpack_from("<I", sh, 12)[0]
-            raw_size = struct.unpack_from("<I", sh, 16)[0]
-            sections.append({
-                "name": name,
-                "vaddr": vaddr,
-                "vsize": vsize,
-                "raw_addr": raw_addr,
-                "raw_size": raw_size
-            })
-    return sections
+    """Section table as dicts, from the shared parser in `xbe_image`.
+
+    The dict shape is kept because this module's own callers index it by name.
+    """
+    import xbe_image
+
+    _raw, secs = xbe_image.load_xbe(XBE_PATH)
+    return [{"name": s.name, "vaddr": s.va, "vsize": s.vsize,
+             "raw_addr": s.raw_off, "raw_size": s.raw_size} for s in secs]
 
 
 def _read_xbe_bytes(sections: list, va: int, size: int) -> bytes:
-    for s in sections:
-        if s["vaddr"] <= va < s["vaddr"] + s["vsize"]:
-            file_off = s["raw_addr"] + (va - s["vaddr"])
-            with open(XBE_PATH, "rb") as f:
-                f.seek(file_off)
-                return f.read(size)
-    return None
+    """File-backed bytes at `va`, or None where the XBE holds no value.
+
+    Deliberately `read_va_raw`, not `read_va`.  Callers below keep an address
+    only when this returns the full `size`, and bucket the rest as "UNMAPPED
+    (runtime-initialized or BSS)" -- which is the correct answer for a `.data`
+    address past `raw_size`, because the image simply has no load-time value
+    there.  A zero-filled read would record `00000000` as if it were a known
+    value; the previous file-seek form was worse still, returning whatever
+    followed in the FILE (the next section's bytes, or nothing past EOF).
+    """
+    import xbe_image
+
+    raw, secs = xbe_image.load_xbe(XBE_PATH)
+    got = xbe_image.read_va_raw(raw, secs, va, size)
+    return got or None
 
 
 def _va_from_symbol(name: str) -> int:

@@ -114,23 +114,15 @@ HEAP_ALLOC_BASE = HEAP_BASE + 0x1000
 
 
 def _load_xbe_sections(path: Path) -> list:
-    """Return [(vaddr, bytes)] for every section of an XBE image."""
-    data = path.read_bytes()
-    base = struct.unpack_from("<I", data, 0x104)[0]
-    nsec = struct.unpack_from("<I", data, 0x11C)[0]
-    sec_hdr = struct.unpack_from("<I", data, 0x120)[0] - base
-    out = []
-    for i in range(nsec):
-        off = sec_hdr + i * 0x38
-        vaddr = struct.unpack_from("<I", data, off + 0x04)[0]
-        vsize = struct.unpack_from("<I", data, off + 0x08)[0]
-        raw_off = struct.unpack_from("<I", data, off + 0x0C)[0]
-        raw_size = struct.unpack_from("<I", data, off + 0x10)[0]
-        blob = data[raw_off:raw_off + raw_size]
-        if len(blob) < vsize:
-            blob = blob + b"\0" * (vsize - len(blob))
-        out.append((vaddr, blob[:vsize]))
-    return out
+    """Return [(vaddr, bytes)] for every section of an XBE image.
+
+    Kept as a thin adapter over `xbe_image` (the single XBE parser) because the
+    `(vaddr, blob)` shape is what this file's mapping code consumes.
+    """
+    import xbe_image
+
+    raw, secs = xbe_image.load_xbe(path)
+    return [(s.va, xbe_image.read_va(raw, secs, s.va, s.vsize)) for s in secs]
 
 
 class InflateMachine:
@@ -163,16 +155,10 @@ class InflateMachine:
                 f"`rtk python3 tools/build/build.py -q` (no --target) so the "
                 f"patched XBE is regenerated before testing")
         # One flat RWX region covering every section keeps page alignment simple.
-        sections = _load_xbe_sections(xbe_path)
-        lo = min(v for v, _ in sections)
-        hi = max(v + len(b) for v, b in sections)
-        lo &= ~0xFFF
-        hi = (hi + 0xFFF) & ~0xFFF
-        self.uc.mem_map(lo, hi - lo, UC_PROT_ALL)
-        for vaddr, blob in sections:
-            if blob:
-                self.uc.mem_write(vaddr, blob)
-        self.image_range = (lo, hi)
+        import xbe_image
+
+        raw, secs = xbe_image.load_xbe(xbe_path)
+        self.image_range = xbe_image.map_image(self.uc, raw, secs)
 
     def _map_harness(self) -> None:
         for base, size in ((STACK_BASE, STACK_SIZE), (HEAP_BASE, HEAP_SIZE),

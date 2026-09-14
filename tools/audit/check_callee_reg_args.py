@@ -115,34 +115,36 @@ def is_sdk_addr(addr: int) -> bool:
 # XBE utilities
 # ---------------------------------------------------------------------------
 
+_XBE_IMAGE = None
+
+
+def _xbe_image():
+    """Import the shared XBE parser lazily (it lives in a sibling tool dir)."""
+    global _XBE_IMAGE
+    if _XBE_IMAGE is None:
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "equivalence"))
+        import xbe_image
+        _XBE_IMAGE = xbe_image
+    return _XBE_IMAGE
+
+
 def load_xbe(xbe_path: Path):
-    """Return (raw_bytes, sections) where sections = list of (va, vsize, raw_off, raw_size)."""
-    data = xbe_path.read_bytes()
-    base      = struct.unpack_from("<I", data, 0x104)[0]
-    n_sects   = struct.unpack_from("<I", data, 0x11C)[0]
-    hdrs_va   = struct.unpack_from("<I", data, 0x120)[0]
-    hdr_off   = hdrs_va - base
-    sections  = []
-    for i in range(n_sects):
-        off = hdr_off + i * 0x38
-        va       = struct.unpack_from("<I", data, off + 0x04)[0]
-        vsize    = struct.unpack_from("<I", data, off + 0x08)[0]
-        raw_off  = struct.unpack_from("<I", data, off + 0x0C)[0]
-        raw_size = struct.unpack_from("<I", data, off + 0x10)[0]
-        sections.append((va, vsize, raw_off, raw_size))
-    return data, sections
+    """Return (raw_bytes, sections) where sections = list of (va, vsize, raw_off, raw_size).
+
+    Delegates to `tools/equivalence/xbe_image.py`, the single XBE parser.
+    """
+    return _xbe_image().load_xbe_legacy4(xbe_path)
 
 
 def read_va(xbe_data: bytes, sections, va: int, length: int = 128) -> bytes | None:
-    for (sec_va, sec_vsize, raw_off, raw_size) in sections:
-        if sec_va <= va < sec_va + sec_vsize:
-            off_in_sec = va - sec_va
-            file_off   = raw_off + off_in_sec
-            avail      = raw_size - off_in_sec
-            if avail <= 0:
-                return None
-            return xbe_data[file_off : file_off + min(length, avail)]
-    return None
+    """File-backed bytes at `va`, or None where nothing is backed.
+
+    Uses `read_va_raw`, not `read_va`: this feeds a disassembler, and a
+    zero-filled buffer would decode as `add [eax],al` instead of being
+    recognised as absent data.
+    """
+    got = _xbe_image().read_va_raw(xbe_data, sections, va, length)
+    return got or None
 
 
 # ---------------------------------------------------------------------------

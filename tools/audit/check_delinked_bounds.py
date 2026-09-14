@@ -30,9 +30,9 @@ Exit codes: 0 = no bloat found, 1 = bloat found (with --check), 2 = usage error.
 import argparse
 import os
 import re
-import struct
 import subprocess
 import sys
+from pathlib import Path
 
 DELINKED = "delinked"
 XBE = "halo-patched/cachebeta.xbe"
@@ -42,25 +42,33 @@ SELF_TEST = [(0x174510, 0x174690), (0x103D30, 0x103D7C),
              (0x21FB0, 0x22008), (0x1C7D10, 0x1C7D70)]
 
 
+_XBE_IMAGE = None
+
+
+def _xbe_image():
+    """Import the shared XBE parser lazily (it lives in a sibling tool dir)."""
+    global _XBE_IMAGE
+    if _XBE_IMAGE is None:
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "equivalence"))
+        import xbe_image
+        _XBE_IMAGE = xbe_image
+    return _XBE_IMAGE
+
+
 def load_xbe(path):
-    data = open(path, "rb").read()
-    base = struct.unpack_from("<I", data, 0x104)[0]
-    nsec = struct.unpack_from("<I", data, 0x11C)[0]
-    shdr = struct.unpack_from("<I", data, 0x120)[0] - base
-    secs = []
-    for i in range(nsec):
-        o = shdr + i * 0x38
-        secs.append((struct.unpack_from("<I", data, o + 4)[0],    # vaddr
-                     struct.unpack_from("<I", data, o + 8)[0],    # vsize
-                     struct.unpack_from("<I", data, o + 12)[0]))  # raw
-    return data, secs
+    """`(data, [(vaddr, vsize, raw_off), ...])` -- the legacy 3-tuple shape.
+
+    Delegates to `tools/equivalence/xbe_image.py`, the single XBE section
+    parser.  The 3-tuple shape is kept because `tools/verify/xbe_reference.py`
+    and the bounds tooling below unpack it positionally; anything that needs to
+    MAP a section (and so needs `raw_size` to know where the BSS tail starts)
+    must call `xbe_image.load_xbe` directly instead.
+    """
+    return _xbe_image().load_xbe_legacy(path)
 
 
 def va_to_off(secs, va):
-    for vaddr, vsize, raw in secs:
-        if vaddr <= va < vaddr + vsize:
-            return raw + (va - vaddr)
-    return None
+    return _xbe_image().va_to_off(secs, va)
 
 
 def true_end(data, secs, entry):

@@ -588,46 +588,41 @@ XBE_PATH = REPO_ROOT / "halo-patched" / "cachebeta.xbe"
 _xbe_sections: list[tuple[int, int, int, int]] | None = None
 
 
+def _xbe_image():
+    """Import the shared XBE parser lazily (it lives in a sibling tool dir)."""
+    sys.path.insert(0, str(REPO_ROOT / "tools" / "equivalence"))
+    import xbe_image
+    return xbe_image
+
+
 def _load_xbe_sections() -> list[tuple[int, int, int, int]]:
-    """Load XBE section table for VA-to-file-offset translation."""
+    """XBE section table as 4-tuples, for VA-to-file-offset translation.
+
+    Delegates to `tools/equivalence/xbe_image.py`, the single XBE parser.
+    """
     global _xbe_sections
     if _xbe_sections is not None:
         return _xbe_sections
 
-    import struct
-    sections = []
-    with open(XBE_PATH, "rb") as f:
-        f.seek(0x104)
-        base_addr = struct.unpack("<I", f.read(4))[0]
-        f.seek(0x11C)
-        section_count = struct.unpack("<I", f.read(4))[0]
-        section_header_addr = struct.unpack("<I", f.read(4))[0]
-        f.seek(section_header_addr - base_addr)
-        for _ in range(section_count):
-            sh = f.read(56)
-            vaddr = struct.unpack_from("<I", sh, 4)[0]
-            vsize = struct.unpack_from("<I", sh, 8)[0]
-            raw_addr = struct.unpack_from("<I", sh, 12)[0]
-            raw_size = struct.unpack_from("<I", sh, 16)[0]
-            sections.append((vaddr, vsize, raw_addr, raw_size))
-    _xbe_sections = sections
-    return sections
+    _xbe_sections = _xbe_image().load_xbe_legacy4(XBE_PATH)[1]
+    return _xbe_sections
 
 
 def _read_xbe_string(va: int) -> str | None:
-    """Read a null-terminated ASCII string from the XBE at virtual address va."""
-    import struct
-    sections = _load_xbe_sections()
-    for vaddr, vsize, raw_addr, raw_size in sections:
-        if vaddr <= va < vaddr + vsize:
-            file_off = raw_addr + (va - vaddr)
-            with open(XBE_PATH, "rb") as f:
-                f.seek(file_off)
-                data = f.read(120)
-            null_idx = data.find(b"\x00")
-            if null_idx >= 0:
-                return data[:null_idx].decode("ascii", errors="replace")
-            return None
+    """Read a null-terminated ASCII string from the XBE at virtual address va.
+
+    Uses `read_va_raw` so a `va` past a section's raw data yields nothing
+    rather than a zero-filled buffer, which would decode as an empty string
+    and read as a successfully-resolved (but blank) path.
+    """
+    xi = _xbe_image()
+    raw, secs = xi.load_xbe(XBE_PATH)
+    data = xi.read_va_raw(raw, secs, va, 120)
+    if not data:
+        return None
+    null_idx = data.find(b"\x00")
+    if null_idx >= 0:
+        return data[:null_idx].decode("ascii", errors="replace")
     return None
 
 

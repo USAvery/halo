@@ -124,7 +124,6 @@ DEFAULT_BOUNDS = REPO_ROOT / "tools" / "verify" / "function_bounds.json"
 DEFAULT_KB = REPO_ROOT / "kb.json"
 DEFAULT_OUT = REPO_ROOT / "artifacts" / "ntsc_callgraph" / "callgraph.json"
 
-SECTION_HEADER_SIZE = 0x38  # bytes, per-entry, in the XBE section header table
 MAX_STRING_LEN = 200
 MIN_STRING_LEN = 4
 DEFAULT_MAX_FALLBACK_SPAN = 4096  # bytes; see resolve_function_bounds()
@@ -144,65 +143,35 @@ _REG_ANNOTATION_RE = re.compile(r"@<(\w+)>")
 # XBE parsing
 # ---------------------------------------------------------------------------
 
-class Section:
-    __slots__ = ("name", "va", "vsize", "raw_off", "raw_size")
+def _xbe_image():
+    """Import the shared XBE parser lazily (it lives in a sibling tool dir)."""
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "equivalence"))
+    import xbe_image
+    return xbe_image
 
-    def __init__(self, name: str, va: int, vsize: int, raw_off: int, raw_size: int):
-        self.name = name
-        self.va = va
-        self.vsize = vsize
-        self.raw_off = raw_off
-        self.raw_size = raw_size
 
-    def contains_va(self, v: int) -> bool:
-        return self.va <= v < self.va + self.vsize
-
-    def raw_contains_va(self, v: int) -> bool:
-        return self.va <= v < self.va + self.raw_size
+#: `xbe_image.Section` carries the same five fields plus `contains_va` /
+#: `raw_contains_va`, so the local duplicate was dropped.
+Section = _xbe_image().Section
 
 
 def load_xbe(path: Path) -> Tuple[bytes, int, List[Section], str]:
     """Parse the XBE section table, including section names (not read by
     prior audit tools in this repo). Returns (raw_bytes, base_va, sections,
     md5_hex)."""
-    data = path.read_bytes()
+    xi = _xbe_image()
+    data, sections = xi.load_xbe(path)
     if data[:4] != b"XBEH":
         raise ValueError(f"{path}: not a valid XBE file (bad magic)")
-
     base = struct.unpack_from("<I", data, 0x104)[0]
-    n_sects = struct.unpack_from("<I", data, 0x11C)[0]
-    hdrs_va = struct.unpack_from("<I", data, 0x120)[0]
-    hdr_off = hdrs_va - base
-
-    sections: List[Section] = []
-    for i in range(n_sects):
-        off = hdr_off + i * SECTION_HEADER_SIZE
-        va = struct.unpack_from("<I", data, off + 0x04)[0]
-        vsize = struct.unpack_from("<I", data, off + 0x08)[0]
-        raw_off = struct.unpack_from("<I", data, off + 0x0C)[0]
-        raw_size = struct.unpack_from("<I", data, off + 0x10)[0]
-        name_va = struct.unpack_from("<I", data, off + 0x14)[0]
-        name_off = name_va - base
-        name = data[name_off:name_off + 64].split(b"\0", 1)[0].decode("ascii", "replace")
-        sections.append(Section(name, va, vsize, raw_off, raw_size))
-
-    md5 = hashlib.md5(data).hexdigest()
-    return data, base, sections, md5
+    return data, base, list(sections), hashlib.md5(data).hexdigest()
 
 
 def read_va(data: bytes, sections: List[Section], va: int, length: int) -> bytes:
     """Read up to `length` raw bytes starting at VA `va`. Returns b"" for any
     VA past a section's raw-backed extent (its bss-style zero-fill tail is
     never materialized in the file, so it can never decode as a string)."""
-    for sec in sections:
-        if sec.va <= va < sec.va + sec.vsize:
-            off_in_sec = va - sec.va
-            avail_raw = sec.raw_size - off_in_sec
-            if avail_raw <= 0:
-                return b""
-            file_off = sec.raw_off + off_in_sec
-            return data[file_off: file_off + min(length, avail_raw)]
-    return b""
+    return _xbe_image().read_va_raw(data, sections, va, length)
 
 
 def section_for_va(sections: List[Section], va: int) -> Optional[Section]:
