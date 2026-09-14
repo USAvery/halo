@@ -2952,7 +2952,7 @@ void rasterizer_text_cache_dispose(void)
 /* rasterizer_text_get_character_position: get hardware character screen
  * position. Original ABI: AX=index, EBX=*out_y, stack=*out_x
  */
-void rasterizer_text_get_character_position(short index, short *out_y,
+__declspec(noinline) void rasterizer_text_get_character_position(short index, short *out_y,
                                             short *out_x)
 {
   if (*(char *)0x4d04a0 == 0) {
@@ -3188,33 +3188,22 @@ void rasterizer_text_draw_cached_char(void *arg0, void *font,
   if (*(short *)((int)font_character + 0xc) != -1) {
     rasterizer_text_get_character_position(
       *(short *)((int)font_character + 0xc), &cache_y, &cache_x);
-    tx = (short)(cache_x + (short)cache_offset_x);
-    ty = (short)(cache_y + (short)cache_offset_y);
+    ty = (short)(cache_y + cache_offset_y);
+    tx = (short)(cache_x + cache_offset_x);
 
-    /* vert0 TL */
-    quad_verts[0] = (float)x;
-    quad_verts[1] = (float)y;
-    quad_verts[2] = (float)tx;
-    quad_verts[3] = (float)ty;
     *(unsigned int *)&quad_verts[4] = color;
-    /* vert1 TR */
-    quad_verts[5] = (float)(x + width);
-    quad_verts[6] = (float)y;
-    quad_verts[7] = (float)(tx + width);
-    quad_verts[8] = (float)ty;
     *(unsigned int *)&quad_verts[9] = color;
-    /* vert2 BR */
-    quad_verts[10] = (float)(x + width);
-    quad_verts[11] = (float)(y + height);
-    quad_verts[12] = (float)(tx + width);
-    quad_verts[13] = (float)(ty + height);
     *(unsigned int *)&quad_verts[14] = color;
-    /* vert3 BL */
-    quad_verts[15] = (float)x;
-    quad_verts[16] = (float)(y + height);
-    quad_verts[17] = (float)tx;
-    quad_verts[18] = (float)(ty + height);
     *(unsigned int *)&quad_verts[19] = color;
+
+    quad_verts[15] = quad_verts[0] = (float)x;
+    quad_verts[10] = quad_verts[5] = (float)(x + width);
+    quad_verts[6] = quad_verts[1] = (float)y;
+    quad_verts[16] = quad_verts[11] = (float)(y + height);
+    quad_verts[17] = quad_verts[2] = (float)tx;
+    quad_verts[12] = quad_verts[7] = (float)(tx + width);
+    quad_verts[8] = quad_verts[3] = (float)ty;
+    quad_verts[18] = quad_verts[13] = (float)(ty + height);
 
     FUN_001741d0(quad_verts);
   }
@@ -3276,30 +3265,19 @@ void rasterizer_text_draw_cached_chars(void *arg0, void *font,
         draw_color = color;
       }
 
-      /* vert0 TL */
-      quad_verts[0] = x_base + shadow_off_x;
-      quad_verts[1] = y_base + shadow_off_y;
-      quad_verts[2] = (float)tx;
-      quad_verts[3] = (float)ty;
       *(unsigned int *)&quad_verts[4] = draw_color;
-      /* vert1 TR */
-      quad_verts[5] = x_right + shadow_off_x;
-      quad_verts[6] = y_base + shadow_off_y;
-      quad_verts[7] = (float)(tx + width);
-      quad_verts[8] = (float)ty;
       *(unsigned int *)&quad_verts[9] = draw_color;
-      /* vert2 BR */
-      quad_verts[10] = x_right + shadow_off_x;
-      quad_verts[11] = y_bottom + shadow_off_y;
-      quad_verts[12] = (float)(tx + width);
-      quad_verts[13] = (float)(ty + height);
       *(unsigned int *)&quad_verts[14] = draw_color;
-      /* vert3 BL */
-      quad_verts[15] = x_base + shadow_off_x;
-      quad_verts[16] = y_bottom + shadow_off_y;
-      quad_verts[17] = (float)tx;
-      quad_verts[18] = (float)(ty + height);
       *(unsigned int *)&quad_verts[19] = draw_color;
+
+      quad_verts[15] = quad_verts[0] = x_base + shadow_off_x;
+      quad_verts[10] = quad_verts[5] = x_right + shadow_off_x;
+      quad_verts[6] = quad_verts[1] = y_base + shadow_off_y;
+      quad_verts[16] = quad_verts[11] = y_bottom + shadow_off_y;
+      quad_verts[17] = quad_verts[2] = (float)tx;
+      quad_verts[12] = quad_verts[7] = (float)(tx + width);
+      quad_verts[8] = quad_verts[3] = (float)ty;
+      quad_verts[18] = quad_verts[13] = (float)(ty + height);
 
       FUN_001741d0(quad_verts);
 
