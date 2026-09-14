@@ -80,7 +80,12 @@ jobs:
       - name: Build PR candidate
         run: |
           cmake -Bbuild -S. -DCMAKE_TOOLCHAIN_FILE=toolchains/llvm.cmake
-          ${{ env.VENV_PYTHON }} tools/build/build.py -q --target halo
+          # No --target: the equivalence self-tests (test_inflate_roundtrip.py)
+          # need halo-patched/default.xbe regenerated, which only the separate
+          # `patched_xbe` CMake target (depends on `halo`) produces. Building
+          # just `--target halo` refreshes build/halo without it, leaving
+          # default.xbe stale and failing the staleness check below.
+          ${{ env.VENV_PYTHON }} tools/build/build.py -q
         timeout-minutes: 20
 
       # State the mode in the summary. A green check that silently covered a
