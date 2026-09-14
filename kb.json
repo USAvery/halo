@@ -31585,7 +31585,8 @@
     },
     {
      "addr": "0x17ed70",
-     "decl": "char rasterizer_frame_statistics_sort_index_compare(uint16_t a, uint16_t b);"
+     "decl": "char rasterizer_frame_statistics_sort_index_compare(uint16_t a, uint16_t b);",
+     "ported": true
     },
     {
      "addr": "0x17ed90",

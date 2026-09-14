@@ -2969,6 +2969,35 @@ void FUN_0017ed30(void)
 }
 
 
+/* rasterizer_frame_statistics_sort_index_compare @ 0x17ed70 -- unsigned 16-bit
+ * "greater than" predicate, returned in AL.  Whole function, from disassembly:
+ *
+ *   0017ed73 MOV AX,word ptr [EBP + 0x8]    -- arg a (word-sized)
+ *   0017ed77 CMP AX,word ptr [EBP + 0xc]    -- vs arg b
+ *   0017ed7b JBE 0x0017ed81                 -- unsigned compare
+ *   0017ed7d MOV AL,0x1                     -- a >  b -> 1
+ *   0017ed81 XOR AL,AL                      -- a <= b -> 0
+ *
+ * JBE (not JLE) proves the comparison is unsigned, so the params stay
+ * uint16_t.  The result is written as a byte only, so the kb decl returns
+ * char: a caller that tests AL must not see bits the reference never set. */
+/* The zero-init + conditional-set spelling below is deliberate and measured.
+ * It is what makes cl.exe emit the reference's CMPW / JBE / MOV AL,1 shape;
+ * every direct form (`return a > b;`, `if (c) return 1; return 0;`, if/else,
+ * ternary) collapses to a single SETA and loses 13.3pp of VC71 match.
+ * Do not "simplify". */
+char rasterizer_frame_statistics_sort_index_compare(uint16_t a, uint16_t b)
+{
+  char result;
+
+  result = 0;
+  if (a > b) {
+    result = 1;
+  }
+  return result;
+}
+
+
 /* FUN_0017ed90 @ 0x17ed90 -- returns an index/vertex count selected by a
  * 16-bit tag at the head of the first buffer.
  *
