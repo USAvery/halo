@@ -7934,8 +7934,10 @@
    "functions": [
     {
      "addr": "0x199d40",
-     "decl": "void datastore_read(void);",
-     "comment": "[NAME: datastore_read — CEA PDB line-containment (probable), cea-deferred 2026-09-03]"
+     "decl": "bool datastore_read(const char *file_name, const char *field_name, int length, void *buffer);",
+     "comment": "[NAME: datastore_read — CEA PDB line-containment (probable), cea-deferred 2026-09-03]",
+     "name": "datastore_read",
+     "ported": true
     },
     {
      "addr": "0x19a020",

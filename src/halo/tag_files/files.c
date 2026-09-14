@@ -645,6 +645,127 @@ bool datastore_read_field(const char *file_name, const char *field_name,
   return found;
 }
 
+/**
+ * datastore_read (0x199d40) - store one named field into a data-store file.
+ *
+ * Despite the kb.json name (CEA PDB line-containment, marked probable), the
+ * binary body writes: it loads or creates the DATASTORE_FILE_SIZE record file,
+ * finds the first record whose name matches field_name or whose name is empty,
+ * copies field_name and `length` bytes of `buffer` into that record, then
+ * re-creates/opens the file, writes the whole buffer back and closes it. The
+ * name is therefore UNVERIFIED for this address; the behavior below is taken
+ * from the disassembly at 0x199d40-0x19a00f only.
+ *
+ * Parameter names come from the assert strings (file_name, field_name,
+ * length); `buffer` is the [EBP+0x14] slot passed as the csmemcpy source at
+ * 0x199f68. The final `success` assert at 0x1ef halts when no free or matching
+ * record was found. There are no callers in this build (no xrefs to 0x199d40).
+ */
+bool datastore_read(const char *file_name, const char *field_name, int length,
+                    void *buffer)
+{
+  file_ref_t info;
+  char *data;
+  char *cursor;
+  int index;
+  int size;
+  bool success;
+
+  success = false;
+  size = 0;
+
+  if (file_name == NULL) {
+    display_assert("NULL != file_name", "c:\\halo\\SOURCE\\tag_files\\files.c",
+                   0x1AE, true);
+    system_exit(-1);
+  }
+  if (field_name == NULL) {
+    display_assert("NULL != field_name", "c:\\halo\\SOURCE\\tag_files\\files.c",
+                   0x1AF, true);
+    system_exit(-1);
+  }
+  if (file_name[0] == '\0') {
+    display_assert("'\\0' != file_name[0]",
+                   "c:\\halo\\SOURCE\\tag_files\\files.c", 0x1B0, true);
+    system_exit(-1);
+  }
+  if (field_name[0] == '\0') {
+    display_assert("'\\0' != field_name[0]",
+                   "c:\\halo\\SOURCE\\tag_files\\files.c", 0x1B1, true);
+    system_exit(-1);
+  }
+  if (length >= DATASTORE_MAX_DATA_SIZE) {
+    display_assert("length < DATASTORE_MAX_DATA_SIZE",
+                   "c:\\halo\\SOURCE\\tag_files\\files.c", 0x1B2, true);
+    system_exit(-1);
+  }
+  if ((unsigned int)csstrlen(field_name) >= DATASTORE_MAX_FIELD_NAME_SIZE) {
+    display_assert("strlen(field_name) < DATASTORE_MAX_FIELD_NAME_SIZE",
+                   "c:\\halo\\SOURCE\\tag_files\\files.c", 0x1B3, true);
+    system_exit(-1);
+  }
+
+  csmemset(&info, 0, sizeof(info));
+  info.magic = FILE_REF_MAGIC;
+  info.unk_6 = -1;
+  file_reference_set_name(&info, file_name);
+
+  data = NULL;
+  if (file_exists(&info)) {
+    data = (char *)file_read_into_buffer(&info, &size);
+    if (data == NULL) {
+      file_delete(&info);
+    }
+    if (size != DATASTORE_FILE_SIZE) {
+      debug_free(data, "c:\\halo\\SOURCE\\tag_files\\files.c", 0x1C2);
+      file_delete(&info);
+      data = NULL;
+    }
+  }
+  if (data == NULL) {
+    data = (char *)debug_malloc(DATASTORE_FILE_SIZE, false,
+                                "c:\\halo\\SOURCE\\tag_files\\files.c", 0x1CD);
+    if (data == NULL) {
+      goto failure; /* 0x199f00: shares the final "success" assert arm */
+    }
+    csmemset(data, 0, DATASTORE_FILE_SIZE);
+  }
+
+  index = 0;
+  cursor = data;
+  do {
+    if (*cursor == '\0' || csstrcmp(cursor, field_name) == 0) {
+      csstrcpy(data + index * DATASTORE_RECORD_SIZE, field_name);
+      csmemcpy(data + index * DATASTORE_RECORD_SIZE +
+                 DATASTORE_MAX_FIELD_NAME_SIZE,
+               buffer, length);
+      success = true;
+      break;
+    }
+    index++;
+    cursor += DATASTORE_RECORD_SIZE;
+  } while (index < DATASTORE_FIELD_COUNT);
+
+  if (!file_exists(&info)) {
+    file_create(&info);
+  }
+  if (file_open(&info, 2)) {
+    file_write(&info, DATASTORE_FILE_SIZE, data);
+    file_close(&info);
+  }
+  debug_free(data, "c:\\halo\\SOURCE\\tag_files\\files.c", 0x1EC);
+
+  if (success) {
+    return success;
+  }
+
+failure:
+  display_assert("success", "c:\\halo\\SOURCE\\tag_files\\files.c", 0x1EF,
+                 true);
+  system_exit(-1);
+  return false;
+}
+
 /* 0x19a020 — compare the 8-byte last-modification timestamps of two files.
  *
  * Confirmed from disassembly: MOV EAX,[EBP+0xc] (date2); MOV ECX,[EBP+8]

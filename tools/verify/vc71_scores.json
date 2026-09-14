@@ -58423,6 +58423,21 @@
       "score": 96.3,
       "source": "src/halo/memory/data.c"
     },
+    "datastore_read": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 89.1,
+      "addr": "0x199d40",
+      "end": "0x19a010",
+      "kind": "auto",
+      "n_r": 212,
+      "opnd_percent": 79.4,
+      "raw_mnemonic_pct": 89.1,
+      "ref": "synth",
+      "ref_sha": "bfa26a7178b62c79",
+      "score": 89.1,
+      "source": "src/halo/tag_files/files.c"
+    },
     "datastore_read_field": {
       "abi_model": "raw",
       "abi_model_items": 0,
