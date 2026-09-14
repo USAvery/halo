@@ -1233,6 +1233,102 @@ void ai_create_mounted_weapons_for_unit(int param_1)
   }
 }
 
+/* 0x40700 — ai_handle_deleted_object: tear down every AI reference to an object
+ * that is about to be deleted. Gated on the AI-active byte at ai_globals+1, and
+ * on the object being a biped or vehicle ((1 << type) & 3, type =
+ * byte[obj+0x64]). Deletes the object's actor (obj+0x1a4) if present, otherwise
+ * notifies the swarm (obj+0x1a8). Then walks the encounter/prop pool at
+ * 0x5ab23c: records whose int[+0x18] is this object are released via
+ * FUN_0003b410(actor, handle, -1) + prop_iterator_next(actor, handle); records
+ * whose int[+0x110] is this object get that field reset to -1 and the two bytes
+ * at +0x136/+0x135 cleared. Finally notifies the conversation system and
+ * removes the handle from the mounted-weapon pending list (count int16_t at
+ * globals+0x8b8, array at globals+0x8bc) by swapping the last element down.
+ *
+ * Confirmed: 1 stack param [EBP+8]; no return value; frame SUB ESP,0x10 holds
+ * the data_iter_t at EBP-0x10 (datum_handle read from EBP-0x8).
+ * Confirmed: object_get_and_verify_type(handle,-1) then MOV CL,[EAX+0x64];
+ * MOV EDX,1; SHL EDX,CL; TEST DL,0x3 — biped|vehicle mask.
+ * Confirmed: second lookup object_get_and_verify_type(handle,3) supplies both
+ * 0x1a4 and 0x1a8; the 0x1a8 branch is the ELSE of 0x1a4 != -1.
+ * Confirmed push order: FUN_0003b410 — PUSH -1; PUSH [EBP-8]; PUSH [ESI+4]
+ * (args actor, datum_handle, -1). prop_iterator_next — PUSH [EBP-8]; PUSH
+ * [ESI+4] (args actor, datum_handle). Both cdecl, coalesced ADD ESP,0x14.
+ * Confirmed: ai_conversation_unit_died(handle, 1) — PUSH 1; PUSH EDI.
+ * Confirmed: the removal loop re-reads [0x632574] after each mutating store
+ * (MOV EAX,[0x00632574] at 0x40827 and 0x40845) and the index/count are 16-bit
+ * (MOVSX ESI,DX; CMP DX,CX; JL). The slot byte offset ESI is computed once per
+ * iteration from the pre-mutation index. */
+void ai_handle_deleted_object(int object_handle)
+{
+  char *ai_globals;
+  char *object;
+  char *prop;
+  int actor_handle;
+  int swarm_handle;
+  short count;
+  short index;
+  int slot_offset;
+  data_iter_t iter;
+
+  if (*(char *)(*(int *)0x632574 + 1) == '\0') {
+    return;
+  }
+
+  object = (char *)object_get_and_verify_type(object_handle, -1);
+  if (((1 << (*(unsigned char *)(object + 0x64) & 0x1f)) & 3) == 0) {
+    return;
+  }
+
+  object = (char *)object_get_and_verify_type(object_handle, 3);
+  actor_handle = *(int *)(object + 0x1a4);
+  if (actor_handle != -1) {
+    actor_delete(actor_handle, 0);
+  } else {
+    swarm_handle = *(int *)(object + 0x1a8);
+    if (swarm_handle != -1) {
+      actor_swarm_unit_died(swarm_handle, object_handle);
+    }
+  }
+
+  data_iterator_new(&iter, *(data_t **)0x5ab23c);
+  prop = (char *)data_iterator_next(&iter);
+  while (prop != (char *)0) {
+    if (*(int *)(prop + 0x18) == object_handle) {
+      FUN_0003b410(*(int *)(prop + 4), (int)iter.datum_handle, -1);
+      prop_iterator_next(*(int *)(prop + 4), (int)iter.datum_handle);
+    } else if (*(int *)(prop + 0x110) == object_handle) {
+      *(int *)(prop + 0x110) = -1;
+      *(prop + 0x136) = 0;
+      *(prop + 0x135) = 0;
+    }
+    prop = (char *)data_iterator_next(&iter);
+  }
+
+  ai_conversation_unit_died(object_handle, 1);
+
+  ai_globals = *(char **)0x632574;
+  count = *(short *)(ai_globals + 0x8b8);
+  index = 0;
+  if (count > 0) {
+    do {
+      slot_offset = index * 4 + 0x8bc;
+      if (*(int *)(ai_globals + slot_offset) == object_handle) {
+        count = (short)(count - 1);
+        *(short *)(ai_globals + 0x8b8) = count;
+        ai_globals = *(char **)0x632574;
+        if (*(short *)(ai_globals + 0x8b8) > 0) {
+          *(int *)(ai_globals + slot_offset) =
+            *(int *)(ai_globals + *(short *)(ai_globals + 0x8b8) * 4 + 0x8bc);
+          ai_globals = *(char **)0x632574;
+        }
+      }
+      count = *(short *)(ai_globals + 0x8b8);
+      index = (short)(index + 1);
+    } while (index < count);
+  }
+}
+
 /* 0x40860 — ai_handle_unit_effect: broadcast an AI unit effect (sound/visual
  * cue) from a unit to its AI actor(s), rate-limited per unit.
  *

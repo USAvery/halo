@@ -4463,7 +4463,7 @@
     {
      "addr": "0x40700",
      "decl": "void ai_handle_deleted_object(int object_handle);",
-     "ported": false
+     "ported": true
     },
     {
      "addr": "0x40860",
