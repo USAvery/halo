@@ -81,6 +81,19 @@ class FunctionSlice:
     rdata_relocs: dict = field(default_factory=dict)  # {symbol_name: [CoffReloc]} relative to rdata_map bytes
     text_symbol_offsets: dict = field(default_factory=dict)  # {symbol_name: section-relative offset} for symbols defined in the function's own (.text) section — used to relocate intra-section DIR32 refs such as MSVC switch jump tables
     reached_section_end: bool = False  # slice ran to the end of its section rather than stopping at a following function symbol.  A delinked reference that does not cover this function looks exactly like this, so callers should treat it as a truncation suspect (see slice_looks_truncated).
+    # --- Raw-XBE provenance (unset for every slice parsed from a COFF) ---
+    #
+    # The equivalence lane can also build a slice straight out of the pristine
+    # XBE at the function's real VA (`unicorn_diff._xbe_oracle_slice`).  Such a
+    # slice is NOT relocatable: `relocs` is empty by construction, not because
+    # the function is self-contained.  `real_va` is therefore the discriminator
+    # every consumer uses to decide whether `relocs` carries any authority --
+    # see `unicorn_diff._check_relocations`'s `expect_relocs` argument.  Keeping
+    # the fields here rather than in a subclass means the dozens of places that
+    # treat a slice structurally need no change.
+    real_va: Optional[int] = None       # absolute VA the code was read from
+    bound_kind: Optional[str] = None    # function_bounds.json `kind`
+    bound_provenance: Optional[str] = None  # "table" | "computed"
 
 
 class CoffParseError(Exception):

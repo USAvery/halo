@@ -1020,7 +1020,10 @@ def _run_function(code: bytes, abi: dict, arg_values: list,
                   memory_overrides: dict = None,
                   max_insn: int = None,
                   stub_arg_tracer=None,
-                  auto_map_unmapped: bool = False) -> "state.CPUState":
+                  auto_map_unmapped: bool = False,
+                  image=None,
+                  entry_va: int = None,
+                  native_callee_ranges=None) -> "state.CPUState":
     """Run a function in a fresh Unicorn instance.
 
     Returns a CPUState with captured registers and scratch memory.
@@ -1041,6 +1044,30 @@ def _run_function(code: bytes, abi: dict, arg_values: list,
     func_offset: offset of the target function within section_code
     collect_mem_trace: if True, install write/read hooks for trace differential
     memory_overrides: dict of {address: bytes} written after all setup (snapshot replay)
+
+    image: `(raw, sections)` from `xbe_image.load_xbe()`.  When set, the whole
+        pristine XBE is mapped at its REAL virtual addresses and `code` is
+        written at `entry_va` inside it, instead of mapping CODE_BASE.  That is
+        the raw-XBE oracle: switch tables, .rdata constants, sibling function
+        bodies and BSS-sized .data are all correct by construction, so there is
+        nothing to relocate.  It changes four things in here, each a hazard in
+        docs/raw-xbe-oracle-migration.md:
+          * CODE_BASE is not mapped at all (H4 moved the FXSAVE stub to
+            TRAMP_BASE for exactly this reason);
+          * the two ret-stub pre-map passes must not write into the image (H3),
+            or they would stamp `31 C0 C3` over real function bodies and
+            .rdata;
+          * escaped control flow no longer faults on an unmapped page -- it
+            would execute 6.5 MB of real Halo code until MAX_INSN -- so
+            `hook_code` gets an EIP-domain guard (H5);
+          * `global_reads` is recorded against auto-mapped pages only, and
+            image pages are pre-mapped, so the union is what gets recorded or
+            concolic Phase 2 silently stops seeing any input (H6).
+    entry_va: absolute VA to run from; required with `image`.
+    native_callee_ranges: iterable of `(lo, hi)` VA ranges the oracle is
+        DELIBERATELY allowed to execute natively, i.e. callees the candidate
+        also runs for real.  Anything outside the target body, the stub
+        sentinels and these ranges trips the H5 guard.
     """
     import unicorn
     from unicorn import Uc, UC_ARCH_X86, UC_MODE_32
@@ -1071,7 +1098,20 @@ def _run_function(code: bytes, abi: dict, arg_values: list,
         print("    [stub-map] " + ", ".join(stub_pairs))
 
     # Map memory regions
-    uc.mem_map(CODE_BASE, CODE_SIZE)
+    _image_lo = _image_hi = None
+    _image_pages = frozenset()
+    if image is not None:
+        if entry_va is None:
+            raise ValueError("_run_function(image=...) requires entry_va")
+        import xbe_image
+        _img_raw, _img_secs = image
+        # ONE coalesced page-aligned map plus a write per section: XBE sections
+        # are 0x20-aligned, not page-aligned, so 24 separate mem_map calls
+        # overlap and fail.
+        _image_lo, _image_hi = xbe_image.map_image(uc, _img_raw, _img_secs)
+        _image_pages = frozenset(xbe_image.image_pages(_img_secs))
+    else:
+        uc.mem_map(CODE_BASE, CODE_SIZE)
     uc.mem_map(STACK_BASE, STACK_SIZE)
     uc.mem_map(SCRATCH_BASE, SCRATCH_SIZE)
 
@@ -1134,8 +1174,14 @@ def _run_function(code: bytes, abi: dict, arg_values: list,
                 _override_mapped.add(page)
             uc.mem_write(addr, data)
 
-    # Write function code at CODE_BASE
-    if section_code is not None and len(section_code) <= CODE_SIZE:
+    # Write function code at CODE_BASE -- or, for the raw-XBE oracle, over the
+    # image at the function's real VA.  The bytes are normally identical to what
+    # map_image already wrote; the write is what lets a caller hand in a PATCHED
+    # oracle body (the symmetric-interception JMPs of hazard H9).
+    if image is not None:
+        uc.mem_write(entry_va, code)
+        entry_point = entry_va
+    elif section_code is not None and len(section_code) <= CODE_SIZE:
         combined = bytearray(section_code)
         combined[func_offset:func_offset + len(code)] = code
         uc.mem_write(CODE_BASE, bytes(combined))
@@ -1158,6 +1204,12 @@ def _run_function(code: bytes, abi: dict, arg_values: list,
     for _i in range(len(code) - 3):
         _v = struct.unpack_from('<I', code, _i)[0]
         if _v in _known_targets:
+            if _image_lo is not None and _image_lo <= _v < _image_hi:
+                # H3: the target is already real, mapped code.  These passes
+                # exist only to avoid a fetch-hook cascade on an UNMAPPED
+                # target, which the image map already satisfies, and writing
+                # a ret-stub here would overwrite a real function body.
+                continue
             _page = _v & ~0xFFFF
             if _page not in _pre_mapped:
                 try:
@@ -1187,6 +1239,12 @@ def _run_function(code: bytes, abi: dict, arg_values: list,
                 _ptr = struct.unpack_from('<I', _seed_data, _j)[0]
                 if 0x000100 <= _ptr <= 0x01FFFFFF and _ptr not in _known_targets:
                     if CODE_BASE <= _ptr < CODE_BASE + CODE_SIZE:
+                        continue
+                    if _image_lo is not None and _image_lo <= _ptr < _image_hi:
+                        # H3, and this pass is the dangerous one: its scan range
+                        # 0x000100..0x01FFFFFF CONTAINS the whole image span, so
+                        # without this it would stamp ret-stubs across real code
+                        # and .rdata.
                         continue
                     # Skip pointers backed by snapshot memory or known-globals
                     # data: these are real data addresses (e.g. an __imp__ slot
@@ -1274,6 +1332,15 @@ def _run_function(code: bytes, abi: dict, arg_values: list,
     # rather than as a clean stop with whatever state happened to be left.
     escape_reason = [None]
     _data_exec_guard = os.environ.get("HALO_NO_DATA_EXEC_GUARD") != "1"
+    # H5: with the whole image mapped, escaped control flow does not fault --
+    # it runs real Halo code until MAX_INSN and reports a timeout at some
+    # address unrelated to where control was lost.  Constrain the EIP domain to
+    # the target body, the stub sentinels, and callees the caller declared as
+    # deliberately native.  Disarmed before the FXSAVE capture below, which
+    # deliberately executes a stub at TRAMP_BASE.
+    _eip_guard = [image is not None]
+    _eip_lo, _eip_hi = entry_point, entry_point + len(code)
+    _native_ranges = tuple(native_callee_ranges or ())
     _ring = None
     if os.environ.get("BIPED_RING_TRACE") == "1":
         from collections import deque
@@ -1286,6 +1353,16 @@ def _run_function(code: bytes, abi: dict, arg_values: list,
             _ring.append((address, uc.reg_read(_ESP_T)))
         if address not in visited_pcs:
             visited_pcs[address] = size
+        if _eip_guard[0] and not (_eip_lo <= address < _eip_hi):
+            if (address not in stub_addrs
+                    and not any(lo <= address < hi
+                                for lo, hi in _native_ranges)):
+                escape_reason[0] = (
+                    f"oracle_escaped eip={address:#x} -- outside the target "
+                    f"body [{_eip_lo:#x},{_eip_hi:#x}), the stub sentinels "
+                    f"and the declared native-callee ranges")
+                uc.emu_stop()
+                return
         # Executing inside a page we auto-mapped for DATA is never legitimate:
         # it means an indirect call went through synthetic state -- a garbage
         # function pointer that still passed a `!= NULL` check. Those pages are
@@ -1417,8 +1494,12 @@ def _run_function(code: bytes, abi: dict, arg_values: list,
             mem_writes[key] = value  # last write wins (matches _build_finals)
 
         def hook_mem_read(uc, access, address, size, value, user_data):
+            # H6: only AUTO-mapped pages were recorded, which is the right
+            # filter for synthetic globals -- but the raw-XBE oracle pre-maps
+            # the image, so every real global read would go unrecorded and
+            # concolic Phase 2 would silently have no inputs to work from.
             page = address & ~0xFFFF
-            if page in _mapped_regions:
+            if page in _mapped_regions or page in _image_pages:
                 try:
                     data = bytes(uc.mem_read(address, min(size, 4)))
                     global_reads[address] = (size, int.from_bytes(data, 'little'))
@@ -1592,6 +1673,7 @@ def _run_function(code: bytes, abi: dict, arg_values: list,
     # values, making every float-returning function's ST0 comparison vacuously
     # equal.  TRAMP_BASE is a page neither side owns, so the capture no longer
     # depends on which oracle is in use, and a failure is now recorded.
+    _eip_guard[0] = False   # the capture below deliberately runs a stub
     fxsave_stub_addr = TRAMP_BASE
     fxsave_stub = b"\x0F\xAE\x05" + struct.pack('<I', FXSAVE_BASE) + b"\xC3"
     try:
@@ -1632,17 +1714,348 @@ def _run_function(code: bytes, abi: dict, arg_values: list,
 
 
 # ---------------------------------------------------------------------------
+# Raw-XBE oracle: slice extraction, bound sanity, relocation-free classification
+# ---------------------------------------------------------------------------
+#
+# Under `--oracle=xbe` the oracle is "this VA range of the one true XBE" rather
+# than a delinked COFF.  That removes relocation synthesis, but it also removes
+# the three things the lane derived FROM relocations, so each needs an explicit
+# replacement here:
+#
+#   * `_check_relocations` / `classify_relocations` answered "is this a leaf?"
+#     from the reloc list.  A raw slice has `relocs == []` by construction, and
+#     an empty list would silently read as "self-contained" -- flipping the leaf
+#     gate, suppressing oracle stub sentinels, and letting the Z3 proof run over
+#     code containing CALL.  `_classify_raw_oracle` recovers the same three
+#     counts by disassembling the bytes.
+#   * `slice_looks_truncated` answered "does the reference actually cover the
+#     function?" from `reached_section_end`, which a raw slice never sets.
+#     `_oracle_bound_unreliable` answers it from the committed bounds table.
+#
+# Nothing in this section is reachable until the `--oracle` flag lands; it is
+# exercised directly by tools/equivalence/test_raw_oracle_classify.py.
+
+def _xbe_oracle_slice(addr: int, name: str):
+    """(FunctionSlice, None) for the pristine-XBE body at `addr`, or (None, reason).
+
+    The span comes from the committed `tools/verify/function_bounds.json` -- the
+    same authority the VC71 lane has used since 2026-08-09 -- so the oracle needs
+    no bounds heuristic of its own.  `relocs` is empty and `real_va` is set;
+    every consumer keys off `real_va` to know that the empty reloc list carries
+    no information (see `_check_relocations`).
+    """
+    sys.path.insert(0, str(_REPO_ROOT / "tools" / "verify"))
+    import xbe_reference
+    code, err = xbe_reference.function_bytes(addr)
+    if code is None:
+        return None, err
+    ext = xbe_reference.function_extent(addr)
+    kind, prov = (ext[1], ext[2]) if ext is not None else (None, None)
+    from coff_loader import FunctionSlice
+    return FunctionSlice(
+        name=name,
+        raw_name=name,
+        code=code,
+        relocs=[],
+        defined_symbols=set(),
+        section_offset=0,
+        real_va=addr,
+        bound_kind=kind,
+        bound_provenance=prov,
+    ), None
+
+
+def _oracle_bound_unreliable(addr: int) -> Optional[str]:
+    """Reason the XBE bound for `addr` cannot found a verdict, else None.
+
+    The delinked lane's guard was `slice_looks_truncated`: a reference that did
+    not reach the target produced a one-byte slice, which emulated to 100%
+    coverage against nothing.  A raw slice cannot be short for that reason, but
+    it can be WRONG for four others, and each is missing evidence rather than a
+    behavioural result:
+
+      * no bound at all -- `unmapped`, or `no_terminator` recorded with
+        end == start, both of which `function_extent` reports as None;
+      * `kind == "table_data"` -- the range is data, not a function body;
+      * `kind == "no_terminator"` -- the scan never found a RET/JMP, so the end
+        is wherever the next kb.json symbol happens to start;
+      * `provenance == "computed"` -- the address is absent from the committed
+        table and the bound was recomputed at run time, so it is a per-run
+        heuristic rather than something reviewable in a diff.
+
+    Finally the bytes themselves must disassemble cleanly to a terminating
+    instruction, which is the one check carried over verbatim from
+    `slice_looks_truncated`.
+    """
+    sys.path.insert(0, str(_REPO_ROOT / "tools" / "verify"))
+    import xbe_reference
+    ext = xbe_reference.function_extent(addr)
+    if ext is None:
+        return ("no usable bound for %#x in function_bounds.json (absent, "
+                "unmapped, or recorded with end == start)" % addr)
+    end, kind, prov = ext
+    if kind == "table_data":
+        return "function_bounds.json marks %#x as table_data, not code" % addr
+    if kind == "no_terminator":
+        return ("function_bounds.json marks %#x as no_terminator, so its end "
+                "(%#x) is the next symbol rather than a real tail" % (addr, end))
+    if prov != "table":
+        return ("%#x is absent from function_bounds.json; its bound was "
+                "computed at run time (regenerate with "
+                "tools/verify/function_bounds.py)" % addr)
+    code, err = xbe_reference.function_bytes(addr)
+    if code is None:
+        return err or "no bytes for %#x" % addr
+    from coff_loader import _TERMINATOR_MNEMONICS
+    body = code
+    while body and body[-1] in (0x90, 0xCC):
+        body = body[:-1]
+    if not body:
+        return "slice at %#x is empty after stripping padding" % addr
+    try:
+        import capstone
+    except ImportError:
+        return None
+    md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
+    last, pos = None, 0
+    for insn in md.disasm(body, addr):
+        last = insn
+        pos = insn.address + insn.size - addr
+    if last is None:
+        return "slice at %#x does not disassemble" % addr
+    if pos != len(body):
+        return ("disassembly of %#x stops %d byte(s) before the end of the "
+                "bounded range" % (addr, len(body) - pos))
+    if last.mnemonic not in _TERMINATOR_MNEMONICS:
+        return ("bounded range at %#x ends on '%s', not a terminating "
+                "instruction" % (addr, last.mnemonic))
+    return None
+
+
+def _classify_raw_oracle(code: bytes, va: int):
+    """`stubs.RelocClassification` for raw XBE bytes, which carry no relocations.
+
+    Recovers by disassembly what `classify_relocations` reads off a delinked
+    .obj's relocation table:
+
+      call_count   direct CALL/JMP sites whose target leaves [va, va+len(code)).
+                   A branch back INSIDE that range is a local label and counts
+                   as nothing.
+      dir32_count  absolute-address SITES inside the XBE image span: a memory
+                   operand's displacement with no base register, or an
+                   immediate.  Counted per site, not per distinct address,
+                   because that is what `classify_relocations` does -- each
+                   relocation is one site.
+
+    Two deliberate differences from the delinked classifier, both because a raw
+    image has no notion of an "object":
+
+      * `intra_obj_calls` is always 0.  There is no exported range for a call
+        to be internal to.
+      * `call_count` is therefore >= the delinked `call_count` for the same
+        function.  A delinked .obj that happens to CONTAIN the callee resolved
+        that call itself, with a correct in-object displacement and no
+        relocation at all (which is why `_has_raw_calls` /
+        `_redirect_raw_calls` exist to find them), so `classify_relocations`
+        structurally cannot see it.  Every such call still leaves the function
+        body and still has to be intercepted symmetrically with the candidate
+        (hazard H9), so counting it is the point, not an error.
+        `test_raw_oracle_classify.py` pins exactly this relationship.
+
+    Why the operand guards matter: an absolute displacement is only
+    recognisable as such when the operand has no base register
+    (`mov eax, [0x4ea9ac]`, or the indexed-table form
+    `jmp [eax*4 + 0x1e5000]`); a displacement off a base register is a struct
+    field, not a global.  `.rdata` addresses are counted like any other -- a
+    delinked object names them `s_...` / `DAT_...` externals, and only a
+    relocation against its OWN `.rdata` section carries the `.rdata` prefix
+    that `classify_relocations` skips.
+
+    A bare IMMEDIATE is the one genuinely ambiguous form, since a plain size or
+    count can land in the image span by arithmetic accident: `cmp eax, 0x40000`
+    (256 KB) and `push 0x40000` both fall inside `.text`, which starts at
+    0x12000, and both were counted as data references until this rule was
+    added.  So an immediate pointing into `.text` is only accepted when it is
+    an exact kb.json function entry -- i.e. when it really is someone taking
+    the address of a function.  Immediates into `.rdata`/`.data` keep no such
+    requirement: there is no plausible reading of `push 0x2b998c` other than a
+    pointer to the format string that lives there.
+    """
+    from stubs import RelocClassification
+    lo, hi = _image_span_cached()
+    end = va + len(code)
+
+    rel32_ext = 0
+    dir32_ext = 0
+    external = []
+
+    try:
+        import capstone
+        from capstone import x86 as cs_x86
+    except ImportError:
+        return RelocClassification("non_leaf", 0, 0, 0, ["<no capstone>"],
+                                   "capstone unavailable; cannot classify raw "
+                                   "bytes without a disassembler")
+
+    md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
+    md.detail = True
+    decoded = 0
+    for insn in md.disasm(code, va):
+        decoded = insn.address + insn.size - va
+        is_branch = insn.mnemonic == "call" or insn.mnemonic.startswith("j")
+        for op in insn.operands:
+            if op.type == cs_x86.X86_OP_IMM:
+                target = op.imm & 0xFFFFFFFF
+                if is_branch:
+                    if va <= target < end:
+                        continue            # local label or self-recursion
+                    rel32_ext += 1
+                    external.append("FUN_%08x" % target)
+                elif lo <= target < hi:
+                    if (_xbe_section_name_at(target) == ".text"
+                            and target not in _kb_func_addr_set()):
+                        continue        # a size/count, not an address
+                    dir32_ext += 1
+                    external.append("DAT_%08x" % target)
+            elif op.type == cs_x86.X86_OP_MEM:
+                if op.mem.base != 0:
+                    continue
+                disp = op.mem.disp & 0xFFFFFFFF
+                if lo <= disp < hi and not (va <= disp < end):
+                    dir32_ext += 1
+                    external.append("DAT_%08x" % disp)
+
+    if decoded != len(code):
+        # A tail that does not decode means the bound is wrong or the range is
+        # not all code; `_oracle_bound_unreliable` is the gate that rejects it,
+        # but say so here too rather than silently classifying a partial body.
+        external.append("<undecoded tail at +%#x>" % decoded)
+
+    if dir32_ext == 0 and rel32_ext == 0:
+        # `external` is normally empty here; it can still hold the undecoded-tail
+        # marker above, and dropping that would hide a wrong bound behind a
+        # confident "leaf".
+        return RelocClassification("leaf", 0, 0, 0, external,
+                                   "no calls or absolute data references in "
+                                   "the raw XBE bytes")
+    if rel32_ext == 0:
+        return RelocClassification("data_only", dir32_ext, 0, 0, external,
+                                   f"{dir32_ext} global data reference(s)")
+    return RelocClassification("stubbable", dir32_ext, rel32_ext, 0, external,
+                               f"{rel32_ext} external call(s), {dir32_ext} data ref(s)")
+
+
+def _z3_gate_reason(oracle_slice, lifted_slice, oracle_raw_class) -> Optional[str]:
+    """Reason a Z3 equivalence proof must not be attempted, else None.
+
+    `is_leaf` was the whole gate while both sides came from a COFF, because a
+    relocation table that resolves internally really does mean "no external
+    references".  A raw-XBE oracle has no relocation table (hazard H1), so two
+    extra conditions have to be checked explicitly, and only for that oracle --
+    a delinked run reaches this function with `oracle_raw_class` None and is
+    told to proceed, so delinked verdicts are unchanged.
+
+      * The raw classifier must itself say "leaf".  `z3_equiv/x86_to_z3` models
+        a single straight-line body with a fresh symbolic memory; a CALL in the
+        oracle bytes has no meaning there, and the proof would silently be over
+        different code than the candidate's.
+      * The CANDIDATE must have zero DIR32 relocations.  A candidate DIR32 is a
+        global the oracle reaches through a real absolute address in the shared
+        image while the candidate reaches it through a globals slot, so the two
+        sides' symbolic memories are not the same memory and "proven equal" is
+        a statement about neither.
+    """
+    if oracle_raw_class is None:
+        return None
+    if oracle_raw_class.category != "leaf":
+        return (f"raw oracle is {oracle_raw_class.category}, not leaf "
+                f"({oracle_raw_class.reason})")
+    from stubs import classify_relocations
+    lft = classify_relocations(lifted_slice.relocs,
+                               getattr(lifted_slice, "defined_symbols", set()))
+    if lft.dir32_count:
+        return (f"candidate has {lft.dir32_count} DIR32 data relocation(s); "
+                f"the oracle reads those globals from the image and the "
+                f"candidate from slots, so the two symbolic memories differ")
+    return None
+
+
+_IMAGE_SPAN_CACHE = None
+_XBE_SECTION_TABLE = None
+_KB_FUNC_ADDRS = None
+
+
+def _image_span_cached() -> tuple[int, int]:
+    global _IMAGE_SPAN_CACHE
+    if _IMAGE_SPAN_CACHE is None:
+        import memmap
+        _IMAGE_SPAN_CACHE = memmap.image_span()
+    return _IMAGE_SPAN_CACHE
+
+
+def _xbe_section_name_at(va: int) -> Optional[str]:
+    """Name of the pristine-XBE section containing `va`, or None."""
+    global _XBE_SECTION_TABLE
+    import xbe_image
+    if _XBE_SECTION_TABLE is None:
+        _XBE_SECTION_TABLE = xbe_image.load_xbe()[1]
+    sec = xbe_image.section_at(_XBE_SECTION_TABLE, va)
+    return sec.name if sec is not None else None
+
+
+def _kb_func_addr_set() -> frozenset:
+    """Every kb.json function entry address, as ints.  Same set
+    `stubs.StubManager._kb_func_addrs` builds; kept separate so the raw
+    classifier does not need a StubManager instance."""
+    global _KB_FUNC_ADDRS
+    if _KB_FUNC_ADDRS is None:
+        addrs = set()
+        try:
+            kb = _load_kb()
+        except Exception:
+            kb = {}
+        for obj in kb.get("objects", []):
+            for fn in obj.get("functions", []):
+                a = fn.get("addr", "")
+                if not a:
+                    continue
+                try:
+                    addrs.add(int(a, 16))
+                except ValueError:
+                    pass
+        _KB_FUNC_ADDRS = frozenset(addrs)
+    return _KB_FUNC_ADDRS
+
+
+# ---------------------------------------------------------------------------
 # Relocation checker
 # ---------------------------------------------------------------------------
 
-def _check_relocations(func_slice, label: str, quiet: bool = False) -> bool:
+def _check_relocations(func_slice, label: str, quiet: bool = False,
+                      expect_relocs: bool = True) -> bool:
     """Return True if the function has no unresolvable external relocations.
 
     Relocations that reference symbols defined in the same .obj are safe
     (intra-object calls/data).  Only truly external symbols (not in
     defined_symbols and not section-relative) are rejected.
+
+    `expect_relocs` says whether this slice's relocation table is AUTHORITATIVE.
+    It is for anything parsed from a COFF: an empty table there really does mean
+    the function references nothing outside its own bytes.  It is not for a
+    slice read straight out of the XBE image, where `relocs` is empty by
+    construction (hazard H1) -- and answering "True, it is a leaf" from that
+    would flip the leaf gate, suppress the oracle's stub sentinels, and let the
+    Z3 proof run over code containing CALL.  Callers with a raw slice must use
+    `_classify_raw_oracle` instead; passing `expect_relocs=False` here returns
+    False, which is the conservative direction (treat as non-leaf).
     """
     if not func_slice.relocs:
+        if not expect_relocs:
+            if not quiet:
+                print(f"  [RELOC] {label}: slice carries no relocation table "
+                      f"(raw XBE bytes); leaf status must come from "
+                      f"_classify_raw_oracle, not from an empty reloc list")
+            return False
         return True
 
     defined = getattr(func_slice, 'defined_symbols', set())
@@ -2130,7 +2543,22 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
         return finish("not_applicable", False, "oracle_truncated", 2)
 
     # --- Check for external relocations ---
-    oracle_ok = _check_relocations(oracle_slice, "oracle", quiet=quiet)
+    #
+    # `real_va` is set only by `_xbe_oracle_slice`, so it is the discriminator
+    # for whether the oracle's (empty) relocation table means anything.  A
+    # delinked slice takes the unchanged path; a raw slice is classified by
+    # disassembly instead (hazard H1).
+    _oracle_va = getattr(oracle_slice, "real_va", None)
+    if _oracle_va is None:
+        oracle_ok = _check_relocations(oracle_slice, "oracle", quiet=quiet,
+                                      expect_relocs=True)
+        oracle_raw_class = None
+    else:
+        oracle_raw_class = _classify_raw_oracle(oracle_slice.code, _oracle_va)
+        oracle_ok = oracle_raw_class.category == "leaf"
+        if not quiet:
+            print(f"  [RAW-CLASS] oracle: {oracle_raw_class.category} "
+                  f"({oracle_raw_class.reason})")
     lifted_ok = _check_relocations(lifted_slice, "lifted", quiet=quiet)
     is_leaf = oracle_ok and lifted_ok
     if record_leaf:
@@ -2150,8 +2578,12 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
         from stubs import (classify_relocations, patch_dir32_relocs,
                            patch_rel32_calls, StubManager, GLOBALS_BASE, GLOBALS_SIZE,
                            StubArgTracer, compare_stub_arg_traces)
-        orc_cls = classify_relocations(oracle_slice.relocs,
-                                       getattr(oracle_slice, 'defined_symbols', set()))
+        # Same discriminator as the leaf gate above: a raw slice's empty reloc
+        # table would classify as "leaf, no relocations", which is what
+        # suppresses oracle-side stub sentinels under hazard H1.
+        orc_cls = oracle_raw_class or classify_relocations(
+            oracle_slice.relocs,
+            getattr(oracle_slice, 'defined_symbols', set()))
         lft_cls = classify_relocations(lifted_slice.relocs,
                                        getattr(lifted_slice, 'defined_symbols', set()))
         info(f"  oracle class: {orc_cls.category} ({orc_cls.reason})")
@@ -2450,7 +2882,11 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
     # through to Unicorn; the two are independent oracles and a disagreement
     # between them is itself a finding worth surfacing.
     z3_proven = False
-    if z3_equiv and is_leaf:
+    _z3_block = _z3_gate_reason(oracle_slice, lifted_slice,
+                                oracle_raw_class) if z3_equiv and is_leaf else None
+    if _z3_block:
+        info(f"\n  Z3 proof skipped: {_z3_block}")
+    if z3_equiv and is_leaf and not _z3_block:
         try:
             from z3_equiv import prove_equivalence
             info("\n  Attempting Z3 formal equivalence proof...")
