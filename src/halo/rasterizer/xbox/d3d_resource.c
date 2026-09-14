@@ -2,7 +2,8 @@
  * and texture surface access wrappers for the XDK D3D8 implementation. */
 
 /* Returns 1 if the resource (or its cube-texture face) has persistent/busy
- * GPU flags set (bits 19-22 of resource[0]). */
+ * GPU flags set (bits 19-22 of resource[0]). Called (and inlined) from
+ * D3DResource_IsBusy; the XDK's out-of-line copy lives at 0x1ed870. */
 static int d3d_resource_is_persistent(uint32_t *r)
 {
   uint32_t *face;
@@ -17,38 +18,12 @@ static int d3d_resource_is_persistent(uint32_t *r)
 }
 
 /* Blocks the CPU until the GPU has finished using the resource.
- * For cube textures with a face sub-resource, handles face fences
- * separately. Clears the fence timestamp after blocking. */
+ * Original 0x1ed620 is a 5-byte thunk (JMP D3D_BlockOnResource at
+ * 0x1efd80, which reads the resource from [esp+4] and returns RET 0x4).
+ * The forwarding call lets the compiler emit the same tail JMP. */
 void __stdcall D3DResource_BlockUntilNotBusy(void *resource)
 {
-  uint32_t *r = (uint32_t *)resource;
-  uint32_t *face;
-  uint32_t fence;
-  uint8_t *dev;
-
-  dev = (uint8_t *)D3D_g_pDevice;
-  if (dev == NULL)
-    return;
-
-  if ((r[0] & 0x70000u) == 0x50000u) {
-    face = (uint32_t *)r[5];
-    if (face != NULL) {
-      if (d3d_resource_is_persistent(r)) {
-        D3D_BlockOnTime(*(uint32_t *)(dev + 0x1cu), 0);
-        return;
-      }
-      r = face;
-    }
-  }
-
-  fence = r[2];
-  if (d3d_resource_is_persistent(r)) {
-    D3D_BlockOnTime(*(uint32_t *)((uint8_t *)D3D_g_pDevice + 0x1cu), 0);
-    r[2] = 0;
-    return;
-  }
-  D3D_BlockOnTime(fence, 0);
-  r[2] = 0;
+  D3D_BlockOnResource(resource);
 }
 
 /* Decrements the reference count on a D3D resource. When the count
@@ -74,11 +49,13 @@ uint32_t __stdcall D3DResource_Release(void *resource)
 }
 
 /* Returns 1 if the GPU is still using the resource (fence not yet passed),
- * 0 if the resource is free. Clears the fence timestamp when done. */
+ * 0 if the resource is free. Clears the fence timestamp when done.
+ * The persistent-flag checks go through the (inlined) helper, matching the
+ * original codegen at 0x1ed980. */
 int __stdcall D3DResource_IsBusy(void *resource)
 {
   uint32_t *r = (uint32_t *)resource;
-  uint32_t *face;
+  uint32_t common = r[0];
   uint32_t fence;
   uint32_t current_time;
   uint32_t counter;
@@ -86,38 +63,24 @@ int __stdcall D3DResource_IsBusy(void *resource)
 
   dev = (uint8_t *)D3D_g_pDevice;
 
-  if ((r[0] & 0x70000u) == 0x50000u) {
-    face = (uint32_t *)r[5];
-    if (face != NULL) {
-      if (r[0] & 0x780000u)
-        return 1;
-      if (face[0] & 0x780000u)
-        return 1;
-      r = face;
-    }
+  if ((common & 0x70000u) == 0x50000u && r[5] != 0) {
+    if (d3d_resource_is_persistent(r))
+      return 1;
+    r = (uint32_t *)r[5];
   }
 
-  if (r[0] & 0x780000u)
+  if (d3d_resource_is_persistent(r))
     return 1;
-  if ((r[0] & 0x70000u) == 0x50000u) {
-    face = (uint32_t *)r[5];
-    if (face != NULL && (face[0] & 0x780000u))
-      return 1;
-  }
 
   fence = r[2];
-  if (fence == 0u) {
-    r[2] = 0;
-    return 0;
+  if (fence != 0u) {
+    current_time = *(uint32_t *)(dev + 0x1cu);
+    counter = **(uint32_t **)(dev + 0x3f0u);
+    if ((current_time - fence) < (current_time - counter))
+      return 1;
   }
-
-  current_time = *(uint32_t *)(dev + 0x1cu);
-  counter = **(uint32_t **)(dev + 0x3f0u);
-  if ((current_time - fence) >= (current_time - counter)) {
-    r[2] = 0;
-    return 0;
-  }
-  return 1;
+  r[2] = 0;
+  return 0;
 }
 
 /* Registers a D3D resource by adding a base data address to the
