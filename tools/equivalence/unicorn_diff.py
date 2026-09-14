@@ -192,11 +192,18 @@ except ValueError:
 # Values are loaded from known_globals.json when it exists, falling back to a
 # minimal hardcoded set.  That file is a LIVE CAPTURE, not a static extract:
 # `extract_globals.py --json` writes unpadded keys ("4566ec") while every
-# committed key is 0x-prefixed and 8 wide ("0x004566ec"), and all 867 addresses
-# sit in .data past its raw_size -- where the image holds no load-time value at
-# all, so a static extract buckets them as UNMAPPED and writes nothing.  The
-# values therefore describe a running game, which is exactly why they are worth
-# seeding, and also why they must never be asserted to equal the XBE's bytes.
+# committed key is 0x-prefixed and 8 wide ("0x004566ec").  The values describe
+# a RUNNING game, which is why they are worth seeding and why they must never
+# be asserted to equal the XBE's bytes.
+#
+# Measured shape of the committed file (7181 keys): 6183 are backed by bytes in
+# the image file (5785 .rdata, 534 .data, 22 D3D/BINKDATA) and agree with them
+# byte for byte -- zero disagreements.  998 are not: 840 sit in no section at
+# all and 158 in a section's BSS tail.  So the capture is NOT an independent
+# second opinion about .rdata; it is a 4-or-8-byte-wide echo of the image plus
+# a genuinely unique set of runtime values.  Where it echoes, the image is the
+# better source, because the image is not width-limited -- see
+# `_xbe_global_bytes` below and test_known_globals_vs_xbe.py.
 def _load_known_globals():
     """Load global bytes from known_globals.json, falling back to hardcoded defaults."""
     json_path = Path(__file__).resolve().parent / "known_globals.json"
@@ -221,6 +228,65 @@ def _load_known_globals():
 
 
 _KNOWN_GLOBAL_BYTES = _load_known_globals()
+
+# --- Load-time truth for the globals the XBE file actually backs -------------
+#
+# _KNOWN_GLOBAL_BYTES is a capture, and a capture has a WIDTH: whatever the
+# extractor happened to sample.  `0x2533d0` is the worked example.  It is the
+# 1e-4 epsilon double; the capture holds its low dword `000000e0`, and seeding
+# four bytes leaves the high dword zero, so the oracle compares against
+# 4.6e-310 instead of 1e-4 and takes the other branch
+# (reference_equiv_oracle_reloc_gap).  The image holds all eight bytes,
+# `000000e0 e2361a3f`, and always did.
+#
+# So this is not a second opinion -- it is the same opinion without the width
+# limit.  6183 of the file's 7181 entries are file-backed and every one of them
+# already agrees with the image byte for byte.  The remaining 998 (no section,
+# or a section's BSS tail) have no load-time value at all, and there the
+# capture stays the only evidence: that is why this reads with
+# `read_va_raw` and returns None rather than zero-filling.
+_XBE_GLOBALS_CACHE = None
+
+
+def _xbe_globals_image():
+    """`(raw, secs)` for the pristine XBE, parsed once per process, or None.
+
+    Negative-cached: on a host without the XBE this must not re-stat the file
+    once per relocation site.
+    """
+    global _XBE_GLOBALS_CACHE
+    if _XBE_GLOBALS_CACHE is None:
+        try:
+            import xbe_image
+            xbe_image.assert_pristine()
+            _XBE_GLOBALS_CACHE = xbe_image.load_xbe()
+        except Exception:
+            _XBE_GLOBALS_CACHE = ()
+    return _XBE_GLOBALS_CACHE or None
+
+
+def _xbe_global_bytes(addr: int, size: int = 256):
+    """Load-time bytes at `addr`, or None where the FILE does not back them.
+
+    `read_va_raw`, not `read_va`: read_va zero-fills a section's BSS tail with
+    loader semantics, which is right for an emulated oracle but wrong here.
+    A zero-filled BSS read is indistinguishable from a genuinely zero-
+    initialised global, and seeding those zeros would shadow the capture --
+    which for the 998 unbacked addresses is the only evidence there is.
+    """
+    img = _xbe_globals_image()
+    if img is None:
+        return None
+    import xbe_image
+    raw, secs = img
+    return xbe_image.read_va_raw(raw, secs, addr, size) or None
+
+
+# One DIR32 globals slot is 256 bytes wide.  Seeding a whole slot from the
+# image keeps byte offsets WITHIN a slot coherent (a consumer reading slot+8
+# sees what the original read at orig_addr+8) without ever reaching the next
+# slot's first byte.
+_GLOBALS_SLOT_STRIDE = 256
 
 # Delinked COFF switch tables sometimes keep the table label but lose the table
 # entries themselves (all zeroes, no internal relocations).  Seed only tables we
@@ -628,10 +694,54 @@ def _compile_build_obj_for_source(source_path: str) -> tuple[Optional[Path], Opt
 
 
 def _seed_known_globals(uc, base: int, size: int):
+    """Stamp a freshly mapped region with everything known about its addresses.
+
+    Order is deliberate: the capture goes down first and the XBE's own bytes
+    over it.  Where the two overlap -- 6183 of the capture's 7181 addresses --
+    they are byte-identical today, so the order is only load-bearing for the
+    case where a wider image read covers a narrower captured value, and there
+    the image is the one that should win.  (It is the capture's symbol NAMES
+    that are cross-build and untrustworthy, not these bytes; see
+    known_globals.json's own _warning.)
+    """
     end = base + size
     for addr, data in _KNOWN_GLOBAL_BYTES.items():
         if base <= addr and addr + len(data) <= end:
             uc.mem_write(addr, data)
+    _seed_xbe_initialized(uc, base, size)
+
+
+def _seed_xbe_initialized(uc, base: int, size: int):
+    """Write the XBE's initialised bytes for whatever part of `[base, base+size)`
+    the image file backs.
+
+    Only ever reached for a page the harness mapped ITSELF.  A page of the
+    genuinely mapped image already holds these bytes and its callers skip it
+    (H11).  A SYNTHETIC zero page at an image address, though, is a page where
+    the answer is sitting in a committed file and the harness was guessing
+    zero -- which is the `oracle-unmappable` / NULL-guard-early-out failure
+    mode this migration exists to remove.
+    """
+    img = _xbe_globals_image()
+    if img is None:
+        return
+    import xbe_image
+    raw, secs = img
+    end = base + size
+    for raw_s in secs:
+        s = xbe_image.as_section(raw_s)
+        lo = max(base, s.va)
+        hi = min(end, s.va + s.raw_size)
+        if hi <= lo:
+            continue
+        off = s.raw_off + (lo - s.va)
+        try:
+            uc.mem_write(lo, raw[off:off + (hi - lo)])
+        except Exception:
+            # A partially-mapped region: the known-globals loop above is
+            # equally best-effort, and a missing seed is a weaker oracle, not
+            # a wrong one.
+            pass
 
 
 _SYMBOL_ADDR_CACHE = None
@@ -899,7 +1009,9 @@ def _build_globals_seeds(*slot_maps: dict,
                 # Seeding with the VALUE here (as the non-dllimport branches do)
                 # would make the second deref read whatever garbage lives at
                 # that value-as-address, which is wrong.
-                if snap is not None or orig_addr in _KNOWN_GLOBAL_BYTES:
+                if (snap is not None
+                        or orig_addr in _KNOWN_GLOBAL_BYTES
+                        or _xbe_global_bytes(orig_addr, 4) is not None):
                     seeds[slot_addr] = _struct.pack("<I", orig_addr)
             elif snap is not None:
                 # Direct value reference (DAT_X).  Seed up to 8 bytes so a
@@ -910,6 +1022,15 @@ def _build_globals_seeds(*slot_maps: dict,
                 # take priority over hardcoded known globals.
                 seeds[slot_addr] = _snapshot_value_at(snapshot_overrides,
                                                       orig_addr, 8) or snap
+            elif (xbe_bytes := _xbe_global_bytes(orig_addr,
+                                                 _GLOBALS_SLOT_STRIDE)) is not None:
+                # Load-time truth, at full width, straight out of the binary of
+                # truth.  This is what retires the 4-vs-8-byte epsilon bug: a
+                # double is seeded as eight bytes because that is how many the
+                # image has there, not because the extractor happened to
+                # capture the adjacent dword.  Reaches .rdata constants and
+                # initialised .data; BSS falls through to the capture below.
+                seeds[slot_addr] = xbe_bytes
             elif orig_addr in _KNOWN_GLOBAL_BYTES:
                 # Static fallback: concatenate the adjacent dword when it was
                 # also extracted, so double reads get both halves even without
