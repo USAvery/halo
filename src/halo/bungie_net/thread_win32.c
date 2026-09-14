@@ -6,10 +6,11 @@
  *   0x81170  FUN_00081170 (from public_key_crypt.c — same COFF object)
  *   0x81250  FUN_00081250 (from public_key_crypt.c — same COFF object)
  *   0x81300  FUN_00081300 (from public_key_crypt.c — same COFF object)
- *   0x81480  FUN_00081480 (from random_numbers.c — same COFF object)
+ *   0x81410  FUN_00081410 (from public_key_crypt.c — same COFF object)
  *   0x81630  thread_new
  *   0x81720  thread_is_done
  *   0x81770  thread_close
+ *   0x817e0  create_mutex
  *   0x81870  mutex_acquire (take_mutex)
  *   0x818d0  mutex_release (release_mutex)
  *   0x81910  FUN_00081910
@@ -39,6 +40,9 @@ typedef struct {
 } thread_slot_t;
 
 #define g_thread_slots ((thread_slot_t *)0x334990)
+
+/* Running counter used to build unique mutex names ("mutex_%ld"). */
+#define g_mutex_name_counter (*(int *)0x334988)
 
 /*
  * FUN_00081170 — generate the 2-dword modulus/base/generator triple.
@@ -211,89 +215,50 @@ void FUN_00081300(unsigned int *public_key, unsigned int *p, unsigned int *x,
 }
 
 /*
- * FUN_00081480 — pick a pseudo-random 64-bit value between *min and *max.
+ * FUN_00081410 — seeded pseudo-random draw used by the public_key_crypt
+ * key generator (callers: FUN_00081170 with (0xff, p-2)/(0xff, p-1) and
+ * message_header.c with (0, count-1)).
  *
- * TU: c:\halo\SOURCE\bungie_net\common\random_numbers.c (confirmed by the
- * __FILE__ string at 0x265f08 pushed by all three asserts below); it links
- * into the same COFF object as the thread_win32 routines.
- *
- * Confirmed: parameters are min=[ebp+8] (ESI), max=[ebp+0xc] (EBX),
- * result=[ebp+0x10] (EDI) — the assert compares at 0x81558 and 0x8158a test
- * result against ESI ("result->qword >= min->qword", line 0x3a) and against
- * EBX ("result->qword <= max->qword", line 0x3b) respectively.
- * Confirmed: the seed-once guard is the byte at 0x334980; on the first call
- * srand(crt_time(NULL)) runs (0x814c4-0x814d4, ADD ESP,8 covers both cdecl
- * args) and the byte is set to 1.
- * Confirmed x87 order at 0x814eb-0x81540: FILD the rand() dword first, then
- * build (double)max->qword, FMULP, then build (double)min->qword, FADD the
- * double constant 32767.0 at 0x265eb0, FDIVP. So the scale is
- *   rand() * (double)max->qword / ((double)min->qword + 32767.0)
- * — note the divisor is min, not (max - min); that is what the binary does
- * (it only coincides with the usual "min + range*rand/RAND_MAX" idiom when
- * min is 0), and it is why the two range asserts exist.
- * Confirmed: each unsigned-64 -> double conversion is open-coded as
- * (double)(int64)(v & 0x7fffffffffffffff) - (double)(int64)(v & 1<<63)
- * (FILD low63, FILD signbit, FCHS, FADDP).
- * Confirmed: the _ftol2 result (EDX:EAX) is stored to a local qword and
- * passed as math64_add(min, &offset, result) — first PUSH is the last arg.
- * Unknown: the semantic name of this function; parameter names min/max/
- * result come from the assert strings.
+ * Confirmed (0x81410-0x81475): on the first call — byte 0x334980 still zero —
+ * it seeds the CRT generator with srand(crt_time(NULL)) (PUSH 0 / CALL
+ * 0x1d9d28 / PUSH EAX / CALL 0x1d9cf9 / ADD ESP,8) and sets the byte to 1.
+ * It then returns
+ *   low + (int)((double)rand() * (unsigned)high
+ *               / ((double)(unsigned)low + 32767.0))
+ * Both parameter FILDs carry the MSVC unsigned fixup (TEST/JGE + FADD
+ * 4294967296.0 at 0x265d40), so low and high are read as unsigned; the rand()
+ * result is loaded signed (FILD [EBP-4], no fixup).  The divisor constant at
+ * 0x265eb0 is 32767.0 and the low parameter really is part of the divisor —
+ * FILD [EBP+8] at 0x81457, FADD [0x265eb0] at 0x81462, FDIVP at 0x81468 —
+ * not a decompiler artifact.  The trailing ADD EAX,ESI adds the raw (signed)
+ * low parameter to the _ftol2 result.
+ * Unknown: the function's real name and the meaning of byte 0x334980 beyond
+ * "CRT generator already seeded".
  */
-void FUN_00081480(unsigned int *min, unsigned int *max, unsigned int *result)
+int FUN_00081410(int low, int high)
 {
-  unsigned int rand_value;
-  uint64_t min_qword;
-  uint64_t max_qword;
-  int64_t offset;
-
-  if (min == 0 || max == 0 || result == 0) {
-    display_assert("min && max && result",
-                   "c:\\halo\\SOURCE\\bungie_net\\common\\random_numbers.c",
-                   0x2e, 1);
-    system_exit(-1);
-  }
+  int value;
 
   if (*(char *)0x334980 == 0) {
-    FUN_001d9cf9((unsigned int)crt_time(0));
+    FUN_001d9cf9(crt_time((int *)0));
     *(char *)0x334980 = 1;
   }
 
-  rand_value = (unsigned int)rand();
-  max_qword = *(uint64_t *)max;
-  min_qword = *(uint64_t *)min;
-
-  offset = (int64_t)((double)(int)rand_value *
-                     ((double)(int64_t)(max_qword & 0x7fffffffffffffffULL) -
-                      (double)(int64_t)(max_qword & 0x8000000000000000ULL)) /
-                     (((double)(int64_t)(min_qword & 0x7fffffffffffffffULL) -
-                       (double)(int64_t)(min_qword & 0x8000000000000000ULL)) +
-                      32767.0));
-
-  math64_add((const uint16_t *)min, (const uint16_t *)&offset,
-             (uint16_t *)result);
-
-  if (result[1] < min[1] || (result[1] == min[1] && result[0] < min[0])) {
-    display_assert("result->qword >= min->qword",
-                   "c:\\halo\\SOURCE\\bungie_net\\common\\random_numbers.c",
-                   0x3a, 1);
-    system_exit(-1);
-  }
-  if (result[1] > max[1] || (result[1] == max[1] && result[0] > max[0])) {
-    display_assert("result->qword <= max->qword",
-                   "c:\\halo\\SOURCE\\bungie_net\\common\\random_numbers.c",
-                   0x3b, 1);
-    system_exit(-1);
-  }
+  value = rand();
+  return low + (int)((double)value * (double)(unsigned int)high /
+                     ((double)(unsigned int)low + 32767.0));
 }
 
 /*
- * FUN_000815f0 — initialize the first available 0x28-byte thread slot.
+ * FUN_000815f0 — claim the first available 0x28-byte mutex slot.
  *
  * Confirmed: scans byte 0x334ab4 with stride 0x28 through 0x334fb4; on
- * the first zero it clears dwords 0x334a90 + index*0x28 and +4, then sets
- * byte +0x24. Unknown: the pool type and field meanings.
+ * the first zero it clears dword 0x334a90 + index*0x28 and byte +4, then sets
+ * byte +0x24. Returns the slot pointer in EAX, or NULL when the pool is full
+ * (XOR EAX,EAX at 0x815f0, LEA EAX at 0x81612 — confirmed by disassembly).
+ * Unknown: the original name.
  */
-void FUN_000815f0(void)
+__declspec(noinline) void *FUN_000815f0(void)
 {
   char *slot_in_use;
   int index;
@@ -307,11 +272,12 @@ void FUN_000815f0(void)
       *(char *)(slot + 1) = 0;
       *slot = 0;
       *(char *)((char *)slot + 0x24) = 1;
-      return;
+      return slot;
     }
     slot_in_use = slot_in_use + 0x28;
     index = index + 1;
   } while ((int)slot_in_use < 0x334fb4);
+  return NULL;
 }
 
 /*
@@ -441,6 +407,57 @@ void thread_close(void *thread_reference)
   CloseHandle(slot->handle);
   slot->handle = 0;
   slot->in_use = 0;
+}
+
+/*
+ * create_mutex — claim a mutex slot and create a named Win32 mutex in it.
+ *
+ * Mutex slot layout (stride 0x28, pool 0x334a90 .. 0x334fb4):
+ *   +0x00 int  handle      (CreateMutexA result; deref'd by take/release_mutex)
+ *   +0x04 char name[0x20]  (snprintf destination, size 0x20)
+ *   +0x24 char in_use      (assert "mutex_reference->in_use", FUN_00081910)
+ *
+ * Confirmed: assert "mutex_reference" at line 0xb8.
+ * Confirmed: the counter at 0x334988 is read, the OLD value is formatted and
+ * the stored value is incremented (MOV ECX,EAX / INC EAX / MOV [0x334988],EAX).
+ * Confirmed: the counter is read only on the slot-found path (0x81817 is inside
+ * the JZ-not-taken branch).
+ * Confirmed: snprintf(slot+4, 0x20, "mutex_%ld", counter) — first PUSH is the
+ * last argument; CreateMutexA(NULL, FALSE, slot+4).
+ * Confirmed: the handle is stored into the slot before the success test, and
+ * the out parameter is set to NULL when CreateMutexA fails.
+ */
+bool create_mutex(int **mutex_reference)
+{
+  int *slot;
+  int counter;
+  int handle;
+
+  if (mutex_reference == NULL) {
+    display_assert("mutex_reference",
+                   "c:\\halo\\SOURCE\\bungie_net\\common\\thread_win32.c", 0xb8,
+                   1);
+    system_exit(-1);
+  }
+
+  slot = (int *)FUN_000815f0();
+  if (slot == NULL) {
+    *mutex_reference = NULL;
+    return 0;
+  }
+
+  counter = g_mutex_name_counter;
+  g_mutex_name_counter = counter + 1;
+  snprintf((char *)(slot + 1), 0x20, "mutex_%ld", counter);
+
+  handle = (int)CreateMutexA(NULL, 0, (const char *)(slot + 1));
+  *slot = handle;
+  if (handle == 0) {
+    *mutex_reference = NULL;
+    return 0;
+  }
+  *mutex_reference = slot;
+  return 1;
 }
 
 /*

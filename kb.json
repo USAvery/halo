@@ -26956,7 +26956,8 @@
     },
     {
      "addr": "0x81410",
-     "decl": "int FUN_00081410(int low, int high);"
+     "decl": "int FUN_00081410(int low, int high);",
+     "ported": true
     },
     {
      "addr": "0x81480",
@@ -26965,12 +26966,13 @@
     },
     {
      "addr": "0x815f0",
-     "decl": "void FUN_000815f0(void);",
+     "decl": "void *FUN_000815f0(void);",
      "ported": true
     },
     {
      "addr": "0x817e0",
-     "decl": "void create_mutex(void);"
+     "decl": "bool create_mutex(int **mutex_reference);",
+     "ported": true
     },
     {
      "addr": "0x81910",
@@ -38949,7 +38951,7 @@
     },
     {
      "addr": "0x1cffe5",
-     "decl": "void CreateMutexA(void);"
+     "decl": "void * __stdcall CreateMutexA(void *security, int initial_owner, const char *name);"
     },
     {
      "addr": "0x1d003d",
