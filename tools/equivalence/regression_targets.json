@@ -689,7 +689,8 @@
       "obj": "game_state.obj",
       "seeds": 40,
       "flags": ["--z3-equiv", "--allow-stubs", "--mem-trace", "--float-tolerance", "32"],
-      "reason": "Third data-page-execution-guard tripwire. 0% -> 60.0% coverage, 40/40 PASS, confidence high. Kept alongside the two 100%-coverage ones because it exercises a partial-coverage path rather than a whole tiny function."
+      "reason": "Third data-page-execution-guard tripwire. 0% -> 60.0% coverage, 40/40 PASS, confidence high. Kept alongside the two 100%-coverage ones because it exercises a partial-coverage path rather than a whole tiny function. NOTE: the 40/40 PASS recorded here was post-escape state, see known_artifact.",
+      "known_artifact": "Delinked-oracle artifact, not a lift bug. The oracle RETs to 0x00000000 (a sibling call whose delinked relocation resolves to nothing), so control flow is already lost before the data-exec guard runs. The guard used to pop a second dword off the stack as if a CALL had pushed a return address -- but a RET already consumed it, so it popped a saved register / local address and jumped into the STACK. Whether that faulted or stalled harmlessly was decided by the numeric value of STACK_BASE: it scored 40/40 PASS at 60% coverage with STACK_BASE=0x00100000 and errored with 0x08000000. The guard now refuses to jump to a stack address and reports the escape (plan hazard H5). Expected to become a real verdict under --oracle=xbe, where the sibling call has real bytes; remove this marker then."
     },
     {
       "addr": "0x5ae70",

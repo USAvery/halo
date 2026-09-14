@@ -128,7 +128,7 @@ def main():
         return 0
 
     seed_override = 5 if args.quick else None
-    passed = failed = skipped = errors = 0
+    passed = failed = skipped = errors = artifacts = 0
     t0 = time.time()
 
     print(f"Running {len(targets)} regression target(s)...")
@@ -143,10 +143,27 @@ def main():
 
         status, detail = run_target(t, seed_override)
         seeds_used = seed_override or t.get("seeds", 20)
+        artifact = t.get("known_artifact")
 
         if status == "pass":
-            print(f"  PASS  {_label(t):<24} {seeds_used} seeds — {detail}")
-            passed += 1
+            if artifact:
+                # A target marked as a known harness artifact is expected NOT
+                # to produce a verdict.  If it passes, the artifact is gone and
+                # the marker must be removed -- otherwise a future real
+                # regression on this target would be silently excused.
+                print(f"  PASS! {_label(t):<24} {seeds_used} seeds — passes "
+                      f"despite known_artifact; remove the marker: {artifact}")
+                failed += 1
+            else:
+                print(f"  PASS  {_label(t):<24} {seeds_used} seeds — {detail}")
+                passed += 1
+        elif artifact:
+            # Counted separately, never as a pass and never as a failure.  The
+            # marker requires a written reason, like batch_verify_allowlist's
+            # entries do, so it cannot be used to quietly mute a red target.
+            print(f"  ARTF  {_label(t):<24} {artifact}")
+            print(f"        ({status}: {detail})")
+            artifacts += 1
         elif status == "fail":
             print(f"  FAIL  {_label(t):<24} {seeds_used} seeds — {detail}")
             failed += 1
@@ -156,7 +173,8 @@ def main():
 
     elapsed = time.time() - t0
     print()
-    print(f"Done in {elapsed:.1f}s: {passed} passed, {failed} failed, {errors} errors, {skipped} skipped")
+    print(f"Done in {elapsed:.1f}s: {passed} passed, {failed} failed, "
+          f"{errors} errors, {artifacts} known artifacts, {skipped} skipped")
 
     return 1 if (failed > 0 or errors > 0) else 0
 

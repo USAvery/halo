@@ -187,8 +187,9 @@ def parse_decl(decl: str) -> dict:
 # Argument setup in Unicorn
 # ---------------------------------------------------------------------------
 
-SCRATCH_BASE = 0x10000000   # base address of scratch buffer (mapped externally)
-SCRATCH_SIZE  = 0x10000     # 64 KB
+# Single-sourced from memmap so this module cannot drift from the harness's
+# actual mapping -- it used to be a third independent copy of these numbers.
+from memmap import SCRATCH_BASE, SCRATCH_SIZE  # noqa: F401  (re-exported)
 
 # Slot size inside scratch buffer per pointer argument
 POINTER_SLOT = 0x400  # 1 KB per pointer param — enough for 256 floats

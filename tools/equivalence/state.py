@@ -159,6 +159,12 @@ class CPUState:
     mem_writes: list = field(default_factory=list)
     global_reads: dict = field(default_factory=dict)
     auto_mapped_pages: set = field(default_factory=set)
+    # Why the FXSAVE capture did not run, or None if it did.  `st` above is
+    # only 80-bit-accurate when this is None; otherwise it holds whatever
+    # reg_read gave, which is the mantissa alone.  Recorded rather than
+    # swallowed because a silently-skipped FXSAVE makes every float-returning
+    # function's ST0 comparison vacuously equal.
+    fxsave_error: Optional[str] = None
 
 
 def capture(uc, scratch_base: int, scratch_size: int, entry_esp: int) -> CPUState:

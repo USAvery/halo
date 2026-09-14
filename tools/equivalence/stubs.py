@@ -21,8 +21,16 @@ from typing import Optional, List, Dict, Tuple
 IMAGE_REL_I386_DIR32 = 0x0006
 IMAGE_REL_I386_REL32 = 0x0014
 
-GLOBALS_BASE = 0x00500000
-GLOBALS_SIZE = 0x00100000  # 1 MB
+# The address-space map lives in memmap.py.  These names are re-exported
+# because a good deal of code (and test_stub_arg_trace.py) imports them from
+# here; the VALUES are no longer declared here.
+from memmap import (  # noqa: E402  (kept beside the constants it replaced)
+    GLOBALS_BASE, GLOBALS_SIZE,
+    STACK_BASE as _STACK_BASE, STACK_TOP as _STACK_TOP,
+    CODE_BASE as _CODE_BASE,
+    STUB_BASE, STUB_SLOT,
+    STUB_OBJECT_ARENA, ARENA_PAGE as _ARENA_PAGE,
+)
 
 
 def _st80_to_double(b: bytes) -> float:
@@ -62,9 +70,9 @@ def _write_st0_double(uc, val: float):
 # Stub argument tracing
 # ---------------------------------------------------------------------------
 
-# Stack region bounds (must match unicorn_diff.py constants).
-_STACK_BASE = 0x00100000
-_STACK_TOP  = 0x00200000  # STACK_BASE + STACK_SIZE (1 MB)
+# Stack region bounds come from memmap (imported at the top of this file).
+# They used to be re-hardcoded here, which is exactly the drift memmap exists
+# to prevent.
 
 
 @dataclass
@@ -760,10 +768,10 @@ def patch_dir32_relocs(code: bytes, relocs: list, defined_symbols: set,
     return patched
 
 
-# Must be within signed-int32 range of CODE_BASE (0x00400000) to avoid
-# rel32 displacement overflow when patching CALL instructions.
-STUB_BASE = 0x40000000
-STUB_SLOT = 0x4000  # 16KB per sentinel slot — enough for real callee code
+# STUB_BASE / STUB_SLOT come from memmap, which asserts STUB_BASE stays within
+# signed-int32 range of both CODE_BASE and the XBE image's .text -- CALL
+# targets are patched as rel32, so either code source must be able to reach a
+# sentinel.
 MAX_RECURSION_DEPTH = 3
 
 
@@ -778,7 +786,7 @@ class CalleeStub:
 
 
 def patch_rel32_calls(code: bytes, relocs: list, defined_symbols: set,
-                      code_base: int = 0x00400000,
+                      code_base: int = _CODE_BASE,
                       symbol_sentinels: Optional[dict[str, int]] = None,
                       include_defined: bool = False,
                       force_redirect_names: Optional[set] = None) -> tuple:
@@ -843,9 +851,10 @@ def patch_rel32_calls(code: bytes, relocs: list, defined_symbols: set,
     return bytes(patched), stub_map
 
 
-# Scratch arena for pointer-returning accessor stubs.
-STUB_OBJECT_ARENA = 0x10000000
-_ARENA_PAGE = 0x10000
+# Scratch arena for pointer-returning accessor stubs.  STUB_OBJECT_ARENA and
+# _ARENA_PAGE come from memmap, which no longer lets the arena alias
+# SCRATCH_BASE -- see the comment on STUB_OBJECT_ARENA there for what that
+# alias did to the compared scratch window.
 
 DEFAULT_STUB_RETURNS = {
     "createfilea": 0x100,
@@ -1926,7 +1935,7 @@ class StubManager:
                     data_ptr = int.from_bytes(bytes(uc.mem_read(caller_esp + 4, 4)), "little")
                     handle = int.from_bytes(bytes(uc.mem_read(caller_esp + 8, 4)), "little")
                     import sys as _sys
-                    _g0_b = bytes(uc.mem_read(0x500000, 4)); _g0 = int.from_bytes(_g0_b, "little"); from unicorn.x86_const import UC_X86_REG_ECX as _ECX_R, UC_X86_REG_EAX as _EAX_R; _ecx_v = uc.reg_read(_ECX_R); _eax_v = uc.reg_read(_EAX_R); print(f"[datum_get] data_ptr=0x{data_ptr:08x} handle=0x{handle:08x} glob0=0x{_g0:08x} ECX=0x{_ecx_v:08x} EAX=0x{_eax_v:08x} esp=0x{caller_esp:08x}", file=_sys.stderr)
+                    _g0_b = bytes(uc.mem_read(GLOBALS_BASE, 4)); _g0 = int.from_bytes(_g0_b, "little"); from unicorn.x86_const import UC_X86_REG_ECX as _ECX_R, UC_X86_REG_EAX as _EAX_R; _ecx_v = uc.reg_read(_ECX_R); _eax_v = uc.reg_read(_EAX_R); print(f"[datum_get] data_ptr=0x{data_ptr:08x} handle=0x{handle:08x} glob0=0x{_g0:08x} ECX=0x{_ecx_v:08x} EAX=0x{_eax_v:08x} esp=0x{caller_esp:08x}", file=_sys.stderr)
                     if data_ptr:
                         identifier = (handle >> 16) & 0xFFFF
                         index = handle & 0xFFFF

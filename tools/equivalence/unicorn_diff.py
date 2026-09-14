@@ -62,10 +62,12 @@ HOW IT WORKS
    for pointer params, sanitized for valid-path execution.
 4. For each seed, runs both oracle and lifted in separate Unicorn x86 (i386)
    instances with identical memory layout:
-     - Stack at 0x7FFE0000
-     - Scratch buffer at 0x10000000 (1 KB per pointer param)
-     - Globals region at 0x00500000 (DIR32 targets, seeded from known XBE data)
-     - Stub sentinels at 0x40000000+ (intercepted calls)
+     - Stack (1 MB), code, and a globals region for DIR32 targets seeded from
+       known XBE data
+     - Scratch buffer for pointer params (1 KB per param)
+     - Stub sentinels for intercepted calls
+   Every base address lives in `memmap.py` -- do not restate them here; the
+   ones this docstring used to name were already stale.
 5. Compares EAX/EDX (integer return), ST0 (float return), and scratch buffer.
    With --float-tolerance, float* scratch slots use ULP comparison instead of
    byte-exact.
@@ -73,7 +75,7 @@ HOW IT WORKS
 GLOBALS SEEDING
 ---------------
 The oracle COFF has DIR32 relocations like DAT_002533c8 that reference XBE
-data addresses.  These are patched into the GLOBALS region (0x500000).
+data addresses.  These are patched into the GLOBALS region (see memmap.py).
 _KNOWN_GLOBAL_BYTES maps original XBE addresses to their canonical values
 (0x2533c0=0.0f, 0x2533c8=1.0f, etc.).  After patching, _build_globals_seeds
 writes the correct values into the GLOBALS slots so the oracle reads the same
@@ -149,15 +151,21 @@ BUILD_DIR = _REPO_ROOT / "build"
 # ---------------------------------------------------------------------------
 # Unicorn memory layout constants
 # ---------------------------------------------------------------------------
-CODE_BASE      = 0x00400000   # where we map the function code
-CODE_SIZE      = 0x00040000   # 256 KB — fits largest .text sections
-STACK_BASE     = 0x00100000   # bottom of stack region
-STACK_SIZE     = 0x00100000   # 1 MB stack
-STACK_TOP      = STACK_BASE + STACK_SIZE
-SCRATCH_BASE   = 0x10000000   # scratch buffer for pointer args
-SCRATCH_SIZE   = 0x00010000   # 64 KB
+# Declared once in memmap.py, which also self-tests that the regions are
+# pairwise disjoint, that none of them lands inside the pristine XBE's image
+# span, and that STACK/CODE/GLOBALS stay below HEAP_LINE.  CODE_BASE,
+# STACK_BASE and GLOBALS_BASE all used to sit INSIDE the image (.text, .data,
+# .data) and were moved there for the raw-XBE oracle.
+from memmap import (  # noqa: E402  (kept where the constants used to live)
+    CODE_BASE, CODE_SIZE,
+    STACK_BASE, STACK_SIZE, STACK_TOP,
+    SCRATCH_BASE, SCRATCH_SIZE,
+    TRAMP_BASE, TRAMP_SIZE,
+    FXSAVE_BASE, FXSAVE_SIZE,
+    HEAP_LINE,
+    FAKE_RET_ADDR,
+)
 
-FAKE_RET_ADDR  = 0xDEADC0DE   # fake return address pushed on stack
 MAX_INSN       = 100_000      # hard limit on emulated instructions
 TIMEOUT_MS     = 5_000        # 5 second timeout
 
@@ -1018,7 +1026,7 @@ def _run_function(code: bytes, abi: dict, arg_values: list,
     Returns a CPUState with captured registers and scratch memory.
     If emulation fails, returns a CPUState with .error set.
 
-    map_globals: if True, maps a zeroed globals region at 0x500000
+    map_globals: if True, maps a zeroed globals region at memmap.GLOBALS_BASE
     auto_map_unmapped: if True, installs the auto-map hook without also
         mapping/seeding the globals region. A leaf that reads a global (or
         dereferences an int-typed parameter that is really a pointer) would
@@ -1071,15 +1079,19 @@ def _run_function(code: bytes, abi: dict, arg_values: list,
         from stubs import GLOBALS_BASE, GLOBALS_SIZE
         uc.mem_map(GLOBALS_BASE, GLOBALS_SIZE)
         uc.mem_write(GLOBALS_BASE, b'\x00' * GLOBALS_SIZE)
-        # GLOBALS_BASE..+GLOBALS_SIZE (0x500000-0x600000) overlaps real Xbox
-        # address space, so a candidate's raw-absolute read of a real global
-        # that happens to land in this range (e.g. *(data_t**)0x5ab23c — no
-        # relocation, so it never becomes a slot below) would otherwise read
-        # stale zeros: this region is pre-mapped, so the UC_HOOK_MEM_READ_UNMAPPED
-        # auto-seed path that handles every OTHER known global never fires here.
-        # Seed known-global bytes first so those raw reads resolve correctly;
-        # the explicit slot seeds below are written after and win at their
-        # exact offsets.
+        # This call is a no-op now and kept only as a belt-and-braces guard.
+        #
+        # GLOBALS_BASE used to be 0x00500000, i.e. inside real Xbox address
+        # space, so a candidate's raw-absolute read of a real global landing in
+        # 0x500000-0x600000 (e.g. *(data_t**)0x5ab23c -- no relocation, so it
+        # never becomes a slot below) hit this PRE-MAPPED region and therefore
+        # never reached the UC_HOOK_MEM_READ_UNMAPPED auto-seed path that
+        # handles every OTHER known global.  Seeding here was the patch for
+        # that.  GLOBALS_BASE is now outside the XBE image entirely, so no
+        # known global falls in this window and the read falls through to
+        # hook_mem_unmapped, which maps its 64 KB page and seeds the same bytes
+        # -- the general path, not a special case.  Reads there are now also
+        # recorded in `global_reads`, which the pre-mapped form suppressed.
         _seed_known_globals(uc, GLOBALS_BASE, GLOBALS_SIZE)
         if globals_seeds:
             for addr, data in globals_seeds.items():
@@ -1257,6 +1269,10 @@ def _run_function(code: bytes, abi: dict, arg_values: list,
     # long measurement has burned us before).
     data_exec_recoveries = [0]
     MAX_DATA_EXEC_RECOVERIES = 64
+    # Set when a recovery path declines to continue because control flow is
+    # provably gone.  Folded into err_msg so the seed is scored as an error
+    # rather than as a clean stop with whatever state happened to be left.
+    escape_reason = [None]
     _data_exec_guard = os.environ.get("HALO_NO_DATA_EXEC_GUARD") != "1"
     _ring = None
     if os.environ.get("BIPED_RING_TRACE") == "1":
@@ -1300,6 +1316,26 @@ def _run_function(code: bytes, abi: dict, arg_values: list,
                 _esp = uc.reg_read(_ESP_G)
                 _ret = struct.unpack('<I', bytes(uc.mem_read(_esp, 4)))[0]
             except Exception:
+                uc.emu_stop()
+                return
+            # The dword at ESP is only a return address if a CALL put it there.
+            # After a stray indirect call through garbage, it is just as likely
+            # to be a saved register or the address of a local -- and jumping
+            # to a STACK address means decoding that address's own bytes as
+            # code.  Whether that faults or stalls harmlessly then depends on
+            # the numeric value of the stack base, which is how
+            # game_state_memory_pool_new scored PASS at 60% coverage with
+            # STACK_BASE=0x00100000 and ERROR with STACK_BASE=0x08000000: the
+            # oracle had already lost control flow in BOTH cases and the
+            # verdict was decided by a coin flip in the recovery path.
+            #
+            # Refuse the jump instead.  The escape is then reported as an
+            # escape, identically on both sides and at any stack base.
+            if STACK_BASE <= _ret < STACK_TOP:
+                escape_reason[0] = (f"data-exec recovery at pc={address:#x} "
+                                    f"popped a stack address ({_ret:#x}) as a "
+                                    f"return target -- control flow was "
+                                    f"already lost")
                 uc.emu_stop()
                 return
             uc.reg_write(_EAX_G, 0)
@@ -1349,11 +1385,11 @@ def _run_function(code: bytes, abi: dict, arg_values: list,
     _mapped_regions = set()
 
     # GATED heap-output witnessing (BIPED_HEAP_COMPARE=1): when a heap write
-    # (>= 0x20000000) falls inside a snapshot-mapped region, INCLUDE it in the
+    # (>= HEAP_LINE) falls inside a snapshot-mapped region, INCLUDE it in the
     # write trace so output writes to the live biped object (~0x800bxxxx) are
     # actually compared.  Flag-off behaviour is byte-identical to before (the
-    # blanket >= 0x20000000 drop is preserved).  The FXSAVE instrumentation
-    # page lives at 0x20000000 (0x1000 bytes), which is never inside a snapshot
+    # blanket >= HEAP_LINE drop is preserved).  The FXSAVE instrumentation
+    # page lives at FXSAVE_BASE (== HEAP_LINE), which is never inside a snapshot
     # region, so it is excluded for free by the membership test.
     _heap_compare = (os.environ.get("BIPED_HEAP_COMPARE") == "1"
                      and bool(_override_ranges))
@@ -1366,7 +1402,7 @@ def _run_function(code: bytes, abi: dict, arg_values: list,
                 return
             if CODE_BASE <= address < CODE_BASE + CODE_SIZE:
                 return
-            if address >= 0x20000000:  # FXSAVE region / arbitrary heap
+            if address >= HEAP_LINE:  # FXSAVE region / arbitrary heap
                 if not _heap_compare:
                     return
                 # Only witness heap writes that land in a snapshot-mapped
@@ -1536,18 +1572,31 @@ def _run_function(code: bytes, abi: dict, arg_values: list,
             else:
                 err_msg = err_str
 
+    # A declined recovery stops emulation WITHOUT raising, so it would
+    # otherwise read as a clean return.  Report it.
+    if err_msg is None and escape_reason[0]:
+        err_msg = escape_reason[0]
+
     # Detach stub-arg tracer now that emulation has finished for this run
     if stub_manager is not None and stub_arg_tracer is not None:
         stub_manager.set_tracer(None)
 
     s = state_mod.capture(uc, SCRATCH_BASE, SCRATCH_SIZE, entry_esp + 4)
 
-    # Capture full 80-bit FPU state via FXSAVE (reg_read only returns mantissa)
-    FXSAVE_BASE = 0x20000000
-    fxsave_stub_addr = CODE_BASE + CODE_SIZE - 16
+    # Capture full 80-bit FPU state via FXSAVE (reg_read only returns mantissa).
+    #
+    # The stub used to be written at CODE_BASE + CODE_SIZE - 16, which assumes
+    # this run mapped CODE_BASE at all.  The raw-XBE oracle does not -- it runs
+    # from the image at real VAs -- so the write would raise into the bare
+    # `except: pass` below and silently leave `s.st` holding mantissa-only
+    # values, making every float-returning function's ST0 comparison vacuously
+    # equal.  TRAMP_BASE is a page neither side owns, so the capture no longer
+    # depends on which oracle is in use, and a failure is now recorded.
+    fxsave_stub_addr = TRAMP_BASE
     fxsave_stub = b"\x0F\xAE\x05" + struct.pack('<I', FXSAVE_BASE) + b"\xC3"
     try:
-        uc.mem_map(FXSAVE_BASE, 0x1000)
+        uc.mem_map(TRAMP_BASE, TRAMP_SIZE)
+        uc.mem_map(FXSAVE_BASE, FXSAVE_SIZE)
         uc.mem_write(fxsave_stub_addr, fxsave_stub)
         fake_ret2 = fxsave_stub_addr + len(fxsave_stub) - 1
         cur_esp = uc.reg_read(UC_X86_REG_ESP)
@@ -1560,8 +1609,8 @@ def _run_function(code: bytes, abi: dict, arg_values: list,
         for i in range(8):
             off = 32 + i * 16
             s.st[i] = fxsave_data[off:off + 10]
-    except Exception:
-        pass
+    except Exception as _fx_exc:
+        s.fxsave_error = f"{type(_fx_exc).__name__}: {_fx_exc}"
     if err_msg and _ring is not None:
         print("    [ring] last insns (pc, esp):")
         for _pc, _sp in _ring:
@@ -2635,23 +2684,23 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
                     for _a, _ov, _lv in tdiff.value_diffs[:40]:
                         log(f"      value-diff   0x{_a:08x}  oracle={_ov:#x} lifted={_lv:#x}")
             if _heap_compare_on:
-                # Accumulate affirmative output evidence (heap = >= 0x20000000,
+                # Accumulate affirmative output evidence (heap = >= HEAP_LINE,
                 # i.e. the live biped object). Restrict to heap so we do not
                 # clutter the report with low-VA globals scratch.
                 for addr, size, val in tdiff.matched:
-                    if addr >= 0x20000000:
+                    if addr >= HEAP_LINE:
                         heap_matched[(addr, size)] = val
                 for addr, size, ov, lv, ulp in tdiff.matched_within_tol:
-                    if addr >= 0x20000000:
+                    if addr >= HEAP_LINE:
                         heap_matched_tol[(addr, size)] = (ov, lv, ulp)
                 for addr, ov, lv in tdiff.value_diffs:
-                    if addr >= 0x20000000:
+                    if addr >= HEAP_LINE:
                         heap_value_diffs[(addr, None)] = (ov, lv)
                 for addr in tdiff.oracle_only:
-                    if addr >= 0x20000000:
+                    if addr >= HEAP_LINE:
                         heap_oracle_only.add(addr)
                 for addr in tdiff.lifted_only:
-                    if addr >= 0x20000000:
+                    if addr >= HEAP_LINE:
                         heap_lifted_only.add(addr)
 
         # Determine what to compare based on return type
