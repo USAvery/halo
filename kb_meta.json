@@ -17400,6 +17400,10 @@
       "kind": "function",
       "status": "ported"
     },
+    "0x19a020": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0x19a040": {
       "kind": "function",
       "status": "ported"
@@ -17421,6 +17425,10 @@
       "status": "ported"
     },
     "0x19a370": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x19a400": {
       "kind": "function",
       "status": "ported"
     },
@@ -17480,6 +17488,18 @@
       "status": "ported"
     },
     "0x19acb0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x19acf0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x19ad30": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x19adf0": {
       "kind": "function",
       "status": "ported"
     },

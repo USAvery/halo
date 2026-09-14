@@ -58423,6 +58423,21 @@
       "score": 96.3,
       "source": "src/halo/memory/data.c"
     },
+    "datastore_read_field": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 99.1,
+      "addr": "0x199b20",
+      "end": "0x199d36",
+      "kind": "auto",
+      "n_r": 159,
+      "opnd_percent": 88.4,
+      "raw_mnemonic_pct": 99.1,
+      "ref": "synth",
+      "ref_sha": "5b41937916b9485c",
+      "score": 99.1,
+      "source": "src/halo/tag_files/files.c"
+    },
     "datum_absolute_index_to_index": {
       "abi_model": "raw",
       "abi_model_items": 0,
@@ -61481,6 +61496,21 @@
       "ref": "synth",
       "ref_sha": "a76ced41985e14bc",
       "score": 85.7,
+      "source": "src/halo/tag_files/files.c"
+    },
+    "file_printf": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 94.1,
+      "addr": "0x1995c0",
+      "end": "0x19961a",
+      "kind": "auto",
+      "n_r": 34,
+      "opnd_percent": 91.2,
+      "raw_mnemonic_pct": 94.1,
+      "ref": "synth",
+      "ref_sha": "fc70dda9942de86f",
+      "score": 94.1,
       "source": "src/halo/tag_files/files.c"
     },
     "file_read": {

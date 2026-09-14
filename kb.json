@@ -7893,7 +7893,8 @@
     },
     {
      "addr": "0x1995c0",
-     "decl": "void file_printf(void);"
+     "decl": "void file_printf(file_ref_t *info, const char *format, ...);",
+     "ported": true
     },
     {
      "addr": "0x1996d0",
@@ -7921,7 +7922,9 @@
     },
     {
      "addr": "0x199b20",
-     "decl": "void FUN_00199b20(void);"
+     "decl": "bool datastore_read_field(const char *file_name, const char *field_name, int length, void *buffer);",
+     "name": "datastore_read_field",
+     "ported": true
     }
    ],
    "name": "files.obj",

@@ -228,6 +228,31 @@ void *file_read_into_buffer(file_ref_t *file_ref, int *size_out)
 }
 
 /**
+ * file_printf (0x1995c0) - format a string and append it to an open file.
+ *
+ * Formats into a 1024-byte stack buffer with vsprintf, writes csstrlen(buffer)
+ * bytes to the file, then truncates the file at the new position (the
+ * file_get_position result is the second argument to file_set_eof). Does
+ * nothing when the format string is NULL ([EBP+0xc] TEST/JZ at 0x1995cc).
+ *
+ * [EBP+8] = info (kept in ESI), [EBP+0xc] = format, [EBP+0x10] = first vararg,
+ * so the arglist is (char *)&format + 4 (LEA ECX,[EBP+0x10] at 0x1995d1).
+ * Return values of file_write and file_set_eof are discarded.
+ */
+void file_printf(file_ref_t *info, const char *format, ...)
+{
+  char buffer[1024];
+  char *arglist;
+
+  if (format != NULL) {
+    arglist = (char *)&format + 4;
+    vsprintf(buffer, format, arglist);
+    file_write(info, csstrlen(buffer), buffer);
+    file_set_eof(info, file_get_position(info));
+  }
+}
+
+/**
  * file_reference_verify - validate a file_ref_t pointer.
  *
  * Checks that the pointer is non-NULL, the magic signature matches
@@ -501,6 +526,123 @@ void directory_create_or_delete_contents(const char *directory_name)
   } else {
     file_create(&info);
   }
+}
+
+/* Data-store record layout, from the assert strings at 0x199bd4/0x199c04:
+ *   DATASTORE_MAX_DATA_SIZE and DATASTORE_MAX_FIELD_NAME_SIZE are both 255
+ *   (the compares are against 0xff). The record stride 0x1fe and the total
+ *   file size 0x18e70 are read from the binary; the field count 200 (0xc8) is
+ *   the loop bound at 0x199ced and satisfies 200 * 0x1fe == 0x18e70.
+ * Each record is [field_name: 255 bytes][data: 255 bytes]; the data starts at
+ * +0xff, which is the offset used by the csmemcpy at 0x199d0d. */
+#define DATASTORE_MAX_FIELD_NAME_SIZE 255
+#define DATASTORE_MAX_DATA_SIZE 255
+#define DATASTORE_FIELD_COUNT 200
+#define DATASTORE_RECORD_SIZE \
+  (DATASTORE_MAX_FIELD_NAME_SIZE + DATASTORE_MAX_DATA_SIZE)
+#define DATASTORE_FILE_SIZE (DATASTORE_FIELD_COUNT * DATASTORE_RECORD_SIZE)
+
+/**
+ * datastore_read_field (0x199b20) - read one named field out of a data-store
+ * file into the caller's buffer.
+ *
+ * Reads the whole file, rejects it unless it is exactly DATASTORE_FILE_SIZE
+ * bytes, then scans up to DATASTORE_FIELD_COUNT fixed-size records for one
+ * whose name matches field_name, stopping early at the first record with an
+ * empty name. On a hit it copies `length` bytes of that record's data area to
+ * `buffer` and reports true.
+ *
+ * Parameter names are from the assert strings (file_name, field_name,
+ * length); the function name itself has no string evidence and is derived
+ * from the DATASTORE_* assert macros.
+ *
+ * Divergence note: the original keeps its result flag in the (dead) high byte
+ * of the field_name parameter slot at [EBP+0xf] and only ever stores to it on
+ * the hit path at 0x199d15 — the not-found and bad-size exits return whatever
+ * that byte held, i.e. the high byte of the field_name pointer, which is 0 for
+ * every reachable string address in this build. We initialize the flag to
+ * false, which reproduces the observed behavior without relying on that
+ * aliasing. There are no callers in this build (no xrefs to 0x199b20).
+ */
+bool datastore_read_field(const char *file_name, const char *field_name,
+                          int length, void *buffer)
+{
+  file_ref_t info;
+  char *data;
+  char *cursor;
+  int index;
+  int size;
+  bool found;
+
+  size = 0;
+  found = false;
+
+  if (file_name == NULL) {
+    display_assert("NULL != file_name", "c:\\halo\\SOURCE\\tag_files\\files.c",
+                   0x171, true);
+    system_exit(-1);
+  }
+  if (field_name == NULL) {
+    display_assert("NULL != field_name", "c:\\halo\\SOURCE\\tag_files\\files.c",
+                   0x172, true);
+    system_exit(-1);
+  }
+  if (file_name[0] == '\0') {
+    display_assert("'\\0' != file_name[0]",
+                   "c:\\halo\\SOURCE\\tag_files\\files.c", 0x173, true);
+    system_exit(-1);
+  }
+  if (field_name[0] == '\0') {
+    display_assert("'\\0' != field_name[0]",
+                   "c:\\halo\\SOURCE\\tag_files\\files.c", 0x174, true);
+    system_exit(-1);
+  }
+  if (length >= DATASTORE_MAX_DATA_SIZE) {
+    display_assert("length < DATASTORE_MAX_DATA_SIZE",
+                   "c:\\halo\\SOURCE\\tag_files\\files.c", 0x175, true);
+    system_exit(-1);
+  }
+  if ((unsigned int)csstrlen(field_name) >= DATASTORE_MAX_FIELD_NAME_SIZE) {
+    display_assert("strlen(field_name) < DATASTORE_MAX_FIELD_NAME_SIZE",
+                   "c:\\halo\\SOURCE\\tag_files\\files.c", 0x176, true);
+    system_exit(-1);
+  }
+
+  csmemset(&info, 0, sizeof(info));
+  info.magic = FILE_REF_MAGIC;
+  info.unk_6 = -1;
+  file_reference_set_name(&info, file_name);
+
+  if (file_exists(&info)) {
+    data = (char *)file_read_into_buffer(&info, &size);
+    if (data == NULL) {
+      file_delete(&info);
+    }
+    if (size != DATASTORE_FILE_SIZE) {
+      debug_free(data, "c:\\halo\\SOURCE\\tag_files\\files.c", 0x185);
+      file_delete(&info);
+      return found;
+    }
+    if (data != NULL) {
+      for (index = 0, cursor = data; index < DATASTORE_FIELD_COUNT;
+           index++, cursor += DATASTORE_RECORD_SIZE) {
+        if (csstrcmp(cursor, field_name) == 0) {
+          csmemcpy(buffer,
+                   data + index * DATASTORE_RECORD_SIZE +
+                     DATASTORE_MAX_FIELD_NAME_SIZE,
+                   length);
+          found = true;
+          break;
+        }
+        if (*cursor == '\0') {
+          break;
+        }
+      }
+      debug_free(data, "c:\\halo\\SOURCE\\tag_files\\files.c", 0x1a0);
+    }
+  }
+
+  return found;
 }
 
 /* 0x19a020 — compare the 8-byte last-modification timestamps of two files.
