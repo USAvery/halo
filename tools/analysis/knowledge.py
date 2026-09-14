@@ -540,6 +540,17 @@ __attribute__((naked)) { decl.replace(name, 'THUNK('+name+')') }
 					f.write('\n')
 		self._write_if_changed(path, f.getvalue(), 'Export .def')
 
+	def build_stamp(self, path: str):
+		import hashlib
+		hasher_kb = hashlib.sha256()
+		with open(self.kb_path, 'rb') as f:
+			hasher_kb.update(f.read())
+		hasher_self = hashlib.sha256()
+		with open(os.path.abspath(__file__), 'rb') as f:
+			hasher_self.update(f.read())
+		stamp = f"{hasher_kb.hexdigest()}_{hasher_self.hexdigest()}\n"
+		self._write_if_changed(path, stamp, 'Stamp file')
+
 	def serialize(self):
 		log.info('Saving knowledge base to %s...', self.kb_path)
 
@@ -632,6 +643,7 @@ def main():
 	ap.add_argument('--gen-header', help='Generate import header')
 	ap.add_argument('--gen-thunks', help='Generate import thunks')
 	ap.add_argument('--gen-def', help='Generate import linker def file')
+	ap.add_argument('--gen-stamp', help='Generate SHA-256 stamp file for kb.json and knowledge.py')
 	ap.add_argument('--update', action='store_true', help='Re-serialize the KB')
 	args = ap.parse_args()
 
@@ -656,6 +668,9 @@ def main():
 
 	if args.gen_def:
 		kb.build_def(args.gen_def)
+
+	if args.gen_stamp:
+		kb.build_stamp(args.gen_stamp)
 
 	if args.update:
 		kb.serialize()

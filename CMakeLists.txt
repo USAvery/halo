@@ -22,14 +22,31 @@ set(gen_dir "${PROJECT_BINARY_DIR}/generated")
 add_custom_target(create_gen_dir ALL
 	COMMAND ${CMAKE_COMMAND} -E make_directory ${gen_dir})
 
+# Guard against git branch switches or rebases where kb.json timestamp becomes older
+# than an existing build/generated/decl.h (mtime inversion). Check content hash:
+file(SHA256 "${CMAKE_CURRENT_LIST_DIR}/kb.json" CURRENT_KB_HASH)
+file(SHA256 "${CMAKE_CURRENT_LIST_DIR}/tools/analysis/knowledge.py" CURRENT_KNOWLEDGE_HASH)
+set(CURRENT_INPUT_HASH "${CURRENT_KB_HASH}_${CURRENT_KNOWLEDGE_HASH}")
+set(KB_STAMP_FILE "${gen_dir}/.kb.sha256")
+
+if(EXISTS "${KB_STAMP_FILE}")
+	file(READ "${KB_STAMP_FILE}" SAVED_KB_HASH)
+	string(STRIP "${SAVED_KB_HASH}" SAVED_KB_HASH)
+	if(NOT CURRENT_INPUT_HASH STREQUAL SAVED_KB_HASH)
+		message(STATUS "kb.json or knowledge.py changed; invalidating stale generated headers")
+		file(REMOVE "${gen_dir}/decl.h" "${gen_dir}/halo.xbe.def" "${gen_dir}/thunks.c" "${KB_STAMP_FILE}")
+	endif()
+endif()
+
 add_custom_command(
-	OUTPUT "${gen_dir}/decl.h" "${gen_dir}/halo.xbe.def" "${gen_dir}/thunks.c"
+	OUTPUT "${gen_dir}/decl.h" "${gen_dir}/halo.xbe.def" "${gen_dir}/thunks.c" "${gen_dir}/.kb.sha256"
 	COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_LIST_DIR}/tools/analysis/knowledge.py"
 		--gen-header "${gen_dir}/decl.h"
 		--gen-def "${gen_dir}/halo.xbe.def"
 		--gen-thunks "${gen_dir}/thunks.c"
+		--gen-stamp "${gen_dir}/.kb.sha256"
 	COMMAND "${CMAKE_COMMAND}" -E touch_nocreate
-		"${gen_dir}/decl.h" "${gen_dir}/halo.xbe.def" "${gen_dir}/thunks.c"
+		"${gen_dir}/decl.h" "${gen_dir}/halo.xbe.def" "${gen_dir}/thunks.c" "${gen_dir}/.kb.sha256"
 	DEPENDS "${CMAKE_CURRENT_LIST_DIR}/tools/analysis/knowledge.py" "${CMAKE_CURRENT_LIST_DIR}/kb.json" create_gen_dir
 	VERBATIM
 )

@@ -112,6 +112,65 @@ def _env_flag(name: str) -> bool:
     return value.lower() in ("1", "true", "yes", "on")
 
 
+def _ensure_generated_files(quiet: bool = False) -> None:
+    """Ensure build/generated/decl.h and thunks match kb.json before building.
+
+    Guards against mtime inversion after git branch switches or rebases
+    where decl.h has a newer timestamp than an older-timestamped kb.json.
+    """
+    gen_dir = os.path.join(BUILD_DIR, "generated")
+    stamp_file = os.path.join(gen_dir, ".kb.sha256")
+    decl_h = os.path.join(gen_dir, "decl.h")
+    def_file = os.path.join(gen_dir, "halo.xbe.def")
+    thunks_c = os.path.join(gen_dir, "thunks.c")
+    kb_path = os.path.join(ROOT_DIR, "kb.json")
+    knowledge_py = os.path.join(ROOT_DIR, "tools", "analysis", "knowledge.py")
+
+    if not (os.path.isfile(kb_path) and os.path.isfile(knowledge_py)):
+        return
+
+    import hashlib
+    with open(kb_path, "rb") as f:
+        kb_hash = hashlib.sha256(f.read()).hexdigest()
+    with open(knowledge_py, "rb") as f:
+        py_hash = hashlib.sha256(f.read()).hexdigest()
+    current_hash = f"{kb_hash}_{py_hash}"
+
+    saved_hash = ""
+    if os.path.isfile(stamp_file):
+        try:
+            with open(stamp_file, "r") as f:
+                saved_hash = f.read().strip()
+        except OSError:
+            pass
+
+    if (
+        saved_hash == current_hash
+        and os.path.isfile(decl_h)
+        and os.path.isfile(def_file)
+        and os.path.isfile(thunks_c)
+    ):
+        return
+
+    if not quiet:
+        print("[build] Refreshing generated decl.h and thunks from kb.json...", flush=True)
+
+    os.makedirs(gen_dir, exist_ok=True)
+    cmd = [
+        sys.executable,
+        knowledge_py,
+        "--gen-header", decl_h,
+        "--gen-def", def_file,
+        "--gen-thunks", thunks_c,
+        "--gen-stamp", stamp_file,
+    ]
+    env = os.environ.copy()
+    if quiet:
+        env["LOG_LEVEL"] = "WARNING"
+    subprocess.run(cmd, check=False, cwd=ROOT_DIR, env=env,
+                   stdout=subprocess.DEVNULL if quiet else None)
+
+
 def build(target: str = "", quiet: bool = False, test_harness: bool = False,
           retail64: bool | None = None, rng_trace: bool = False) -> int:
     if not os.path.isdir(BUILD_DIR):
@@ -121,6 +180,8 @@ def build(target: str = "", quiet: bool = False, test_harness: bool = False,
             file=sys.stderr,
         )
         return 1
+
+    _ensure_generated_files(quiet=quiet)
 
     configure_args = ["-DHALO_TEST_HARNESS=" + ("ON" if test_harness else "OFF")]
     # Always pass both states: a cache that kept ON would silently leave
