@@ -1282,13 +1282,24 @@ def generate_html(report: dict, output_path: str, history_path: str = None):
             width: 34px; height: 16px; border-radius: 3px; cursor: pointer;
             background: #21262d; position: relative; overflow: hidden;
             transition: transform 0.1s; flex-shrink: 0;
+            border: 1px solid rgba(255, 255, 255, 0.05);
         }
         .tu-bar-tile:hover { transform: scale(1.6); z-index: 10; }
         .tu-bar-fill {
-            position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px;
+            position: absolute; left: 0; top: 0; bottom: 0; border-radius: 2px;
             min-width: 0;
         }
-        .tu-bar-tile.divergent { outline: 1px solid #f85149; outline-offset: -1px; }
+        .tu-bar-tile.divergent .tu-bar-fill::after {
+            content: ''; position: absolute; inset: 0;
+            background-image: repeating-linear-gradient(
+                -45deg,
+                rgba(0, 0, 0, 0.35),
+                rgba(0, 0, 0, 0.35) 3px,
+                transparent 3px,
+                transparent 6px
+            );
+            border-radius: 2px;
+        }
         .tu-legend {
             display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px;
         }
@@ -2106,9 +2117,10 @@ def generate_html(report: dict, output_path: str, history_path: str = None):
         // correctness.
         function accuracyColor(match) {
             if (match === null || match === undefined) return '#8b949e';
-            if (match >= 95) return '#7ee787';
-            if (match >= 85) return '#d29922';
-            return '#f85149';
+            if (match >= 95) return '#3fb950';
+            if (match >= 85) return '#58a6ff';
+            if (match >= 70) return '#d29922';
+            return '#da3633';
         }
 
         // A unit earns the solid-green "byte-accurate" distinction only when
@@ -2224,7 +2236,7 @@ def generate_html(report: dict, output_path: str, history_path: str = None):
                 var s = u.summary || {};
                 var match = st.ported > 0 ? s.match_weighted : null;
                 var perfect = unitIsPerfect(u, st);
-                var color = perfect ? '#2ea043' : accuracyColor(match);
+                var color = perfect ? '#238636' : accuracyColor(match);
                 var portedPct = unitMeterPct(st, st.portedBytes, st.ported);
                 var tip = unitEvidenceTooltip(u, st);
                 var label = u.name + ': ' + st.state;
@@ -2238,12 +2250,13 @@ def generate_html(report: dict, output_path: str, history_path: str = None):
             var legEl = document.getElementById('tu-legend');
             if (legEl) {
                 var legHtml =
-                    '<div class="tu-legend-item"><div class="tu-legend-swatch" style="background:#2ea043"></div>100% byte-accurate (fully scored)</div>' +
-                    '<div class="tu-legend-item"><div class="tu-legend-swatch" style="background:#7ee787"></div>&ge;95% match</div>' +
-                    '<div class="tu-legend-item"><div class="tu-legend-swatch" style="background:#d29922"></div>85&ndash;95%</div>' +
-                    '<div class="tu-legend-item"><div class="tu-legend-swatch" style="background:#f85149"></div>&lt;85%</div>' +
+                    '<div class="tu-legend-item"><div class="tu-legend-swatch" style="background:#238636"></div>100% byte-accurate (fully scored)</div>' +
+                    '<div class="tu-legend-item"><div class="tu-legend-swatch" style="background:#3fb950"></div>&ge;95% match</div>' +
+                    '<div class="tu-legend-item"><div class="tu-legend-swatch" style="background:#58a6ff"></div>85&ndash;95%</div>' +
+                    '<div class="tu-legend-item"><div class="tu-legend-swatch" style="background:#d29922"></div>70&ndash;85%</div>' +
+                    '<div class="tu-legend-item"><div class="tu-legend-swatch" style="background:#da3633"></div>&lt;70%</div>' +
                     '<div class="tu-legend-item"><div class="tu-legend-swatch" style="background:#8b949e"></div>unscored</div>' +
-                    '<div class="tu-legend-item"><div class="tu-legend-swatch" style="background:transparent;outline:1px solid #f85149;outline-offset:-1px"></div>divergence candidate</div>' +
+                    '<div class="tu-legend-item"><div class="tu-legend-swatch" style="background-color:#58a6ff;background-image:repeating-linear-gradient(-45deg,rgba(0,0,0,0.35),rgba(0,0,0,0.35) 3px,transparent 3px,transparent 6px)"></div>divergence candidate (striped)</div>' +
                     '<div class="tu-map-note">Bar length = implemented (ported bytes / unit bytes). Color = byte-weighted VC71 match over scored bytes; hover a tile for detail.</div>';
                 legEl.innerHTML = legHtml;
             }
