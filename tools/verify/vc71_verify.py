@@ -1493,11 +1493,15 @@ _PER_FUNCTION_OPT: dict[str, dict[str, str]] = {
     # FUN_000dc800: leaf switch table with register parameter; reference has NO EBP frame.
     "halo/interface/event_manager.c": {"FUN_000dc800": "/O2 /Oy"},
     # D3D resource/texture functions in XDK D3D; compiled with /Oy (no EBP frame).
+    # D3DResource_BlockUntilNotBusy: bare JMP thunk (0x1ed620); D3DResource_IsBusy:
+    # ESP-relative addressing throughout (0x1ed980) -- both prove /Oy.
     "rasterizer/xbox/d3d_resource.c": {
+        "D3DResource_BlockUntilNotBusy": "/O2 /Oy",
         "D3DTexture_GetLevelDesc": "/O2 /Oy",
         "D3DTexture_LockRect": "/O2 /Oy",
         "D3DResource_Register": "/O2 /Oy",
         "D3DResource_Release": "/O2 /Oy",
+        "D3DResource_IsBusy": "/O2 /Oy",
     },
 }
 
