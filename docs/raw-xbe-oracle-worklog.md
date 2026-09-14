@@ -470,6 +470,23 @@ excuses under `--oracle=xbe`.
    were `domain_skipped` (since `failed == 0` and `errors == 0`). It now explicitly
    reports `inconclusive` when `passed == 0`.
 
+### Triage of the 35 `now_fails`: Data Iterators and HUD Inlining
+
+The 35 `now_fails` were triaged by evidence strength rather than alphabetic order. The highest-value cluster was the `0xd6e50–0xd8cf0` neighborhood and the `data_t` iterators (`data_next_index`, `data_prev_index`).
+
+1. **`data_next_index` (`0x1198f0`, `src/halo/memory/data.c`)**:
+   - **Diagnosis**: Not a harness pointer-seeding asymmetry, but a real compiler defect. Clang optimized the signed 32-bit loop with an extraneous local variable into a 16-bit `decw %cx` countdown loop with `%edi = -index` and `subl %edi, %eax`. When traversing arrays > 65,535 items, `%cx` wrapped, terminating early and returning `0x00000000` instead of the found handle (`0x7257d305` in oracle).
+   - **Fix**: Removed the extra `int16_t index` variable and incremented `prev_index` in place, directly matching the original binary structure (`inc esi; test si, si`).
+   - **Result**: Raw-XBE equivalence reached 91/100 passes (95.5% coverage).
+
+2. **`data_prev_index` (`0x119980`, `src/halo/memory/data.c`)**:
+   - **Diagnosis**: Decompiled C used multi-step casts and messy temporaries (`psVar1`, `sVar2`, `uVar3`).
+   - **Fix**: Refactored to match Bungie's original `do { ... } while (index-- >= 0);` loop idiom.
+   - **Result**: VC71 operand-normalized match jumped from 79.3% to **92.5%** (+13.2 pp), instruction match improved from 93.7% to **94.3%** (+0.6 pp), and raw-XBE equivalence achieved **19/20 passes** (87.1% coverage). `score_improve.py check` verified 0 regressions across all 27 functions in `data.c`. Committed in `f18eb4687`.
+
+3. **`FUN_000d7cd0` (`0xd7cd0`, `src/halo/interface/hud_messaging.c`)**:
+   - **Diagnosis**: In `cachebeta.xbe`, `0xd7cd0` calls `FUN_000d7280` (`unit_hud_get_slot`) out-of-line (`call 0xd7280`). In `hud_messaging.c`, clang inlined `FUN_000d7280`. `FUN_000d7280` asserts `*(int*)0x46bd20 != 0` (`unit_hud_globals`). In the test harness, uninitialized memory at `0x46bd20` is 0, causing the candidate to halt on `display_assert`. The oracle never asserted because `0xd7280` was intercepted as an external callee stub.
+
 ## The progress dashboard
 
 A read-only audit checked `tools/report/` against the new cache schema. The
