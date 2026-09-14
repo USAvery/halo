@@ -197,6 +197,51 @@ bool FUN_001c6ed0(file_ref_t *info, void *param_2, void *param_3)
   return result;
 }
 
+/* Normalize the sample data read out of a RIFF/WAVE 'data' chunk (0x1c6fb0).
+ *
+ * param_1 is the parsed WAVE format block; its 16-bit field at +0x8 is the
+ * significant bits per sample (the assert text names it
+ * info->significant_bits_per_sample). 16-bit data is already in the engine's
+ * format and is left untouched; anything other than 8 or 16 asserts.
+ *
+ * For 8-bit data the buffer is expanded in place from unsigned 8-bit to signed
+ * 16-bit, walking backwards from the last byte so source and destination never
+ * overlap destructively: value = sample * 0x101 + 0x7f80, i.e.
+ * (sample - 128) * 257 truncated to 16 bits. The byte count through param_2 is
+ * then doubled. The binary loads the byte with MOVZX into a 16-bit register and
+ * stores only the low word, so the multiply/add wraps at 16 bits. */
+void FUN_001c6fb0(void *param_1, void *param_2, void *param_3)
+{
+  int count;
+  unsigned char *src;
+  short *dst;
+
+  if (*(short *)((char *)param_1 + 8) == 8) {
+    count = *(int *)param_2;
+    count--;
+    src = (unsigned char *)param_3 + count;
+    dst = (short *)((char *)param_3 + count * 2);
+    if (count >= 0) {
+      count++;
+      do {
+        *dst = (short)(unsigned short)((unsigned short)*src * 0x101 + 0x7f80);
+        src--;
+        dst--;
+        count--;
+      } while (count != 0);
+    }
+    *(int *)param_2 = *(int *)param_2 << 1;
+    return;
+  }
+  if (*(short *)((char *)param_1 + 8) == 0x10) {
+    return;
+  }
+  display_assert("info->significant_bits_per_sample==16",
+                 "c:\\halo\\SOURCE\\sound\\sound_import\\sound_wave.c", 0x118,
+                 1);
+  system_exit(-1);
+}
+
 void game_sound_initialize(void)
 {
   *(void **)0x5054e4 =

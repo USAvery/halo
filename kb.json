@@ -10061,7 +10061,8 @@
     },
     {
      "addr": "0x1c6fb0",
-     "decl": "void FUN_001c6fb0(void *param_1, void *param_2, void *param_3);"
+     "decl": "void FUN_001c6fb0(void *param_1, void *param_2, void *param_3);",
+     "ported": true
     },
     {
      "addr": "0x1c70b0",
