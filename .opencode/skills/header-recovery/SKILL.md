@@ -71,6 +71,18 @@ A recovered header carries only:
 - `#define`s and enums (see `name-cleanup`)
 - `static inline` functions, if the binary shows one lived there
 
+## 2b. Includer census and shadow build (required)
+
+A header change is not codegen-neutral until proven. Before committing:
+
+1. **Includer census:** enumerate every TU that includes the header directly or
+   transitively, and flag those with `__LINE__`-sensitive asserts below the
+   insertion point (adding an `#include` shifts every subsequent `assert_halt`).
+2. **Shadow build:** build with the header change and confirm byte-identical
+   `.text` for every includer; any exact-function regression blocks the commit.
+3. Never mix a header move with an in-flight lift — one header (or one type) per
+   commit.
+
 ## 3. Placement: which header does a type belong in?
 
 | Tier | Evidence | Action |

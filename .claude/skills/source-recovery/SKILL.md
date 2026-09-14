@@ -315,6 +315,12 @@ refused to mechanical.
   pass; exit 1 means split the commit.
 - **Never touched here**: `@<reg>` annotations, `ported` flags, kb.json signatures,
   build config. A needed signature fix is *lift* work — stop and surface it.
+- **Scoring honesty**: count only strict matches as exact; report
+  meaningful-exact, padded-exact, and fuzzy bytes separately. If easy exact
+  matching is unavailable, keep the coherent fuzzy source, park it with a
+  reason, and give it **zero exact credit** — never promote fuzzy/coherent-only
+  work to exact.
+- **Zero regressions**: never trade an existing exact function for a new match.
 - **Regression protocol**: gate failure → revert that unit and `set-status ...
   parked --reason <why>`, then continue with independent items. A drop discovered
   later (or runtime misbehavior) → `cleanup-regression-triage` before anything else.

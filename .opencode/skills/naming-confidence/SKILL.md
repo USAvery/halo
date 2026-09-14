@@ -20,6 +20,11 @@ must be justified by a tier below, and the name's *shape* must not exceed its ti
 The cardinal sin is a T3 rename with a T1-shaped name (`player_health` because "it
 looks like health"). If you can't cite the evidence in one line, the name is T3 or T4.
 
+**No invented placeholders.** Never coin spellings like `code_<addr>` /
+`bss_<addr>` / `sub_<addr>`. The canonical repo placeholders are `FUN_<addr>`
+(functions), `field_<hex>` / `pad_<hex>[n]` (accessed / never-accessed struct
+offsets), and the legacy `unk_<addr>` / `unk_N[]` for data.
+
 ## Per-symbol-kind rules
 
 - **Functions (kb.json).** Renames go through the existing pipeline —

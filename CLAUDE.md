@@ -61,6 +61,10 @@ The hook `tools/audit/token_discipline_hook.py` (wired in `.claude/settings.json
 ### 2. Implementation & kb.json Discipline
 - **C89 only.** All lifted code must be valid C89: declare all variables at the top of their block scope, before any statements. No mixed declarations (C99). Enforced by VC71 verify. We stay C89 until the game is fully reimplemented.
 - **No Speculation:** Do not invent behavior or names without binary evidence.
+- **No Fake Matching:** A byte-perfect or high-VC71 result never justifies disallowed constructs — `volatile` shaping, redundant/dead stores, arbitrary barriers or pragmas, raw-offset access where a proven struct field exists, representation tricks, undefined behavior, or invented source. Logic that matches but is nonsensical is a bug: investigate or park it, never ship it.
+- **Authentic Types & Idioms:** Use engine types (`real`, `boolean`, fixed-width ints from `src/types.h`), not `float`/`bool`/stdlib substitutes; `cseries` flag/math macros and typed tag/object accessors, not hand-rolled bitwise logic or casts after raw `tag_get`/`object_get`; named enum constants in `switch` cases, not bare numbers. Declarations live in their genuine owning header (or kb.json's `decl.h`), never an unrelated `.c`. Details: `halo-xbox-re`.
+- **Preserve Inline Schedule:** Do not force, duplicate, suppress, or hand-copy inlining to chase bytes; match the original's inline vs. out-of-line placement. An unintended extra COMDAT (out-of-line copy of an inlined helper) is a fidelity bug.
+- **Zero-Regression & Scoring Honesty:** Never trade an existing exact/ported match for a new one. Count only strict matches as exact; report meaningful-exact, padded-exact, and fuzzy bytes separately. A coherent-but-unmatched lift gets zero exact credit and is parked with a reason (`source-recovery`).
 - **ABI Stability:** `@<reg>` annotations in `kb.json` are **immutable**. Never remove or change register assignments.
 - **New Symbols:** Register-arg callees must be added to `kb.json` with `@<reg>` and called by name.
 - **No Inline ASM:** The build system handles thunks via `kb.json`. Do not use inline assembly in C.

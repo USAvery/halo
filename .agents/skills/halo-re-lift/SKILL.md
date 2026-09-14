@@ -53,6 +53,8 @@ All file edits, `rtk git` commands, and tool invocations must target **that path
    - preserve control-flow shape
    - preserve side-effect order
    - preserve pointer arithmetic and odd logic unless disproven
+   - preserve engine idioms: `real`/`boolean` types, `cseries` macros, typed
+     tag/object accessors, named enum switch cases (see `halo-xbox-re`)
    - Asserts: `assert_halt(cond)`
    - Compiler gotchas: Flags are `-Wall -Werror -target i386-pc-win32 -march=pentium3 -nostdlib -ffreestanding -fno-builtin -fno-exceptions -include src/common.h`. Note that `-Wall` does NOT include `-Wunused-parameter`. Non-void functions MUST return a value or `-Werror` breaks the build. Explicitly cast pointer <-> int assignments (e.g. `dword_50548c = (int)game_state_malloc(...)`).
 8. Write implementation in address-ordered position.

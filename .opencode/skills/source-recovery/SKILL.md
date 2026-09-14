@@ -60,6 +60,13 @@ Categories may be skipped when inapplicable, never reordered. Without
 - Start from a clean tree; never mix recovery with an in-flight lift.
 - Use one commit per category. Before each commit run `rtk python3 tools/recovery/check_category_purity.py <category> --staged`; exit 0 or the documented exit 2 is acceptable, exit 1 is not.
 - Never change `@<reg>` annotations, `ported` flags, kb.json signatures, or build configuration.
+- If easy exact matching is unavailable, keep the coherent fuzzy source,
+  document/park it with a reason, and give it **zero exact credit** — never
+  promote fuzzy/coherent-only work to exact.
+- Count only strict matches as exact; report meaningful-exact, padded-exact, and
+  fuzzy bytes separately.
+- Never trade an existing exact function for a new match; the campaign target is
+  zero regressions.
 - On a gate failure, revert only that unit and park it with a specific reason; continue independent items.
 - Ratchet VC71 floors upward after productive work with `vc71_regression.py update --source <file>`.
 - Preserve ABI, layout, evaluation order, side effects, and control-flow shape unless risky recovery is explicitly authorized.

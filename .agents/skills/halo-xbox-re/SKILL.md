@@ -30,6 +30,38 @@ The binary is the source of truth. The target executable is **Halo Xbox debug bu
 - Do not add empty stubs.
 - Preserve ABI, stack behavior, field offsets, packing, and side-effect order.
 
+## Source fidelity: types, idioms, anti-forgery
+
+Faithful = the original's *idioms*, not just its control flow and bytes.
+
+- **Types:** use engine types (`real`, `boolean`, `int8`/`int16`/`uint32` from
+  `src/types.h`) — never `float`/`bool`/stdlib substitutes. Width and signedness
+  are load-bearing.
+- **Macros:** use `cseries` flag/math macros (`FLAG(b)`, bit/mask helpers) and
+  typed tag/object accessors instead of hand-rolled bitwise logic or casts after
+  raw `tag_get`/`object_get`.
+- **Enums:** name `switch` cases with recovered enum constants; a bare number is
+  a TODO, not a match (`const-enum-recovery`).
+- **Names:** authentic private-function and global names, never placeholders
+  like `code_<addr>`/`bss_<addr>`; with no evidence stay `FUN_<addr>` /
+  `field_<hex>` / `pad_<hex>[n]` (`naming-confidence`).
+- **Ownership:** declarations belong in the genuinely associated header (proven
+  by `__FILE__`), or kb.json's generated `decl.h` — never an unrelated `.c`
+  (`header-recovery`).
+- **Inlining:** match the original's inline vs. out-of-line schedule. Do not
+  force, duplicate, suppress, or hand-copy inlining; an unintended extra COMDAT
+  (out-of-line copy of an inlined helper) is a fidelity bug.
+- **Inline asm:** avoid; only an evidenced helper/math routine may use it, and
+  only in the guarded form (see `AGENTS.md` §2 MSVC-`__asm` rule). Otherwise use
+  the C idiom the compiler lowers correctly.
+- **Anti-forgery:** reject `volatile` shaping, redundant/dead stores, arbitrary
+  barriers or pragmas, raw-offset struct access where a field is proven,
+  representation tricks, undefined behavior, and invented source. Logic that
+  byte-matches but makes no sense is a bug, not a win.
+- **Reference sources:** cross-build PC/CE code, the PDB/map corpus, and any
+  open-source analogue may guide semantics and style only — they never prove a
+  byte match or override 2276 evidence.
+
 ## Efficiency guardrails
 
 - Prefer bounded, evidence-first pulls over broad dumps.

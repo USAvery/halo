@@ -102,6 +102,8 @@ All edits target **that path**, not a hardcoded `/mnt/g/dev/halo`.
    - `(float)(int)` float-as-pointer smuggling
 7. **Produce structurally faithful C lift:**
    - Preserve control-flow shape, side-effect order, pointer arithmetic
+   - Preserve engine idioms: `real`/`boolean` types, `cseries` macros, typed
+     tag/object accessors, named enum switch cases (see `halo-xbox-re`)
    - Asserts: `assert_halt(cond)`
    - Compiler: `-Wall -Werror -target i386-pc-win32 -march=pentium3`
    - Non-void functions MUST return a value. Cast pointer↔int explicitly.
