@@ -795,6 +795,109 @@ LAB_0005ef13:
   return *(char *)nav_state_out;
 }
 
+/* 0x005f240 — build_path_edges_for_surface
+ * Walks the edge ring of one collision-BSP surface and fills an output array
+ * of up to 0x40 edge records (0x20 bytes each). Returns the number written.
+ *
+ * Register-arg: structure_bsp in EAX (used at entry with no stack load:
+ * `MOV ECX,[EAX+0x1e8]` / `ADD EAX,0xb0` at 0x5f246-0x5f251). surface_index
+ * is [EBP+8], edges_out is [EBP+0xc].
+ *
+ * Same tag_block chain as FUN_0005e700 above:
+ *   tag_block_get_element(structure_bsp + 0xb0, 0, 0x60)     -> bsp
+ *   tag_block_get_element(bsp + 0x3c, surface_index, 0xc)    -> surface
+ *   tag_block_get_element(bsp + 0x48, edge_index, 0x18)      -> edge
+ *   tag_block_get_element(bsp + 0x54, vertex_index, 0x10)    -> vertex
+ * [structure_bsp+0x1e8] is a per-surface byte array; its element indexed by
+ * the adjacent surface index is stored at out+0x4. Meaning unproven.
+ *
+ * Edge layout (0x18, offsets disassembly-derived only):
+ *   +0x00 int vertex_a, +0x04 int vertex_b,
+ *   +0x08/+0x0c int next_edge (selected by which surface we came from),
+ *   +0x10/+0x14 int surface_a / surface_b.
+ * `is_right` = (surface_index == edge[5]); the adjacent surface is the OTHER
+ * of the two (0x5f2dc SETZ AL / 0x5f2ec SETZ DL selects edge[4 + !is_right]),
+ * while the ring walk continues through edge[2 + is_right] (0x5f39c).
+ *
+ * Output record (0x20):
+ *   +0x00 int adjacent_surface_index
+ *   +0x04 byte  structure_bsp[0x1e8][adjacent_surface_index]
+ *   +0x08 float[3] vertex_a position (copied as three dwords, 0x5f35a-0x5f36a)
+ *   +0x14 float[3] vertex_b - vertex_a (FLD [v1]; FSUB [v0]; FSTP,
+ *                  0x5f370-0x5f390 — v1 minus v0, not the reverse)
+ *
+ * Return is 16-bit: the loop counter lives in BX (MOVSX ESI,BX at 0x5f2df)
+ * and the fall-through exit reloads only AX (`MOV AX,word ptr [EBP-8]` at
+ * 0x5f3a9), so the upper half of EAX is not part of the result.
+ */
+short build_path_edges_for_surface(void *structure_bsp, int surface_index,
+                                   char *edges_out)
+{
+  unsigned char *surface_flags;
+  char *bsp;
+  int *surface;
+  int *edge;
+  float *v0;
+  float *v1;
+  char *out;
+  int edge_index;
+  int adjacent;
+  int is_right;
+  short edge_count;
+
+  surface_flags = *(unsigned char **)((char *)structure_bsp + 0x1e8);
+  bsp = (char *)tag_block_get_element((char *)structure_bsp + 0xb0, 0, 0x60);
+  edge_count = 0;
+
+  if (surface_index < 0 || surface_index >= *(int *)(bsp + 0x3c)) {
+    display_assert(
+      "(surface_index >= 0) && (surface_index < bsp->surfaces.count)",
+      "c:\\halo\\SOURCE\\ai\\path.c", 0x5d8, 1);
+    system_exit(-1);
+  }
+
+  surface = (int *)tag_block_get_element(bsp + 0x3c, surface_index, 0xc);
+  edge_index = surface[1];
+
+  for (;;) {
+    edge = (int *)tag_block_get_element(bsp + 0x48, edge_index, 0x18);
+    is_right = (surface_index == edge[5]);
+    out = edges_out + edge_count * 0x20;
+    edge_count++;
+
+    adjacent = edge[4 + (is_right == 0)];
+    *(int *)out = adjacent;
+    if (adjacent != -1 && (adjacent < 0 || adjacent >= *(int *)(bsp + 0x3c))) {
+      display_assert("(edge->adjacent_surface_index >= 0) && "
+                     "(edge->adjacent_surface_index < bsp->surfaces.count)",
+                     "c:\\halo\\SOURCE\\ai\\path.c", 0x5ee, 1);
+      system_exit(-1);
+    }
+
+    out[4] = (char)surface_flags[*(int *)out];
+
+    v0 = (float *)tag_block_get_element(bsp + 0x54, edge[0], 0x10);
+    v1 = (float *)tag_block_get_element(bsp + 0x54, edge[1], 0x10);
+
+    *(int *)(out + 0x8) = ((int *)v0)[0];
+    *(int *)(out + 0xc) = ((int *)v0)[1];
+    *(int *)(out + 0x10) = ((int *)v0)[2];
+    *(float *)(out + 0x14) = v1[0] - v0[0];
+    *(float *)(out + 0x18) = v1[1] - v0[1];
+    *(float *)(out + 0x1c) = v1[2] - v0[2];
+
+    if (edge_count == 0x40) {
+      break;
+    }
+    edge_index = edge[2 + is_right];
+    if (edge_index == surface[1]) {
+      break;
+    }
+  }
+
+  return edge_count;
+}
+
 /* 0x005ff70 — path traverse and debug snapshot
  * Initializes a path traverse operation on a path buffer, then optionally
  * copies the resulting state into a debug record.
@@ -802,9 +905,9 @@ LAB_0005ef13:
  * Increments one of two global 16-bit counters depending on a flag at +0x4c
  * (obstacle_valid). Clears the node list, resets distance fields, calls
  * FUN_0005ef80 (@edi) to set up the initial path node. If that succeeds,
- * calls path_state_traverse to perform the full traverse. If a debug record exists
- * at +0x48, copies the entire path buffer into it, stores the BSP index, and
- * asserts the traverse result is non-zero (not _path_traverse_result_none).
+ * calls path_state_traverse to perform the full traverse. If a debug record
+ * exists at +0x48, copies the entire path buffer into it, stores the BSP index,
+ * and asserts the traverse result is non-zero (not _path_traverse_result_none).
  * If the result is not 5, marks the debug record as needing attention.
  *
  * Returns: char (0 = failed/skipped, nonzero = traverse result from

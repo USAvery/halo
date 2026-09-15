@@ -17474,7 +17474,8 @@
     },
     {
      "addr": "0x89a20",
-     "decl": "void FUN_00089a20(float *out, float *p0, float *p1, float *p2, float *p3, float t0, float h, float t);"
+     "decl": "void FUN_00089a20(float *out, float *p0, float *p1, float *p2, float *p3, float t0, float h, float t);",
+     "ported": true
     },
     {
      "addr": "0x89ab0",
@@ -39880,7 +39881,8 @@
     },
     {
      "addr": "0x5f240",
-     "decl": "void build_path_edges_for_surface(void);"
+     "decl": "short build_path_edges_for_surface(void *structure_bsp @<eax>, int surface_index, char *edges_out);",
+     "ported": true
     },
     {
      "addr": "0x5f3c0",
