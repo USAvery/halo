@@ -194,6 +194,268 @@ void FUN_0016dee0(void)
   }
 }
 
+/* rasterizer_xbox_motion_sensor: draw the motion-sensor blip pass.
+ * 0x16e2e0, TU c:\halo\SOURCE\rasterizer\xbox\rasterizer_xbox_motion_sensor.c
+ * (assert __FILE__ at 0x2a399c, line 0x9c).
+ *
+ * Three passes, all gated on the feature byte 0x3256db, the "motion sensor
+ * ready" byte 0x47e007 (set by FUN_0016dee0 at 0x16dee0), and both interface
+ * bitmaps (interface tag indices 7 and 8, bitmap 0) resolving to a hardware
+ * texture:
+ *   1. full-screen quad of the blip bitmap, UV swept by param_2 around the
+ *      0.5f centre constant at 0x253398;
+ *   2. full-screen quad of the background bitmap;
+ *   3. a screen-space quad of half-extent `size` centred on position[0/1],
+ *      drawn through the viewport-derived orthographic projection built from
+ *      the rectangle2d at 0x5a5bf4 ({top,left,bottom,right} int16).
+ * If any gate fails but the feature/ready bytes are still both set, the pass
+ * only restores the render target (FUN_00158140 at 0x16ea50).
+ *
+ * Argument evidence (disassembly at 0016e2e0):
+ *  - Ghidra reports `void __cdecl FUN_0016e2e0(void)` but the body reads
+ *    [EBP+8] (0016e992 MOV EDI,[EBP+8], then FLD [EDI]/[EDI+4]) and [EBP+0xC]
+ *    (0016e5ac FLD float ptr [EBP+0xc]) => (float *position, float param_2),
+ *    matching the existing kb.json decl and the caller in rasterizer_sprites.c.
+ *  - 0016e2e9 PUSH 0 / PUSH 7 / CALL interface_get_tag_index / ADD ESP,4 /
+ *    PUSH EAX / CALL FUN_00076ff0 / ADD ESP,8: the leading PUSH 0 is
+ *    FUN_00076ff0's bitmap_index, pushed before the inner call whose own
+ *    argument is retired separately (same shape as FUN_0016dee0).
+ *  - 0016e5ac FLD [EBP+0xc] / FMUL [0x253398] / FLD [0x253398] / FSUB ST0,ST1
+ *    / FSTP [EBP-4] => uv_lo = 0.5f - param_2*0.5f; the un-popped product then
+ *    FADD [0x253398] / FSTP [EBP-8] => uv_hi = param_2*0.5f + 0.5f. Both are
+ *    forwarded to SetVertexData2f as raw dwords via EDI/EBX (PUSH EDI/PUSH
+ *    EBX), so the first push is the LAST argument: (4, uv_hi, uv_lo).
+ *  - 0016e968 CALL local_player_count / CMP AX,SI(=1) / MOV [EBP-4],32.0f /
+ *    JG / MOV [EBP-4],42.0f => size = (count < 2) ? 42.0f : 32.0f (signed).
+ *  - the four position vertices use SUB ESP,8 + FSTP [ESP+4] / FSTP [ESP],
+ *    the MSVC push-then-fstp float idiom; operand order taken from the FSUB
+ *    vs FADD direction at each site (FSUB [EBP-4] = value - size, FADD = size
+ *    + value), not from the decompiler.
+ *  - 0016e76e PUSH ESI(1)/PUSH 0/PUSH 0/PUSH 0/PUSH EDX(=zero-extended word
+ *    at 0x5a5bc0) => FUN_00158140(target, 0, 0, 0, 1).
+ *  - 0016e784 PUSH 0 / PUSH 4 / PUSH 0 => FUN_001584f0(0, 4, 0).
+ *  - 0016e486 and 0016e84a PUSH 0 / PUSH 8 / PUSH 4 => FUN_00178b40(4, 8, 0).
+ *
+ * Constants read from the XBE: 0x253398 = 0.5f, 0x2533c8 = 1.0f,
+ * 0x255e94 = -1.0f, 0x25eeac = -2.0f.  FDIVR (not FDIV): the 1.0f constant is
+ * the dividend.
+ *
+ * Uncertain: the meaning of the render-state shadow globals at 0x1fb7xx and
+ * of the 0xf0-byte pixel-shader state block fields at 0x5a5ac0; both are
+ * written verbatim.
+ */
+void FUN_0016e2e0(float *position, float param_2)
+{
+  float vs_const[20];
+  void *blip_bitmap;
+  void *bg_bitmap;
+  float uv_lo;
+  float uv_hi;
+  float size;
+  short width;
+  short height;
+  float x_scale;
+  float y_scale;
+
+  blip_bitmap = FUN_00076ff0(interface_get_tag_index(7), 0);
+  bg_bitmap = FUN_00076ff0(interface_get_tag_index(8), 0);
+
+  if (*(int *)0x476ab0 == 0) {
+    display_assert(
+      "global_d3d_device",
+      "c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_motion_sensor.c",
+      0x9c, 1);
+    system_exit(-1);
+  }
+
+  if (*(char *)0x3256db != 0) {
+    if (*(char *)0x47e007 != 0 &&
+        xbox_texture_cache_get_hardware_format(blip_bitmap, 0, 1) != 0 &&
+        xbox_texture_cache_get_hardware_format(bg_bitmap, 0, 1) != 0) {
+      /* ---- pass 1: the swept blip bitmap ---- */
+      rasterizer_set_texture_bitmap_data(0, blip_bitmap);
+      D3DDevice_SetTextureStageState(0, 10, 4);
+      D3DDevice_SetTextureStageState(0, 0xb, 4);
+      D3DDevice_SetTextureState_BorderColor(0, 0x46000000);
+      D3DDevice_SetTextureStageState(0, 0xd, 2);
+      D3DDevice_SetTextureStageState(0, 0xe, 2);
+      D3DDevice_SetTextureStageState(0, 0xf, 1);
+      D3DDevice_SetRenderState_CullMode(0x901);
+      D3DDevice_SetRenderState_Simple(NV097_SET_COLOR_MASK_CMD,
+                                      NV097_COLOR_MASK_RGB);
+      *(unsigned long *)0x1fb7a4 = 0x10101;
+      D3DDevice_SetRenderState_Simple(0x40304, 1);
+      *(unsigned long *)0x1fb784 = 1;
+      D3DDevice_SetRenderState_Simple(0x40344, 1);
+      *(unsigned long *)0x1fb790 = 1;
+      D3DDevice_SetRenderState_Simple(0x40348, 0x302);
+      *(unsigned long *)0x1fb794 = 0x302;
+      D3DDevice_SetRenderState_Simple(0x40350, 0x8006);
+      *(unsigned long *)0x1fb7c0 = 0x8006;
+      D3DDevice_SetRenderState_Simple(0x40300, 0);
+      *(unsigned long *)0x1fb788 = 0;
+      D3DDevice_SetRenderState_ZEnable(0);
+      D3DDevice_SetRenderState_ZBias(0);
+
+      FUN_00178b40(4, 8, 0);
+
+      /* Identity 4x4 followed by the constant row (1,1,0,1). */
+      vs_const[0] = 1.0f;
+      vs_const[1] = 0.0f;
+      vs_const[2] = 0.0f;
+      vs_const[3] = 0.0f;
+      vs_const[4] = 0.0f;
+      vs_const[5] = 1.0f;
+      vs_const[6] = 0.0f;
+      vs_const[7] = 0.0f;
+      vs_const[8] = 0.0f;
+      vs_const[9] = 0.0f;
+      vs_const[10] = 1.0f;
+      vs_const[11] = 0.0f;
+      vs_const[12] = 0.0f;
+      vs_const[13] = 0.0f;
+      vs_const[14] = 0.0f;
+      vs_const[15] = 1.0f;
+      vs_const[16] = 1.0f;
+      vs_const[17] = 1.0f;
+      vs_const[18] = 0.0f;
+      vs_const[19] = 1.0f;
+      D3DDevice_SetVertexShaderConstant(-0x44, vs_const, 5);
+
+      csmemset((void *)0x5a5ac0, 0, 0xf0);
+      *(int *)0x5a5b98 = 1;
+      *(int *)0x5a5b94 = 1;
+      *(int *)0x5a5b48 = 0x8040000;
+      *(int *)0x5a5b74 = 0xc0;
+      *(int *)0x5a5ac0 = 0x18140000;
+      *(int *)0x5a5b28 = 0xc0;
+      *(int *)0x5a5ae0 = 0xc;
+      *(int *)0x5a5ae4 = 0x1c00;
+      rasterizer_set_pixel_shader((void *)0x5a5ac0);
+
+      D3DDevice_Begin(7);
+      D3DDevice_SetVertexData4f(9, 0.4588f, 0.7294f, 1.0f, 1.0f);
+      uv_lo = *(const float *)0x253398 - param_2 * *(const float *)0x253398;
+      uv_hi = param_2 * *(const float *)0x253398 + *(const float *)0x253398;
+      D3DDevice_SetVertexData2f(4, uv_hi, uv_lo);
+      D3DDevice_SetVertexData2f(0, -1.015625f, 1.046875f);
+      D3DDevice_SetVertexData2f(4, uv_lo, uv_lo);
+      D3DDevice_SetVertexData2f(0, 1.046875f, 1.046875f);
+      D3DDevice_SetVertexData2f(4, uv_lo, uv_hi);
+      D3DDevice_SetVertexData2f(0, 1.046875f, -1.015625f);
+      D3DDevice_SetVertexData2f(4, uv_hi, uv_hi);
+      D3DDevice_SetVertexData2f(0, -1.015625f, -1.015625f);
+      D3DDevice_End();
+
+      /* ---- pass 2: the background bitmap ---- */
+      rasterizer_set_texture_bitmap_data(0, bg_bitmap);
+      D3DDevice_SetRenderState_Simple(0x40304, 1);
+      *(unsigned long *)0x1fb784 = 1;
+      D3DDevice_SetRenderState_Simple(0x40344, 0);
+      *(unsigned long *)0x1fb790 = 0;
+      D3DDevice_SetRenderState_Simple(0x40348, 0x302);
+      *(unsigned long *)0x1fb794 = 0x302;
+
+      csmemset((void *)0x5a5ac0, 0, 0xf0);
+      *(int *)0x5a5b98 = 1;
+      *(int *)0x5a5b94 = 1;
+      *(int *)0x5a5ae0 = 8;
+      *(int *)0x5a5ae4 = 0x1800;
+      rasterizer_set_pixel_shader((void *)0x5a5ac0);
+
+      D3DDevice_Begin(7);
+      D3DDevice_SetVertexData4f(9, 0.4f, 0.8f, 0.4f, 1.0f);
+      D3DDevice_SetVertexData2f(4, 1.0f, 0.0f);
+      D3DDevice_SetVertexData2f(0, -1.015625f, 1.046875f);
+      D3DDevice_SetVertexData2f(4, 0.0f, 0.0f);
+      D3DDevice_SetVertexData2f(0, 1.046875f, 1.046875f);
+      D3DDevice_SetVertexData2f(4, 0.0f, 1.0f);
+      D3DDevice_SetVertexData2f(0, 1.046875f, -1.015625f);
+      D3DDevice_SetVertexData2f(4, 1.0f, 1.0f);
+      D3DDevice_SetVertexData2f(0, -1.015625f, -1.015625f);
+      D3DDevice_End();
+
+      /* ---- pass 3: the screen-space blip quad ---- */
+      FUN_00158140((int)*(unsigned short *)0x5a5bc0, 0, 0, 0, 1);
+      FUN_001584f0(0, 4, 0);
+
+      D3DDevice_SetTextureStageState(0, 10, 3);
+      D3DDevice_SetTextureStageState(0, 0xb, 3);
+      D3DDevice_SetTextureStageState(0, 0xd, 2);
+      D3DDevice_SetTextureStageState(0, 0xe, 2);
+      D3DDevice_SetTextureStageState(0, 0xf, 1);
+      D3DDevice_SetTextureState_BorderColor(0, 0);
+      D3DDevice_SetRenderState_CullMode(0x901);
+      D3DDevice_SetRenderState_Simple(NV097_SET_COLOR_MASK_CMD,
+                                      NV097_COLOR_MASK_RGB);
+      *(unsigned long *)0x1fb7a4 = 0x10101;
+      SetRenderStateSmart(0x3b, 1);
+      SetRenderStateSmart(0x3e, 1);
+      SetRenderStateSmart(0x3f, 0x303);
+      SetRenderStateSmart(0x4a, 0x8006);
+      SetRenderStateSmart(0x3c, 0);
+      SetRenderStateSmart(0x7b, 0);
+      D3DDevice_SetRenderState_ZBias(0);
+
+      FUN_00178b40(4, 8, 0);
+
+      width = *(const short *)0x5a5bfa - *(const short *)0x5a5bf6;
+      height = (short)(*(const int *)0x5a5bf8 - *(const int *)0x5a5bf4);
+      x_scale = 1.0f / (float)width;
+      vs_const[1] = 0.0f;
+      vs_const[2] = 0.0f;
+      vs_const[4] = 0.0f;
+      vs_const[6] = 0.0f;
+      vs_const[8] = 0.0f;
+      vs_const[9] = 0.0f;
+      vs_const[10] = 0.0f;
+      vs_const[0] = x_scale + x_scale;
+      vs_const[3] = -1.0f - x_scale;
+      y_scale = 1.0f / (float)height;
+      vs_const[5] = -2.0f * y_scale;
+      vs_const[7] = y_scale + 1.0f;
+      vs_const[11] = 0.5f;
+      vs_const[12] = 0.0f;
+      vs_const[13] = 0.0f;
+      vs_const[14] = 0.0f;
+      vs_const[15] = 1.0f;
+      vs_const[16] = 1.0f;
+      vs_const[17] = 1.0f;
+      vs_const[18] = 0.0f;
+      vs_const[19] = 1.0f;
+      D3DDevice_SetVertexShaderConstant(-0x44, vs_const, 5);
+
+      csmemset((void *)0x5a5ac0, 0, 0xf0);
+      *(int *)0x5a5b98 = 1;
+      *(int *)0x5a5b94 = 1;
+      *(int *)0x5a5ae0 = 8;
+      *(int *)0x5a5ae4 = 0x1800;
+      rasterizer_set_pixel_shader((void *)0x5a5ac0);
+
+      size = 32.0f;
+      if (local_player_count() < 2) {
+        size = 42.0f;
+      }
+
+      D3DDevice_Begin(7);
+      D3DDevice_SetVertexData2s(4, 0, 0);
+      D3DDevice_SetVertexData2f(0, position[0] - size, position[1] - size);
+      D3DDevice_SetVertexData2s(4, 1, 0);
+      D3DDevice_SetVertexData2f(0, size + position[0], position[1] - size);
+      D3DDevice_SetVertexData2s(4, 1, 1);
+      D3DDevice_SetVertexData2f(0, size + position[0], size + position[1]);
+      D3DDevice_SetVertexData2s(4, 0, 1);
+      D3DDevice_SetVertexData2f(0, position[0] - size, size + position[1]);
+      D3DDevice_End();
+      return;
+    }
+
+    if (*(char *)0x3256db != 0 && *(char *)0x47e007 != 0) {
+      FUN_00158140((int)*(unsigned short *)0x5a5bc0, 0, 0, 0, 1);
+    }
+  }
+}
+
 /* rasterizer_plasma_energy_draw (FUN_0016eef0): emit the plasma-energy
  * transparent shader (shader type 10) for one geometry group. Binds the two
  * noise-map textures (primary at shader+0xe0, secondary at shader+0x128),

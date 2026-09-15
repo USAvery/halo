@@ -21004,7 +21004,8 @@
     },
     {
      "addr": "0x16e2e0",
-     "decl": "void FUN_0016e2e0(float *position, float param_2);"
+     "decl": "void FUN_0016e2e0(float *position, float param_2);",
+     "ported": true
     },
     {
      "addr": "0x16eef0",
