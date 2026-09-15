@@ -8734,8 +8734,11 @@
     "call_count": 17
   },
   "0x183c00": {
-    "class": "stubbable",
-    "call_count": 3
+    "class": "non_leaf",
+    "call_count": 3,
+    "confidence": "high",
+    "coverage_pct": 100.0,
+    "oracle": "xbe"
   },
   "0x183cf0": {
     "class": "stubbable",
