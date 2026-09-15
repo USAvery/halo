@@ -27947,8 +27947,9 @@
     },
     {
      "addr": "0xeec10",
-     "decl": "void player_profile_color_picker_select_color(void);",
-     "comment": "[NAME: player_profile_color_picker_select_color — name_source=2276-symbol-dump method=exact_address tier=confirmed (T1), cea-apply-unified 2026-09-14]"
+     "decl": "bool player_profile_color_picker_select_color(void *widget, void *event_data, bool *widget_deleted);",
+     "comment": "[NAME: player_profile_color_picker_select_color — name_source=2276-symbol-dump method=exact_address tier=confirmed (T1), cea-apply-unified 2026-09-14]",
+     "ported": true
     },
     {
      "addr": "0xeed10",
@@ -28071,8 +28072,9 @@
     },
     {
      "addr": "0xf0740",
-     "decl": "void new_campaign_if_no_custom_player_profiles_exist(void);",
-     "comment": "[NAME: new_campaign_if_no_custom_player_profiles_exist — name_source=2276-symbol-dump method=exact_address tier=confirmed (T1), cea-apply-unified 2026-09-14]"
+     "decl": "bool new_campaign_if_no_custom_player_profiles_exist(void *widget, void *event_data, bool *widget_deleted);",
+     "comment": "[NAME: new_campaign_if_no_custom_player_profiles_exist — name_source=2276-symbol-dump method=exact_address tier=confirmed (T1), cea-apply-unified 2026-09-14]",
+     "ported": true
     },
     {
      "addr": "0xf0790",
@@ -28129,7 +28131,8 @@
     {
      "addr": "0xf2390",
      "decl": "void netgame_prejoin_players(void);",
-     "comment": "[NAME: netgame_prejoin_players — name_source=2276-symbol-dump method=exact_address tier=confirmed (T1), cea-apply-unified 2026-09-14]"
+     "comment": "[NAME: netgame_prejoin_players — name_source=2276-symbol-dump method=exact_address tier=confirmed (T1), cea-apply-unified 2026-09-14]",
+     "ported": true
     },
     {
      "addr": "0xf24b0",
@@ -28153,8 +28156,9 @@
     },
     {
      "addr": "0xf2850",
-     "decl": "void main_menu_animation_fakery(void);",
-     "comment": "[NAME: main_menu_animation_fakery — name_source=2276-symbol-dump method=exact_address tier=confirmed (T1), cea-apply-unified 2026-09-14]"
+     "decl": "void main_menu_animation_fakery(void *widget);",
+     "comment": "[NAME: main_menu_animation_fakery — name_source=2276-symbol-dump method=exact_address tier=confirmed (T1), cea-apply-unified 2026-09-14]",
+     "ported": true
     },
     {
      "addr": "0xf28e0",
@@ -28171,8 +28175,9 @@
     },
     {
      "addr": "0xf2b00",
-     "decl": "void get_active_player_profile_color_index(void);",
-     "comment": "[NAME: get_active_player_profile_color_index — name_source=2276-symbol-dump method=exact_address tier=confirmed (T1), cea-apply-unified 2026-09-14]"
+     "decl": "void get_active_player_profile_color_index(void *widget);",
+     "comment": "[NAME: get_active_player_profile_color_index — name_source=2276-symbol-dump method=exact_address tier=confirmed (T1), cea-apply-unified 2026-09-14]",
+     "ported": true
     },
     {
      "addr": "0xf2b90",
@@ -28190,8 +28195,9 @@
     },
     {
      "addr": "0xf2ed0",
-     "decl": "void multiplayer_game_set_text_box_for_score_limit(void);",
-     "comment": "[NAME: multiplayer_game_set_text_box_for_score_limit — name_source=2276-symbol-dump method=exact_address tier=confirmed (T1), cea-apply-unified 2026-09-14]"
+     "decl": "void multiplayer_game_set_text_box_for_score_limit(void *widget);",
+     "comment": "[NAME: multiplayer_game_set_text_box_for_score_limit — name_source=2276-symbol-dump method=exact_address tier=confirmed (T1), cea-apply-unified 2026-09-14]",
+     "ported": true
     },
     {
      "addr": "0xf2f60",
@@ -28214,7 +28220,8 @@
     },
     {
      "addr": "0xf3320",
-     "decl": "void multiplayer_edit_profile_set_ruleset_textbox_string_index(void);",
+     "decl": "void multiplayer_edit_profile_set_ruleset_textbox_string_index(void *widget);",
+     "ported": true,
      "comment": "[NAME: multiplayer_edit_profile_set_ruleset_textbox_string_index — name_source=2276-symbol-dump method=exact_address tier=confirmed (T1), cea-apply-unified 2026-09-14]"
     },
     {

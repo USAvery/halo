@@ -65698,6 +65698,21 @@
       "score": 100.0,
       "source": "src/halo/objects/objects.c"
     },
+    "get_active_player_profile_color_index": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 87.3,
+      "addr": "0xf2b00",
+      "end": "0xf2b8e",
+      "kind": "auto",
+      "n_r": 56,
+      "opnd_percent": 58.2,
+      "raw_mnemonic_pct": 87.3,
+      "ref": "synth",
+      "ref_sha": "24851f00bea8997c",
+      "score": 87.3,
+      "source": "src/halo/interface/ui_widget_game_data_input_functions.c"
+    },
     "get_ball_definition_index": {
       "abi_model": "raw",
       "abi_model_items": 0,
@@ -70513,6 +70528,21 @@
       "score": 100.0,
       "source": "src/halo/interface/ui_widget.c"
     },
+    "main_menu_animation_fakery": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 97.7,
+      "addr": "0xf2850",
+      "end": "0xf28d6",
+      "kind": "auto",
+      "n_r": 44,
+      "opnd_percent": 83.7,
+      "raw_mnemonic_pct": 97.7,
+      "ref": "synth",
+      "ref_sha": "77f0d9076daebefe",
+      "score": 97.7,
+      "source": "src/halo/interface/ui_widget_game_data_input_functions.c"
+    },
     "main_menu_is_active": {
       "abi_model": "raw",
       "abi_model_items": 0,
@@ -71743,6 +71773,21 @@
       "score": 100.0,
       "source": "src/halo/interface/event_manager.c"
     },
+    "multiplayer_edit_profile_set_ruleset_textbox_string_index": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 100.0,
+      "addr": "0xf3320",
+      "end": "0xf33af",
+      "kind": "auto",
+      "n_r": 53,
+      "opnd_percent": 98.1,
+      "raw_mnemonic_pct": 100.0,
+      "ref": "synth",
+      "ref_sha": "354c77919ee94225",
+      "score": 100.0,
+      "source": "src/halo/interface/ui_widget_game_data_input_functions.c"
+    },
     "multiplayer_game_set_text_box_for_game_ruleset": {
       "abi_model": "raw",
       "abi_model_items": 0,
@@ -71757,6 +71802,36 @@
       "ref_sha": "3bfe6e6942a15f8e",
       "score": 8.1,
       "source": "src/halo/unported_thunks.c"
+    },
+    "multiplayer_game_set_text_box_for_score_limit": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 100.0,
+      "addr": "0xf2ed0",
+      "end": "0xf2f60",
+      "kind": "auto",
+      "n_r": 50,
+      "opnd_percent": 96.0,
+      "raw_mnemonic_pct": 100.0,
+      "ref": "synth",
+      "ref_sha": "b100a066dea1902b",
+      "score": 100.0,
+      "source": "src/halo/interface/ui_widget_game_data_input_functions.c"
+    },
+    "netgame_prejoin_players": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 100.0,
+      "addr": "0xf2390",
+      "end": "0xf24aa",
+      "kind": "auto",
+      "n_r": 95,
+      "opnd_percent": 98.9,
+      "raw_mnemonic_pct": 100.0,
+      "ref": "synth",
+      "ref_sha": "0651d2151d232c5c",
+      "score": 100.0,
+      "source": "src/halo/interface/ui_widget_game_data_input_functions.c"
     },
     "network_client_get_oos": {
       "abi_model": "raw",
@@ -73767,6 +73842,21 @@
       "ref_sha": "778c29bd7fa0d048",
       "score": 92.3,
       "source": "src/halo/networking/network_server_manager.c"
+    },
+    "new_campaign_if_no_custom_player_profiles_exist": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 92.1,
+      "addr": "0xf0740",
+      "end": "0xf078c",
+      "kind": "auto",
+      "n_r": 33,
+      "opnd_percent": 92.1,
+      "raw_mnemonic_pct": 92.1,
+      "ref": "synth",
+      "ref_sha": "720fa2603d9b7d9c",
+      "score": 92.1,
+      "source": "src/halo/interface/ui_widget_game_data_input_functions.c"
     },
     "normalize3d": {
       "abi_model": "raw",
@@ -77936,6 +78026,21 @@
       "ref": "synth",
       "ref_sha": "07b6dd82ed4ce354",
       "score": 79.2,
+      "source": "src/halo/interface/ui_widget_game_data_input_functions.c"
+    },
+    "player_profile_color_picker_select_color": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 90.1,
+      "addr": "0xeec10",
+      "end": "0xeed0e",
+      "kind": "auto",
+      "n_r": 81,
+      "opnd_percent": 84.0,
+      "raw_mnemonic_pct": 90.1,
+      "ref": "synth",
+      "ref_sha": "07b60167609ecc64",
+      "score": 90.1,
       "source": "src/halo/interface/ui_widget_game_data_input_functions.c"
     },
     "player_profile_get_from_path": {

@@ -60,6 +60,71 @@ bool ui_widget_color_picker_menu_dispose(void *widget, void *event_data,
   return true;
 }
 
+/* player profile color picker selection handler (event handler table index 63,
+ * 0x0eec10) — validates the spinner list widget hanging off widget+0x38 (type
+ * 2, definition tag 'DeLa' with 3 list items), bounds-checks the selected color
+ * index at list_widget+0x3c against the profile colour count, then writes it
+ * into the profile currently being edited at profile+0x18. Reports a deferred
+ * error and returns false when no profile is being edited. */
+bool player_profile_color_picker_select_color(void *widget, void *event_data,
+                                              bool *widget_deleted)
+{
+  int *list_widget;
+  void *profile;
+  short *list_tag;
+
+  (void)event_data;
+  (void)widget_deleted;
+
+  list_widget = *(int **)((char *)widget + 0x38);
+  profile = player_ui_get_edit_player_profile();
+
+  if (list_widget == NULL || *(short *)((char *)list_widget + 0xe) != 2) {
+    display_assert(
+      "expected the color select screen to contain a spinner list for the "
+      "color picker",
+      "c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 0xe2e,
+      1);
+    system_exit(-1);
+  }
+
+  list_tag = (short *)tag_get(0x44654c61 /* 'DeLa' */, *list_widget);
+  if (*list_tag != 2) {
+    display_assert(
+      "expected a spinner list widget for 'player color picker list' widget",
+      "c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 0xe35,
+      1);
+    system_exit(-1);
+  }
+
+  if (*(int *)((char *)list_tag + 0x3e0) != 3) {
+    display_assert(
+      "expected 3 list items for 'player color picker list' widget",
+      "c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 0xe36,
+      1);
+    system_exit(-1);
+  }
+
+  if (*(short *)((char *)list_widget + 0x3c) < 0 ||
+      (int)*(short *)((char *)list_widget + 0x3c) >= (int)FUN_001c0ed0()) {
+    display_assert(
+      "invalid player profile color index specified",
+      "c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 0xe3c,
+      1);
+    system_exit(-1);
+  }
+
+  if (profile == NULL) {
+    error(2,
+          "failed to set player profile color because no profile is currently "
+          "being edited");
+    return false;
+  }
+
+  *(short *)((char *)profile + 0x18) = *(short *)((char *)list_widget + 0x3c);
+  return true;
+}
+
 /* player profile list selection handler (event handler table index 64,
  * 0x0eed10) — validates the 'player profile list' spinner widget (3 items)
  * hanging off widget+0x34, resolves the selected item's profile handle, and
@@ -814,6 +879,31 @@ bool ui_widget_game_data_select_difficulty_item(void *widget)
   return true;
 }
 
+/* new campaign if no custom player profiles exist (0xf0740) — calls the
+ * saved-game profile enumerator at 0x1c0d50 with the same argument shape as
+ * FUN_000e5590 (index -1, two out-param locals with local_4 pre-set to 1,
+ * trailing flag 0 here). The enumerator's result is read back as a signed
+ * 16-bit value: if it is positive the handler does nothing and returns true;
+ * otherwise it forwards the event to ui_widget_new_campaign_chosen (whose
+ * return value is discarded — the constant false is materialised in the
+ * callee-saved BL before the call) and returns false. */
+bool new_campaign_if_no_custom_player_profiles_exist(void *widget,
+                                                     void *event_data,
+                                                     bool *widget_deleted)
+{
+  int local_4;
+  int local_8;
+
+  local_4 = 1;
+  FUN_001c0d50(-1, &local_4, &local_8, 0);
+  if ((short)local_4 > 0) {
+    return true;
+  }
+
+  ui_widget_new_campaign_chosen(widget, event_data, widget_deleted);
+  return false;
+}
+
 void ui_widget_game_data_function_invoke(
   void *widget, unsigned __int16 game_data_input_reference_function)
 {
@@ -1194,6 +1284,65 @@ void ui_widget_game_data_build_version(int widget)
   }
 }
 
+/* netgame_prejoin_players (0xf2390). While the client is in state 2 (joining),
+ * builds a 4-entry table of local players that want to play multiplayer,
+ * clears the entries for local players already present in the network game
+ * player list (16 slots of 0x20 bytes at game+0x226, local-player index byte
+ * at +0x243), then sends a join request for each remaining wanted player. */
+void netgame_prejoin_players(void)
+{
+  void *client;
+  int game;
+  int index;
+  char wants_to_play[4];
+
+  client = network_game_client_get();
+  if (client == NULL) {
+    return;
+  }
+  if (network_game_client_get_state(client, &index) != 2) {
+    return;
+  }
+
+  game = network_game_get_game();
+  if (game == 0) {
+    display_assert(
+      "game",
+      "c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+      0x614, 1);
+    system_exit(-1);
+  }
+
+  index = 0;
+  do {
+    wants_to_play[(short)index] =
+      (char)player_ui_local_player_wants_to_play_multiplayer((short)index);
+    index++;
+  } while ((short)index < 4);
+
+  index = 0;
+  do {
+    if (network_player_is_valid(
+          (void *)((char *)(uintptr_t)game + (short)index * 0x20 + 0x226)) &&
+        network_game_player_is_local(
+          (void *)((char *)(uintptr_t)game + (short)index * 0x20 + 0x226))) {
+      wants_to_play[(int)*(char *)((char *)(uintptr_t)game +
+                                   (short)index * 0x20 + 0x243)] = 0;
+    }
+    index++;
+  } while ((short)index < 0x10);
+
+  index = 0;
+  do {
+    if (wants_to_play[(short)index] != 0) {
+      if (!network_game_client_add_player(client, (uint16_t)index)) {
+        network_game_log("failed to send join request");
+      }
+    }
+    index++;
+  } while ((short)index < 4);
+}
+
 /* player-profile three-column list update (0x0f2560). Validates the column
  * list and extended-description text widget, then stores the selected list
  * item's spinner setting into the text widget. */
@@ -1389,6 +1538,54 @@ void FUN_000f2720(void *widget)
   *(short *)((char *)picture_widget + 0x50) = list_value;
 }
 
+/* main_menu_animation_fakery (0xf2850) — requires the widget to be a column
+ * list (type == 3 at +0xe) and its cached extended-description child at +0x48
+ * to be a non-NULL container/picture widget (type == 0 at +0xe), then copies
+ * the column list's selected index (+0x3c, signed 16-bit) into the picture
+ * widget's +0x50 slot, clamped at zero. The reference re-loads widget+0x48
+ * after the store and writes +0x50 on both clamp branches. Evidence:
+ * reference disassembly at 0xf2850-0xf28d5 (assert strings/lines are the
+ * reference's own PUSH immediates at 0xf2860/0xf2865/0xf286a and
+ * 0xf288e/0xf2893/0xf2898). */
+void main_menu_animation_fakery(void *widget)
+{
+  char *widget_bytes;
+  void *picture_widget;
+  int zero;
+  short value;
+
+  if (*(short *)((char *)widget + 0xe) != 3) {
+    display_assert(
+      "expected column list for main menu options list",
+      "c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+      0x9ab, 1);
+    system_exit(-1);
+  }
+
+  picture_widget = *(void **)((char *)widget + 0x48);
+  if (picture_widget == (void *)(zero = 0) ||
+      *(short *)((char *)picture_widget + 0xe) != zero) {
+    display_assert(
+      "expected a picture (container) for main menu options list extended "
+      "description",
+      "c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+      0x9ae, 1);
+    system_exit(-1);
+  }
+
+  picture_widget = *(void **)((char *)widget + 0x48);
+  widget_bytes = (char *)widget;
+  *(short *)((char *)picture_widget + 0x50) = *(short *)(widget_bytes + 0x3c);
+
+  picture_widget = *(void **)(widget_bytes + 0x48);
+  value = *(short *)((char *)picture_widget + 0x50);
+  if (value < zero) {
+    *(short *)((char *)picture_widget + 0x50) = (short)zero;
+  } else {
+    *(short *)((char *)(*(void **)(widget_bytes + 0x48)) + 0x50) = value;
+  }
+}
+
 /* FUN_000f28e0 (0xf28e0)
  * "profile display name" data-driven text box widget update. Requires the
  * widget to be a text box (type == 1 at +0xe) and its bound local player
@@ -1434,6 +1631,46 @@ void FUN_000f28e0(void *widget)
     ustrncpy(new_buf, (wchar_t *)profile, 0xb);
     *(unsigned short *)((char *)new_buf + 0x16) = 0;
   }
+}
+
+/* get_active_player_profile_color_index (0xf2b00) — "profile color picture"
+ * data-driven widget update. Requires the widget's bound local player index
+ * (+0x8, signed 16-bit) to be in [0, MAXIMUM_NUMBER_OF_LOCAL_PLAYERS), fetches
+ * that player's active profile (the same 0x30-byte opaque record as
+ * player_ui_get_active_player_profile), reads its color index at +0x18, and
+ * stores it into the widget's +0x50 value slot clamped to
+ * [0, FUN_001c0ed0() - 1]. A negative profile color index stores 0. The
+ * reference calls FUN_001c0ed0 twice on the over-range path (0xf2b64 and
+ * 0xf2b71) — both calls are preserved. Evidence: reference disassembly at
+ * 0xf2b00-0xf2b8d (assert string/line are the reference's own PUSH immediates
+ * at 0xf2b1b/0xf2b20/0xf2b25). */
+void get_active_player_profile_color_index(void *widget)
+{
+  unsigned char profile[0x30];
+  short local_player_index;
+  short color_index;
+
+  local_player_index = *(short *)((char *)widget + 8);
+  if (local_player_index < 0 || local_player_index >= 4) {
+    display_assert(
+      "profile color picture requires a valid local player index",
+      "c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+      0xa2d, 1);
+    system_exit(-1);
+  }
+
+  player_ui_get_active_player_profile(local_player_index, profile);
+
+  color_index = *(short *)(profile + 0x18);
+  if (color_index < 0) {
+    *(short *)((char *)widget + 0x50) = 0;
+    return;
+  }
+  if ((int)color_index > (int)FUN_001c0ed0() - 1) {
+    *(short *)((char *)widget + 0x50) = (short)(FUN_001c0ed0() - 1);
+    return;
+  }
+  *(short *)((char *)widget + 0x50) = color_index;
 }
 
 /* FUN_000f2b90 (0xf2b90) — maps the active multiplayer map name to its
@@ -1542,6 +1779,51 @@ void FUN_000f2e60(void *widget)
   }
 }
 
+/* multiplayer_game_set_text_box_for_score_limit (0xf2ed0)
+ * "mp game settings text" numeric text box widget update for the network
+ * game's score limit. Requires the widget to be a text box (type == 1 at
+ * +0xe); otherwise asserts + exits (reference PUSH immediates at
+ * 0xf2edf/0xf2ee1/0xf2ee6/0xf2eeb). Looks up the current network game via
+ * network_game_get_game(); if none is active, reports error 2 "no network
+ * game" (reference PUSH immediates at 0xf2f4d/0xf2f52) and leaves the text
+ * buffer untouched. Otherwise reallocates the widget's text buffer (+0x3c)
+ * to 0x10 bytes (8 wchar_t) and formats the game object's dword at +0xe4
+ * into it with "%d" (format string at 0x26c118 = L"%d"), then explicitly
+ * null-terminates at wchar index 7 (byte offset 0xe) by re-reading the
+ * widget's +0x3c pointer. Evidence: reference disassembly at
+ * 0xf2ed0-0xf2f5f (ui_widget_realloc call at 0xf2f0a-0xf2f1f;
+ * unicode_sprintf call at 0xf2f29-0xf2f40; terminator store at
+ * 0xf2f3d/0xf2f44). */
+void multiplayer_game_set_text_box_for_score_limit(void *widget)
+{
+  int game;
+  wchar_t *new_buf;
+
+  if (*(short *)((char *)widget + 0xe) != 1) {
+    display_assert(
+      "expected text box widget for mp game settings text",
+      "c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+      0xac3, 1);
+    system_exit(-1);
+  }
+
+  game = network_game_get_game();
+  if (game != 0) {
+    new_buf = (wchar_t *)ui_widget_realloc(
+      *(int *)((char *)widget + 0x3c), 0x10,
+      "c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+      0xac8);
+    *(wchar_t **)((char *)widget + 0x3c) = new_buf;
+    if (new_buf != NULL) {
+      unicode_sprintf(new_buf, 7, L"%d", *(int *)(game + 0xe4));
+      *(unsigned short *)((char *)*(wchar_t **)((char *)widget + 0x3c) + 0xe) =
+        0;
+    }
+  } else {
+    error(2, "no network game");
+  }
+}
+
 /* FUN_000f2f60 (0xf2f60)
  * "mp game settings text" data-driven text box widget update (game-type
  * variant). Requires the widget to be a text box (type == 1 at +0xe);
@@ -1633,6 +1915,55 @@ void FUN_000f3280(void *widget)
     }
   } else {
     error(2, "no network game");
+  }
+}
+
+/* multiplayer_edit_profile_set_ruleset_textbox_string_index (0xf3320)
+ * "mp profile edit ruleset text" text box widget update. Requires the widget
+ * to be a text box (type == 1 at +0xe); otherwise asserts + exits (assert
+ * string/file/line are the reference's own PUSH immediates at
+ * 0xf3330/0xf3335/0xf333a). Fetches the playlist profile currently being
+ * edited (player_ui_get_edit_playlist_profile at 0xf334e); if none is being
+ * edited, reports error 2 "not currently editing a game variant" and leaves
+ * the widget untouched. Otherwise maps the profile's ruleset field at +0x18
+ * (values 1..5, via the DEC/CMP 4/JA jump table at 0xf3357-0xf3360) onto the
+ * widget's +0x40 string index 3..7, with 8 for any other value. */
+void multiplayer_edit_profile_set_ruleset_textbox_string_index(void *widget)
+{
+  int profile;
+
+  if (*(short *)((char *)widget + 0xe) != 1) {
+    display_assert(
+      "expected a text box widget for mp profile edit ruleset text widget",
+      "c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+      0xb69, 1);
+    system_exit(-1);
+  }
+
+  profile = (int)player_ui_get_edit_playlist_profile();
+  if (profile != 0) {
+    switch (*(int *)(profile + 0x18)) {
+    case 1:
+      *(unsigned short *)((char *)widget + 0x40) = 3;
+      return;
+    case 2:
+      *(unsigned short *)((char *)widget + 0x40) = 4;
+      return;
+    case 3:
+      *(unsigned short *)((char *)widget + 0x40) = 5;
+      return;
+    case 4:
+      *(unsigned short *)((char *)widget + 0x40) = 6;
+      return;
+    case 5:
+      *(unsigned short *)((char *)widget + 0x40) = 7;
+      return;
+    default:
+      *(unsigned short *)((char *)widget + 0x40) = 8;
+      return;
+    }
+  } else {
+    error(2, "not currently editing a game variant");
   }
 }
 
