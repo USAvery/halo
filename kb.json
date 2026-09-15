@@ -7889,7 +7889,7 @@
     {
      "addr": "0x199420",
      "decl": "file_ref_t *file_reference_create(file_ref_t *info, int16_t location);",
-     "ported": false
+     "ported": true
     },
     {
      "addr": "0x1995c0",

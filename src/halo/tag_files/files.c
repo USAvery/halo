@@ -162,6 +162,36 @@ static int g_find_file_handles[8] = { -1, -1, -1, -1, -1, -1, -1, -1 };
 static unsigned char g_find_file_data[0x148];
 
 /**
+ * file_reference_create - initialize a file reference in place.
+ *
+ * Asserts the destination is non-NULL and that location is in
+ * [NONE, NUMBER_OF_FILE_REFERENCE_LOCATIONS) == [-1, 2), then zeroes
+ * the whole 0x10C-byte structure, stores the location and finally the
+ * FILE_REFERENCE_SIGNATURE magic. Store order (location before magic)
+ * follows the binary (MOV [ESI+6],DI at 0x199486 then MOV [ESI],imm32
+ * at 0x19948b).
+ *
+ * Returns the initialized reference (MOV EAX,ESI at 0x199491).
+ */
+file_ref_t *file_reference_create(file_ref_t *info, int16_t location)
+{
+  if (info == NULL) {
+    display_assert("info", "c:\\halo\\SOURCE\\tag_files\\files.c", 0x5b, true);
+    system_exit(-1);
+  }
+  if (location < -1 || location >= 2) {
+    display_assert("location>=NONE && "
+                   "location<NUMBER_OF_FILE_REFERENCE_LOCATIONS",
+                   "c:\\halo\\SOURCE\\tag_files\\files.c", 0x5c, true);
+    system_exit(-1);
+  }
+  csmemset(info, 0, 0x10c);
+  info->unk_6 = location;
+  info->magic = FILE_REF_MAGIC;
+  return info;
+}
+
+/**
  * find_files - enumerate files matching a directory reference.
  *
  * Begins a file search using the given flags and directory reference,
