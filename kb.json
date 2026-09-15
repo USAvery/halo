@@ -9956,7 +9956,9 @@
     },
     {
      "addr": "0xb3df0",
-     "decl": "void race_engine_display_score(void);",
+     "decl": "char race_engine_display_score(int player_index, int event_type, int player_handle, wchar_t *buffer, int buffer_size);",
+     "ported": true,
+     "src": "src/halo/game/game_engine.c",
      "comment": "[NAME: race_engine_display_score \u2014 name_source=2276-symbol-dump method=exact_address tier=confirmed (T1), cea-apply-unified 2026-09-14]"
     }
    ],

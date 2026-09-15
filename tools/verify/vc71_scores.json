@@ -80473,6 +80473,21 @@
       "score": 100.0,
       "source": "src/halo/math/real_math.c"
     },
+    "race_engine_display_score": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 96.5,
+      "addr": "0xb3df0",
+      "end": "0xb4090",
+      "kind": "auto",
+      "n_r": 259,
+      "opnd_percent": 89.6,
+      "raw_mnemonic_pct": 96.5,
+      "ref": "synth",
+      "ref_sha": "0120dd3f2160f659",
+      "score": 96.5,
+      "source": "src/halo/game/game_engine.c"
+    },
     "race_player_added": {
       "abi_model": "raw",
       "abi_model_items": 0,
