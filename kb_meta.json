@@ -41,6 +41,10 @@
       "kind": "function",
       "status": "ported"
     },
+    "0x129f0": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0x12f10": {
       "kind": "function",
       "status": "ported"
@@ -2086,6 +2090,10 @@
         "The semantic meaning of param_2 and scenario definition flag bit 0 remains uncertain beyond their observed control-flow roles."
       ]
     },
+    "0x45830": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0x458f0": {
       "kind": "function",
       "status": "ported"
@@ -2913,6 +2921,10 @@
       "kind": "function",
       "status": "ported"
     },
+    "0x60260": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0x60c40": {
       "kind": "function",
       "status": "ported"
@@ -3236,12 +3248,20 @@
         "The upstream libtiff identity of this entry point and the meaning of bit 0 of the byte at tif+0x9 are both UNKNOWN; in particular it is unproven whether that byte is byte 1 of an upstream uint32 tif_flags based at 0x08, so the bit is set with a literal 1 and cleared with 0xfe rather than a named TIFF_ macro."
       ]
     },
+    "0x68e20": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0x69200": {
       "kind": "function",
       "status": "unknown",
       "inferred": [
         "FUN_00069200 is upstream libtiff _PutBits as a real function: its own disassembly shows EAX as the bit count (mov ebx,eax at 0x6920b then cmp against sp->bit), the lone [ebp+8] stack argument as the code shifted into the accumulator, and the TIFF handle arriving in EDI (mov esi,[edi+0x120] at 0x69205 with EDI never initialized locally)."
       ]
+    },
+    "0x69310": {
+      "kind": "function",
+      "status": "ported"
     },
     "0x693b0": {
       "kind": "function",
@@ -3299,6 +3319,14 @@
       "uncertain": [
         "The freed block at tif+0x120 is typed tiff_codec_bits_t* by reusing this translation unit's own private-state shape recovered from FUN_00069520; nothing in this body proves the fax3 codec's state has that layout, and debug_free takes void* so the type is never load-bearing here."
       ]
+    },
+    "0x69690": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x69b90": {
+      "kind": "function",
+      "status": "ported"
     },
     "0x6a070": {
       "kind": "function",
@@ -4080,6 +4108,10 @@
       "kind": "function",
       "status": "ported"
     },
+    "0x805a0": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0x807d0": {
       "kind": "function",
       "status": "ported"
@@ -4327,11 +4359,19 @@
       "kind": "function",
       "status": "ported"
     },
+    "0x85b60": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0x861a0": {
       "kind": "function",
       "status": "ported"
     },
     "0x861c0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x861d0": {
       "kind": "function",
       "status": "ported"
     },
@@ -6858,6 +6898,10 @@
       "kind": "function",
       "status": "ported"
     },
+    "0xb3df0": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0xb40f0": {
       "kind": "function",
       "status": "ported"
@@ -6875,6 +6919,10 @@
       "status": "ported"
     },
     "0xb4300": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0xb4d00": {
       "kind": "function",
       "status": "ported"
     },
@@ -9939,6 +9987,10 @@
       "kind": "function",
       "status": "ported"
     },
+    "0xcaf70": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0xcaff0": {
       "kind": "function",
       "status": "ported"
@@ -10657,6 +10709,10 @@
       "status": "ported"
     },
     "0xde140": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0xde360": {
       "kind": "function",
       "status": "ported"
     },
@@ -11483,6 +11539,10 @@
       "kind": "function",
       "status": "ported"
     },
+    "0xeec10": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0xef900": {
       "kind": "function",
       "status": "ported"
@@ -11511,6 +11571,10 @@
       "kind": "function",
       "status": "ported"
     },
+    "0xf0740": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0xf0a30": {
       "kind": "function",
       "status": "ported"
@@ -11523,11 +11587,31 @@
       "kind": "function",
       "status": "ported"
     },
+    "0xf2390": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0xf24b0": {
       "kind": "function",
       "status": "ported"
     },
     "0xf2560": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0xf2850": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0xf2b00": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0xf2ed0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0xf3320": {
       "kind": "function",
       "status": "ported"
     },
@@ -14492,6 +14576,10 @@
       "status": "ported"
     },
     "0x1318f0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x132fb0": {
       "kind": "function",
       "status": "ported"
     },
@@ -17656,6 +17744,14 @@
       "kind": "function",
       "status": "ported"
     },
+    "0x19ccf0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x19cec0": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0x19d060": {
       "kind": "function",
       "status": "ported"
@@ -17704,6 +17800,10 @@
       "status": "ported"
     },
     "0x19d670": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x19d6e0": {
       "kind": "function",
       "status": "ported"
     },
@@ -18935,11 +19035,19 @@
       "kind": "function",
       "status": "ported"
     },
+    "0x1b7020": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0x1b7ee0": {
       "kind": "function",
       "status": "ported",
       "name": "vehicle_moving_near_any_player",
       "name_confidence": "high"
+    },
+    "0x1b8f10": {
+      "kind": "function",
+      "status": "ported"
     },
     "0x1b9890": {
       "kind": "function",
