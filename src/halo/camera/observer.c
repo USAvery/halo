@@ -2,16 +2,16 @@
 
 /* Camera observer — tracks camera position/orientation per player. */
 
-/* Evaluate the scalar interpolator FUN_00089940 once per component of a
+/* Evaluate the scalar interpolator uniform_cubic_spline once per component of a
  * 3-vector (0x89a20). The four input pointers supply the four control values
  * y0..y3 for each component; t0/h/t are shared scalars forwarded unchanged to
  * every component. Results are stored into out[0..2] as each call returns. */
 void FUN_00089a20(float *out, float *p0, float *p1, float *p2, float *p3,
                   float t0, float h, float t)
 {
-  out[0] = FUN_00089940(p0[0], p1[0], p2[0], p3[0], t0, h, t);
-  out[1] = FUN_00089940(p0[1], p1[1], p2[1], p3[1], t0, h, t);
-  out[2] = FUN_00089940(p0[2], p1[2], p2[2], p3[2], t0, h, t);
+  out[0] = uniform_cubic_spline(p0[0], p1[0], p2[0], p3[0], t0, h, t);
+  out[1] = uniform_cubic_spline(p0[1], p1[1], p2[1], p3[1], t0, h, t);
+  out[2] = uniform_cubic_spline(p0[2], p1[2], p2[2], p3[2], t0, h, t);
 }
 
 void observer_initialize(void)
