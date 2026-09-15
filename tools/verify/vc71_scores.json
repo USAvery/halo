@@ -62293,6 +62293,21 @@
       "score": 88.0,
       "source": "src/halo/game/players.c"
     },
+    "finddiff": {
+      "abi_model": "regparam_stripped_saves",
+      "abi_model_items": 5,
+      "abi_modeled_mnemonic_pct": 83.7,
+      "addr": "0x69690",
+      "end": "0x696c5",
+      "kind": "auto",
+      "n_r": 22,
+      "opnd_percent": 60.5,
+      "raw_mnemonic_pct": 79.2,
+      "ref": "synth",
+      "ref_sha": "20dc8e0467bc15ce",
+      "score": 83.7,
+      "source": "src/halo/bitmaps/libtiff/tif_flush.c"
+    },
     "first_person_camera_new": {
       "abi_model": "raw",
       "abi_model_items": 0,

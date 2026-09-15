@@ -36807,8 +36807,9 @@
     },
     {
      "addr": "0x69690",
-     "decl": "void finddiff(void);",
-     "comment": "[NAME: finddiff \u2014 name_source=2276-symbol-dump method=exact_address tier=confirmed (T1), cea-apply-unified 2026-09-14]"
+     "decl": "int finddiff(unsigned char *cp, int bs @<esi>, int be @<edx>, int color);",
+     "comment": "[NAME: finddiff \u2014 name_source=2276-symbol-dump method=exact_address tier=confirmed (T1), cea-apply-unified 2026-09-14]",
+     "ported": true
     },
     {
      "addr": "0x696d0",

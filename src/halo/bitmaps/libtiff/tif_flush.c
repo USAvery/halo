@@ -1558,7 +1558,7 @@ void FUN_000695c0(void *tif_)
  *             scan stopped.
  * @return the number of like-valued bits found, never more than `be - bs`.
  */
-int FUN_00069600(int bs /* @<ecx> */, int be /* @<edx> */,
+__declspec(noinline) int FUN_00069600(int bs /* @<ecx> */, int be /* @<edx> */,
                  const unsigned char *runs /* @<ebx> */, unsigned char **pbp)
 {
   unsigned char *bp = *pbp;
@@ -1616,6 +1616,67 @@ int FUN_00069600(int bs /* @<ecx> */, int be /* @<edx> */,
 
   *pbp = bp;
   return span;
+}
+
+/**
+ * Find the next colour change, in bits, starting at bit `bs`.
+ *
+ * Upstream libtiff tif_fax3.c spells this as the macro
+ * `finddiff(_cp,_bs,_be,_color) (_bs + (_color ? find1span(...) :
+ * find0span(...)))`; Bungie's build has it out of line, and the 2276 symbol
+ * dump names this address `finddiff`. The body is exactly that expression: bias
+ * the byte cursor by `bs>>3` (`mov eax,esi / sar eax,3 / add ecx,eax` at
+ * 0x69696-0x0006969b -- the shift is arithmetic, so `bs` is signed), select
+ * the run table, call the shared span scanner, and add `bs` back to its
+ * result (`add eax,esi` at 0x696c0).
+ *
+ * The polarity of the table select is pinned by the branch at
+ * 0x696a6-0x696ad: EBX is loaded with 0x2ec4c8 unconditionally and only
+ * rewritten to 0x2ec3c8 on the fall-through when `color` is zero. So a
+ * non-zero `color` scans with 0x2ec4c8 (upstream `oneruns`, the `find1span`
+ * arm) and zero scans with 0x2ec3c8 (upstream `zeroruns`, `find0span`),
+ * matching the upstream macro.
+ *
+ * ABI recovered from the frame at 0x69690: `push ebp / mov ebp,esp` with no
+ * `sub esp`, one `push ebx` (EBX is written here, so it is saved -- it is an
+ * outgoing register argument to FUN_00069600, not an incoming one), and two
+ * cdecl stack arguments at [ebp+8] and [ebp+0xc]. ESI is read at 0x69696
+ * before any write in this frame and is the value added back at 0x696c0, so
+ * it is the incoming `bs`; EDX is never touched here at all yet the callee
+ * takes `be` in EDX, so `be` is an incoming register argument forwarded
+ * untouched. Ghidra reported `void(void)` and dropped the whole body because
+ * kb.json carried a stale `(void)` prototype -- the same defect already
+ * recorded for FUN_00068940, FUN_00069600 and FUN_0006a070 in this TU.
+ *
+ * The byte cursor is passed to the scanner BY REFERENCE out of its own
+ * parameter slot: the biased pointer is stored back to [ebp+8] at 0x696a3 and
+ * `lea ecx,[ebp+8] / push ecx` at 0x696b2 hands that slot to the callee,
+ * which is why the caller-side bias upstream does inside find0span/find1span
+ * lives here instead. The updated cursor is therefore visible only to this
+ * frame -- `cp` is by value, and finddiff discards it on return.
+ *
+ * @param cp    byte cursor for the scanline, unbiased.
+ * @param bs    bit index to start scanning from.
+ * @param be    one past the last bit index available to scan.
+ * @param color non-zero to scan a run of set bits, zero for clear bits.
+ * @return the bit index of the next colour change, at most `be`.
+ */
+int finddiff(unsigned char *cp, int bs /* @<esi> */, int be /* @<edx> */,
+             int color)
+{
+  const unsigned char *runs;
+
+  cp += bs >> 3;
+  /* Spelled as pre-store + inverted test, not `color ? ONE : ZERO`, to match
+   * the reference's `test eax,eax / mov ebx,0x2ec4c8 / jne / mov ebx,0x2ec3c8`
+   * at 0x696a6-0x696ad. The ternary makes clang select branchlessly
+   * (neg/sbb/and 0x100/add), which is a different shape. Do not "simplify". */
+  runs = TIFF_FAX_ONERUNS;
+  if (!color) {
+    runs = TIFF_FAX_ZERORUNS;
+  }
+
+  return bs + FUN_00069600(bs, be, runs, &cp);
 }
 
 /**
