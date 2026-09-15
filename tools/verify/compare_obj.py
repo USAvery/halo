@@ -839,8 +839,17 @@ def strip_regparam_loads(insns: list[str], reference: list[str],
 
 def normalize_instruction(insn: str) -> str:
     """Full instruction normalization: mnemonic + operand shape with canonical registers."""
+    # Strip llvm-objdump's trailing `# imm = 0x...` annotation. The reference
+    # side already has this stripped by xbe_reference._strip_annotation before
+    # it reaches here; a freshly-disassembled candidate does not, so without
+    # this the same literal immediate (e.g. `and eax, 0xffff` in both) reads as
+    # a mismatch purely because one side carries the comment and the other
+    # doesn't. Operand text only -- the mnemonic-only primary score never sees
+    # this either way.
+    i = insn.find("#")
+    s = insn[:i].rstrip() if i > 0 else insn
     # Strip disassembler label annotations: <symbol+0xNN> or <LAB_xxx>
-    s = re.sub(r'\s*<[^>]+>', '', insn)
+    s = re.sub(r'\s*<[^>]+>', '', s)
     s = re.sub(r'\$0x[0-9a-f]+', '$IMM', s)
     s = re.sub(r'\b0x[0-9a-f]+\b', 'IMM', s)
     s = re.sub(r'\b[0-9a-f]{5,}\b', 'IMM', s)

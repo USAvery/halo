@@ -1278,16 +1278,16 @@
     "D3DResource_IsBusy": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 88.0,
+      "abi_modeled_mnemonic_pct": 88.9,
       "addr": "0x1ed980",
       "end": "0x1eda0d",
       "kind": "auto",
       "n_r": 49,
-      "opnd_percent": 32.0,
-      "raw_mnemonic_pct": 88.0,
+      "opnd_percent": 46.5,
+      "raw_mnemonic_pct": 88.9,
       "ref": "synth",
       "ref_sha": "47dc7717de6aaf8a",
-      "score": 88.0,
+      "score": 88.9,
       "source": "src/halo/rasterizer/xbox/d3d_resource.c"
     },
     "D3DResource_Register": {
@@ -1298,7 +1298,7 @@
       "end": "0x1eda58",
       "kind": "auto",
       "n_r": 11,
-      "opnd_percent": 72.7,
+      "opnd_percent": 100.0,
       "raw_mnemonic_pct": 100.0,
       "ref": "synth",
       "ref_sha": "8dc678a56318e570",
@@ -1313,7 +1313,7 @@
       "end": "0x1ed97e",
       "kind": "auto",
       "n_r": 28,
-      "opnd_percent": 82.1,
+      "opnd_percent": 100.0,
       "raw_mnemonic_pct": 100.0,
       "ref": "synth",
       "ref_sha": "4360cf04015565e5",
@@ -1454,6 +1454,21 @@
       "ref_sha": "d02feea54b0fadfd",
       "score": 75.0,
       "source": "src/halo/math/real_math.c"
+    },
+    "D3D_BlockOnResource": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 88.1,
+      "addr": "0x1efd80",
+      "end": "0x1efe01",
+      "kind": "auto",
+      "n_r": 46,
+      "opnd_percent": 61.9,
+      "raw_mnemonic_pct": 88.1,
+      "ref": "synth",
+      "ref_sha": "c91985d0f76ef92f",
+      "score": 88.1,
+      "source": "src/halo/rasterizer/xbox/d3d_resource.c"
     },
     "D3D_BlockOnTime": {
       "abi_model": "raw",
@@ -47112,6 +47127,21 @@
       "ref_sha": "9650d710531351ba",
       "score": 44.4,
       "source": "src/halo/unported_thunks.c"
+    },
+    "FUN_001ed870": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 100.0,
+      "addr": "0x1ed870",
+      "end": "0x1ed8a5",
+      "kind": "auto",
+      "n_r": 16,
+      "opnd_percent": 100.0,
+      "raw_mnemonic_pct": 100.0,
+      "ref": "synth",
+      "ref_sha": "f8576cfb44b026b2",
+      "score": 100.0,
+      "source": "src/halo/rasterizer/xbox/d3d_resource.c"
     },
     "FUN_0020f081": {
       "abi_model": "raw",

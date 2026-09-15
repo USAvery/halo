@@ -30666,6 +30666,16 @@
      "addr": "0x1edc70",
      "decl": "void __stdcall D3DTexture_LockRect(void *texture, unsigned int level, void *locked_rect, void *rect, unsigned int flags);",
      "ported": true
+    },
+    {
+     "addr": "0x1ed870",
+     "decl": "int __stdcall FUN_001ed870(void *resource);",
+     "ported": true
+    },
+    {
+     "addr": "0x001efd80",
+     "decl": "void __stdcall D3D_BlockOnResource(void *resource);",
+     "ported": true
     }
    ],
    "name": "d3d_resource.obj",
@@ -41312,10 +41322,6 @@
      "decl": "void CDevice_MakeSpace(void);"
     },
     {
-     "addr": "0x001efd80",
-     "decl": "void __stdcall D3D_BlockOnResource(void *resource);"
-    },
-    {
      "addr": "0x001efe10",
      "decl": "void XMETAL_StartPush(void);"
     },
@@ -44231,10 +44237,6 @@
     {
      "addr": "0x1ed7c0",
      "decl": "void __stdcall FUN_001ed7c0(int a0);"
-    },
-    {
-     "addr": "0x1ed870",
-     "decl": "void __stdcall FUN_001ed870(int a0);"
     },
     {
      "addr": "0x1ed8b0",
