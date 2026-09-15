@@ -2909,6 +2909,10 @@
       "kind": "function",
       "status": "ported"
     },
+    "0x5f240": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0x60c40": {
       "kind": "function",
       "status": "ported"
@@ -6891,6 +6895,10 @@
       "status": "ported"
     },
     "0xb4e20": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0xb5210": {
       "kind": "function",
       "status": "ported"
     },
@@ -11118,6 +11126,10 @@
         "summary": "Checks whether a deferred UI error should be shown once the main menu is ready, then routes through the existing error display path."
       }
     },
+    "0xe4500": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0xe4590": {
       "kind": "function",
       "status": "ported"
@@ -11207,6 +11219,10 @@
       "status": "ported"
     },
     "0xe5530": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0xe55e0": {
       "kind": "function",
       "status": "ported"
     },
@@ -11407,7 +11423,15 @@
       "kind": "function",
       "status": "ported"
     },
+    "0xe98c0": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0xe9a60": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0xe9a90": {
       "kind": "function",
       "status": "ported"
     },
@@ -11428,6 +11452,14 @@
       "status": "ported"
     },
     "0xea1f0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0xea210": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0xea3e0": {
       "kind": "function",
       "status": "ported"
     },
@@ -13664,6 +13696,14 @@
       "kind": "function",
       "status": "ported"
     },
+    "0x1209b0": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x120a40": {
+      "kind": "function",
+      "status": "ported"
+    },
     "0x120cb0": {
       "kind": "function",
       "status": "ported"
@@ -13681,6 +13721,10 @@
       "status": "ported"
     },
     "0x121940": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x122060": {
       "kind": "function",
       "status": "ported"
     },
@@ -15463,6 +15507,14 @@
       ]
     },
     "0x14ad40": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x14ad60": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x14ad80": {
       "kind": "function",
       "status": "ported"
     },
@@ -17397,6 +17449,14 @@
       "status": "ported"
     },
     "0x199a60": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x199b20": {
+      "kind": "function",
+      "status": "ported"
+    },
+    "0x199d40": {
       "kind": "function",
       "status": "ported"
     },

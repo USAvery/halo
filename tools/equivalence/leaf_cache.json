@@ -35227,6 +35227,11 @@
     "dir32_count": 2,
     "call_count": 4
   },
+  "0xe4ad0": {
+    "class": "non_leaf",
+    "confidence": "none",
+    "coverage_pct": 30.2
+  },
   "0xe4d40": {
     "class": "stubbable",
     "call_count": 3
@@ -35291,6 +35296,11 @@
     "class": "stubbable",
     "dir32_count": 5,
     "call_count": 4
+  },
+  "0xe5180": {
+    "class": "non_leaf",
+    "confidence": "weak",
+    "coverage_pct": 27.5
   },
   "0xe59e0": {
     "class": "stubbable",
@@ -36474,6 +36484,11 @@
     "dir32_count": 4,
     "call_count": 15
   },
+  "0xfb690": {
+    "class": "non_leaf",
+    "confidence": "none",
+    "coverage_pct": 100.0
+  },
   "0xfc4b0": {
     "class": "stubbable",
     "dir32_count": 4,
@@ -36539,6 +36554,11 @@
     "class": "stubbable",
     "dir32_count": 2,
     "call_count": 3
+  },
+  "0xfcc90": {
+    "class": "non_leaf",
+    "confidence": "none",
+    "coverage_pct": 100.0
   },
   "0xfcec0": {
     "class": "stubbable",
