@@ -38,6 +38,22 @@ OUTCOMES_DIR = REPO_ROOT / "artifacts" / "research_cache" / "outcomes"
 COMMITTED = "committed"
 PARKED = "parked"
 
+# Relative to Sonnet 5 pricing. Outcome records contain one aggregate token
+# count, so this is a token-equivalent estimate, not an absolute dollar cost.
+MODEL_PRICE_WEIGHTS = {
+    "opus": 2.5,
+    "sonnet": 1.0,
+    "haiku": 0.5,
+}
+
+
+def price_weight(model_id: str) -> float | None:
+    model = (model_id or "").strip().lower()
+    for family, weight in MODEL_PRICE_WEIGHTS.items():
+        if model == family or model.startswith(family + "-"):
+            return weight
+    return None
+
 
 def load_outcomes(outcomes_dir: Path, since: str = "") -> list[dict]:
     """Load every outcome record, oldest first, optionally filtered by date."""
@@ -70,6 +86,16 @@ def aggregate(records: list[dict], key: str = "cohort") -> dict:
         committed = sum(1 for r in rows if r.get("outcome") == COMMITTED)
         parked = sum(1 for r in rows if r.get("outcome") == PARKED)
         tokens = sum(int(r.get("tokens") or 0) for r in rows)
+        weighted_tokens = 0.0
+        priced_records = 0
+        priced_committed = 0
+        for record in rows:
+            weight = price_weight(str(record.get("model_id") or ""))
+            if weight is None:
+                continue
+            priced_records += 1
+            weighted_tokens += int(record.get("tokens") or 0) * weight
+            priced_committed += int(record.get("outcome") == COMMITTED)
         outcomes: dict[str, int] = defaultdict(int)
         for r in rows:
             outcomes[str(r.get("outcome") or "unknown")] += 1
@@ -84,6 +110,12 @@ def aggregate(records: list[dict], key: str = "cohort") -> dict:
             # Cost of one landed function: the number the experiment exists
             # to move.  None when the arm has landed nothing yet.
             "tokens_per_commit": (tokens / committed) if committed else None,
+            "priced_records": priced_records,
+            "unpriced_records": n - priced_records,
+            "sonnet_equivalent_tokens": weighted_tokens if priced_records else None,
+            "sonnet_equivalent_per_commit": (
+                weighted_tokens / priced_committed if priced_committed else None
+            ),
             "outcomes": dict(sorted(outcomes.items())),
         }
     return dict(sorted(out.items()))
@@ -96,15 +128,17 @@ def render(summary: dict, key: str, total: int) -> str:
     lines.append(f"  records: {total}")
     lines.append("")
     hdr = (f"  {'cohort':<12} {'n':>6} {'commit%':>8} {'park%':>7} "
-           f"{'mean tok':>10} {'tok/commit':>11}")
+           f"{'mean tok':>10} {'tok/commit':>11} {'STE/commit':>11}")
     lines.append(hdr)
     lines.append("  " + "-" * (len(hdr) - 2))
     for name, s in summary.items():
         tpc = ("-" if s["tokens_per_commit"] is None
                else f"{s['tokens_per_commit']:,.0f}")
+        ste = ("-" if s["sonnet_equivalent_per_commit"] is None
+               else f"{s['sonnet_equivalent_per_commit']:,.0f}")
         lines.append(
             f"  {name:<12} {s['n']:>6} {s['committed_rate']*100:>7.1f}% "
-            f"{s['parked_rate']*100:>6.1f}% {s['mean_tokens']:>10,.0f} {tpc:>11}"
+            f"{s['parked_rate']*100:>6.1f}% {s['mean_tokens']:>10,.0f} {tpc:>11} {ste:>11}"
         )
     lines.append("")
     for name, s in summary.items():

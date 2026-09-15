@@ -63,18 +63,32 @@ def repo_root() -> Path:
         return Path(__file__).resolve().parents[2]
 
 
-def parked_dir() -> Path:
-    env = os.environ.get("HALO_PARKED_DIR")
-    if env:
-        return Path(env)
+def shared_artifacts_root() -> Path:
     try:
         common = subprocess.run(
             ["git", "rev-parse", "--git-common-dir"],
             capture_output=True, text=True, check=True,
         ).stdout.strip()
-        return (Path(common).resolve().parent / "artifacts" / "parked")
+        common_dir = Path(common)
+        if not common_dir.is_absolute():
+            common_dir = Path.cwd() / common_dir
+        return common_dir.resolve().parent / "artifacts"
     except Exception:
-        return repo_root() / "artifacts" / "parked"
+        return repo_root() / "artifacts"
+
+
+def parked_dir() -> Path:
+    env = os.environ.get("HALO_PARKED_DIR")
+    if env:
+        return Path(env)
+    return shared_artifacts_root() / "parked"
+
+
+def failures_dir() -> Path:
+    env = os.environ.get("HALO_FAILURES_DIR")
+    if env:
+        return Path(env)
+    return shared_artifacts_root() / "auto_lift" / "failures"
 
 
 def normalize(model, effort):
