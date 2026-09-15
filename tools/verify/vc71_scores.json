@@ -43546,17 +43546,17 @@
     "FUN_0019d3c0": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 20.0,
+      "abi_modeled_mnemonic_pct": 93.9,
       "addr": "0x19d3c0",
       "end": "0x19d413",
       "kind": "auto",
       "n_r": 35,
-      "opnd_percent": 15.0,
-      "raw_mnemonic_pct": 20.0,
+      "opnd_percent": 84.8,
+      "raw_mnemonic_pct": 93.9,
       "ref": "synth",
       "ref_sha": "11e3378df39b429a",
-      "score": 20.0,
-      "source": "src/halo/unported_thunks.c"
+      "score": 93.9,
+      "source": "src/halo/text/international_strings.c"
     },
     "FUN_0019d420": {
       "abi_model": "raw",
@@ -53221,17 +53221,17 @@
     "align_to_character": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 16.3,
+      "abi_modeled_mnemonic_pct": 100.0,
       "addr": "0x19d6e0",
       "end": "0x19d75c",
       "kind": "auto",
       "n_r": 44,
-      "opnd_percent": 12.2,
-      "raw_mnemonic_pct": 16.3,
+      "opnd_percent": 97.7,
+      "raw_mnemonic_pct": 100.0,
       "ref": "synth",
       "ref_sha": "6d77da70dba17289",
-      "score": 16.3,
-      "source": "src/halo/unported_thunks.c"
+      "score": 100.0,
+      "source": "src/halo/text/international_strings.c"
     },
     "angle_between_normals3d": {
       "abi_model": "raw",
@@ -54537,6 +54537,21 @@
       "ref_sha": "1d93aafaaf67843f",
       "score": 91.9,
       "source": "src/halo/text/draw_string.c"
+    },
+    "bitmap_draw_string": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 99.5,
+      "addr": "0x19cec0",
+      "end": "0x19cfd1",
+      "kind": "auto",
+      "n_r": 100,
+      "opnd_percent": 79.6,
+      "raw_mnemonic_pct": 99.5,
+      "ref": "synth",
+      "ref_sha": "c8cc14e9278cfaec",
+      "score": 99.5,
+      "source": "src/halo/text/international_strings.c"
     },
     "bitmap_fade": {
       "abi_model": "raw",
@@ -59952,6 +59967,21 @@
       "ref_sha": "012fe59d64555feb",
       "score": 2.8,
       "source": "src/halo/unported_thunks.c"
+    },
+    "draw_string_compute_bounds": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 85.2,
+      "addr": "0x19ccf0",
+      "end": "0x19cda9",
+      "kind": "auto",
+      "n_r": 52,
+      "opnd_percent": 63.0,
+      "raw_mnemonic_pct": 85.2,
+      "ref": "synth",
+      "ref_sha": "6d37f5851dc6f442",
+      "score": 85.2,
+      "source": "src/halo/text/international_strings.c"
     },
     "draw_string_get_color": {
       "abi_model": "raw",
@@ -89683,6 +89713,21 @@
       "score": 100.0,
       "source": "src/halo/text/international_strings.c"
     },
+    "umemcpy": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 100.0,
+      "addr": "0x19d4f0",
+      "end": "0x19d584",
+      "kind": "auto",
+      "n_r": 54,
+      "opnd_percent": 98.1,
+      "raw_mnemonic_pct": 100.0,
+      "ref": "synth",
+      "ref_sha": "4e5b2fbc51df70d6",
+      "score": 100.0,
+      "source": "src/halo/text/international_strings.c"
+    },
     "umemmove": {
       "abi_model": "raw",
       "abi_model_items": 0,
@@ -92397,6 +92442,21 @@
       "ref_sha": "d2c8729a2629f61f",
       "score": 100.0,
       "source": "src/halo/text/unicode.c"
+    },
+    "ustrcat": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 100.0,
+      "addr": "0x19d760",
+      "end": "0x19d801",
+      "kind": "auto",
+      "n_r": 52,
+      "opnd_percent": 96.2,
+      "raw_mnemonic_pct": 100.0,
+      "ref": "synth",
+      "ref_sha": "6bd7b00eb4376ee5",
+      "score": 100.0,
+      "source": "src/halo/text/international_strings.c"
     },
     "ustrchr": {
       "abi_model": "raw",

@@ -1098,11 +1098,11 @@
     },
     {
      "addr": "0x1db156",
-     "decl": "void _wcscat(void);"
+     "decl": "wchar_t *_wcscat(wchar_t *dest, const wchar_t *src);"
     },
     {
      "addr": "0x1db180",
-     "decl": "void _wcscpy(void);"
+     "decl": "wchar_t *_wcscpy(wchar_t *dest, const wchar_t *src);"
     },
     {
      "addr": "0x1db19c",
@@ -33632,7 +33632,8 @@
     },
     {
      "addr": "0x19ccf0",
-     "decl": "void draw_string_compute_bounds(void);",
+     "decl": "void draw_string_compute_bounds(void *screen_pos, char *text, int16_t *out_bounds, int16_t *out_cursor);",
+     "ported": true,
      "comment": "[NAME: draw_string_compute_bounds — name_source=2276-symbol-dump method=exact_address tier=confirmed (T1), cea-apply-unified 2026-09-14]"
     },
     {
@@ -33646,8 +33647,9 @@
     },
     {
      "addr": "0x19cec0",
-     "decl": "void bitmap_draw_string(void);",
-     "comment": "[NAME: bitmap_draw_string — name_source=2276-symbol-dump method=exact_address tier=confirmed (T1), cea-apply-unified 2026-09-14]"
+     "decl": "void bitmap_draw_string(void *bitmap, int16_t *screen_bounds, int16_t *clip_bounds, char *text);",
+     "comment": "[NAME: bitmap_draw_string — name_source=2276-symbol-dump method=exact_address tier=confirmed (T1), cea-apply-unified 2026-09-14]",
+     "ported": true
     },
     {
      "addr": "0x19cff0",
@@ -33685,7 +33687,8 @@
     },
     {
      "addr": "0x19d3c0",
-     "decl": "char *FUN_0019d3c0(int index, short param_2);"
+     "decl": "char *FUN_0019d3c0(int index, short param_2);",
+     "ported": true
     },
     {
      "addr": "0x19d420",
@@ -33698,7 +33701,8 @@
     },
     {
      "addr": "0x19d4f0",
-     "decl": "void umemcpy(void);"
+     "decl": "void umemcpy(void *dest, const void *src, size_t count);",
+     "ported": true
     },
     {
      "addr": "0x19d590",
@@ -33717,11 +33721,13 @@
     },
     {
      "addr": "0x19d6e0",
-     "decl": "void align_to_character(wchar_t *dest, const wchar_t *src);"
+     "decl": "void align_to_character(wchar_t *dest, const wchar_t *src);",
+     "ported": true
     },
     {
      "addr": "0x19d760",
-     "decl": "void ustrcat(void);"
+     "decl": "void ustrcat(wchar_t *dest, const wchar_t *src);",
+     "ported": true
     }
    ],
    "name": "international_strings.obj",
