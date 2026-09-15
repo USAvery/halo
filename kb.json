@@ -30049,12 +30049,12 @@
     },
     {
      "addr": "0x1b6560",
-     "decl": "void update_alien_fighter_physics_new(void);",
+     "decl": "void update_alien_fighter_physics_new(int vehicle_handle, int param_2, int param_3);",
      "comment": "[NAME: update_alien_fighter_physics_new \u2014 name_source=2276-symbol-dump method=exact_address tier=confirmed (T1), cea-apply-unified 2026-09-14]"
     },
     {
      "addr": "0x1b69a0",
-     "decl": "void update_alien_fighter_physics_old(void);",
+     "decl": "void update_alien_fighter_physics_old(int vehicle_handle, int param_2);",
      "comment": "[NAME: update_alien_fighter_physics_old \u2014 name_source=2276-symbol-dump method=exact_address tier=confirmed (T1), cea-apply-unified 2026-09-14]"
     },
     {
@@ -30069,7 +30069,7 @@
     },
     {
      "addr": "0x1b7020",
-     "decl": "void create_ghost_effect(void);",
+     "decl": "void create_ghost_effect(int vehicle_handle);",
      "comment": "[NAME: create_ghost_effect \u2014 name_source=2276-symbol-dump method=exact_address tier=confirmed (T1), cea-apply-unified 2026-09-14]"
     },
     {
@@ -30112,8 +30112,9 @@
     },
     {
      "addr": "0x1b8f10",
-     "decl": "void update_alien_fighter_physics(void);",
-     "comment": "[NAME: update_alien_fighter_physics \u2014 name_source=2276-symbol-dump method=exact_address tier=confirmed (T1), cea-apply-unified 2026-09-14]"
+     "decl": "void update_alien_fighter_physics(int vehicle_handle@<esi>, int param_2@<eax>, int param_3@<ebx>);",
+     "comment": "[NAME: update_alien_fighter_physics \u2014 name_source=2276-symbol-dump method=exact_address tier=confirmed (T1), cea-apply-unified 2026-09-14]",
+     "ported": true
     },
     {
      "addr": "0x1b8f80",

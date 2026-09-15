@@ -593,3 +593,52 @@ bool vehicle_moving_near_any_player(void)
 done:
   return found == 0;
 }
+
+/*
+ * update_alien_fighter_physics (0x1b8f10) — select which alien-fighter
+ * (Banshee) physics update to run for this vehicle, then run the ghost
+ * effect update.
+ *
+ * Confirmed from disassembly at 0x1b8f10:
+ *   PUSH EDI (callee save, POP EDI at both exits); PUSH 0x2; PUSH ESI;
+ *   MOV EDI,EAX -> object_get_and_verify_type(vehicle_handle@<esi>, 2), with
+ *   the incoming EAX stashed in EDI. So this function takes three register
+ *   arguments: ESI, EAX and EBX (EBX is PUSHed at 0x1b8f44 as a call argument
+ *   and only ever reclaimed by ADD ESP — never POPped — so it is an incoming
+ *   argument, not a save).
+ *   MOV EAX,[EAX]; PUSH EAX; PUSH 0x76656869 -> tag_get('vehi',
+ * obj->tag_index). MOV ECX,[EAX+0x8c]; PUSH ECX; PUSH 0x70687973 ->
+ *     tag_get('phys', vehi_tag->physics_tag_index at +0x8c).
+ *   ADD ESP,0x18 -> all three cdecl cleanups (3 calls x 2 args) coalesced.
+ *   FLD [EAX]; FCOMP [0x002533c0]; FNSTSW AX; TEST AH,0x41; JNZ 0x1b8f60.
+ *     TEST AH,0x41 masks C0|C3, so the jump is taken when phys[0] <= 0.0f and
+ *     the FALL-THROUGH is the phys[0] > 0.0f case. 0x2533c0 is the shared 0.0f
+ *     constant. Fall-through runs 0x1b69a0 (the "_old" variant).
+ *   Fall-through: PUSH ESI; CALL 0x1b69a0; ADD ESP,0x8 -> two stack args, the
+ *     EBX pushed at 0x1b8f44 plus ESI: update_alien_fighter_physics_old(esi,
+ * ebx). Taken: PUSH EDI; PUSH ESI; CALL 0x1b6560; ADD ESP,0xc -> three stack
+ * args: update_alien_fighter_physics_new(esi, edi(=incoming eax), ebx). Both
+ * paths end PUSH ESI; CALL 0x1b7020; ADD ESP,0x4 -> create_ghost_effect(esi).
+ * Inferred: names from kb.json symbol dump.
+ * Unknown: the meaning of the EAX and EBX arguments (they are only forwarded,
+ *   never inspected here), and which 'phys' field lives at offset 0.
+ */
+void update_alien_fighter_physics(int vehicle_handle, int param_2, int param_3)
+{
+  void *vehicle;
+  char *vehicle_tag;
+  float *physics_tag;
+
+  vehicle = object_get_and_verify_type(vehicle_handle, 2);
+  vehicle_tag = (char *)tag_get(0x76656869, *(uint32_t *)vehicle);
+  physics_tag = (float *)tag_get(0x70687973, *(int32_t *)(vehicle_tag + 0x8c));
+
+  if (*physics_tag > *(float *)0x2533c0) {
+    update_alien_fighter_physics_old(vehicle_handle, param_3);
+    create_ghost_effect(vehicle_handle);
+    return;
+  }
+
+  update_alien_fighter_physics_new(vehicle_handle, param_2, param_3);
+  create_ghost_effect(vehicle_handle);
+}

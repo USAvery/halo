@@ -92068,6 +92068,21 @@
       "score": 91.4,
       "source": "src/halo/networking/network_client_manager.c"
     },
+    "update_alien_fighter_physics": {
+      "abi_model": "regparam_stripped_saves",
+      "abi_model_items": 4,
+      "abi_modeled_mnemonic_pct": 84.2,
+      "addr": "0x1b8f10",
+      "end": "0x1b8f75",
+      "kind": "auto",
+      "n_r": 37,
+      "opnd_percent": 57.9,
+      "raw_mnemonic_pct": 80.0,
+      "ref": "synth",
+      "ref_sha": "553cb21ef7b88c11",
+      "score": 84.2,
+      "source": "src/halo/units/vehicles.c"
+    },
     "update_client_add_player": {
       "abi_model": "raw",
       "abi_model_items": 0,
