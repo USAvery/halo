@@ -21,6 +21,222 @@
  * Register-arg callees are reached through shims in camera_internal.h. */
 #include "camera_internal.h"
 
+/*
+ * FUN_00085a40 (0x85a40) — is there another player whose player-record dword
+ * at +0x20 equals this player's?
+ *
+ * player_handle arrives in EDI (the decompiler reports it as `unaff_EDI`:
+ * EDI is read at 0x85a4d/0x85a80 and never written in this function).
+ * Returns in AL: 1 as soon as an iterated player other than player_handle has
+ * the same dword at player+0x20; otherwise the BL zeroed at 0x85a62 (0).
+ *
+ * Call sites traced from the disassembly:
+ *   PUSH EDI / PUSH EAX(=[0x5aa6d4]) / CALL 0x119320
+ *     -> datum_get(player_data, player_handle)
+ *   PUSH ECX(=[0x5aa6d4]) / PUSH EDX(=EBP-0x10) / CALL 0x1197b0
+ *     -> data_iterator_new(&iter, player_data)
+ *   PUSH EBP-0x10 / CALL 0x119810 -> data_iterator_next(&iter)
+ * The single ADD ESP,0x14 at 0x85a72 cleans all three cdecl arg groups
+ * (2 + 2 + 1 dwords) at once; the earlier PUSH EBX/PUSH ESI are callee saves
+ * matched by the POP ESI/POP EBX at both exits.
+ *
+ * The iterator local is at EBP-0x10, so CMP [EBP-0x8],EDI compares
+ * iter.datum_handle (data_iter_t +0x8). Both [0x5aa6d4] loads are kept
+ * separate, matching the two MOVs at 0x85a46 and 0x85a54.
+ *
+ * The meaning of the player field at +0x20 is unproven here; it is only ever
+ * compared for equality between two player records.
+ *
+ * 0x85a40 / director.obj
+ */
+bool FUN_00085a40(int player_handle)
+{
+  data_iter_t iter;
+  char *player;
+  char *other;
+  int value;
+  bool result;
+
+  player = (char *)datum_get(player_data, player_handle);
+  value = *(int *)(player + 0x20);
+  result = 0;
+
+  data_iterator_new(&iter, player_data);
+  other = (char *)data_iterator_next(&iter);
+  while (other != NULL) {
+    if (iter.datum_handle != (uint32_t)player_handle &&
+        *(int *)(other + 0x20) == value) {
+      return 1;
+    }
+    other = (char *)data_iterator_next(&iter);
+  }
+
+  return result;
+}
+
+/*
+ * FUN_00085ab0 (0x85ab0) — pick the next eligible player handle after
+ * `current_handle`, falling back to `current_handle` when none is found.
+ *
+ * Arguments (0x85ab0..0x85b5d):
+ *   BL          restrict_flag; tested at 0x85ab6 and again at 0x85b0e, never
+ *               written in this function (decompiler reports `unaff_BL`).
+ *   [EBP+0x8]   player_handle  — the player to exclude (CMP at 0x85b03) and,
+ *               when restrict_flag is set, the source of the +0x20 dword.
+ *   [EBP+0xc]   current_handle — compared against each candidate's low word
+ *               (0x85b20..0x85b32) and returned unchanged at 0x85b4d.
+ *   Result in EAX (0x85b57 MOV EAX,ESI / 0x85b4d MOV EAX,[EBP+0xc]).
+ *
+ * Call sites traced from the disassembly:
+ *   0x85ac7  PUSH [EBP+8] / PUSH [0x5aa6d4] -> datum_get(player_data, handle)
+ *   0x85ae5  PUSH [0x5aa6d4] / PUSH EBP-0x10 -> data_iterator_new(&iter, ...)
+ *   0x85aee, 0x85b38  PUSH EBP-0x10 -> data_iterator_next(&iter)
+ * The ADD ESP,0xc at 0x85af3 cleans the iterator_new + first iterator_next arg
+ * groups together; the datum_get group is cleaned separately at 0x85acf.
+ *
+ * The iterator local sits at EBP-0x10, so MOV ECX,[EBP-0x8] at 0x85b00 reads
+ * iter.datum_handle (data_iter_t +0x8).
+ *
+ * Candidate filter (0x85b00..0x85b15): handle differs from player_handle, the
+ * player dword at +0x34 is not -1, and — only when restrict_flag is set — the
+ * dword at +0x20 matches the caller player's. The meaning of both fields is
+ * unproven; +0x20 is only ever compared for equality (same as FUN_00085a40)
+ * and +0x34 only against -1.
+ *
+ * Selection (0x85b17..0x85b46): the first candidate is remembered in ESI; a
+ * later candidate whose low 16 bits exceed those of current_handle replaces it
+ * and ends the scan (JG at 0x85b32 -> 0x85b46, which falls into the exit
+ * check). Both operands are masked to 16 bits before the signed compare, so
+ * signedness cannot matter.
+ *
+ * 0x85ab0 / director.obj
+ */
+uint32_t FUN_00085ab0(char restrict_flag, uint32_t player_handle,
+                      uint32_t current_handle)
+{
+  data_iter_t iter;
+  char *player;
+  int value;
+  uint32_t result;
+
+  if (restrict_flag == 0) {
+    value = -1;
+  } else {
+    player = (char *)datum_get(player_data, (int)player_handle);
+    value = *(int *)(player + 0x20);
+  }
+
+  result = 0xffffffff;
+  data_iterator_new(&iter, player_data);
+  player = (char *)data_iterator_next(&iter);
+  while (player != NULL) {
+    if (iter.datum_handle != player_handle && *(int *)(player + 0x34) != -1 &&
+        (restrict_flag == 0 || *(int *)(player + 0x20) == value)) {
+      if (result == 0xffffffff) {
+        result = iter.datum_handle;
+      } else if ((int)(iter.datum_handle & 0xffff) >
+                 (int)(current_handle & 0xffff)) {
+        result = iter.datum_handle;
+        break;
+      }
+    }
+    player = (char *)data_iterator_next(&iter);
+  }
+
+  if (result == 0xffffffff) {
+    return current_handle;
+  }
+  return result;
+}
+
+/*
+ * dead_camera_new (0x85b60) — initialize the dead/third-person follow camera
+ * state block for a local player.
+ *
+ * cdecl(camera, local_player_index, handle). The assert at 0x85b7b passes
+ * "camera" as the reason string with file c:\halo\SOURCE\camera\dead_camera.c
+ * line 0x17 (23), which names the first parameter.
+ *
+ * Layout written into the block (field meanings beyond the first vector are
+ * unproven; the offsets below are exactly the stores at 0x85b98..0x85c6e):
+ *   +0x00..0x0b  three dwords copied verbatim from observer_get_camera()
+ *                (MOV dword, not FLD/FSTP) — the observer camera position
+ *   +0x0c        random_real_range(seed, 0.0f, 2*pi)
+ *   +0x10        -random_real_range(seed, 0.15*pi, 0.35*pi)   (FCHS at 0x85c02)
+ *   +0x14        random_real_range(seed, 2.0f, 6.0f)
+ *   +0x18        1.2217305f (0x3f9c61aa, 70 degrees in radians)
+ *   +0x1c        dword copied from [0x266f38]
+ *   +0x20        local_player_get_player_index(local_player_index)
+ *   +0x24        copy of the dword just written at +0x20 (reloaded from the
+ *                block at 0x85c54/0x85c65, not held in a register)
+ *   +0x28        `handle` when it is not -1, otherwise player_data[+0x38]
+ *   +0x2c        float selected at 0x85c0a..0x85c32
+ *
+ * Store order matters: +0x18 is written before the first random draw, and the
+ * three random_real_range() calls happen in the order 0x14, 0x0c, 0x10 — each
+ * one re-reads the local seed address (three separate CALL 0x10b120).
+ *
+ * The +0x2c selector reads three distinct float globals and only calls
+ * game_engine_running() on the handle == -1 path (JZ at 0x85c10).
+ *
+ * 0x85b60 / director.obj
+ */
+void dead_camera_new(void *camera, int16_t local_player_index, int handle)
+{
+  char *dst;
+  uint32_t *src;
+  float selected;
+  float drawn;
+  uint32_t copied;
+  int player_handle;
+  char *player;
+
+  src = (uint32_t *)observer_get_camera((unsigned short)local_player_index);
+
+  assert_halt_at("c:\\halo\\SOURCE\\camera\\dead_camera.c", 23, camera);
+
+  dst = (char *)camera;
+  *(uint32_t *)(dst + 0x00) = src[0];
+  *(uint32_t *)(dst + 0x04) = src[1];
+  *(uint32_t *)(dst + 0x08) = src[2];
+  *(float *)(dst + 0x18) = 1.2217305f;
+  *(float *)(dst + 0x14) =
+    random_real_range((int *)random_math_get_local_seed_address(), 2.0f, 6.0f);
+  *(float *)(dst + 0x0c) = random_real_range(
+    (int *)random_math_get_local_seed_address(), 0.0f, 6.2831855f);
+  drawn = random_real_range((int *)random_math_get_local_seed_address(),
+                            0.47123894f, 1.0995574f);
+  /* [0x266f38] is loaded at 0x85bfc, ahead of the FCHS/FSTP pair at
+   * 0x85c02/0x85c07 — keep the read in front of the negated store. */
+  copied = *(uint32_t *)0x266f38;
+  *(float *)(dst + 0x10) = -drawn;
+  *(uint32_t *)(dst + 0x1c) = copied;
+
+  if (handle != -1) {
+    selected = *(float *)0x2548fc;
+  } else if (game_engine_running()) {
+    selected = *(float *)0x266f3c;
+  } else {
+    selected = *(float *)0x266f40;
+  }
+  *(float *)(dst + 0x2c) = selected;
+
+  player_handle = local_player_get_player_index(local_player_index);
+  *(int *)(dst + 0x20) = player_handle;
+
+  /* JNE at 0x85c43 makes the handle == -1 case the fall-through; both tails
+   * duplicate the +0x28/+0x24 stores and reload +0x20 from the block. */
+  if (handle == -1) {
+    player = (char *)datum_get(player_data, player_handle);
+    *(int *)(dst + 0x28) = *(int *)(player + 0x38);
+    *(int *)(dst + 0x24) = *(int *)(dst + 0x20);
+    return;
+  }
+
+  *(int *)(dst + 0x28) = handle;
+  *(int *)(dst + 0x24) = *(int *)(dst + 0x20);
+}
+
 /* Allocate director scripting state. */
 void director_initialize(void)
 {
@@ -31,6 +247,16 @@ void director_initialize(void)
 /* Dispose — nothing to clean up. */
 void director_dispose(void)
 {
+}
+
+/* Set the per-player director "inhibit facing" flag (0x861d0).
+ * Writes 1 to the per-player director state byte at struct offset +0x4d
+ * (base 0x3352b4 + local_player_index * 0xf8). */
+void director_inhibit_facing(int16_t local_player_index)
+{
+  assert_halt(local_player_index >= 0 &&
+              local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
+  ((char *)0x335301)[(int)local_player_index * 0xf8] = 1;
 }
 
 /* Set active local-player context used by hs/console during cheat dispatch.
@@ -76,6 +302,34 @@ void director_set_mode(int16_t mode)
   if (*(int16_t *)0x3352ac != mode) {
     *(int16_t *)0x3352ac = mode;
     *(uint8_t *)0x3352ae = 1;
+  }
+}
+
+/* director_save_camera (0x86360) — debug helper that dumps the local player 0
+ * observer camera to "d:\camera.txt". Field offsets are read straight off the
+ * camera block returned by observer_get_camera:
+ *   +0x00..0x08  position xyz
+ *   +0x20..0x28  forward xyz
+ *   +0x2c..0x34  up xyz
+ *   +0x38        field of view
+ * Each float is widened to double for the varargs fprintf (FLD dword /
+ * FSTP qword in the reference). Nothing is written when the fopen fails. */
+void director_save_camera(void)
+{
+  void *file;
+  float *camera;
+
+  file = crt_fopen("d:\\camera.txt", "w");
+  if (file) {
+    camera = (float *)observer_get_camera(0);
+    crt_fprintf(file, "%f %f %f\n", (double)camera[0], (double)camera[1],
+                (double)camera[2]);
+    crt_fprintf(file, "%f %f %f\n", (double)camera[8], (double)camera[9],
+                (double)camera[10]);
+    crt_fprintf(file, "%f %f %f\n", (double)camera[11], (double)camera[12],
+                (double)camera[13]);
+    crt_fprintf(file, "%f\n", (double)camera[14]);
+    crt_fclose(file);
   }
 }
 
@@ -469,9 +723,7 @@ void director_set_player_camera_normal(int16_t local_player_index,
     if (current_camera == (void *)0x85c80)
       return; /* already in the third-person follow camera */
 
-    /* 0x85b60: cdecl(camera_data_ptr, player_index, init_flag=-1). */
-    ((void (*)(void *, int16_t, int))0x85b60)((void *)(base + 8),
-                                              local_player_index, -1);
+    dead_camera_new((void *)(base + 8), local_player_index, -1);
     camera_internal_set_camera_fn(local_player_index, (void *)0x85c80, 1);
     return;
   }
@@ -1292,6 +1544,121 @@ void editor_camera_update(int param_1, unsigned short *param_2,
     param_3[0x12] = 0;
     param_3[0] |= 9;
   }
+}
+
+/* editor_camera_set_scripted (0x88050) — enter or leave scripted camera mode.
+ *
+ * Ghidra types this void(void) and reports the parameter as
+ * in_stack_00000004; the disassembly reads it at [EBP+8] into BL (TEST BL,BL
+ * at 0x8805a, MOVZX EDX,BL at 0x881d1), so it is a single cdecl byte
+ * parameter.  MOVZX is what makes it unsigned.
+ *
+ * Entering (enable != 0): run the _translate_from callback for the current
+ * mode, derive the angle pair from the live look vector, hand both the
+ * position (*(0x2ee670) + 0x10) and those angles to editor_camera_set_position,
+ * then start a camera interpolation through FUN_00085280.  Leaving
+ * (enable == 0): copy the live position/angles back into the camera-data
+ * block at 0x3356b0, notify FUN_00087eb0, and run the mode callback.
+ *
+ * Both asserts test the _translate_from slot at 0x2ee67c, but the entering
+ * path dispatches through 0x2ee67c while the leaving path dispatches through
+ * 0x2ee680 (CALL dword ptr [EDX*8 + 0x2ee680] at 0x881c1) — the leaving-path
+ * mismatch is in the original (same quirk as editor_camera_update) and is
+ * preserved.
+ *
+ * Call sites:
+ *  - 0x880c2 vector_to_angles: PUSH ECX (= *(0x2ee670) + 0x1c) is in_vector,
+ *    PUSH EDX (= EBP-8) is out_angles.  [0x2ee670] is re-loaded at 0x880c7
+ *    for the +0x10 position, so the reload is kept.
+ *  - 0x880d5 editor_camera_set_position: PUSH EAX (= EBP-8) is the last
+ *    argument (angles), PUSH ECX (= globals + 0x10) the first (point); the
+ *    single ADD ESP,0x10 at 0x880df cleans both calls' four pushes.
+ *  - 0x88101 / 0x88128 FUN_00085280 (ADD ESP,0x18, six dwords): first PUSH is
+ *    param_1, so param_6 is the dword at [0x2ee66c] (-1 on the 0x8810e path),
+ *    param_5 is 0, param_4 the float immediate 0x3f9c61aa = 1.2217305f.
+ *    The two paths differ only in param_1 (0x3356b8 vs globals + 0x10) and
+ *    param_6.
+ *  - 0x88170 FUN_00087eb0 takes the dword at [0x2ee66c]; ADD ESP,0xc at
+ *    0x8817b cleans it together with the two vector_to_angles pushes.
+ *  - 0x881ef console_printf: the message selector is the char * table at
+ *    0x2ee694 indexed by the zero-extended parameter.
+ *
+ * The old flag at 0x335698 is read into CL before the stores at 0x881e3 /
+ * 0x881e9, so the save-then-overwrite order is preserved. */
+void editor_camera_set_scripted(unsigned char enable)
+{
+  float local_angles[2];
+  char *globals;
+  uint32_t *src;
+  uint32_t *camera_data;
+  const char *message;
+  char previous;
+  int16_t mode;
+  int target;
+
+  if (enable != 0) {
+    /* MOV AX,[0x3356c4] at 0x88062 is the only load; both MOVSX at 0x8806d
+     * and 0x880a1 re-use AX, so the mode word is read once. */
+    mode = *(int16_t *)0x3356c4;
+    if (mode != 0) {
+      if (*(void **)(0x2ee67c + (int)mode * 8) == 0) {
+        display_assert("translate_funcs[camera_mode][_translate_from]",
+                       "c:\\halo\\SOURCE\\camera\\editor_flying_camera.c",
+                       0x183, 1);
+        system_exit(-1);
+      }
+      (*(void (**)(void *))(0x2ee67c + (int)mode * 8))(*(void **)0x3356b0);
+    }
+
+    vector_to_angles(local_angles, (float *)(*(char **)0x2ee670 + 0x1c));
+    globals = *(char **)0x2ee670;
+    editor_camera_set_position((const uint32_t *)(globals + 0x10),
+                               (const uint32_t *)local_angles);
+
+    /* JZ 0x8810e at 0x880e5: the fall-through (target != -1) is the
+     * 0x3356b8 path, so the != test comes first. */
+    target = *(int *)0x2ee66c;
+    if (target != -1) {
+      globals = *(char **)0x2ee670;
+      FUN_00085280((float *)0x3356b8, (float *)(globals + 0x1c),
+                   (float *)(globals + 0x28), 1.2217305f, 0, target);
+    } else {
+      globals = *(char **)0x2ee670;
+      FUN_00085280((float *)(globals + 0x10), (float *)(globals + 0x1c),
+                   (float *)(globals + 0x28), 1.2217305f, 0, -1);
+    }
+  } else {
+    /* ADD EAX,0x10 / MOV ECX,EAX at 0x8813a: globals + 0x10 is held in one
+     * register and the three dwords are read through it. */
+    src = (uint32_t *)(*(char **)0x2ee670 + 0x10);
+    camera_data = *(uint32_t **)0x3356b0;
+    camera_data[0] = src[0];
+    camera_data[1] = src[1];
+    camera_data[2] = src[2];
+    vector_to_angles((float *)(camera_data + 3),
+                     (float *)(*(char **)0x2ee670 + 0x1c));
+    FUN_00087eb0(*(void **)0x2ee66c);
+
+    mode = *(int16_t *)0x3356c4;
+    if (mode != 0) {
+      if (*(void **)(0x2ee67c + (int)mode * 8) == 0) {
+        display_assert("translate_funcs[camera_mode][_translate_from]",
+                       "c:\\halo\\SOURCE\\camera\\editor_flying_camera.c",
+                       0x19e, 1);
+        system_exit(-1);
+      }
+      (*(void (**)(void *))(0x2ee680 + (int)mode * 8))(*(void **)0x3356b0);
+    }
+  }
+
+  /* The reference loads CL from 0x335698 and the message pointer before it
+   * writes 0x3356ca / 0x335698 (stores at 0x881e3 / 0x881e9 sit after the
+   * three console_printf pushes). */
+  previous = *(char *)0x335698;
+  message = *(const char **)(0x2ee694 + (unsigned int)enable * 4);
+  *(char *)0x3356ca = previous;
+  *(char *)0x335698 = (char)enable;
+  console_printf(0, "%s scripted camera mode", message);
 }
 
 /* FUN_00088200 (0x88200) — park the caller's camera block as the override

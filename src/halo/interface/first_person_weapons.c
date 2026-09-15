@@ -183,6 +183,17 @@ void FUN_000dc9d0(int param_2, int object_handle)
   }
 }
 
+/* Return the first-person weapon state block for a local player (0xdcaf0).
+ * local_player_index arrives in SI (register argument); the result is returned
+ * in EAX as fp_base + local_player_index * 0x1ea0. */
+void *FUN_000dcaf0(int16_t local_player_index)
+{
+  assert_halt(local_player_index >= 0 &&
+              local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
+
+  return (void *)(*(int *)0x46bea8 + (int)local_player_index * 0x1ea0);
+}
+
 /* Toggle the first-person weapon activation state for a local player (0xdcb30).
  * When activating (activate != 0): asserts weapon_index != NONE, then calls
  * effects_start_on_first_person_weapon to start effects. When deactivating:
@@ -353,6 +364,30 @@ int16_t FUN_000dcd60(int object_handle)
   return (int16_t)-1;
 }
 
+/* Find the local player index (0..3) whose player record controls the given
+ * unit object handle (0xdcdc0). Iterates all local players, resolves each
+ * player datum, and compares the player's controlled-unit handle at +0x34
+ * against the handle passed in EDI. Returns the local player index or -1. */
+int16_t FUN_000dcdc0(int unit_handle)
+{
+  int16_t i;
+
+  for (i = 0; i < 4; i++) {
+    int player_handle;
+    char *player;
+
+    player_handle = local_player_get_player_index(i);
+    if (player_handle == -1)
+      continue;
+
+    player = (char *)datum_get(player_data, player_handle);
+    if (*(int *)(player + 0x34) == unit_handle)
+      return i;
+  }
+
+  return (int16_t)-1;
+}
+
 /* Precache the weapon's predicted resources and set the reload timer (0xdce00).
  * If the player has a valid weapon, resolves the weapon tag and calls
  * predicted_resources_precache on the resource block at weapon_tag + 0x4e4.
@@ -455,6 +490,25 @@ void FUN_000dd4d0(int16_t local_player_index, int16_t blend_ticks)
     *(int16_t *)(fp + 0x88) = 0;
     *(int16_t *)(fp + 0x8a) = blend_ticks;
   }
+}
+
+/* Get first-person weapon markers by name, but only for the local player
+ * currently being rendered (0xddb90). The weapon's holding local player is
+ * resolved via FUN_000dcd60 and compared against the current render local
+ * player index (global 0x506548); on a mismatch the function returns 0
+ * markers. Otherwise it forwards all four arguments to
+ * first_person_weapon_get_marker_by_name (0xdd190) and returns its count. */
+int16_t first_person_weapon_get_marker_by_name_render(int object_handle,
+                                                      void *marker_name,
+                                                      void *out_markers,
+                                                      int max_count)
+{
+  if (*(int16_t *)0x506548 == FUN_000dcd60(object_handle)) {
+    return first_person_weapon_get_marker_by_name(object_handle, marker_name,
+                                                  out_markers, max_count);
+  }
+
+  return 0;
 }
 
 /* Set the first-person weapon animation state for a local player (0xddbd0).
@@ -735,6 +789,26 @@ done:
   FUN_000dce00(local_player_index);
 }
 
+/* Bind a first-person weapon state block to a player and reset it (0xde0e0).
+ * local_player_index arrives in ESI (register argument); param_2 arrives on the
+ * stack and is stored at fp+4 (the value later passed to
+ * player_clear_aim_assist by FUN_000de140). Clears the byte at fp+0x50, then
+ * runs the weapon-state reset in FUN_000dde80. */
+void FUN_000de0e0(int local_player_index, int param_2)
+{
+  char *fp;
+
+  assert_halt((int16_t)local_player_index >= 0 &&
+              (int16_t)local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS);
+
+  fp = (char *)(*(int *)0x46bea8 + (int)(int16_t)local_player_index * 0x1ea0);
+
+  *(uint8_t *)(fp + 0x50) = 0;
+  *(int *)(fp + 4) = param_2;
+
+  FUN_000dde80(local_player_index);
+}
+
 /* Process a weapon event for a local player's first-person weapon (0xde140).
  * Handles reload initiation, weapon put-away, aim-assist clearing, and state
  * transitions. Computes reload count from trigger data and weapon ammo state,
@@ -842,6 +916,29 @@ apply_state:
 cleanup:
   if (saved_event == 0xc)
     *(int16_t *)(fp + 0x8a) = 0;
+}
+
+/* Notify the first-person weapon system that a unit generated an event
+ * (0xde360). Finds the local player controlling the unit (0xdcdc0) and
+ * processes the event for that player. If no local player controls the
+ * unit, falls back to the third-person path for the unit's currently
+ * equipped weapon index at unit+0x2a2. */
+void first_person_weapon_message_from_unit(int unit_handle, int message_type)
+{
+  int16_t local_player;
+
+  local_player = FUN_000dcdc0(unit_handle);
+  FUN_000de140(local_player, message_type);
+  if (local_player == -1) {
+    char *unit;
+    int16_t weapon_index;
+
+    unit = (char *)object_get_and_verify_type(unit_handle, 3);
+    weapon_index = *(int16_t *)(unit + 0x2a2);
+    if (weapon_index != -1) {
+      FUN_000dc9d0(message_type, (int)weapon_index);
+    }
+  }
 }
 
 /* Notify the first-person weapon system of an object event (0xde3b0).

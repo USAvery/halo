@@ -7,6 +7,7 @@
  *   0x81250  FUN_00081250 (from public_key_crypt.c — same COFF object)
  *   0x81300  FUN_00081300 (from public_key_crypt.c — same COFF object)
  *   0x81410  FUN_00081410 (from public_key_crypt.c — same COFF object)
+ *   0x81480  FUN_00081480 (from random_numbers.c — same COFF object)
  *   0x81630  thread_new
  *   0x81720  thread_is_done
  *   0x81770  thread_close
@@ -247,6 +248,82 @@ int FUN_00081410(int low, int high)
   value = rand();
   return low + (int)((double)value * (double)(unsigned int)high /
                      ((double)(unsigned int)low + 32767.0));
+}
+
+/*
+ * FUN_00081480 — pick a pseudo-random 64-bit value between *min and *max.
+ *
+ * TU: c:\halo\SOURCE\bungie_net\common\random_numbers.c (confirmed by the
+ * __FILE__ string at 0x265f08 pushed by all three asserts below); it links
+ * into the same COFF object as the thread_win32 routines.
+ *
+ * Confirmed: parameters are min=[ebp+8] (ESI), max=[ebp+0xc] (EBX),
+ * result=[ebp+0x10] (EDI) — the assert compares at 0x81558 and 0x8158a test
+ * result against ESI ("result->qword >= min->qword", line 0x3a) and against
+ * EBX ("result->qword <= max->qword", line 0x3b) respectively.
+ * Confirmed: the seed-once guard is the byte at 0x334980; on the first call
+ * srand(crt_time(NULL)) runs (0x814c4-0x814d4, ADD ESP,8 covers both cdecl
+ * args) and the byte is set to 1.
+ * Confirmed x87 order at 0x814eb-0x81540: FILD the rand() dword first, then
+ * build (double)max->qword, FMULP, then build (double)min->qword, FADD the
+ * double constant 32767.0 at 0x265eb0, FDIVP. So the scale is
+ *   rand() * (double)max->qword / ((double)min->qword + 32767.0)
+ * — note the divisor is min, not (max - min); that is what the binary does
+ * (it only coincides with the usual "min + range*rand/RAND_MAX" idiom when
+ * min is 0), and it is why the two range asserts exist.
+ * Confirmed: each unsigned-64 -> double conversion is open-coded as
+ * (double)(int64)(v & 0x7fffffffffffffff) - (double)(int64)(v & 1<<63)
+ * (FILD low63, FILD signbit, FCHS, FADDP).
+ * Confirmed: the _ftol2 result (EDX:EAX) is stored to a local qword and
+ * passed as math64_add(min, &offset, result) — first PUSH is the last arg.
+ * Unknown: the semantic name of this function; parameter names min/max/
+ * result come from the assert strings.
+ */
+void FUN_00081480(unsigned int *min, unsigned int *max, unsigned int *result)
+{
+  unsigned int rand_value;
+  uint64_t min_qword;
+  uint64_t max_qword;
+  int64_t offset;
+
+  if (min == 0 || max == 0 || result == 0) {
+    display_assert("min && max && result",
+                   "c:\\halo\\SOURCE\\bungie_net\\common\\random_numbers.c",
+                   0x2e, 1);
+    system_exit(-1);
+  }
+
+  if (*(char *)0x334980 == 0) {
+    FUN_001d9cf9((unsigned int)crt_time(0));
+    *(char *)0x334980 = 1;
+  }
+
+  rand_value = (unsigned int)rand();
+  max_qword = *(uint64_t *)max;
+  min_qword = *(uint64_t *)min;
+
+  offset = (int64_t)((double)(int)rand_value *
+                     ((double)(int64_t)(max_qword & 0x7fffffffffffffffULL) -
+                      (double)(int64_t)(max_qword & 0x8000000000000000ULL)) /
+                     (((double)(int64_t)(min_qword & 0x7fffffffffffffffULL) -
+                       (double)(int64_t)(min_qword & 0x8000000000000000ULL)) +
+                      32767.0));
+
+  math64_add((const uint16_t *)min, (const uint16_t *)&offset,
+             (uint16_t *)result);
+
+  if (result[1] < min[1] || (result[1] == min[1] && result[0] < min[0])) {
+    display_assert("result->qword >= min->qword",
+                   "c:\\halo\\SOURCE\\bungie_net\\common\\random_numbers.c",
+                   0x3a, 1);
+    system_exit(-1);
+  }
+  if (result[1] > max[1] || (result[1] == max[1] && result[0] > max[0])) {
+    display_assert("result->qword <= max->qword",
+                   "c:\\halo\\SOURCE\\bungie_net\\common\\random_numbers.c",
+                   0x3b, 1);
+    system_exit(-1);
+  }
 }
 
 /*

@@ -7748,7 +7748,7 @@
      "addr": "0xdb250",
      "decl": "char FUN_000db250(int object_handle@<esi>);",
      "file": "src/halo/interface/event_manager.c",
-     "ported": true
+     "ported": false
     },
     {
      "addr": "0xdb330",
@@ -7889,7 +7889,7 @@
     {
      "addr": "0x199420",
      "decl": "file_ref_t *file_reference_create(file_ref_t *info, int16_t location);",
-     "ported": true
+     "ported": false
     },
     {
      "addr": "0x1995c0",
@@ -34072,7 +34072,7 @@
     {
      "addr": "0xfe890",
      "decl": "void FUN_000fe890(int trigger_index@<eax>, int weapon_handle@<ebx>);",
-     "ported": true
+     "ported": false
     },
     {
      "addr": "0xfe910",
@@ -38366,12 +38366,12 @@
     {
      "addr": "0x14ad60",
      "decl": "void render_debug_collision_sphere(void *sphere, void *color);",
-     "ported": true
+     "ported": false
     },
     {
      "addr": "0x14ad80",
      "decl": "void render_debug_collision_cylinder(void *cylinder, void *color);",
-     "ported": true
+     "ported": false
     },
     {
      "addr": "0x14adb0",
