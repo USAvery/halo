@@ -1873,7 +1873,7 @@
     "class": "non_leaf",
     "call_count": 1,
     "confidence": "high",
-    "coverage_pct": 65.8,
+    "coverage_pct": 92.4,
     "oracle": "xbe"
   },
   "0x119720": {
