@@ -39340,7 +39340,7 @@
     },
     {
      "addr": "0x80470",
-     "decl": "void FUN_00080470(int buffer, unsigned short buffer_size, unsigned int *prime /* @<esi> */, unsigned int *g /* @<ebx> */, unsigned int *key /* @<edi> */);",
+     "decl": "unsigned short *FUN_00080470(int buffer, unsigned short buffer_size, unsigned int *prime /* @<esi> */, unsigned int *g /* @<ebx> */, unsigned int *key /* @<edi> */);",
      "ported": true,
      "source_path": "src/halo/networking/message_header.c"
     },
@@ -39358,8 +39358,9 @@
     },
     {
      "addr": "0x805a0",
-     "decl": "void initiate_key_exchange(void);",
-     "comment": "[NAME: initiate_key_exchange \u2014 name_source=2276-symbol-dump method=exact_address tier=confirmed (T1), cea-apply-unified 2026-09-14]"
+     "decl": "bool initiate_key_exchange(int *endpoint, unsigned int *public_key, unsigned int *prime, unsigned int *secret);",
+     "comment": "[NAME: initiate_key_exchange \u2014 name_source=2276-symbol-dump method=exact_address tier=confirmed (T1), cea-apply-unified 2026-09-14]",
+     "ported": true
     },
     {
      "addr": "0x80620",

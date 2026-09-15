@@ -88,12 +88,16 @@ unsigned short *key_agreement_build_message(short type, void *data, int buffer,
  * the assert text "prime && g && key") into a contiguous 24-byte stack
  * buffer in that order (prime, then g, then key), then forwards buffer and
  * buffer_size unchanged to key_agreement_build_message with message type 0
- * and the packed buffer as data. Return value is discarded (binary-proven:
- * no test of EAX after the CALL). Asserts and halts if prime, g, or key is
- * NULL. */
-void FUN_00080470(int buffer, unsigned short buffer_size,
-                  unsigned int *prime /* @<esi> */,
-                  unsigned int *g /* @<ebx> */, unsigned int *key /* @<edi> */)
+ * and the packed buffer as data. 0x80470 itself does not touch EAX after the
+ * CALL, so key_agreement_build_message's message pointer passes through
+ * unmodified (implicit-EAX return); initiate_key_exchange (0x805a0) consumes
+ * it (MOV ESI,EAX at 0x805df), so the return type is declared explicitly
+ * rather than relying on a void function happening to leave EAX intact.
+ * Asserts and halts if prime, g, or key is NULL. */
+unsigned short *FUN_00080470(int buffer, unsigned short buffer_size,
+                             unsigned int *prime /* @<esi> */,
+                             unsigned int *g /* @<ebx> */,
+                             unsigned int *key /* @<edi> */)
 {
   unsigned int packed_data[6];
 
@@ -108,7 +112,7 @@ void FUN_00080470(int buffer, unsigned short buffer_size,
   packed_data[4] = key[0];
   packed_data[5] = key[1];
 
-  key_agreement_build_message(0, packed_data, buffer, buffer_size);
+  return key_agreement_build_message(0, packed_data, buffer, buffer_size);
 }
 
 /* 0x804e0 - Pack a key value and build a key-agreement message (single-value
@@ -167,6 +171,60 @@ int key_agreement_peek_packet_type(unsigned char *msgptr,
     return 1;
   }
   return 0;
+}
+
+/* 0x805a0 - Start a key exchange: generate the group parameters, compute our
+ * public key, pack (prime, g, public_key) into a key-agreement message and
+ * send it to the endpoint.
+ *
+ * cdecl with four stack params (binary-proven): endpoint@[EBP+8],
+ * public_key@[EBP+0xc], prime@[EBP+0x10], secret@[EBP+0x14].  The 8-byte
+ * generator `g` is a local (LEA [EBP-0xc], passed to all three crypto
+ * callees); its size is proven by FUN_00080470 copying two dwords from it.
+ *
+ * Call-site argument mapping (first PUSH is the last argument):
+ *   FUN_00081170(prime, secret, g)               - pushes ESI,EBX,EAX
+ *   FUN_00081250(prime, secret, g, public_key)   - pushes ESI,EBX,ECX,EDI
+ *   FUN_00080470(0x334780, 0x200, prime, g, key) - pushes 0x334780,0x200 with
+ *      the register args ESI=prime, EBX=&g (LEA at 0x805d7), EDI=public_key
+ * The three cdecl frames are cleaned up together (ADD ESP,0x24 = 9 dwords).
+ *
+ * The message header is read BEFORE byte_swap_message_header runs
+ * (binary-proven: MOV DI,word ptr [ESI] at 0x805e8 precedes the CALL at
+ * 0x805f2), so the length compared against send_endpoint's return is the
+ * host-order size; MOVSX EDI,DI at 0x805fa makes it a signed short.
+ *
+ * Returns a 1-byte result (binary-proven: XOR AL,AL on the shared failure
+ * exit, MOV AL,byte ptr [EBP-1] on the success exit).  The original keeps the
+ * success value in a stack slot initialised to 1 at 0x805b5 and never writes
+ * it again, so the success return is unconditionally true.
+ *
+ * 0x334780 is the same unnamed 0x200-byte global message buffer used by
+ * 0x80620 (no symbol or string evidence for a name). */
+bool initiate_key_exchange(int *endpoint, unsigned int *public_key,
+                           unsigned int *prime, unsigned int *secret)
+{
+  unsigned int g[2];
+  unsigned short *msg;
+  short msg_size;
+  bool result;
+
+  result = true;
+
+  FUN_00081170(prime, secret, g);
+  FUN_00081250(prime, secret, g, public_key);
+
+  msg = FUN_00080470(0x334780, 0x200, prime, g, public_key);
+  if (msg == (unsigned short *)0) {
+    result = false;
+  } else {
+    msg_size = (short)(*msg >> 4);
+    byte_swap_message_header(msg, 1);
+    if (send_endpoint(endpoint, (const char *)msg, msg_size) != msg_size) {
+      result = false;
+    }
+  }
+  return result;
 }
 
 /* 0x80620 - Handle an inbound key-agreement message (key_agreement.c, line
@@ -478,7 +536,11 @@ good_type:
 /* 0x80c20 - Byte-swap a 2-byte message header for network byte order.
  * param_2 == 0: host->network; param_2 == 1: network->host.
  * Both directions are identical (swap both bytes). */
-void byte_swap_message_header(unsigned short *header, int byte_order)
+/* noinline: the original keeps a real CALL at every call site (e.g. CALL
+ * 0x00080c20 at 0x805f2 in initiate_key_exchange); cl.exe /Ob2 otherwise
+ * inlines the swap into its same-TU callers. */
+__declspec(noinline) void byte_swap_message_header(unsigned short *header,
+                                                   int byte_order)
 {
   unsigned short v;
 
