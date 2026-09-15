@@ -22,6 +22,15 @@ Categories:
                                              hard-blocked.
   raw_offset_deref *(T *)(ident + 0xNN)     SOFT -- an un-recovered struct field
                                              access. Same rationale as fun_call.
+  untyped_producer *(T *)(p + 0xNN) where p HARD -- p came from an untyped cast
+                   came from `(char *)f(...)`      of a call, so the struct type was
+                                                   lost at f's kb.json RETURN decl,
+                                                   not at this line. Typing that one
+                                                   decl types every caller at once
+                                                   and is codegen-neutral (a pointer
+                                                   return is EAX either way). Gated
+                                                   on ADDED lines only, so existing
+                                                   sites never block an edit.
 
 Modes:
   --check           Global ratchet over src/. Auto-lowers the soft baseline on any
@@ -29,6 +38,14 @@ Modes:
                     exits 0 (non-blocking) -- normal lifts add FUN_ calls and
                     offset derefs before recovery pays them down. Raw fn-ptr casts
                     are NOT gated here; run check_raw_casts.py for that hard gate.
+  --untyped-producer
+                    Repo-wide census ranking producers by the offset-deref debt
+                    downstream of their untyped return. The kb.json worklist,
+                    ordered by leverage. Read-only.
+  --untyped-producer-added
+                    Report only sites on lines ADDED by the staged diff.
+                    Exits 1 if any -- this is the pre-commit hard gate.
+  --self-test       Unit-check the scope walker.
   --changed-only    Per-file, line-numbered findings across ALL categories for the
                     files you have touched (git staged + unstaged-tracked +
                     untracked). Developer/agent feedback loop. Exits 1 if any
@@ -70,6 +87,29 @@ PATTERNS = {
         r'\*\([A-Za-z_][\w ]*\*\)\([A-Za-z_]\w* \+ 0x[0-9a-fA-F]+\)'),
 }
 
+# Same shape as raw_offset_deref, but capturing the base identifier so we can
+# look up its declared type and decide whether the struct is already recovered.
+OFFSET_BASE_RE = re.compile(
+    r'\*\([A-Za-z_][\w ]*\*\)\(([A-Za-z_]\w*) \+ 0x[0-9a-fA-F]+\)')
+
+# `} foo_t;` / `} foo_t, *pfoo;` -- the tail of a typedef'd struct/union.
+STRUCT_TYPEDEF_RE = re.compile(r'^\}\s*([A-Za-z_]\w*)\s*[,;]', re.MULTILINE)
+
+# A local/param declared as a pointer to a recovered struct: `foo_t *p`,
+# `const foo_t *p`, `foo_t * restrict p`. Deliberately NOT matching `char *`,
+# `void *` or any non-typedef'd type -- those are the un-recovered cases that
+# raw_offset_deref already tracks as soft debt.
+TYPED_PTR_DECL_RE = re.compile(
+    r'\b(?:const\s+)?([A-Za-z_]\w*_t)\s*\*\s*(?:restrict\s*)?([A-Za-z_]\w*)')
+
+# `char *obj = (char *)object_get_and_verify_type(h);` and the bare-assignment
+# form `obj = (char *)object_get(h);` -- an untyped pointer produced by a call.
+UNTYPED_PRODUCER_RE = re.compile(
+    r'(?:\b(?:char|void|uint8_t|int8_t|unsigned\s+char)\s*\*\s*)?'
+    r'\b([A-Za-z_]\w*)\s*=\s*'
+    r'\(\s*(?:const\s+)?(?:char|void|uint8_t|int8_t|unsigned\s+char)\s*\*\s*\)\s*'
+    r'([A-Za-z_]\w*)\s*\(')
+
 # Categories the ratchet baseline owns. raw_fnptr_cast is HARD-gated elsewhere
 # (check_raw_casts.py) so it is intentionally NOT ratcheted here.
 SOFT_CATEGORIES = ('fun_call', 'raw_offset_deref')
@@ -106,6 +146,322 @@ def findings_file(fpath):
                 if pat.search(line):
                     out.append((lineno, cat, line.strip()))
     return out
+
+
+# ---------------------------------------------------------------------------
+# untyped_producer: an accessor whose result is held as char*/void* and then
+# raw-offset-dereffed by its callers.
+#
+# This is where struct types are actually lost. A raw offset on a base that is
+# ALREADY declared `foo_t *` does not exist and cannot exist -- `p + 0x10` on a
+# struct pointer scales by sizeof, so the C type system rules it out. What the
+# tree has instead is `char *obj = (char *)object_get_and_verify_type(h)`: the
+# producer's kb.json decl returns void*/char*, so every caller holds an untyped
+# pointer and raw offsets are the only spelling available.
+#
+# Typing ONE producer decl therefore types every one of its callers at once, and
+# a pointer return is EAX either way, so it is codegen-neutral. This census ranks
+# producers by how much offset-deref debt each one is upstream of -- the kb.json
+# worklist, ordered by leverage.
+# ---------------------------------------------------------------------------
+
+_known_structs_cache = None
+
+
+def known_struct_types():
+    """Set of typedef'd struct/union names defined anywhere under src/."""
+    global _known_structs_cache
+    if _known_structs_cache is not None:
+        return _known_structs_cache
+    names = set()
+    for dirpath, _, filenames in os.walk(SRC_DIR):
+        for fname in filenames:
+            if not fname.endswith('.h'):
+                continue
+            with open(os.path.join(dirpath, fname), 'r', errors='replace') as f:
+                names.update(STRUCT_TYPEDEF_RE.findall(f.read()))
+    _known_structs_cache = {n for n in names if n.endswith('_t')}
+    return _known_structs_cache
+
+
+def _blank_noncode(lines):
+    """Return `lines` with block comments, // comments, string and char literals
+    blanked out, preserving line count and column positions.
+
+    Brace counting and declaration scanning both run on this, so a `{` inside a
+    comment or a `'{'` literal can never open a scope. Getting this wrong is not
+    cosmetic: a single unbalanced brace in a comment keeps one function's scope
+    alive for thousands of lines and turns every later `char *obj` deref into a
+    false struct_bypass report.
+    """
+    out = []
+    in_block = False
+    for raw in lines:
+        buf = []
+        i, n = 0, len(raw)
+        while i < n:
+            c = raw[i]
+            if in_block:
+                if raw.startswith('*/', i):
+                    in_block = False
+                    buf.append('  ')
+                    i += 2
+                else:
+                    buf.append(' ')
+                    i += 1
+                continue
+            if raw.startswith('/*', i):
+                in_block = True
+                buf.append('  ')
+                i += 2
+                continue
+            if raw.startswith('//', i):
+                buf.append(' ' * (n - i))
+                break
+            if c in ('"', "'"):
+                quote = c
+                buf.append(' ')
+                i += 1
+                while i < n:
+                    if raw[i] == '\\':
+                        buf.append('  ')
+                        i += 2
+                        continue
+                    if raw[i] == quote:
+                        buf.append(' ')
+                        i += 1
+                        break
+                    buf.append(' ')
+                    i += 1
+                continue
+            buf.append(c)
+            i += 1
+        out.append(''.join(buf))
+    return out
+
+
+def _scan_decls(text, known, out):
+    """Add every `foo_t *p` declaration in `text` to the `out` scope map."""
+    for typ, ident in TYPED_PTR_DECL_RE.findall(text):
+        if typ in known:
+            out.setdefault(ident, typ)
+
+
+def struct_bypass_findings(fpath):
+    """[(lineno, base_ident, producer_callee, line_text)] for one file.
+
+    Finds raw offset derefs whose base pointer came from an untyped cast of a
+    call -- i.e. the producer's return type is where the struct was lost.
+
+    The identifier->producer map is FUNCTION-scoped, not file-scoped. units.c
+    alone declares `unit` as `char *` in 101 functions; a file-wide map would
+    attribute every one of them to whichever producer happened to be seen first.
+    Scope resets at each top-level `{`.
+    """
+    with open(fpath, 'r', errors='replace') as f:
+        raw_lines = f.read().splitlines()
+    code = _blank_noncode(raw_lines)
+
+    out = []
+    depth = 0
+    scope = {}          # ident -> producer callee name
+    cond_stack = []     # depth at each open #if, so #else can rewind to it
+
+    for idx, line in enumerate(code):
+        lineno = idx + 1
+        # Preprocessor directives do not open or close C scopes; a
+        # `#define X { ... }` would otherwise unbalance the whole file.
+        stripped = line.lstrip()
+        is_directive = stripped.startswith('#')
+
+        if is_directive:
+            # Sibling #if/#else branches are mutually exclusive, but a linear
+            # scan sees BOTH. objects.c's MSVC-vs-clang asm guard opens a brace
+            # in each arm and closes it once; counting both leaves depth
+            # permanently +1 and leaks one function's scope over the next 3000
+            # lines. Rewind to the #if's depth at each sibling branch.
+            directive = (stripped[1:].lstrip().split(None, 1) or [''])[0]
+            if directive in ('if', 'ifdef', 'ifndef'):
+                cond_stack.append(depth)
+            elif directive in ('else', 'elif'):
+                if cond_stack:
+                    depth = cond_stack[-1]
+            elif directive == 'endif':
+                if cond_stack:
+                    cond_stack.pop()
+
+        if depth > 0:
+            for ident, callee in UNTYPED_PRODUCER_RE.findall(line):
+                scope[ident] = callee
+            for base in OFFSET_BASE_RE.findall(line):
+                if base in scope:
+                    out.append((lineno, base, scope[base],
+                                raw_lines[idx].strip()))
+
+        if is_directive:
+            continue
+        opens = line.count('{')
+        closes = line.count('}')
+        if depth == 0 and opens:
+            scope = {}
+        depth += opens - closes
+        if depth <= 0:
+            depth = 0
+            scope = {}
+    return out
+
+
+def _self_test_struct_bypass():
+    """Guard the scope walker against the comment / char-literal / #if-#else
+    leaks that made the first version report 1107 sites, 1007 of them false."""
+    import tempfile
+    src = """
+/* A comment with an unbalanced { brace and a 'quote. */
+void a(int h)
+{
+  char *obj = (char *)object_get(h);
+  x = *(int *)(obj + 0x10);     // FINDING: producer object_get
+}
+
+char brace_literal(void) { return '{'; }
+
+void b(int h)
+{
+  char *obj = local_buffer;
+  y = *(int *)(obj + 0x10);     // not a finding: no producer call
+}
+
+void c(int h)
+{
+  char *g = (char *)widget_get(h);
+#if defined(_MSC_VER) && !defined(__clang__)
+  if (p) {
+#else
+  if (q) {
+#endif
+    z = *(int *)(g + 0x4);      // FINDING: producer widget_get
+  }
+}
+"""
+    failures = 0
+    with tempfile.NamedTemporaryFile('w', suffix='.c', delete=False) as f:
+        f.write(src)
+        path = f.name
+    try:
+        found = struct_bypass_findings(path)
+    finally:
+        os.unlink(path)
+
+    want = [('obj', 'object_get'), ('g', 'widget_get')]
+    got = [(f[1], f[2]) for f in found]
+    if got != want:
+        print(f'  FAIL untyped_producer: expected {want}, got {got} ({found})')
+        failures += 1
+    else:
+        print('  ok   untyped_producer scope walker '
+              '(comment / char-literal / non-call / #if-#else cases)')
+    return failures
+
+
+def _added_lines_by_file():
+    """{repo-relative path: set(line numbers added by the staged diff)}."""
+    try:
+        out = subprocess.run(
+            ['git', 'diff', '--cached', '--unified=0', '--diff-filter=ACMR'],
+            cwd=ROOT_DIR, capture_output=True, text=True, check=False).stdout
+    except Exception:
+        return {}
+    added, cur, lineno = {}, None, 0
+    for line in out.splitlines():
+        if line.startswith('+++ b/'):
+            cur = line[6:].strip()
+            continue
+        if line.startswith('@@'):
+            m = re.search(r'\+(\d+)', line)
+            lineno = int(m.group(1)) if m else 0
+            continue
+        if cur and line.startswith('+') and not line.startswith('+++'):
+            added.setdefault(cur, set()).add(lineno)
+            lineno += 1
+    return added
+
+
+def mode_untyped_producer(as_json, added_only):
+    """Rank the producers whose untyped return is upstream of offset-deref debt.
+
+    `--added` narrows to lines the staged diff adds, which is the pre-commit
+    gate: a NEW offset deref on a pointer from an already-known producer means
+    the decl should have been typed first.
+    """
+    added = _added_lines_by_file() if added_only else None
+    if added_only:
+        files = sorted(os.path.join(ROOT_DIR, r) for r in added
+                       if (r.endswith('.c') or r.endswith('.h'))
+                       and os.path.exists(os.path.join(ROOT_DIR, r)))
+    else:
+        files = sorted(_iter_c_files())
+
+    by_producer = {}
+    total = 0
+    for fpath in files:
+        rel = os.path.relpath(fpath, ROOT_DIR)
+        fnd = struct_bypass_findings(fpath)
+        if added_only:
+            allowed = added.get(rel, set())
+            fnd = [f for f in fnd if f[0] in allowed]
+        for lineno, base, callee, text in fnd:
+            rec = by_producer.setdefault(callee, {'sites': 0, 'files': set(),
+                                                  'offsets': set(),
+                                                  'examples': []})
+            rec['sites'] += 1
+            rec['files'].add(rel)
+            m = re.search(r'\+ (0x[0-9a-fA-F]+)\)', text)
+            if m:
+                rec['offsets'].add(m.group(1).lower())
+            if len(rec['examples']) < 3:
+                rec['examples'].append(f'{rel}:{lineno}  {text[:90]}')
+            total += 1
+
+    if as_json:
+        print(json.dumps({k: {'sites': v['sites'],
+                              'files': sorted(v['files']),
+                              'offsets': sorted(v['offsets']),
+                              'examples': v['examples']}
+                          for k, v in by_producer.items()}, indent=2))
+        return 1 if (added_only and total) else 0
+
+    if not by_producer:
+        print('untyped_producer: none'
+              + (' on added lines' if added_only else ' repo-wide'))
+        return 0
+
+    ranked = sorted(by_producer.items(), key=lambda kv: -kv[1]['sites'])
+    print(f'{"producer":<44} {"sites":>6} {"files":>6} {"offsets":>8}')
+    print('-' * 68)
+    for callee, rec in ranked:
+        print(f'{callee:<44} {rec["sites"]:>6} {len(rec["files"]):>6} '
+              f'{len(rec["offsets"]):>8}')
+    print('-' * 68)
+    print(f'{"TOTAL":<44} {total:>6} '
+          f'{len(set().union(*(r["files"] for r in by_producer.values()))):>6}')
+
+    print('\nTop producers, with examples:')
+    for callee, rec in ranked[:5]:
+        print(f'\n  {callee}  ({rec["sites"]} sites, '
+              f'{len(rec["offsets"])} distinct offsets)')
+        for ex in rec['examples']:
+            print(f'      {ex}')
+
+    if added_only:
+        print(f'\npre-commit BLOCKED: {total} added line(s) raw-offset-deref a '
+              'pointer from a known producer.')
+        print('Type the producer\'s return in kb.json (a pointer return is EAX '
+              'either way, so it is codegen-neutral), then use `p->field`. '
+              'Bypass with --no-verify.')
+        return 1
+    print('\nEach producer is ONE kb.json decl. Typing its return types every '
+          'caller at once.')
+    return 0
 
 
 def count_all():
@@ -451,6 +807,12 @@ def main():
         write_baseline(count_all())
         print(f'readability baseline updated: {read_baseline()}')
         return 0
+    if '--self-test' in argv:
+        return 1 if _self_test_struct_bypass() else 0
+    if '--untyped-producer-added' in argv:
+        return mode_untyped_producer(as_json, added_only=True)
+    if '--untyped-producer' in argv:
+        return mode_untyped_producer(as_json, added_only=False)
     if '--changed-only' in argv:
         return mode_changed_only(as_json)
     # default / --check

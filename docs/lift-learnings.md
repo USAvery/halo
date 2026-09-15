@@ -2979,3 +2979,78 @@ than the destination, for parameters and locals alike. It reproduces the
 `char new_var = key` hit on the pre-fix `tags.c`. An explicit cast is read as
 intent and never flagged; suppress a verified-faithful narrowing with
 `/* hazard-ok: narrowing-assign */` on the line.
+
+---
+
+## 60. VC71 is type-blind, and the post-hoc lane cannot fix a type
+
+**Symptom class:** a lift scores acceptably and ships, but a parameter, return
+value, or field access has the wrong *type*. Truncation, `1069547520` where
+`0.5f` was meant, a branch that is always taken.
+
+**Why the gates miss it.** The official VC71 `pct` is a mnemonic-only LCS
+(`vc71_verify.py:1851` — the operand-normalized score is "ADVISORY ONLY"). Type
+errors mostly do not change the mnemonic stream, and where they do the delta is
+inside codegen noise:
+
+- `actor_move_update` (0x2e560) read a float tag field through `unsigned int *`,
+  so `max_speed_sq` became ~1.1e18 instead of 0.25 and a gate was always true.
+  VC71 scored it **68.7% before and after** the fix — a `FILD` for an `FLD` is
+  ~4 instructions. Root cause of the c40 cutscene hang.
+- `collision_features_from_point` (0x14adb0) declares `int param_3`; the
+  0x14ea10 call site reserves both float slots at once (`sub esp,8`; two
+  `fstp`), the MSVC shape for two adjacent `float` params.
+- `FUN_000ae400` reached a stored **100.0%** by swapping the loop-exit variable
+  from the scan index to the match counter. Two variables in two registers
+  normalize to the same shape, so the scorer was measuring wrong code. Result
+  was the MP "Loading level…" page fault (CR2=0x14); the correct fix took it to
+  89.4%.
+
+**Why it has to be fixed in `/lift`, not `/recover-source`.** The recovery
+ladder's `offset-to-field` category is gate (b): byte-identical `.text` **plus**
+zero VC71 drop. Correcting a type changes bytes by construction, so the lane
+that nominally owns type recovery can only re-spell offsets that were already
+right. Every genuinely wrong type is locked in by the gate meant to protect it.
+Type recovery therefore belongs where bytes are still allowed to move.
+
+**The dividing line that works:** anything that can change the emitted
+instruction stream (prototype types, `@<reg>`, callee arity, struct field
+widths) belongs in the lift; anything that provably cannot (names, comments,
+magic constants, expression form) belongs in `/recover-source`.
+
+**Corollary — a raw offset deref is usually an untyped PRODUCER.** A raw offset
+on a base already declared `foo_t *` does not exist and cannot exist: `p + 0x10`
+on a struct pointer scales by `sizeof`, so C rules it out. What the tree has is
+`char *obj = (char *)object_get_and_verify_type(h)` — the type was lost at that
+callee's kb.json **return** decl, and every caller is then forced into raw
+offsets. 7042 deref sites trace to 36 producers; `object_get_and_verify_type`
+alone is 1980 sites across 34 files. Typing one decl types every caller and is
+codegen-neutral, because a pointer return is EAX either way. Generic accessors
+(`datum_get`, `tag_get`) genuinely return `void *` — the type depends on the
+pool — and need a typed wrapper rather than a changed decl.
+
+**Automation:**
+- `tools/audit/check_param_types.py` cross-checks every kb.json decl against the
+  value-passing shape at its call sites in the pristine XBE: `float` params
+  (a slot filled by `fstp dword/qword ptr [esp+K]`, where the slot index is
+  `K/4` plus the pushes between that store and the CALL), `float` returns
+  (callers consuming ST(0) with no intervening `fld`) and byte returns (all
+  conclusive callers testing AL). Only sites whose `ADD ESP,N` matches the
+  declared slot count are counted, which pins the argument-block base and rules
+  out ESP-relative stores into locals. `--check` gates against
+  `tools/audit/param_type_baseline.json`; `--callee 0x<addr>` for one function.
+  It independently reproduces the 0x14adb0 finding above.
+- `tools/audit/check_readability.py --untyped-producer` ranks producers by the
+  offset-deref debt downstream of their untyped return — the kb.json worklist,
+  ordered by leverage. `--untyped-producer-added` is the pre-commit gate
+  (wired in `tools/hooks/pre-commit-readability.sh`) and fires only on lines the
+  staged diff ADDS, so the existing 7042 sites never block an unrelated edit.
+
+**Gotcha for anyone extending the producer scan:** its identifier→producer map
+must be function-scoped, and the brace walker must blank block comments, `//`
+comments, string and char literals, and must rewind depth at `#else`/`#elif`.
+The first version got all three wrong and reported 1107 sites of which 1007 were
+false — `objects.c`'s MSVC-vs-clang `#if` guard opens a brace in each arm and
+closes it once, which left depth permanently +1 and leaked one function's scope
+across the next 3000 lines. `check_readability.py --self-test` covers all four
+cases.

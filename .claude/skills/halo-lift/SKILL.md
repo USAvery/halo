@@ -92,8 +92,23 @@ All edits target **that path**, not a hardcoded `/mnt/g/dev/halo`.
    verification: for every CALL, trace each PUSH backward. Watch for register
    aliasing, push-then-fstp, struct field rotation. Use `lift-decompiler-traps`
    for the full hazard checklist.
-5. Infer the narrowest defensible prototype (see
-   `docs/references/prototype-inference.md`).
+5. **Infer the narrowest defensible prototype, TYPES INCLUDED** (see
+   `docs/references/prototype-inference.md`). The prototype is an *input* to
+   the lift, not a cleanup of it: a `float` param declared `int` compiles to a
+   `PUSH` where the original does `FSTP`, and the VC71 official score is a
+   mnemonic-only LCS that will not notice. Read the type off the call sites:
+   - a param slot filled by `fstp dword ptr [esp+K]` is `float`; `qword` is
+     `double` (K/4 plus the pushes between that store and the CALL gives the
+     slot index)
+   - `ADD ESP,N` after the CALL gives the stack slot count
+   - callers doing `test al,al` / `movzx r,al` want an 8-bit return; `test
+     eax,eax` a 32-bit one (see `reference_callback_return_width_must_match_test_insn`)
+   - callers consuming ST(0) with no intervening `fld` mean a `float` return
+
+   `rtk python3 tools/audit/check_param_types.py --callee 0x<addr>` does all
+   four mechanically against the pristine XBE. Run it for the target AND for
+   any callee whose decl you are about to rely on. Record what it confirmed
+   under **Types recovered** and what you assumed under **Types assumed**.
 6. **Pre-implementation pattern check** — scan for crash classes
    `check_lift_hazards.py` does NOT flag:
    - XCALLs to targets being ported
@@ -101,7 +116,24 @@ All edits target **that path**, not a hardcoded `/mnt/g/dev/halo`.
    - Loops advancing a parameter pointer when original uses a copy register
    - `(float)(int)` float-as-pointer smuggling
 7. **Produce structurally faithful C lift:**
-   - Preserve control-flow shape, side-effect order, pointer arithmetic
+   - Preserve control-flow shape and side-effect order
+   - **Use the struct field where a struct exists for that base.** Do not ship
+     `*(int *)(p + 0x1b8)` when `p`'s type has a field there —
+     `&g->players[i]` and `(char *)g + i*0x40 + 0x10` compile identically, so
+     the recovered spelling is free. If no struct exists for the base and the
+     function touches 3+ distinct offsets off it, define or extend one now
+     (`struct-recovery`), with `field_<hex>` for offsets you see accessed and
+     `pad_<hex>[n]` for the gaps. Partial is fine and expected: it grows as more
+     of the object is lifted.
+   - **Type the producer, not the site.** A raw offset is usually not a missing
+     field — it is a producer whose kb.json return decl is `void *`/`char *`.
+     `rtk python3 tools/audit/check_readability.py --untyped-producer` ranks
+     them; 7042 deref sites trace to 36 producers. Typing one decl types every
+     caller and is codegen-neutral (a pointer return is EAX either way). The
+     pre-commit hook blocks a NEWLY-ADDED deref on a known producer.
+   - Generic accessors (`datum_get`, `tag_get`) genuinely return `void *` —
+     the type depends on the pool. Those need a typed wrapper, not a changed
+     decl; leave them and say so rather than inventing a type.
    - Preserve engine idioms: `real`/`boolean` types, `cseries` macros, typed
      tag/object accessors, named enum switch cases (see `halo-xbox-re`)
    - Asserts: `assert_halt(cond)`
@@ -115,6 +147,10 @@ All edits target **that path**, not a hardcoded `/mnt/g/dev/halo`.
 12. Build and verify: `llvm-objdump -dr --disassemble-symbols=_<fn> <obj>`.
 13. Run `rtk python3 tools/audit/check_lift_hazards.py` — fix target-relevant hazards.
     Use `lift-silent-bugs` before deploying to Xbox.
+13b. Run `rtk python3 tools/audit/check_param_types.py --check`. A new ERROR
+    means a decl you touched contradicts the call sites — a silent truncation
+    bug VC71 cannot see. Fix the decl; only record it with `--update-baseline`
+    if you can say why the disassembly evidence is wrong.
 14. **Post-verify score routing:**
     - Check `artifacts/score_context/<func>.json` first
     - Score 65–84% and "structural" → `lift-score-improve` skill

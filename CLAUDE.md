@@ -90,6 +90,38 @@ The hook `tools/audit/token_discipline_hook.py` (wired in `.claude/settings.json
 
 - **Audit XCALL return and param types against kb.json.** A raw function-pointer cast that doesn't match the real signature silently uses the wrong register or push convention: `float` return reads ST(0), `int`/`uint32_t` return reads EAX; `float` params go via FLD+FSTP[ESP], `int` params via PUSH (so `(int)float_var` truncates). **Run `rtk python3 tools/audit/check_xcall_types.py` after adding or modifying any XCALL macro.** ERROR-level (float↔int) mismatches are blockers.
 
+- **Recover types during the lift, not after.** The VC71 official score is a
+  mnemonic-only LCS, so it is largely blind to type errors — a `float` param
+  declared `int` scores fine and truncates at runtime (`0x14adb0 param_3`), and
+  a float field read through a `uint32_t *` scored 68.7% before AND after the
+  fix that ended the c40 hang. The post-hoc `/recover-source` lane **cannot** fix
+  these: its `offset-to-field` gate is byte-identical `.text` plus zero VC71
+  drop, and correcting a type changes bytes by construction. So type recovery
+  belongs in `/lift`, while bytes are still allowed to move:
+  - **Interface types** (param float-vs-int, return width, `@<reg>`, callee
+    arity) — settle BEFORE writing the body.
+    `rtk python3 tools/audit/check_param_types.py --callee 0x<addr>` reads them
+    off the pristine XBE. `--check` gates against `param_type_baseline.json`.
+  - **Struct fields this function touches** — recover incrementally DURING the
+    lift (`field_<hex>` accessed / `pad_<hex>[n]` never observed). `p->field`
+    and `*(int *)(p + 0xNN)` compile identically, so the recovered spelling is
+    free; the raw one is the un-recovered lift, not the faithful one.
+  - **Names, comments, magic constants, expression form** — AFTER the score
+    settles, in `/recover-source`, gated byte-identical. Keep these out of
+    score work.
+  The line is: anything that can change the emitted instruction stream belongs
+  in the lift; anything that provably cannot belongs in `/recover-source`.
+
+- **A raw offset deref is usually an untyped PRODUCER, not a missing field.**
+  `char *obj = (char *)object_get_and_verify_type(h)` loses the type at that
+  callee's kb.json return decl, so every caller is forced into raw offsets.
+  7042 deref sites trace to 36 producers (`object_get_and_verify_type` alone is
+  1980 across 34 files). Typing one decl types every caller and is
+  codegen-neutral — a pointer return is EAX either way. Census:
+  `rtk python3 tools/audit/check_readability.py --untyped-producer`. Generic
+  accessors (`datum_get`, `tag_get`) genuinely return `void *` because the type
+  depends on the pool; those need a typed wrapper, not a changed decl.
+
 - **Verify callee buffer sizes.** Ghidra may under-size local buffers; check the callee's `memset`/init size in disassembly for the true required size. Detail: `lift-decompiler-traps` §5.
 
 - **MSVC stack layout overlap hazard.** When a lifted function calls an **unlifted** function by pointer (vtable, callback, function table), the callee may read offsets within a local array that MSVC placed overlapping other locals; our clang layout puts garbage there. Detection and fix: `lift-decompiler-traps` §5.
@@ -108,6 +140,7 @@ The hook `tools/audit/token_discipline_hook.py` (wired in `.claude/settings.json
 - **Hazard Scan:** Run `rtk python3 tools/audit/check_lift_hazards.py` after source edits or when reviewing auto-lift output (`--changed-only` for files you touched; `--staged-only` is the pre-commit hook's mode). Intrinsic calls, undersized buffers, duplicate arguments, pointer-as-float, and CONCAT survival are blockers until investigated. **WARN-level findings in files you touched are review items, not ignorable noise.** Check-to-learnings mapping: `halo-verify-debug`.
 - **Learnings-must-ship-a-detector rule:** Every new `docs/lift-learnings.md` section **must ship, in the same commit**, either (a) a check wired into `check_lift_hazards.py` / `draft_decompiler.py` / `buffer_alias_detector.py` / the call-site audit, or (b) a one-line `Automation: not mechanically detectable because …` line. A documented grep counts as (a) only when actually implemented as a check.
 - **XCALL Type Audit:** `rtk python3 tools/audit/check_xcall_types.py` after adding or modifying XCALL macros (see §2 rule).
+- **Param/Return Type Audit:** `rtk python3 tools/audit/check_param_types.py --check` after any kb.json decl change or new lift. Reads float params (`fstp [esp+K]` into an arg slot), float returns (callers consuming ST(0)) and byte returns (callers testing AL) off the pristine XBE and compares them to the decl. New ERRORs are blockers — VC71 cannot see these. Baseline: `tools/audit/param_type_baseline.json`; `--callee 0x<addr>` for one function.
 - **Golden Master Test Harness:** Runs functions inside the engine context (`src/halo/shell_xbox.c`) against Xbox ASM output; tests in `src/halo/test_harness.c`, driver `tools/verify/run_golden_tests.py`. Usage: `halo-verify-debug`.
 - **Live Memory Capture + State Replay:** Capture live game state and replay into `unicorn_diff.py --state-snapshot <path>` (or `--from-halorec`). **Use the proven virtual-memory paths (`memsave_snapshot.py`, `qmp_capture.py`) — never physical `pmemsave`**, and never QEMU `savevm`/`loadvm` for oracle tests. **VERIFY EVERY CAPTURE** against a known global first. Flows, verification gate, xemu-MCP bypass: `debug-xemu`.
 - **Dual-Oracle Runtime Harness:** For high-value stateful targets prefer a same-process harness case over two emulator runs — original and candidate called on cloned inputs in one initialized engine state. Procedure: `halo-verify-debug`.

@@ -5,6 +5,12 @@
 #            literal address (((T(*)(A))0xADDR)(...)). These bypass kb.json and
 #            the thunk system and hide calling-convention bugs; a raw cast is
 #            never necessary (add the callee to kb.json instead).
+#   HARD  -- block if a staged .c file ADDS a raw offset deref on a pointer that
+#            came from an untyped cast of a call. The struct type was lost at
+#            that producer's kb.json RETURN decl; type it there (a pointer return
+#            is EAX either way, so it is codegen-neutral) and every caller gets
+#            fields. Only ADDED lines gate, so the existing 7042 sites never
+#            block an unrelated edit.
 #   SOFT  -- print, but never block, the FUN_-call / offset-deref findings in
 #            touched files (they legitimately grow as new code is lifted; the
 #            ratchet in check_readability.py --check locks the wins over time).
@@ -33,6 +39,12 @@ if [ -n "$added_raw" ]; then
     echo ""
     echo "Add the callee to kb.json with its signature (and @<reg> if register-"
     echo "passed) and call it by name instead. Bypass with --no-verify."
+    exit 1
+fi
+
+# HARD: newly-added offset derefs on a pointer from an untyped producer.
+if ! python3 "$REPO_ROOT/tools/audit/check_readability.py" \
+        --untyped-producer-added; then
     exit 1
 fi
 exit 0

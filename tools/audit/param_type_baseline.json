@@ -1,0 +1,348 @@
+{
+  "_comment": "Known param/return type mismatches accepted at baseline time. check_param_types.py --check fails on findings NOT listed here. Remove an entry once the decl is fixed.",
+  "findings": {
+    "0x10a480:byte_return:declared return `int` but all 1 conclusive callers test AL only": {
+      "detail": "declared return `int` but all 1 conclusive callers test AL only",
+      "kind": "byte_return",
+      "name": "FUN_0010a480",
+      "ported": true,
+      "severity": "WARN"
+    },
+    "0x10cc90:byte_return:declared return `int` but all 5 conclusive callers test AL only": {
+      "detail": "declared return `int` but all 5 conclusive callers test AL only",
+      "kind": "byte_return",
+      "name": "point_in_pill2d",
+      "ported": true,
+      "severity": "WARN"
+    },
+    "0x11ba50:byte_return:declared return `int` but all 3 conclusive callers test AL only": {
+      "detail": "declared return `int` but all 3 conclusive callers test AL only",
+      "kind": "byte_return",
+      "name": "FUN_0011ba50",
+      "ported": true,
+      "severity": "WARN"
+    },
+    "0x122450:float_param:param 3 `void *in_node_data` receives an x87 dword store (stack slot 2)": {
+      "detail": "param 3 `void *in_node_data` receives an x87 dword store (stack slot 2)",
+      "kind": "float_param",
+      "name": "overlay_animation_apply_scaled",
+      "ported": false,
+      "severity": "ERROR"
+    },
+    "0x12cd60:byte_return:declared return `int` but all 1 conclusive callers test AL only": {
+      "detail": "declared return `int` but all 1 conclusive callers test AL only",
+      "kind": "byte_return",
+      "name": "network_game_server_switch_machine_from_postgame_to_pregame",
+      "ported": true,
+      "severity": "WARN"
+    },
+    "0x1363d0:byte_return:declared return `int` but all 1 conclusive callers test AL only": {
+      "detail": "declared return `int` but all 1 conclusive callers test AL only",
+      "kind": "byte_return",
+      "name": "FUN_001363d0",
+      "ported": true,
+      "severity": "WARN"
+    },
+    "0x13e050:byte_return:declared return `int` but all 3 conclusive callers test AL only": {
+      "detail": "declared return `int` but all 3 conclusive callers test AL only",
+      "kind": "byte_return",
+      "name": "object_header_block_allocate",
+      "ported": true,
+      "severity": "WARN"
+    },
+    "0x14adb0:float_param:param 3 `int param_3` receives an x87 dword store (stack slot 2)": {
+      "detail": "param 3 `int param_3` receives an x87 dword store (stack slot 2)",
+      "kind": "float_param",
+      "name": "collision_features_from_point",
+      "ported": true,
+      "severity": "ERROR"
+    },
+    "0x14c8e0:byte_return:declared return `int` but all 8 conclusive callers test AL only": {
+      "detail": "declared return `int` but all 8 conclusive callers test AL only",
+      "kind": "byte_return",
+      "name": "FUN_0014c8e0",
+      "ported": true,
+      "severity": "WARN"
+    },
+    "0x15020:byte_return:declared return `int` but all 1 conclusive callers test AL only": {
+      "detail": "declared return `int` but all 1 conclusive callers test AL only",
+      "kind": "byte_return",
+      "name": "action_flee_blind_panic",
+      "ported": true,
+      "severity": "WARN"
+    },
+    "0x15880:byte_return:declared return `int` but all 3 conclusive callers test AL only": {
+      "detail": "declared return `int` but all 3 conclusive callers test AL only",
+      "kind": "byte_return",
+      "name": "action_guard_setup_current_position",
+      "ported": true,
+      "severity": "WARN"
+    },
+    "0x15900:byte_return:declared return `int` but all 1 conclusive callers test AL only": {
+      "detail": "declared return `int` but all 1 conclusive callers test AL only",
+      "kind": "byte_return",
+      "name": "action_guard_setup_find_position",
+      "ported": true,
+      "severity": "WARN"
+    },
+    "0x16050:byte_return:declared return `int` but all 1 conclusive callers test AL only": {
+      "detail": "declared return `int` but all 1 conclusive callers test AL only",
+      "kind": "byte_return",
+      "name": "action_guard_setup_from_combat_transition",
+      "ported": true,
+      "severity": "WARN"
+    },
+    "0x16e70:byte_return:declared return `int` but all 2 conclusive callers test AL only": {
+      "detail": "declared return `int` but all 2 conclusive callers test AL only",
+      "kind": "byte_return",
+      "name": "action_obey_command_list_setup",
+      "ported": true,
+      "severity": "WARN"
+    },
+    "0x19750:byte_return:declared return `int` but all 1 conclusive callers test AL only": {
+      "detail": "declared return `int` but all 1 conclusive callers test AL only",
+      "kind": "byte_return",
+      "name": "action_search_setup_target",
+      "ported": true,
+      "severity": "WARN"
+    },
+    "0x197d0:byte_return:declared return `int` but all 1 conclusive callers test AL only": {
+      "detail": "declared return `int` but all 1 conclusive callers test AL only",
+      "kind": "byte_return",
+      "name": "action_search_setup_pursuit",
+      "ported": true,
+      "severity": "WARN"
+    },
+    "0x19f530:byte_return:declared return `int` but all 1 conclusive callers test AL only": {
+      "detail": "declared return `int` but all 1 conclusive callers test AL only",
+      "kind": "byte_return",
+      "name": "FUN_0019f530",
+      "ported": true,
+      "severity": "WARN"
+    },
+    "0x1a080:byte_return:declared return `int` but all 1 conclusive callers test AL only": {
+      "detail": "declared return `int` but all 1 conclusive callers test AL only",
+      "kind": "byte_return",
+      "name": "action_uncover_setup_target",
+      "ported": true,
+      "severity": "WARN"
+    },
+    "0x1a0db0:byte_return:declared return `int` but all 1 conclusive callers test AL only": {
+      "detail": "declared return `int` but all 1 conclusive callers test AL only",
+      "kind": "byte_return",
+      "name": "biped_flying_through_air",
+      "ported": true,
+      "severity": "WARN"
+    },
+    "0x1a100:byte_return:declared return `int` but all 1 conclusive callers test AL only": {
+      "detail": "declared return `int` but all 1 conclusive callers test AL only",
+      "kind": "byte_return",
+      "name": "action_uncover_setup_pursuit",
+      "ported": true,
+      "severity": "WARN"
+    },
+    "0x1a6bc0:byte_return:declared return `int` but all 1 conclusive callers test AL only": {
+      "detail": "declared return `int` but all 1 conclusive callers test AL only",
+      "kind": "byte_return",
+      "name": "FUN_001a6bc0",
+      "ported": true,
+      "severity": "WARN"
+    },
+    "0x1a8200:byte_return:declared return `int` but all 2 conclusive callers test AL only": {
+      "detail": "declared return `int` but all 2 conclusive callers test AL only",
+      "kind": "byte_return",
+      "name": "unit_get_seat_enter_position",
+      "ported": true,
+      "severity": "WARN"
+    },
+    "0x1a97c0:byte_return:declared return `uint32_t` but all 4 conclusive callers test AL only": {
+      "detail": "declared return `uint32_t` but all 4 conclusive callers test AL only",
+      "kind": "byte_return",
+      "name": "unit_test_animation_impulse",
+      "ported": true,
+      "severity": "WARN"
+    },
+    "0x1c300:byte_return:declared return `int32_t` but all 1 conclusive callers test AL only": {
+      "detail": "declared return `int32_t` but all 1 conclusive callers test AL only",
+      "kind": "byte_return",
+      "name": "actor_action_perform",
+      "ported": true,
+      "severity": "WARN"
+    },
+    "0x1cce80:byte_return:declared return `int` but all 2 conclusive callers test AL only": {
+      "detail": "declared return `int` but all 2 conclusive callers test AL only",
+      "kind": "byte_return",
+      "name": "sound_update_time",
+      "ported": true,
+      "severity": "WARN"
+    },
+    "0x1da19f:byte_return:declared return `int` but all 2 conclusive callers test AL only": {
+      "detail": "declared return `int` but all 2 conclusive callers test AL only",
+      "kind": "byte_return",
+      "name": "crt_toupper",
+      "ported": true,
+      "severity": "WARN"
+    },
+    "0x1da1d8:byte_return:declared return `int` but all 2 conclusive callers test AL only": {
+      "detail": "declared return `int` but all 2 conclusive callers test AL only",
+      "kind": "byte_return",
+      "name": "crt_tolower",
+      "ported": true,
+      "severity": "WARN"
+    },
+    "0x1fe8e0:float_param:param 1 `int a0` receives an x87 dword store (stack slot 0)": {
+      "detail": "param 1 `int a0` receives an x87 dword store (stack slot 0)",
+      "kind": "float_param",
+      "name": "FUN_001fe8e0",
+      "ported": false,
+      "severity": "ERROR"
+    },
+    "0x1fe8e0:float_param:param 2 `int a1` receives an x87 dword store (stack slot 1)": {
+      "detail": "param 2 `int a1` receives an x87 dword store (stack slot 1)",
+      "kind": "float_param",
+      "name": "FUN_001fe8e0",
+      "ported": false,
+      "severity": "ERROR"
+    },
+    "0x2002e2:float_param:param 4 `int a3` receives an x87 dword store (stack slot 3)": {
+      "detail": "param 4 `int a3` receives an x87 dword store (stack slot 3)",
+      "kind": "float_param",
+      "name": "FUN_002002e2",
+      "ported": false,
+      "severity": "ERROR"
+    },
+    "0x20f80:byte_return:declared return `int` but all 1 conclusive callers test AL only": {
+      "detail": "declared return `int` but all 1 conclusive callers test AL only",
+      "kind": "byte_return",
+      "name": "actor_combat_check_mode",
+      "ported": true,
+      "severity": "WARN"
+    },
+    "0x21f70:byte_return:declared return `int` but all 3 conclusive callers test AL only": {
+      "detail": "declared return `int` but all 3 conclusive callers test AL only",
+      "kind": "byte_return",
+      "name": "FUN_00021f70",
+      "ported": true,
+      "severity": "WARN"
+    },
+    "0x22010:byte_return:declared return `int` but all 2 conclusive callers test AL only": {
+      "detail": "declared return `int` but all 2 conclusive callers test AL only",
+      "kind": "byte_return",
+      "name": "actor_combat_check_fire_target",
+      "ported": true,
+      "severity": "WARN"
+    },
+    "0x23c920:float_return:declared return `void` but 1/1 callers consume ST(0)": {
+      "detail": "declared return `void` but 1/1 callers consume ST(0)",
+      "kind": "float_return",
+      "name": "calctonality",
+      "ported": false,
+      "severity": "ERROR"
+    },
+    "0x28610:byte_return:declared return `int` but all 6 conclusive callers test AL only": {
+      "detail": "declared return `int` but all 6 conclusive callers test AL only",
+      "kind": "byte_return",
+      "name": "valid_real_normal2d",
+      "ported": true,
+      "severity": "WARN"
+    },
+    "0x2a360:byte_return:declared return `int` but all 6 conclusive callers test AL only": {
+      "detail": "declared return `int` but all 6 conclusive callers test AL only",
+      "kind": "byte_return",
+      "name": "FUN_0002a360",
+      "ported": true,
+      "severity": "WARN"
+    },
+    "0x2a3f0:byte_return:declared return `int` but all 6 conclusive callers test AL only": {
+      "detail": "declared return `int` but all 6 conclusive callers test AL only",
+      "kind": "byte_return",
+      "name": "actor_path_at_destination",
+      "ported": true,
+      "severity": "WARN"
+    },
+    "0x30d10:byte_return:declared return `unsigned int` but all 2 conclusive callers test AL only": {
+      "detail": "declared return `unsigned int` but all 2 conclusive callers test AL only",
+      "kind": "byte_return",
+      "name": "FUN_00030d10",
+      "ported": false,
+      "severity": "WARN"
+    },
+    "0x3d6c0:byte_return:declared return `int` but all 1 conclusive callers test AL only": {
+      "detail": "declared return `int` but all 1 conclusive callers test AL only",
+      "kind": "byte_return",
+      "name": "actor_swarm_attach_unit",
+      "ported": true,
+      "severity": "WARN"
+    },
+    "0x61ec0:byte_return:declared return `int` but all 1 conclusive callers test AL only": {
+      "detail": "declared return `int` but all 1 conclusive callers test AL only",
+      "kind": "byte_return",
+      "name": "FUN_00061ec0",
+      "ported": true,
+      "severity": "WARN"
+    },
+    "0x7d300:byte_return:declared return `short` but all 1 conclusive callers test AL only": {
+      "detail": "declared return `short` but all 1 conclusive callers test AL only",
+      "kind": "byte_return",
+      "name": "palette_find_closest_match",
+      "ported": true,
+      "severity": "WARN"
+    },
+    "0x84a10:byte_return:declared return `int` but all 36 conclusive callers test AL only": {
+      "detail": "declared return `int` but all 36 conclusive callers test AL only",
+      "kind": "byte_return",
+      "name": "real_vector3d_valid",
+      "ported": true,
+      "severity": "WARN"
+    },
+    "0x85150:byte_return:declared return `int` but all 2 conclusive callers test AL only": {
+      "detail": "declared return `int` but all 2 conclusive callers test AL only",
+      "kind": "byte_return",
+      "name": "FUN_00085150",
+      "ported": true,
+      "severity": "WARN"
+    },
+    "0xabb90:byte_return:declared return `int` but all 1 conclusive callers test AL only": {
+      "detail": "declared return `int` but all 1 conclusive callers test AL only",
+      "kind": "byte_return",
+      "name": "FUN_000abb90",
+      "ported": true,
+      "severity": "WARN"
+    },
+    "0xb2890:byte_return:declared return `int` but all 1 conclusive callers test AL only": {
+      "detail": "declared return `int` but all 1 conclusive callers test AL only",
+      "kind": "byte_return",
+      "name": "FUN_000b2890",
+      "ported": true,
+      "severity": "WARN"
+    },
+    "0xd6550:byte_return:declared return `short` but all 1 conclusive callers test AL only": {
+      "detail": "declared return `short` but all 1 conclusive callers test AL only",
+      "kind": "byte_return",
+      "name": "FUN_000d6550",
+      "ported": true,
+      "severity": "WARN"
+    },
+    "0xfb090:byte_return:declared return `int` but all 3 conclusive callers test AL only": {
+      "detail": "declared return `int` but all 3 conclusive callers test AL only",
+      "kind": "byte_return",
+      "name": "weapon_must_be_readied",
+      "ported": true,
+      "severity": "WARN"
+    },
+    "0xfb0f0:byte_return:declared return `int` but all 1 conclusive callers test AL only": {
+      "detail": "declared return `int` but all 1 conclusive callers test AL only",
+      "kind": "byte_return",
+      "name": "weapon_prevents_grenade_throwing",
+      "ported": true,
+      "severity": "WARN"
+    },
+    "0xfba20:byte_return:declared return `int` but all 2 conclusive callers test AL only": {
+      "detail": "declared return `int` but all 2 conclusive callers test AL only",
+      "kind": "byte_return",
+      "name": "weapon_set_animation_state",
+      "ported": true,
+      "severity": "WARN"
+    }
+  }
+}

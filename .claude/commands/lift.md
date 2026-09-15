@@ -74,7 +74,29 @@ Steps:
    Do not use inline assembly or raw function pointer casts — the build
    generates thunks automatically. Never remove or change existing `@<reg>`
    slot assignments.
-6. Produce a structurally faithful C implementation.
+5b. **Type the interface before writing the body.** The prototype is an input
+   to the lift, not a cleanup of it — VC71's official score is a mnemonic-only
+   LCS, so a `float` param declared `int` scores fine and truncates at runtime.
+   Run:
+   ```bash
+   rtk python3 tools/audit/check_param_types.py --callee 0x<target>
+   ```
+   for the target and for any callee whose decl you are about to rely on. It
+   reads float params (`fstp [esp+K]` into an arg slot), float returns
+   (callers consuming ST(0)) and byte returns (callers testing AL) straight
+   off the pristine XBE. Fix the kb.json decl before writing C; note what it
+   confirmed vs what you assumed in the report.
+6. Produce a structurally faithful C implementation. **Use struct fields, not
+   raw offsets, where a struct exists for the base** — the two compile
+   identically, so the recovered spelling is free; `p->field` is the faithful
+   lift and `*(int *)(p + 0x1b8)` is the un-recovered one. Where the base has
+   no struct and the function touches 3+ distinct offsets off it, define or
+   extend one now (`struct-recovery`, `field_<hex>` / `pad_<hex>[n]`). If the
+   base came from a producer whose kb.json return is `void *`/`char *`, the
+   type was lost at that decl — check
+   `tools/audit/check_readability.py --untyped-producer` and fix it there so
+   every caller benefits. Generic accessors (`datum_get`, `tag_get`) legitimately
+   return `void *`; leave those and say so.
 7. Write the implementation directly to the source file at the correct
    address-ordered position.
 8. If the `kb.json` declaration needs updating, update it conservatively.
@@ -82,11 +104,16 @@ Steps:
    `tools/kb_reg_baseline.json` — the pre-commit hook requires these in sync.
 9. Run `rtk python3 tools/analysis/maintain.py <source_file>` to sort and reformat.
 10. Run `rtk python3 tools/audit/check_lift_hazards.py` after source edits and fix any target-relevant hazards.
+11. Run `rtk python3 tools/audit/check_param_types.py --check` — a new ERROR is
+    a decl that contradicts its call sites.
 
 Output format follows `halo-lift` (see `docs/references/output-schema.md`).
 
 Report at minimum:
 - Target / Confirmed / Inferred / Uncertain
+- **Types recovered** (param/return/struct-field types proven from call sites or
+  disassembly, and the evidence) / **Types assumed** (everything you had to pick
+  without evidence — these are the latent truncation bugs, so name them)
 - Proposed code (as written)
 - kb.json updates made
 - RESOLVED_TARGET: <function_name>
