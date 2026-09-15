@@ -25655,7 +25655,8 @@
     },
     {
      "addr": "0x1ba2f0",
-     "decl": "void FUN_001ba2f0(int buffer, int size, int dest_file, int dest_file_size, const char *source_file_name);"
+     "decl": "void FUN_001ba2f0(int buffer, int size, int dest_file, int dest_file_size, const char *source_file_name);",
+     "ported": true
     },
     {
      "addr": "0x1ba5d0",
@@ -38971,7 +38972,7 @@
     },
     {
      "addr": "0x1cfeca",
-     "decl": "void ResetEvent(void);"
+     "decl": "void __stdcall ResetEvent(void *handle);"
     },
     {
      "addr": "0x1cff08",

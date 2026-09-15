@@ -45091,17 +45091,17 @@
     "FUN_001ba2f0": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 4.0,
+      "abi_modeled_mnemonic_pct": 91.1,
       "addr": "0x1ba2f0",
       "end": "0x1ba5cb",
       "kind": "auto",
       "n_r": 194,
-      "opnd_percent": 3.0,
-      "raw_mnemonic_pct": 4.0,
+      "opnd_percent": 35.8,
+      "raw_mnemonic_pct": 91.1,
       "ref": "synth",
       "ref_sha": "be1c4633fdf851f5",
-      "score": 4.0,
-      "source": "src/halo/unported_thunks.c"
+      "score": 91.1,
+      "source": "src/halo/cache/tags.c"
     },
     "FUN_001ba5d0": {
       "abi_model": "raw",

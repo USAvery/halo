@@ -277,6 +277,170 @@ void FUN_001ba290(char raise_priority)
   }
 }
 
+/* 0x1ba2f0 — FUN_001ba2f0: arm the cache-copy worker for one copy session:
+ * validate the request, publish its parameters into the cache globals block,
+ * clear the per-session state and signal copy_start_event.
+ *
+ * Assert TU is cache_files_decompress_windows.c (same block as the zlib
+ * allocator pair below), lines 0x20c..0x234; the strings are reproduced
+ * verbatim because __FILE__/__LINE__ are match-visible.
+ *
+ * Globals block (reached through the POINTER global at 0x32ea98, built by
+ * FUN_001bc280). Every offset below is named by its own assert string except
+ * the four stores, which are UNPROVEN beyond "this parameter is published
+ * here":
+ *   +0x000  destination of csstrcpy(globals, source_file_name) -- the source
+ *           file-name character buffer at the head of the block
+ *           (0x1ba529 PUSH EDX / 0x1ba537 PUSH EAX / CALL 0x8dff0).
+ *   +0x104  0x800 bytes zeroed by csmemset (0x1ba57e PUSH 0x800 /
+ *           0x1ba583 ADD EAX,0x104 / 0x1ba588 PUSH 0x0).
+ *   +0x904  cleared to 0 before the copy starts; meaning unproven.
+ *   +0x928  zlib_stream.zalloc   (asserted non-null, line 0x219)
+ *   +0x92c  zlib_stream.zfree    (asserted non-null, line 0x21a)
+ *   +0x94c  copy_start_event     (SetEvent, last side effect)
+ *   +0x950  copy_stop_event      (ResetEvent)
+ *   +0x954  copy_complete_event  (polled with a zero timeout at entry, then
+ *                                 ResetEvent)
+ *   +0x958  progress_update_event
+ *   +0x95c  copy_thread
+ *   +0x960  written with the caller's buffer
+ *   +0x98c  written with destination_file
+ *   +0xaa0  cleared to 0; meaning unproven.
+ *
+ * The entry poll is WaitForSingleObject(copy_complete_event, 0): PUSH 0x0 is
+ * the timeout and PUSH ECX the handle (0x1ba2fe..0x1ba301), so any result
+ * other than WAIT_OBJECT_0 (== 0) means the previous session is still
+ * running. That assert block lives at the tail of the function in the
+ * original (0x1ba5a9) -- a cold-block placement, not a different order.
+ *
+ * `size` and `destination_file_size` are used ONLY by their asserts; neither
+ * is stored. The size floor 0x512000 is the TOTAL_BUFFER_SIZE named by the
+ * assert string.
+ *
+ * Globals-pointer loads follow the original exactly: one load for the entry
+ * poll (0x1ba2f3), one load at 0x1ba3db kept live in EAX across every field
+ * assert and the three stores around csstrcpy, then a fresh reload before
+ * each of the remaining four call sites (0x1ba543 / 0x1ba567 / 0x1ba579 /
+ * 0x1ba590).
+ *
+ * The dest_file assert exits with the handle register itself (0x1ba355 PUSH
+ * EDI, where EDI is destination_file and the branch already proved it -1),
+ * not with a fresh -1 immediate like the other assert arms. */
+void FUN_001ba2f0(int buffer, int size, int dest_file, int dest_file_size,
+                  const char *source_file_name)
+{
+  unsigned char *globals;
+
+  if (WaitForSingleObject(*(int *)(*(unsigned char **)0x32ea98 + 0x954), 0) !=
+      0) {
+    display_assert("previous copy session did not complete",
+                   "c:\\halo\\SOURCE\\cache\\cache_files_decompress_windows.c",
+                   0x234, true);
+    system_exit(-1);
+  }
+
+  if (source_file_name == (const char *)0) {
+    display_assert("source_file_name",
+                   "c:\\halo\\SOURCE\\cache\\cache_files_decompress_windows.c",
+                   0x20c, true);
+    system_exit(-1);
+  }
+
+  if (dest_file == -1) {
+    display_assert("destination_file!=INVALID_HANDLE_VALUE",
+                   "c:\\halo\\SOURCE\\cache\\cache_files_decompress_windows.c",
+                   0x20d, true);
+    system_exit(dest_file);
+  }
+
+  if (buffer == 0) {
+    display_assert("buffer",
+                   "c:\\halo\\SOURCE\\cache\\cache_files_decompress_windows.c",
+                   0x20e, true);
+    system_exit(-1);
+  }
+
+  if (size < 0x512000) {
+    display_assert("size>= TOTAL_BUFFER_SIZE",
+                   "c:\\halo\\SOURCE\\cache\\cache_files_decompress_windows.c",
+                   0x20f, true);
+    system_exit(-1);
+  }
+
+  if (dest_file_size != (int)GetFileSize(dest_file, (unsigned int *)0)) {
+    display_assert("destination_file_size==GetFileSize(destination_file, NULL)",
+                   "c:\\halo\\SOURCE\\cache\\cache_files_decompress_windows.c",
+                   0x210, true);
+    system_exit(-1);
+  }
+
+  globals = *(unsigned char **)0x32ea98;
+
+  if (*(int *)(globals + 0x954) == 0) {
+    display_assert("global_self->copy_complete_event",
+                   "c:\\halo\\SOURCE\\cache\\cache_files_decompress_windows.c",
+                   0x212, true);
+    system_exit(-1);
+  }
+
+  if (*(int *)(globals + 0x950) == 0) {
+    display_assert("global_self->copy_stop_event",
+                   "c:\\halo\\SOURCE\\cache\\cache_files_decompress_windows.c",
+                   0x213, true);
+    system_exit(-1);
+  }
+
+  if (*(int *)(globals + 0x94c) == 0) {
+    display_assert("global_self->copy_start_event",
+                   "c:\\halo\\SOURCE\\cache\\cache_files_decompress_windows.c",
+                   0x214, true);
+    system_exit(-1);
+  }
+
+  if (*(int *)(globals + 0x958) == 0) {
+    display_assert("global_self->progress_update_event",
+                   "c:\\halo\\SOURCE\\cache\\cache_files_decompress_windows.c",
+                   0x215, true);
+    system_exit(-1);
+  }
+
+  if (*(int *)(globals + 0x95c) == 0) {
+    display_assert("global_self->copy_thread",
+                   "c:\\halo\\SOURCE\\cache\\cache_files_decompress_windows.c",
+                   0x217, true);
+    system_exit(-1);
+  }
+
+  if (*(int *)(globals + 0x928) == 0) {
+    display_assert("global_self->zlib_stream.zalloc",
+                   "c:\\halo\\SOURCE\\cache\\cache_files_decompress_windows.c",
+                   0x219, true);
+    system_exit(-1);
+  }
+
+  if (*(int *)(globals + 0x92c) == 0) {
+    display_assert("global_self->zlib_stream.zfree",
+                   "c:\\halo\\SOURCE\\cache\\cache_files_decompress_windows.c",
+                   0x21a, true);
+    system_exit(-1);
+  }
+
+  *(int *)(globals + 0x904) = 0;
+  *(int *)(globals + 0x960) = buffer;
+  csstrcpy((char *)globals, source_file_name);
+
+  globals = *(unsigned char **)0x32ea98;
+  *(int *)(globals + 0x98c) = dest_file;
+  *(int *)(globals + 0xaa0) = 0;
+  ResetEvent(*(void **)(globals + 0x954));
+
+  ResetEvent(*(void **)(*(unsigned char **)0x32ea98 + 0x950));
+
+  csmemset(*(unsigned char **)0x32ea98 + 0x104, 0, 0x800);
+
+  SetEvent(*(void **)(*(unsigned char **)0x32ea98 + 0x94c));
+}
+
 /* 0x1ba5d0 — FUN_001ba5d0: if the cache-copy worker is currently busy,
  * signal the "queue end" event.
  *
