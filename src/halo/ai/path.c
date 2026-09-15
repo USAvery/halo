@@ -1353,6 +1353,106 @@ float FUN_00060200(void *path, int16_t param_2)
   return *(float *)(base + ((int)step_index + 2) * 40);
 }
 
+/* 0x00060260 — error_heap: dump the obstacle-avoidance step heap to the
+ * error log, one line per heap entry.
+ *
+ * Evidence: fingerprinted Ghidra bundle
+ * b5b3bf171119dc3ac77aeab5d0640ad97949fa404a2242658cfbdd4b54a63da2
+ * (decompile + disassembly + call-site audit), bounded 0x60260-0x60328 per
+ * the committed function_bounds.json entry (end 0x60329).
+ *
+ * ABI (disassembly-confirmed): the function never loads EBX — it reads
+ * [EBX+0x1430], [EBX+0x2c] and [EBX+EAX*8] directly at entry, so the `path`
+ * pointer is an implicit EBX register argument (kb.json decl carries
+ * @<ebx>). One ordinary cdecl stack argument at [EBP+8] (MOV EDX,[EBP+0x8])
+ * is forwarded unchanged as the first argument of error(), whose kb.json
+ * decl types it `unsigned __int16` — the error severity/type code.
+ *
+ * Disassembly-confirmed body:
+ *   MOV AX,[EBX+0x1430]        ; path->heap_count
+ *   XOR ESI,ESI                ; heap_index = 0
+ *   TEST AX,AX; JLE end        ; hoisted first test of the for-condition
+ * loop:
+ *   TEST SI,SI; JL fail1
+ *   CMP SI,AX; JGE fail1
+ *   CMP AX,0x80; JLE ok1       ; inlined heap accessor bounds assert
+ * fail1: PUSH 1; PUSH 0x31; PUSH 0x25ea14; PUSH 0x25ea40
+ *   CALL display_assert; PUSH -1; CALL system_exit
+ * ok1:
+ *   MOVSX EAX,SI; MOV DI,[EBX+EAX*2+0x1432]   ; step_index = path->heap[i]
+ *   TEST DI,DI; JL fail2
+ *   MOV AX,[EBX+0x2c]; CMP DI,AX; JGE fail2
+ *   CMP AX,0x80; JLE ok2       ; inlined step accessor bounds assert
+ * fail2: PUSH 1; PUSH 0x28; PUSH 0x25ea14; PUSH 0x25e9b0
+ *   CALL display_assert; PUSH -1; CALL system_exit
+ * ok2:
+ *   MOV EDX,[EBP+0x8]
+ *   MOVSX EAX,DI; ADD EAX,2; LEA EAX,[EAX+EAX*4]
+ *   FLD dword [EBX+EAX*8]      ; == path + (step_index+2)*40
+ *   MOVSX EAX,SI
+ *   FSTP dword [EBP-0x4]       ; narrow to a float local
+ *   MOV ECX,[EBP-0x4]          ; the SAME float's raw bits
+ *   FLD dword [EBP-0x4]
+ *   PUSH ECX                   ; last vararg -> "%x"
+ *   SUB ESP,8; FSTP qword [ESP] ; float promoted to double -> "%.12g"
+ *   PUSH EAX                   ; heap_index -> "%3d"
+ *   PUSH 0x25eab4              ; "%3d. %.12g (%x)"
+ *   PUSH EDX                   ; error type
+ *   CALL error; MOV AX,[EBX+0x1430]; ADD ESP,0x18
+ *   INC ESI; CMP SI,AX; JL loop
+ *
+ * Both inlined accessors are the same two bounds checks already lifted
+ * standalone in this TU (FUN_00060140 at line 0x31 and FUN_000600f0 /
+ * FUN_00060200 at line 0x28, same __FILE__ 0x25ea14 and same reason strings
+ * 0x25ea40 / 0x25e9b0). They are written inline here, NOT as calls to those
+ * helpers, because the reference contains no CALL to either — inlining that
+ * the original compiler performed must be preserved, not re-outlined.
+ *
+ * The float read is path + (step_index+2)*40 == path+0x30+step_index*0x28
+ * +0x20, i.e. the same float at +0x20 of the 40-byte step record that
+ * FUN_00060200 reads; the field has no independently established name.
+ *
+ * The third vararg is the dword of that float, not a second float: ECX is
+ * loaded from the narrowed [EBP-0x4] slot with an integer MOV and pushed as
+ * a plain dword (the "%x" conversion), while the separate FLD/FSTP qword of
+ * the same slot supplies the "%.12g" double. This is the standard Bungie
+ * float-debug-print idiom (value plus its hex bit pattern).
+ */
+void error_heap(void *path, unsigned short type)
+{
+  char *base;
+  short heap_index;
+  short heap_count;
+  short step_index;
+  short step_count;
+  float value;
+
+  base = (char *)path;
+  for (heap_index = 0; heap_index < *(short *)(base + 0x1430); heap_index++) {
+    heap_count = *(short *)(base + 0x1430);
+    if (heap_index < 0 || heap_count <= heap_index || heap_count > 0x80) {
+      display_assert("heap_index>=0 && heap_index<path->heap_count && "
+                     "path->heap_count<=MAXIMUM_OBSTACLE_AVOIDANCE_STEPS",
+                     "c:\\halo\\SOURCE\\ai\\path_obstacle_avoidance.c", 0x31,
+                     1);
+      system_exit(-1);
+    }
+
+    step_index = *(short *)(base + 0x1432 + (int)heap_index * 2);
+    step_count = *(short *)(base + 0x2c);
+    if (step_index < 0 || step_count <= step_index || step_count > 0x80) {
+      display_assert("step_index>=0 && step_index<path->step_count && "
+                     "path->step_count<=MAXIMUM_OBSTACLE_AVOIDANCE_STEPS",
+                     "c:\\halo\\SOURCE\\ai\\path_obstacle_avoidance.c", 0x28,
+                     1);
+      system_exit(-1);
+    }
+
+    value = *(float *)(base + ((int)step_index + 2) * 40);
+    error(type, "%3d. %.12g (%x)", (int)heap_index, value, *(uint32_t *)&value);
+  }
+}
+
 /* 0x00060910 — bounded push onto a fixed-size 16-bit value list
  * The owning structure's type is not established by this call site (it is
  * NOT the giant path-state struct used elsewhere in this file — offset

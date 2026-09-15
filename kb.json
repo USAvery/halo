@@ -39970,8 +39970,9 @@
     },
     {
      "addr": "0x60260",
-     "decl": "void error_heap(void);",
-     "comment": "[NAME: error_heap — name_source=2276-symbol-dump method=exact_address tier=confirmed (T1), cea-apply-unified 2026-09-14]"
+     "decl": "void error_heap(void *path@<ebx>, unsigned short type);",
+     "comment": "[NAME: error_heap — name_source=2276-symbol-dump method=exact_address tier=confirmed (T1), cea-apply-unified 2026-09-14]",
+     "ported": true
     },
     {
      "addr": "0x60330",

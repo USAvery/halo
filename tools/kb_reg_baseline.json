@@ -7319,7 +7319,7 @@
  "0x601e0": "void FUN_000601e0(void);",
  "0x601f0": "void FUN_000601f0(void);",
  "0x60200": "void FUN_00060200(void);",
- "0x60260": "void FUN_00060260(void);",
+ "0x60260": "void error_heap(void *path@<ebx>, unsigned short type);",
  "0x60330": "void FUN_00060330(void *param_1@<eax>, const char *param_2);",
  "0x609e0": "void FUN_000609e0(void *path);",
  "0x62960": "void path_obstacles_debug_render(void *obstacles, float radius);",
@@ -10038,7 +10038,9 @@
   "0x2258a4": "int __stdcall send(void *xnet@<ecx>, unsigned int socket, const char *buf, int len, int flags);",
   "0x002258a4": "int __stdcall send(void *xnet@<ecx>, unsigned int socket, const char *buf, int len, int flags);",
   "0xb4d00": "void slayer_engine_adjust_score(unsigned int player_handle@<eax>, int score_delta@<edi>);",
-  "0x45830": "int ai_communication_find_specific_actor_to_talk(int param_1, int param_2, int param_3, int param_4, int param_5, int param_6, int param_7, unsigned int ai_index @<eax>, int other_object_handle @<esi>, int object_handle @<edi>);"
+  "0x45830": "int ai_communication_find_specific_actor_to_talk(int param_1, int param_2, int param_3, int param_4, int param_5, int param_6, int param_7, unsigned int ai_index @<eax>, int other_object_handle @<esi>, int object_handle @<edi>);",
+  "0xe4800": "void ui_widget_add_child(void *child@<ebx>, void *parent);",
+  "0x60260": "void error_heap(void *path@<ebx>, unsigned short type);"
  },
  "0x57330": "short ai_scripting_command_list_status_internal(int16_t scenario_index@<eax>, void *record@<esi>, int field_1a8_val, int child_handle, int reserved);",
  "0x1631d0": "void FUN_001631d0(void);"
