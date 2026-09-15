@@ -25753,6 +25753,21 @@
       "score": 88.6,
       "source": "src/halo/interface/ui_widget.c"
     },
+    "FUN_000e9dd0": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 94.7,
+      "addr": "0xe9dd0",
+      "end": "0xe9fc7",
+      "kind": "auto",
+      "n_r": 188,
+      "opnd_percent": 87.7,
+      "raw_mnemonic_pct": 94.7,
+      "ref": "synth",
+      "ref_sha": "43103f9458a08b60",
+      "score": 94.7,
+      "source": "src/halo/interface/ui_widget.c"
+    },
     "FUN_000ea010": {
       "abi_model": "raw",
       "abi_model_items": 0,
@@ -70621,16 +70636,16 @@
     "main_screen_shell_load": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 55.6,
+      "abi_modeled_mnemonic_pct": 90.0,
       "addr": "0xe8700",
       "end": "0xe882a",
       "kind": "auto",
       "n_r": 90,
-      "opnd_percent": 48.4,
-      "raw_mnemonic_pct": 55.6,
+      "opnd_percent": 86.7,
+      "raw_mnemonic_pct": 90.0,
       "ref": "synth",
       "ref_sha": "b216561cf0d23c36",
-      "score": 55.6,
+      "score": 90.0,
       "source": "src/halo/interface/ui_widget.c"
     },
     "main_set_difficulty": {
@@ -71382,6 +71397,21 @@
       "ref_sha": "8f31d66327b360d3",
       "score": 100.0,
       "source": "src/halo/models/model_animations.c"
+    },
+    "modulate_pixel32_by_real_alpha": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 91.9,
+      "addr": "0xe55e0",
+      "end": "0xe5616",
+      "kind": "auto",
+      "n_r": 20,
+      "opnd_percent": 86.5,
+      "raw_mnemonic_pct": 91.9,
+      "ref": "synth",
+      "ref_sha": "dbc850841e57eb5f",
+      "score": 91.9,
+      "source": "src/halo/interface/ui_widget.c"
     },
     "motion_sensor_initialize": {
       "abi_model": "raw",
@@ -88516,16 +88546,16 @@
     "ui_widget_display_error": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 76.0,
+      "abi_modeled_mnemonic_pct": 79.0,
       "addr": "0xe8910",
       "end": "0xe8c75",
       "kind": "auto",
       "n_r": 284,
-      "opnd_percent": 65.1,
-      "raw_mnemonic_pct": 76.0,
+      "opnd_percent": 67.6,
+      "raw_mnemonic_pct": 79.0,
       "ref": "synth",
       "ref_sha": "f4f5f65fc51ec229",
-      "score": 76.0,
+      "score": 79.0,
       "source": "src/halo/interface/ui_widget.c"
     },
     "ui_widget_display_scenario_help": {
@@ -88666,16 +88696,16 @@
     "ui_widget_get_attract_mode_flag": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 57.1,
+      "abi_modeled_mnemonic_pct": 100.0,
       "addr": "0xe46a0",
       "end": "0xe46a6",
       "kind": "auto",
       "n_r": 2,
-      "opnd_percent": 57.1,
-      "raw_mnemonic_pct": 57.1,
+      "opnd_percent": 100.0,
+      "raw_mnemonic_pct": 100.0,
       "ref": "synth",
       "ref_sha": "a333af30f49bb107",
-      "score": 57.1,
+      "score": 100.0,
       "source": "src/halo/interface/ui_widget.c"
     },
     "ui_widget_get_last_child": {
@@ -88723,19 +88753,34 @@
       "score": 100.0,
       "source": "src/halo/interface/ui_widget.c"
     },
+    "ui_widget_initialize_single_player_level_list": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 95.0,
+      "addr": "0xe98c0",
+      "end": "0xe9a5c",
+      "kind": "auto",
+      "n_r": 138,
+      "opnd_percent": 80.6,
+      "raw_mnemonic_pct": 95.0,
+      "ref": "synth",
+      "ref_sha": "50390686e3cceed7",
+      "score": 95.0,
+      "source": "src/halo/interface/ui_widget.c"
+    },
     "ui_widget_is_main_menu_loaded": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 62.5,
+      "abi_modeled_mnemonic_pct": 100.0,
       "addr": "0xe43f0",
       "end": "0xe441d",
       "kind": "auto",
       "n_r": 16,
-      "opnd_percent": 62.5,
-      "raw_mnemonic_pct": 62.5,
+      "opnd_percent": 100.0,
+      "raw_mnemonic_pct": 100.0,
       "ref": "synth",
       "ref_sha": "156e65a2e2377383",
-      "score": 62.5,
+      "score": 100.0,
       "source": "src/halo/interface/ui_widget.c"
     },
     "ui_widget_join_controller_to_multiplayer_game": {
@@ -88858,6 +88903,21 @@
       "score": 95.8,
       "source": "src/halo/interface/ui_widget.c"
     },
+    "ui_widget_multiplayer_level_select": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 97.6,
+      "addr": "0xea210",
+      "end": "0xea3dd",
+      "kind": "auto",
+      "n_r": 144,
+      "opnd_percent": 78.0,
+      "raw_mnemonic_pct": 97.6,
+      "ref": "synth",
+      "ref_sha": "01d879b5bf8ab727",
+      "score": 97.6,
+      "source": "src/halo/interface/ui_widget.c"
+    },
     "ui_widget_multiplayer_profile_init_name": {
       "abi_model": "raw",
       "abi_model_items": 0,
@@ -88887,6 +88947,21 @@
       "ref_sha": "155a02bf0a25e2cb",
       "score": 98.4,
       "source": "src/halo/interface/ui_widget_game_data_input_functions.c"
+    },
+    "ui_widget_multiplayer_profiles_list_initialize": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 93.6,
+      "addr": "0xea3e0",
+      "end": "0xea534",
+      "kind": "auto",
+      "n_r": 111,
+      "opnd_percent": 71.8,
+      "raw_mnemonic_pct": 93.6,
+      "ref": "synth",
+      "ref_sha": "15fd23f45ecd21c0",
+      "score": 93.6,
+      "source": "src/halo/interface/ui_widget.c"
     },
     "ui_widget_network_game_unjoin_player": {
       "abi_model": "raw",

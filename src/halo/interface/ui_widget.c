@@ -778,6 +778,29 @@ void __stdcall FUN_000e5590(int param_1)
   }
 }
 
+/* modulate_pixel32_by_real_alpha (0xe55e0) — scales the alpha byte of a
+ * packed 32-bit pixel by a float factor, leaving the low 24 bits (the
+ * colour channels) untouched. The alpha byte is extracted with SHR 24
+ * (unsigned) and converted with FILD as a signed dword; the TEST/JGE
+ * "negative int" fixup that follows is provably unreachable (the shifted
+ * value is 0..255), which is why Ghidra removes that block. The product is
+ * rounded back to an integer with a bare FLD/FISTP — the FPU's current
+ * rounding mode (round-to-nearest), NOT a truncating C cast — and OR'd back
+ * into bits 24..31. The intermediate is stored to a 32-bit float slot and
+ * reloaded before the FISTP, so the product is narrowed to single precision
+ * first. No callers found in the binary (xrefs empty); the name describes
+ * the operation, the caller-side meaning of the float is unproven. */
+uint32_t modulate_pixel32_by_real_alpha(uint32_t pixel, float alpha)
+{
+  int alpha_byte;
+  float scaled;
+
+  alpha_byte = (int)(pixel >> 24);
+  scaled = (float)alpha_byte * alpha;
+  HALO_FLT_ROUNDTRIP(scaled);
+  return (pixel & 0x00ffffff) | ((uint32_t)x87_round_to_int(scaled) << 24);
+}
+
 /* ui_widget_close — tears down a single UI widget and frees its memory.
  * Handles the "widget deleted" event handlers (type 0x19) from the widget's
  * DeLa tag definition, firing each matching handler via
@@ -1982,9 +2005,11 @@ after_local_handling:
   *handled_out = (uint8_t)widget_deleted;
 }
 
-__declspec(noinline) void *ui_widget_load_by_name_or_tag(const char *name, int tag_index, int a3,
-                                    int widget_stack, int parent_tag_index,
-                                    int a6, int a7)
+__declspec(noinline) void *ui_widget_load_by_name_or_tag(const char *name,
+                                                         int tag_index, int a3,
+                                                         int widget_stack,
+                                                         int parent_tag_index,
+                                                         int a6, int a7)
 {
   typedef struct ui_widget_pending_load_entry {
     int tag_index;
@@ -2884,6 +2909,94 @@ __declspec(noinline) void ui_widget_clear_last_error_index(void)
   *(int *)0x31e4c0 = -1;
 }
 
+/* initialize sp level list (0x0e98c0) — rebuilds the 0x50-byte single-player
+ * level list scratch block at 0x46cce8 (10 entries x 8 bytes: a level name
+ * pointer from the table at 0x31e498 plus four flag bytes at +4..+7).  An
+ * entry is unlocked when either local player's profile flag byte (profile
+ * offset 0x1c + i) is set, when i is one past either player's stored last
+ * level played, or for i == 0 (the first level is always available).  Then
+ * asserts the bound 'solo level list' widget is a spinner list ('DeLa' type
+ * 2) with 3 list items, publishes the block pointer/count at widget +0x40 /
+ * +0x44 and clamps the selected index at +0x3c to [0, 9]. */
+bool ui_widget_initialize_single_player_level_list(void *widget,
+                                                   void *event_data,
+                                                   bool *widget_deleted)
+{
+  uint8_t profile0[0x30];
+  uint8_t profile1[0x30];
+  int16_t last_level0;
+  int16_t last_level_unused0;
+  int16_t last_level1;
+  int16_t last_level_unused1;
+  int i;
+  uint8_t flags0;
+  unsigned int flags;
+  int16_t *list_tag;
+  int16_t selected;
+
+  (void)event_data;
+  (void)widget_deleted;
+
+  csmemset((void *)0x46cce8, 0, 0x50);
+  player_ui_get_active_player_profile(0, profile0);
+  player_profile_save_last_level_played(profile0, &last_level0,
+                                        &last_level_unused0);
+  player_ui_get_active_player_profile(1, profile1);
+  player_profile_save_last_level_played(profile1, &last_level1,
+                                        &last_level_unused1);
+
+  /* Spelled do/while: the reference is a bottom-tested loop MSVC left rolled
+   * (INC EAX / CMP EAX,0xa / JL). The equivalent `for (i = 0; i < 10; i++)`
+   * body is fully unrolled 5x by clang (294 candidate insns vs the
+   * reference's 138, 60.6% match). */
+  i = 0;
+  do {
+    *(const char **)(0x46cce8 + i * 8) = ((const char **)0x31e498)[i];
+    flags0 = profile0[0x1c + i];
+    if ((flags0 != 0) || (i == (int)last_level0 + 1) ||
+        (profile1[0x1c + i] != 0) || (i == (int)last_level1 + 1) || (i == 0)) {
+      flags = (unsigned int)((int)(signed char)profile1[0x1c + i] |
+                             (int)(signed char)flags0);
+      *(uint8_t *)(0x46cce8 + i * 8 + 5) = (uint8_t)((flags >> 1) & 1);
+      *(uint8_t *)(0x46cce8 + i * 8 + 4) = 1;
+      *(uint8_t *)(0x46cce8 + i * 8 + 6) = (uint8_t)((flags >> 2) & 1);
+      *(uint8_t *)(0x46cce8 + i * 8 + 7) = (uint8_t)((flags >> 3) & 1);
+    }
+    i++;
+  } while (i < 10);
+
+  list_tag = (int16_t *)tag_get(0x44654c61, *(int *)widget);
+  if (*list_tag != 2) {
+    display_assert(
+      "expected a spinner list widget for 'solo level list' widget",
+      "c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 0x2b1,
+      true);
+    system_exit(-1);
+  }
+  if (*(int *)((char *)list_tag + 0x3e0) != 3) {
+    display_assert(
+      "expected 3 list items for 'solo level list' widget",
+      "c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 0x2b2,
+      true);
+    system_exit(-1);
+  }
+
+  *(int *)((char *)widget + 0x40) = 0x46cce8;
+  *(int16_t *)((char *)widget + 0x44) = 10;
+
+  if (player_ui_get_last_single_player_level_played(0) < 0) {
+    *(int16_t *)((char *)widget + 0x3c) = 0;
+    return true;
+  }
+  if (player_ui_get_last_single_player_level_played(0) > 9) {
+    *(int16_t *)((char *)widget + 0x3c) = 9;
+    return true;
+  }
+  selected = player_ui_get_last_single_player_level_played(0);
+  *(int16_t *)((char *)widget + 0x3c) = selected;
+  return true;
+}
+
 /* dispose sp level list (event handler table index 7, 0x0e9a60) — clears the
  * 0x50-byte single-player level list scratch block at 0x46cce8 and drops the
  * widget's cached list pointer/count at +0x40/+0x44. */
@@ -2983,6 +3096,121 @@ fail:
   network_game_set_accept_remote_connections(0);
   player_ui_clear_multiplayer_variant();
   error(2, "failed to initiate a multiplayer game server");
+  return result;
+}
+
+/* join selected network game server (event handler, single data xref at
+ * 0x31e1a8, 0x0e9dd0) — reads the widget's cached server-list pointer at
+ * +0x40 and selected index at +0x3c (signed 16-bit) against the cached
+ * count at +0x44, then validates the selected server entry: byte +0xe0
+ * must be 1 ("open") and word +0xde must be 0 (same platform). It then
+ * builds a transport_address for the entry via FUN_00082bd0 (entry+0x18,
+ * entry+0x08, entry+0x00, port 0x141e), requires a non-zero address dword
+ * and a non-zero port, prepares the join parameters (word +0x02 = 0,
+ * token at +0x12) and hands them to
+ * network_game_client_initiate_join_game. On success it spawns the
+ * connected-pregame screen, switches the connection state to 1 (client),
+ * and marks the widget deleted; a spawn failure also marks the widget
+ * deleted but returns false.
+ *
+ * The widget+0x38 gate and every failure path return the [EBP-1] flag,
+ * which is only ever set on the fully successful path.
+ *
+ * Uncertain: the meaning of the entry fields at +0x00/+0x08/+0x18 handed
+ * to FUN_00082bd0 is not evidenced here, so they stay raw offsets; the
+ * 0x18-byte address record is zeroed as six dwords because the callee
+ * writes +0x14, past the declared transport_address tail. */
+bool FUN_000e9dd0(void *widget, void *event_data, bool *widget_deleted)
+{
+  unsigned char address[0x18];
+  unsigned char join_params[0x22];
+  void *entry;
+  void *spawned;
+  void *last_child;
+  int *player_index_ptr;
+  int player_index;
+  int child_index;
+  short selected;
+  bool result;
+
+  (void)event_data;
+
+  result = false;
+  if (*(int *)((char *)widget + 0x38) == 0) {
+    goto done;
+  }
+  selected = *(short *)((char *)widget + 0x3c);
+  if (selected < 0) {
+    goto done;
+  }
+  if ((int)selected < (int)*(uint16_t *)((char *)widget + 0x44) &&
+      *(int *)((char *)widget + 0x40) != 0) {
+    if (*(uint16_t *)((char *)widget + 0x44) != 0) {
+      entry = *(void **)(*(char **)((char *)widget + 0x40) + (int)selected * 4);
+      if (*(unsigned char *)((char *)entry + 0xe0) == 1) {
+        if (*(short *)((char *)entry + 0xde) == 0) {
+          ((uint32_t *)address)[0] = 0;
+          ((uint32_t *)address)[1] = 0;
+          ((uint32_t *)address)[2] = 0;
+          ((uint32_t *)address)[3] = 0;
+          ((uint32_t *)address)[4] = 0;
+          ((uint32_t *)address)[5] = 0;
+          FUN_00082bd0((char *)entry + 0x18,
+                       (const uint32_t *)((char *)entry + 8),
+                       (const uint32_t *)entry, 0x141e, (uint32_t *)address);
+          if (((uint32_t *)address)[0] != 0 &&
+              *(uint16_t *)(address + 0x12) != 0) {
+            *(uint16_t *)(join_params + 2) = 0;
+            network_game_generate_join_game_token(join_params + 0x12);
+            if (network_game_client_initiate_join_game(
+                  network_game_client_get(), entry, join_params, address)) {
+              last_child = ui_widget_get_last_child(widget);
+              player_index_ptr = *(int **)((char *)widget + 0x30);
+              if (player_index_ptr != NULL) {
+                player_index = *player_index_ptr;
+              } else {
+                player_index = -1;
+              }
+              child_index = widget_instance_get_child_index_from_parent(widget);
+              spawned = ui_widget_load_by_name_or_tag(
+                "ui\\shell\\main_menu\\multiplayer_type_"
+                "select\\connected\\pregame\\"
+                "connected_pregame_screen",
+                -1, 0, -1, *(int *)last_child, player_index, child_index);
+              if (spawned == NULL) {
+                error(2, "event handler failed to spawn widget");
+                *widget_deleted = true;
+                goto done;
+              }
+
+              set_game_connection(1);
+              result = true;
+              *widget_deleted = true;
+            } else {
+              network_game_abort();
+              error(2, "failed to initiate join game procedures");
+            }
+          } else {
+            error(2, "attempted to join a network game with a bogus address");
+          }
+
+        } else {
+          error(2, "attempted to join a network game running on a different "
+                   "platform than the local system");
+        }
+      } else {
+        error(2, "attempted to join a closed game");
+        ui_play_audio_feedback_sound(4);
+      }
+    } else {
+      error(2, "unable to join server: there are no servers in the server list "
+               "(maybe the server list was disposed?)");
+    }
+  } else {
+    error(2, "unable to join server: this doesn't look like a valid server "
+             "list to me... or the server list has been disposed?");
+  }
+done:
   return result;
 }
 
@@ -3108,6 +3336,208 @@ bool ui_widget_multiplayer_level_list_dispose(void *widget, void *event_data,
 {
   *(int *)((char *)widget + 0x40) = 0;
   *(int16_t *)((char *)widget + 0x44) = 0;
+  return true;
+}
+
+/* multiplayer level select (event handler, 0x0ea210) — fired when the user
+ * accepts a level on the multiplayer level select screen.  Asserts the
+ * widget chain: `widget` is a wrapper tag (child count +0x3e0 == 1), its
+ * child at +0x34 is a container tag (type 0) with 3 children, and that
+ * container's child at +0x34 is a spinner list tag (type 2) with 3 list
+ * items.  Reads the list widget's selected index at +0x3c, bounds-checks
+ * it against the 13-entry level_name_table at 0x31e4c8, and takes that
+ * entry's name.  A debug override file "d:\map_automation.txt", when it
+ * opens, replaces the name with its first whitespace-delimited token.  The
+ * name is then pushed to main, to the game engine map-name override, and
+ * to the network server when one exists; finally the table is scanned
+ * case-insensitively and the matching entry is remembered as the last used
+ * multiplayer map.  Always returns true. */
+bool ui_widget_multiplayer_level_select(void *widget, void *event_data,
+                                        bool *widget_deleted)
+{
+  void *wrapper_tag;
+  short *screen_tag;
+  void *screen_widget;
+  void *list_widget;
+  short *list_tag;
+  int16_t selected_index;
+  char *map_name;
+  void *file;
+  void *server;
+  int index;
+  char line[64];
+
+  (void)event_data;
+  (void)widget_deleted;
+
+  wrapper_tag = tag_get(0x44654c61 /* 'DeLa' */, *(int *)widget);
+  if (*(int *)((char *)wrapper_tag + 0x3e0) != 1) {
+    display_assert(
+      "expected a wrapper widget around the multiplayer level select screen",
+      "c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 0x500,
+      1);
+    system_exit(-1);
+  }
+
+  screen_widget = *(void **)((char *)widget + 0x34);
+  screen_tag = (short *)tag_get(0x44654c61 /* 'DeLa' */, *(int *)screen_widget);
+  if (*screen_tag != 0 || *(int *)((char *)screen_tag + 0x3e0) != 3) {
+    display_assert(
+      "expected the multiplayer level select screen to be a container w/ 3 "
+      "children",
+      "c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 0x505,
+      1);
+    system_exit(-1);
+  }
+
+  list_widget = *(void **)((char *)screen_widget + 0x34);
+  list_tag = (short *)tag_get(0x44654c61 /* 'DeLa' */, *(int *)list_widget);
+  if (*list_tag != 2) {
+    display_assert(
+      "expected a spinner list widget for 'multiplayer level list' widget",
+      "c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 0x508,
+      1);
+    system_exit(-1);
+  }
+
+  if (*(int *)((char *)list_tag + 0x3e0) != 3) {
+    display_assert(
+      "expected 3 list items for 'multiplayer level list' widget",
+      "c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 0x509,
+      1);
+    system_exit(-1);
+  }
+
+  selected_index =
+    *(int16_t *)((char *)*(void **)((char *)*(void **)((char *)widget + 0x34) +
+                                    0x34) +
+                 0x3c);
+  if (selected_index < 0 || selected_index >= 13) {
+    display_assert(
+      "invalid multiplayer level specified from 'multiplayer level list' list "
+      "widget",
+      "c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 0x512,
+      1);
+    system_exit(-1);
+  }
+
+  map_name = ((char **)0x31e4c8)[selected_index];
+
+  file = crt_fopen("d:\\map_automation.txt", "r");
+  if (file != NULL) {
+    crt_fgets(line, 0x40, file);
+    line[63] = '\0';
+    csstrtok(line, "\n\r \t");
+    map_name = line;
+    crt_fclose(file);
+  }
+
+  main_set_multiplayer_map_name(map_name);
+  game_engine_override_map_name(map_name);
+
+  server = network_game_server_get();
+  if (server != NULL) {
+    network_game_server_change_map_name((int)server, map_name);
+  }
+
+  index = 0;
+  do {
+    if (crt_stricmp(map_name, ((char **)0x31e4c8)[index]) == 0) {
+      saved_game_file_remember_last_used_multiplayer_map(
+        ((char **)0x31e4c8)[index]);
+      return true;
+    }
+    index++;
+  } while (index < 13);
+
+  return true;
+}
+
+/* multiplayer profiles list initialize (event handler, 0x0ea3e0) — builds
+ * the "multiplayer settings list" (game-variant profile) list owned by
+ * `widget`.  Clears the pending profile handle (DAT_0031e494) and the
+ * 0x144-byte profile scratch block at DAT_005aa260 to -1, asserts that
+ * `widget` is a spinner-list tag ('DeLa' type 2) with exactly 3 list
+ * items, then (re)allocates a 400-byte / 100-entry handle buffer at
+ * widget+0x40 through ui_widget_realloc.  FUN_001c26b0 fills the buffer
+ * and writes back the number of entries found (capacity passed in as
+ * 100); any shortfall below 3 entries is padded with -1 so the list always
+ * has at least 3 rows.  The final count lands at widget+0x44.  Finally, if
+ * a last-used multiplayer variant directory is remembered and resolves to
+ * a profile index, the buffer is scanned linearly and the matching row is
+ * left selected at widget+0x3c (left untouched when there is no match).
+ * A failed allocation skips everything after the store.  event_data and
+ * widget_deleted are unused; always returns true. */
+bool ui_widget_multiplayer_profiles_list_initialize(void *widget,
+                                                    void *event_data,
+                                                    bool *widget_deleted)
+{
+  short *list_tag;
+  int *items;
+  int count;
+  int profile_index;
+  unsigned short i;
+  char variant_directory[256];
+
+  (void)event_data;
+  (void)widget_deleted;
+
+  *(int *)0x31e494 = -1; /* DAT_0031e494 — pending profile handle */
+  csmemset((void *)0x5aa260, -1,
+           0x144); /* DAT_005aa260 — profile scratch block */
+
+  list_tag = (short *)tag_get(0x44654c61 /* 'DeLa' */, *(int *)widget);
+  if (*list_tag != 2) {
+    display_assert(
+      "expected a spinner list widget for 'multiplayer settings list' widget",
+      "c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 0x568,
+      1);
+    system_exit(-1);
+  }
+
+  if (*(int *)((char *)list_tag + 0x3e0) != 3) {
+    display_assert(
+      "expected 3 list items for 'multiplayer settings list' widget",
+      "c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 0x569,
+      1);
+    system_exit(-1);
+  }
+
+  items = (int *)ui_widget_realloc(
+    *(int *)((char *)widget + 0x40), 400,
+    "c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 0x56e);
+  *(int **)((char *)widget + 0x40) = items;
+  if (items == NULL) {
+    return true;
+  }
+
+  count = 100;
+  FUN_001c26b0(0, &count, items);
+
+  while ((unsigned short)count < 3) {
+    items[count] = -1;
+    count++;
+  }
+  *(int16_t *)((char *)widget + 0x44) = (int16_t)count;
+
+  if (!saved_game_file_retrieve_last_used_multiplayer_variant_directory(
+        variant_directory)) {
+    return true;
+  }
+
+  profile_index =
+    saved_game_file_find_profile_index_for_directory_path(variant_directory, 1);
+  if (profile_index == -1) {
+    return true;
+  }
+
+  for (i = 0; i < (unsigned short)count; i++) {
+    if (items[i] == profile_index) {
+      *(int16_t *)((char *)widget + 0x3c) = (int16_t)i;
+      break;
+    }
+  }
+
   return true;
 }
 
