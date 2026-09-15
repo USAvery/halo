@@ -4,10 +4,10 @@
   "obj": "items.obj",
   "source_path": "src/halo/items/items.c",
   "best_score": 81.8,
-  "best_patch": "artifacts/parked/patches/FUN_000f56b0-20260711-142241.patch",
-  "status": "parked",
+  "best_patch": "artifacts/parked/patches/FUN_000f56b0-20260711-102505.patch",
+  "status": "superseded",
   "first_parked": "2026-07-11T10:25:05+00:00",
-  "last_updated": "2026-07-22T06:00:06+00:00",
+  "last_updated": "2026-09-15T19:00:27+00:00",
   "promoted_commit": null,
   "attempts": [
     {
@@ -73,5 +73,6 @@
       "reason": "structural_cap",
       "patch": "artifacts/parked/patches/FUN_000f56b0-20260722-060006.patch"
     }
-  ]
+  ],
+  "superseded_reason": "kb.json ported=true: function landed; this parked patch is no longer the path forward"
 }

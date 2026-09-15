@@ -5,9 +5,9 @@
   "source_path": "src/halo/game/players.c",
   "best_score": 83.9,
   "best_patch": "artifacts/parked/patches/players_update_before_game_client-20260714-193031.patch",
-  "status": "parked",
+  "status": "superseded",
   "first_parked": "2026-07-14T19:30:31+00:00",
-  "last_updated": "2026-07-14T19:30:31+00:00",
+  "last_updated": "2026-09-15T19:00:27+00:00",
   "promoted_commit": null,
   "attempts": [
     {
@@ -19,5 +19,6 @@
       "reason": "structural_cap",
       "patch": "artifacts/parked/patches/players_update_before_game_client-20260714-193031.patch"
     }
-  ]
+  ],
+  "superseded_reason": "kb.json ported=true: function landed; this parked patch is no longer the path forward"
 }

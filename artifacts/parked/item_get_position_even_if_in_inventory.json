@@ -5,9 +5,9 @@
   "source_path": "src/halo/items/items.c",
   "best_score": 80.4,
   "best_patch": "artifacts/parked/patches/item_get_position_even_if_in_inventory-20260711-125924.patch",
-  "status": "parked",
+  "status": "superseded",
   "first_parked": "2026-07-11T12:59:24+00:00",
-  "last_updated": "2026-07-11T12:59:24+00:00",
+  "last_updated": "2026-09-15T19:00:27+00:00",
   "promoted_commit": null,
   "attempts": [
     {
@@ -19,5 +19,6 @@
       "reason": "structural_cap",
       "patch": "artifacts/parked/patches/item_get_position_even_if_in_inventory-20260711-125924.patch"
     }
-  ]
+  ],
+  "superseded_reason": "kb.json ported=true: function landed; this parked patch is no longer the path forward"
 }

@@ -5,9 +5,9 @@
   "source_path": "src/halo/ai/path_obstacle_avoidance.c",
   "best_score": 59.5,
   "best_patch": "artifacts/parked/patches/valid_real_point2d-20260710-201808.patch",
-  "status": "parked",
+  "status": "superseded",
   "first_parked": "2026-07-10T20:18:08+00:00",
-  "last_updated": "2026-07-10T20:18:08+00:00",
+  "last_updated": "2026-09-15T19:00:27+00:00",
   "promoted_commit": null,
   "attempts": [
     {
@@ -19,5 +19,6 @@
       "reason": "below_65pct",
       "patch": "artifacts/parked/patches/valid_real_point2d-20260710-201808.patch"
     }
-  ]
+  ],
+  "superseded_reason": "kb.json ported=true: function landed; this parked patch is no longer the path forward"
 }

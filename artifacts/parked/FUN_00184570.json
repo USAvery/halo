@@ -5,9 +5,9 @@
   "source_path": "src/halo/render/render.c",
   "best_score": 84.0,
   "best_patch": "artifacts/parked/patches/FUN_00184570-20260722-061230.patch",
-  "status": "parked",
+  "status": "superseded",
   "first_parked": "2026-07-22T06:12:30+00:00",
-  "last_updated": "2026-07-22T06:12:30+00:00",
+  "last_updated": "2026-09-15T19:00:27+00:00",
   "promoted_commit": null,
   "attempts": [
     {
@@ -19,5 +19,6 @@
       "reason": "structural_cap",
       "patch": "artifacts/parked/patches/FUN_00184570-20260722-061230.patch"
     }
-  ]
+  ],
+  "superseded_reason": "kb.json ported=true: function landed; this parked patch is no longer the path forward"
 }

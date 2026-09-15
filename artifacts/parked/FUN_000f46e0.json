@@ -5,9 +5,9 @@
   "source_path": "src/halo/items/items.c",
   "best_score": 86.2,
   "best_patch": "artifacts/parked/patches/FUN_000f46e0-20260711-182640.patch",
-  "status": "parked",
+  "status": "superseded",
   "first_parked": "2026-07-11T07:49:59+00:00",
-  "last_updated": "2026-07-11T18:26:41+00:00",
+  "last_updated": "2026-09-15T19:00:27+00:00",
   "promoted_commit": null,
   "attempts": [
     {
@@ -37,5 +37,6 @@
       "reason": "NEEDS_RUNTIME: Target: FUN_000f46e0 / ui_widget_game_data \"mp player settings select\" spinner-list rebuild (0xf46e0, items.obj, src/halo/items/items.c).\n\nStructural Match: 86.2% VC71 (per-function delinked ref 000f46e0.obj). This is in the <90% band. Acceptance path was pass1+permute only \u2014 no golden/runtime/live-state lane passed.\n\nDecision policy: <90% structural match REQUIRES golden/runtime behavioral verification plus classified mismatches. Absent that, the mandated verdict is NEEDS_RUNTIME. That requirement is not met here.\n\nWhy not AUTO_ACCEPT: 86.2% is far below the 98% clean-accept floor and below the 90% floor entirely. The only behavioral lane that ran (Unicorn equivalence) FAILED and is non-probative: 0/100 seeds passed, coverage 9.2% (105/1142 bytes), confidence \"weak\", zero-fill inputs (widget=[0,1,-1,...]). Execution reaches ONLY the entry guard (widget[0xc]==0 \u2192 first assert) and stops. The entire meaningful body is UNVERIFIED: the descriptor-table walk at abs 0x5aa3c0 (stride 0x34), the profile/ruleset name+description string rebuild (ustrncpy / unicode_sprintf / FUN_0019d420 with default_player_profile_names), the ui_widget_realloc paths, the qsort reindex with comparator FUN_000f3960, and the selected-index re-clamp + outer do/while re-validation. None of that has any behavioral evidence. A prior opus/high review (artifacts/parked/FUN_000f46e0.json, 2026-07-11) already parked this at 85.6% for the same reason and noted the acceptance narrative cited live-state (infection_swarm, a Flood combat scene) that does NOT contain the profile-select widget hierarchy/tags/table \u2014 i.e., a self-contradictory \"runtime verified\" claim, not real coverage.\n\nWhy not REJECT: no concrete correctness bug found. The single seed-independent stub-arg divergence is _display_assert arg[2] (the assert line number): oracle=0x864 (original source line 2148) vs candidate=0x41d (items.c __LINE__ 1053). _display_assert is void __cdecl(const char *expr, const char *file, int line, ...) (game_state.c:166); arg[2] is diagnostic-only, materialized only on assertion failure, and does not affect normal control flow. The two string args (expr, file) soft-matched. Hazard scan clean (--changed-only, no findings). ABI audit clean (regs=none; plain cdecl int* widget stack arg, matches decl). So this is weak-evidence-for-commit, not a proven bug.\n\nBlocking gap for auto-commit: structural evidence (86.2%) is too weak and the sole behavioral lane covers 9.2% of the body. The correct gate is a live-state snapshot of an actual profile-select widget hierarchy driving unicorn_diff --state-snapshot (or a golden/dual-oracle harness case), which would exercise the tag/table rebuild and qsort paths. Another zero-fill equivalence pass will not resolve this. Verdict: NEEDS_RUNTIME.",
       "patch": "artifacts/parked/patches/FUN_000f46e0-20260711-182640.patch"
     }
-  ]
+  ],
+  "superseded_reason": "kb.json ported=true: function landed; this parked patch is no longer the path forward"
 }
