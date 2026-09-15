@@ -933,6 +933,71 @@ int FUN_00068d80(void *tif_)
 }
 
 /**
+ * Set `count` consecutive bits to 1 in the bitmap row `cp`, starting at bit
+ * index `x`. Bits run MSB-first inside each byte, so bit `x` lives in byte
+ * `x >> 3` at shift `x & 7`.
+ *
+ * All three parameters arrive in registers -- `cp` in EAX, `x` in ECX,
+ * `count` in EDX (0x68e27 `mov esi,eax`, 0x68e2b `mov eax,ecx`, 0x68e24
+ * `test edx,edx`). Every count test the reference makes is SIGNED (`jle` at
+ * 0x68e29, `jge` at 0x68e41, `jl` at 0x68e6c), so `count` is a signed int and
+ * a non-positive count paints nothing.
+ *
+ * The mask table is the nine bytes at 0x2ec378 -- 00 80 c0 e0 f0 f8 fc fe ff
+ * -- indexed by a bit count in 0..8, read as `mov dl,byte ptr [edx+0x2ec378]`
+ * at 0x68e43 and 0x68e96. It sits immediately before the "Fax3" string in
+ * .rdata, i.e. it is file-local rodata, so it is reproduced here as a
+ * function-local static rather than given a kb.json address.
+ *
+ * The whole-byte run is expanded inline by the reference as
+ * `shr ecx,2 / rep stosd` then `and ecx,3 / rep stosb` (0x68e78-0x68e88) with
+ * EAX = -1. That is the compiler's fill substitution for a memset, not
+ * something the C says; it is written here as the same plain byte loop
+ * FUN_00069420 uses, because a variable-length `memset` is not linkable in
+ * this build (`-nostdlib -ffreestanding -fno-builtin`).
+ *
+ * @param cp    first byte of the bitmap row.
+ * @param x     starting bit index within the row.
+ * @param count number of bits to set.
+ */
+void fillspan(char *cp /* @<eax> */, int x /* @<ecx> */, int count /* @<edx> */)
+{
+  static const unsigned char masks[9] = { 0x00, 0x80, 0xc0, 0xe0, 0xf0,
+                                          0xf8, 0xfc, 0xfe, 0xff };
+  int whole_bytes;
+  int n;
+
+  if (count <= 0)
+    return;
+
+  cp += x >> 3;
+  x &= 7;
+  if (x != 0) {
+    /* Not enough bits to reach the next byte boundary: one masked OR. */
+    if (count < 8 - x) {
+      *cp |= masks[count] >> x;
+      return;
+    }
+    *cp |= 0xff >> x;
+    cp++;
+    count -= 8 - x;
+  }
+
+  if (count >= 8) {
+    whole_bytes = (int)((unsigned int)count >> 3);
+    n = whole_bytes;
+    while (n > 0) {
+      *cp = (char)0xff;
+      cp++;
+      n--;
+    }
+    count -= whole_bytes << 3;
+  }
+
+  *cp |= masks[count];
+}
+
+/**
  * Decode one complete fax run length out of the raw byte stream.
  *
  * EDI carries the TIFF handle (0x68eb0 opens with `mov edx,[edi+0x120]` before

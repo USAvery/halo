@@ -62083,6 +62083,21 @@
       "score": 92.9,
       "source": "src/halo/tag_files/files.c"
     },
+    "fillspan": {
+      "abi_model": "regparam_stripped",
+      "abi_model_items": 1,
+      "abi_modeled_mnemonic_pct": 86.0,
+      "addr": "0x68e20",
+      "end": "0x68ea4",
+      "kind": "auto",
+      "n_r": 61,
+      "opnd_percent": 59.5,
+      "raw_mnemonic_pct": 85.2,
+      "ref": "synth",
+      "ref_sha": "41f15e7363656949",
+      "score": 86.0,
+      "source": "src/halo/bitmaps/libtiff/tif_flush.c"
+    },
     "find_best_starting_location_index": {
       "abi_model": "raw",
       "abi_model_items": 0,

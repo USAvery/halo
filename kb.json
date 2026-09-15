@@ -36733,8 +36733,9 @@
     },
     {
      "addr": "0x68e20",
-     "decl": "void fillspan(void);",
-     "comment": "[NAME: fillspan \u2014 name_source=2276-symbol-dump method=exact_address tier=confirmed (T1), cea-apply-unified 2026-09-14]"
+     "decl": "void fillspan(char *cp @<eax>, int x @<ecx>, int count @<edx>);",
+     "comment": "[NAME: fillspan \u2014 name_source=2276-symbol-dump method=exact_address tier=confirmed (T1), cea-apply-unified 2026-09-14]",
+     "ported": true
     },
     {
      "addr": "0x68eb0",
