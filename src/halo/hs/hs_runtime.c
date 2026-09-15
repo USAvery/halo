@@ -502,6 +502,8 @@ bool FUN_000c88b0(int function_index, int expression_index)
 bool FUN_000c89c0(int function_index, int expression_index)
 {
   int argument_nodes[2];
+  register int left_node;
+  register int right_node;
   /* As in FUN_000c88b0, the reference keeps the accept flag in the frame byte
    * at [EBP-1] rather than in a register, which is what makes the frame 0xc
    * bytes (int[2] plus the flag) rather than 8; volatile pins it there. */
@@ -522,17 +524,19 @@ bool FUN_000c89c0(int function_index, int expression_index)
                                       (int16_t)function_index) +
                                     4),
                    argument_nodes, expression_index, 2)) {
-    if (hs_type_check(argument_nodes[0], 0) && /* _hs_type_unparsed */
-        HS_TYPE_IS_COMPARABLE(argument_nodes[0])) {
+    left_node = argument_nodes[0];
+    if (hs_type_check(left_node, 0) && /* _hs_type_unparsed */
+        HS_TYPE_IS_COMPARABLE(left_node)) {
       if (hs_type_check(argument_nodes[1],
-                        HS_SYNTAX_NODE_TYPE_UNSIGNED(argument_nodes[0]))) {
+                        HS_SYNTAX_NODE_TYPE_UNSIGNED(left_node))) {
         success = true;
       }
     } else if (*(int *)0x46b6fc == 0) {
-      if (hs_type_check(argument_nodes[1], 0) && /* _hs_type_unparsed */
-          HS_TYPE_IS_COMPARABLE(argument_nodes[1])) {
-        if (hs_type_check(argument_nodes[0],
-                          HS_SYNTAX_NODE_TYPE_UNSIGNED(argument_nodes[1]))) {
+      right_node = argument_nodes[1];
+      if (hs_type_check(right_node, 0) && /* _hs_type_unparsed */
+          HS_TYPE_IS_COMPARABLE(right_node)) {
+        if (hs_type_check(left_node,
+                          HS_SYNTAX_NODE_TYPE_UNSIGNED(right_node))) {
           success = true;
         }
       } else if (*(int *)0x46b6fc == 0) {
@@ -3829,16 +3833,15 @@ static void hs_return(int thread_handle, int value)
 int FUN_000cc0a0(int16_t global_ref)
 {
   int index;
-  char *datum_ptr;
 
-  FUN_000cb230((int)global_ref);
-  if ((global_ref & 0x8000) == 0) {
-    index = (global_ref & 0x7fff) + (int)*(int16_t *)0x27d504;
+  index = (int)global_ref;
+  FUN_000cb230(index);
+  if ((index & 0x8000) != 0) {
+    index &= 0x7fff;
   } else {
-    index = global_ref & 0x7fff;
+    index = (index & 0x7fff) + (int)*(int16_t *)0x27d504;
   }
-  datum_ptr = (char *)datum_get(*(data_t **)0x5aa6c0, index);
-  return *(int *)(datum_ptr + 4);
+  return *(int *)((char *)datum_get(*(data_t **)0x5aa6c0, index) + 4);
 }
 
 /* 0xcc0e0 — HS 'wake' evaluator. Wakes the thread that is currently running

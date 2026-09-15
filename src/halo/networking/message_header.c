@@ -279,10 +279,10 @@ void message_encrypt(unsigned short *msgptr, unsigned int *key)
     blocks = (unsigned int)(((unsigned short)(hdr >> 4) - 2) >> 3);
     remain = (unsigned int)((unsigned char)((char)((hdr >> 4) - 2)) & 7);
     cursor = msgptr + 1;
-    key_copy[0] = key[0];
-    key_copy[1] = key[1];
-    key_copy[2] = key_copy[0];
-    key_copy[3] = key_copy[1];
+    key_copy[2] = key[0];
+    key_copy[0] = key_copy[2];
+    key_copy[3] = key[1];
+    key_copy[1] = key_copy[3];
 
     if ((short)blocks != 0) {
       i = (unsigned int)(blocks & 0xffff);
@@ -326,10 +326,10 @@ void message_decrypt(unsigned short *msgptr, unsigned int *key)
     blocks = (unsigned int)(((unsigned short)(hdr >> 4) - 2) >> 3);
     remain = (unsigned int)((unsigned char)((char)((hdr >> 4) - 2)) & 7);
     cursor = msgptr + 1;
-    key_copy[0] = key[0];
-    key_copy[1] = key[1];
-    key_copy[2] = key_copy[0];
-    key_copy[3] = key_copy[1];
+    key_copy[2] = key[0];
+    key_copy[0] = key_copy[2];
+    key_copy[3] = key[1];
+    key_copy[1] = key_copy[3];
 
     if ((short)blocks != 0) {
       i = (unsigned int)(blocks & 0xffff);
@@ -505,7 +505,7 @@ unsigned int *sieve_of_eratosthenes(unsigned int limit,
         p += 2;
       } while (uVar5 < count);
       do {
-        if (uVar3 < primes[local_8])
+        if (primes[local_8] > uVar3)
           break;
         local_8++;
       } while (local_8 < count);

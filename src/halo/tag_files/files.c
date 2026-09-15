@@ -749,8 +749,10 @@ bool file_rename(file_ref_t *info, const char *new_name)
   char dst_path[256];
 
   ref = file_reference_verify(info);
-  memset(src_path, 0, sizeof(src_path));
-  memset(dst_path, 0, sizeof(dst_path));
+  src_path[0] = 0;
+  memset(src_path + 1, 0, sizeof(src_path) - 1);
+  dst_path[0] = 0;
+  memset(dst_path + 1, 0, sizeof(dst_path) - 1);
   path_from_file_reference(ref->unk_6, ref->unk_8, src_path);
   csstrcpy(dst_path, src_path);
   path_remove_filename(dst_path);

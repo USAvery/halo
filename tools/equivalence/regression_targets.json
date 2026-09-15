@@ -23,7 +23,8 @@
     },
     {
       "addr": "0x1198f0",
-      "name": "data_next_index[valid-pool]",
+      "name": "data_next_index",
+      "label": "data_next_index[valid-pool]",
       "obj": "data.obj",
       "seeds": 20,
       "flags": [

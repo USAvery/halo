@@ -506,7 +506,7 @@ void FUN_001bc620(void)
 /* Set the precache thread priority — forwards param to thread handler. */
 void cache_files_precache_set_priority(bool high)
 {
-  ((void (*)(bool))0x1ba290)(high);
+  FUN_001ba290((char)high);
 }
 
 /* Returns true if a map copy operation is currently in progress. */

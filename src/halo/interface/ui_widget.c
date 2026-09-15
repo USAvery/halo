@@ -1604,7 +1604,7 @@ void ui_widget_process_event(void *widget, void *widget_tag, void *event_data,
   }
 
   if (*(int16_t *)event == 3 && event[5] > 1 && *(int16_t *)(event + 2) >= 0 &&
-      *(int16_t *)(event + 2) < 4 && event[4] >= 8 && event[4] < 0xc &&
+      *(int16_t *)(event + 2) < 4 && event[4] >= 8 && event[4] <= 0xb &&
       (uint32_t)(*(uint32_t *)0x46cc40 -
                  *(uint32_t *)(0x46cc90 +
                                ((event[4] - 8) + *(int16_t *)(event + 2) * 4) *

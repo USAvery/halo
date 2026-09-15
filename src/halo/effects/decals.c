@@ -2491,7 +2491,7 @@ void *FUN_0017caf0(int cache_index, uint32_t cache_size)
 
 void thunk_FUN_0015b960(void)
 {
-  /* 0x17cb00: JMP 0x15b960; 0x15b960: RET -- no-op thunk */
+  FUN_0015b960();
 }
 
 void FUN_0017cb10(int decal_index)

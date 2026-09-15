@@ -39,10 +39,10 @@ float FUN_0017ffa0(short param_1)
 float *FUN_0017ffc0(float *param_1, unsigned int param_2)
 {
   float fVar1;
-  fVar1 = (float)(int)((param_2 >> 0xb) << 0x15) * *(float *)0x29ba04;
   *param_1 =
     ((float)(int)(param_2 << 0x15) * *(float *)0x29ba04 + *(float *)0x2533c8) *
     *(float *)0x2afe34;
+  fVar1 = (float)(int)((param_2 >> 0xb) << 0x15) * *(float *)0x29ba04;
   param_1[1] = (fVar1 + *(float *)0x2533c8) * *(float *)0x2afe34;
   param_1[2] = ((float)(int)(param_2 & 0xffc00000) * *(float *)0x2afe30 +
                 *(float *)0x2533c8) *
@@ -3024,7 +3024,24 @@ void rasterizer_text_cache_character(void *font_character, void *font)
 
   hw_index = *(short *)(character + 0xc);
 
-  if (hw_index == -1) {
+  if (hw_index != -1) {
+    if (hw_index < 0 || hw_index >= 256) {
+      display_assert(
+        "font_character->hardware_character_index>=0 && "
+        "font_character->hardware_character_index<MAXIMUM_HARDWARE_CHARACTERS",
+        "c:\\halo\\SOURCE\\rasterizer\\rasterizer_text.c", 0x27d, 1);
+      system_exit(-1);
+    }
+    if (character != *(int *)(0x4d04b0 + hw_index * 8)) {
+      display_assert("font_character==hardware_character_cache.characters[font_"
+                     "character->hardware_character_index].character",
+                     "c:\\halo\\SOURCE\\rasterizer\\rasterizer_text.c", 0x27e,
+                     1);
+      system_exit(-1);
+    }
+    return;
+  }
+
     if (*(short *)(character + 4) > 128) {
       display_assert(
         "font_character->bitmap_width<=HARDWARE_CHARACTER_CACHE_BITMAP_WIDTH",
@@ -3046,7 +3063,8 @@ void rasterizer_text_cache_character(void *font_character, void *font)
     if (128 < (int)*(short *)0x4d04a6 + (int)*(short *)(character + 4)) {
       *(short *)0x4d04a8 += *(short *)0x4d04aa;
       *(short *)0x4d04a6 = 0;
-      *(short *)0x4d04aa = 0;
+      *(uint32_t *)0x4d04a8 =
+        (uint32_t)(unsigned short)*(short *)0x4d04a8;
     }
 
     /* Wrap back to top if needed, evicting characters. Original writes
@@ -3055,7 +3073,7 @@ void rasterizer_text_cache_character(void *font_character, void *font)
     if (128 < (int)*(short *)0x4d04a8 + (int)*(short *)(character + 6)) {
       *(short *)0x4d04a6 = 0;
       *(short *)0x4d04a8 = 0;
-      *(short *)0x4d04aa = 0;
+      *(uint32_t *)0x4d04a8 = 0;
 
       read_index = *(unsigned short *)0x4d04a2;
       write_index = *(unsigned short *)0x4d04a4;
@@ -3117,7 +3135,20 @@ void rasterizer_text_cache_character(void *font_character, void *font)
     if ((unsigned char)(*(unsigned char *)0x4d04a4 + 1) ==
         *(unsigned char *)0x4d04a2) {
       character_slot = (int **)(0x4d04b0 + *(short *)0x4d04a2 * 8);
-      rasterizer_text_evict_character(character_slot);
+      if (character_slot == (int **)0) {
+        display_assert("hardware_character",
+                       "c:\\halo\\SOURCE\\rasterizer\\rasterizer_text.c",
+                       0x262, 1);
+        system_exit(-1);
+      }
+      if (*character_slot != (int *)0) {
+        *(short *)((char *)*character_slot + 0xc) = -1;
+        if (*(short *)((char *)*character_slot + 0xe) ==
+            *(short *)0x325748) {
+          error(3, "font cache overwrote character in use");
+        }
+        *character_slot = (int *)0;
+      }
       *(unsigned short *)0x4d04a2 =
         (unsigned short)(unsigned char)(*(unsigned char *)0x4d04a2 + 1);
     }
@@ -3148,22 +3179,6 @@ void rasterizer_text_cache_character(void *font_character, void *font)
     *(short *)0x4d04a6 += *(short *)(character + 4);
     *(unsigned short *)0x4d04a4 =
       (unsigned short)(unsigned char)(*(unsigned char *)0x4d04a4 + 1);
-  } else {
-    if (hw_index < 0 || hw_index >= 256) {
-      display_assert(
-        "font_character->hardware_character_index>=0 && "
-        "font_character->hardware_character_index<MAXIMUM_HARDWARE_CHARACTERS",
-        "c:\\halo\\SOURCE\\rasterizer\\rasterizer_text.c", 0x27d, 1);
-      system_exit(-1);
-    }
-    if (character != *(int *)(0x4d04b0 + hw_index * 8)) {
-      display_assert("font_character==hardware_character_cache.characters[font_"
-                     "character->hardware_character_index].character",
-                     "c:\\halo\\SOURCE\\rasterizer\\rasterizer_text.c", 0x27e,
-                     1);
-      system_exit(-1);
-    }
-  }
 }
 
 /* rasterizer_text_draw_cached_char: draw a single cached character quad.

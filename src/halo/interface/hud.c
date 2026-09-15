@@ -3,18 +3,13 @@
  * clear, or its scalar field (+0x4) equals 1.0f.  EAX = state buffer. */
 int FUN_000d02c0(void *state_buf)
 {
-  if (*(short *)((char *)state_buf + 0x10) != 0) {
-    if (*(short *)((char *)state_buf + 0xe) == 0) {
-      if (*(short *)((char *)state_buf + 0x12) == 0) {
-        goto ret_1;
-      }
-    }
+  if (((*(short *)((char *)state_buf + 0x10) == 0) ||
+       (*(short *)((char *)state_buf + 0xe) != 0) ||
+       (*(short *)((char *)state_buf + 0x12) != 0)) &&
+      (*(int *)((char *)state_buf + 4) != 0x3f800000)) {
+    return 0;
   }
-  if (*(int *)((char *)state_buf + 4) == 0x3f800000) {
-  ret_1:
-    return 1;
-  }
-  return 0;
+  return 1;
 }
 
 /* hud_new (0xd02f0) — allocate hud scripted globals and initialise HUD
@@ -1288,40 +1283,37 @@ int FUN_000d1c50(float param_1)
 
 uint32_t FUN_000d1c90(float *color)
 {
+  float scale;
   int a;
   int r;
   int g;
   int b;
   uint32_t result;
-  float ca;
-  float cr;
-  float cg;
-  float cb;
+  uint32_t verify;
 
+  scale = 255.0f;
   if (!valid_real_argb_color(color)) {
-    /* clamp overbright tag colors instead of halting — cachebeta contrails
-     * store HDR color bounds > 1.0 that would crash the original assert. */
-    ca = color[0] < 0.0f ? 0.0f : (color[0] > 1.0f ? 1.0f : color[0]);
-    cr = color[1] < 0.0f ? 0.0f : (color[1] > 1.0f ? 1.0f : color[1]);
-    cg = color[2] < 0.0f ? 0.0f : (color[2] > 1.0f ? 1.0f : color[2]);
-    cb = color[3] < 0.0f ? 0.0f : (color[3] > 1.0f ? 1.0f : color[3]);
-    a = (int)(ca * 255.0f + 0.5f);
-    r = (int)(cr * 255.0f + 0.5f);
-    g = (int)(cg * 255.0f + 0.5f);
-    b = (int)(cb * 255.0f + 0.5f);
-    return (uint32_t)b | ((uint32_t)g << 8) | ((uint32_t)r << 16) |
-           ((uint32_t)a << 24);
+    display_assert(
+      csprintf((char *)0x5ab100,
+               "%s: assert_valid_real_argb_color(%f, %f, %f, %f)",
+               "color", (double)color[0], (double)color[1],
+               (double)color[2], (double)color[3]),
+      "..\\bitmaps\\bitmaps_inlines.h", 0x59, 1);
+    system_exit(-1);
   }
 
-  a = (int)(color[0] * 255.0f + 0.5f);
-  r = (int)(color[1] * 255.0f + 0.5f);
-  g = (int)(color[2] * 255.0f + 0.5f);
-  b = (int)(color[3] * 255.0f + 0.5f);
+  a = x87_round_to_int(color[0] * scale);
+  r = x87_round_to_int(color[1] * scale);
+  g = x87_round_to_int(color[2] * scale);
+  b = x87_round_to_int(color[3] * scale);
   result = (uint32_t)b | ((uint32_t)g << 8) | ((uint32_t)r << 16) |
            ((uint32_t)a << 24);
 
-  if (((uint32_t)(b & 0xff) | ((uint32_t)(g & 0xff) << 8) |
-       ((uint32_t)(r & 0xff) << 16) | ((uint32_t)a << 24)) != result) {
+  verify = (uint32_t)(x87_round_to_int(color[3] * scale) & 0xff) |
+           ((uint32_t)(x87_round_to_int(color[2] * scale) & 0xff) << 8) |
+           ((uint32_t)(x87_round_to_int(color[1] * scale) & 0xff) << 16) |
+           ((uint32_t)x87_round_to_int(color[0] * scale) << 24);
+  if (verify != result) {
     display_assert("verify == result", "..\\bitmaps\\bitmaps_inlines.h", 0xbc,
                    true);
     system_exit(-1);
@@ -1338,23 +1330,22 @@ unsigned int FUN_000d1dd0(float *color)
 {
   float scale;
   int packed;
-  char *msg;
 
   scale = 255.0f;
   if (!valid_real_rgb_color(color)) {
-    msg =
-      csprintf((char *)0x5ab100, "%s: assert_valid_real_rgb_color(%f, %f, %f)",
-               "color", (double)color[0], (double)color[1], (double)color[2]);
-    display_assert(msg, "..\\bitmaps\\bitmaps_inlines.h", 0xc9, 1);
+    display_assert(
+      csprintf((char *)0x5ab100,
+               "%s: assert_valid_real_rgb_color(%f, %f, %f)", "color",
+               (double)color[0], (double)color[1], (double)color[2]),
+      "..\\bitmaps\\bitmaps_inlines.h", 0xc9, 1);
     system_exit(-1);
   }
 
-  /* Original rounds via x87 FISTP (round-to-nearest); the products are always
-   * positive (color is validated to [0,1]), so the +0.5f truncation idiom is
-   * behaviorally equivalent under our clang/-mno-sse build. */
-  packed = (int)(color[2] * scale + 0.5f) & 0xff;
-  packed |= ((int)(color[1] * scale + 0.5f) & 0xff) << 8;
-  packed |= ((int)(color[0] * scale + 0.5f) & 0xff) << 16;
+  /* The original uses x87 FISTP, whose default rounding mode is
+   * round-to-nearest. */
+  packed = x87_round_to_int(color[2] * scale) & 0xff;
+  packed |= (x87_round_to_int(color[1] * scale) & 0xff) << 8;
+  packed |= (x87_round_to_int(color[0] * scale) & 0xff) << 16;
   return (unsigned int)packed;
 }
 
@@ -1524,7 +1515,7 @@ int FUN_000d2300(int param_1)
   float v;
 
   v = *(float *)(param_1 + 8) * *(float *)0x253394;
-  return (int)(v < 0.0f ? v - 0.5f : v + 0.5f);
+  return x87_round_to_int(v);
 }
 
 /* Resolves the animated HUD meter color: decompresses two packed colors,

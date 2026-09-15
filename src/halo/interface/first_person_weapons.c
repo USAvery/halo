@@ -50,7 +50,7 @@ void FUN_000dc7f0(void)
 /* Map a first-person weapon state to an animation graph index (0xdc8c0).
  * Pure lookup table: 24 states (0..23) map to animation indices; any
  * out-of-range state returns -1. */
-int16_t FUN_000dc8c0(int16_t state)
+int FUN_000dc8c0(int16_t state)
 {
   switch (state) {
   case 0:

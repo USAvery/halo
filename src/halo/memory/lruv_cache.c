@@ -933,7 +933,7 @@ void *FUN_0011d320(int cache, int value)
       *(int *)(cache + 0x20)) { /* +0x20 capacity: cache full -> evict LRU */
     block = *(int *)(cache + 0x34); /* +0x34 first block record */
     victim_serial = 0; /* dead init; only read once victim != 0 */
-    if (count < 1) {
+    if (count <= 0) {
       return (void *)0;
     }
     i = 0;
@@ -1533,14 +1533,14 @@ int FUN_0011de10(void *cache, unsigned int size)
 
   unsigned int segment_stamp; /* EBP-0x1c */
   int segment_page_count; /* EBP-0x10 */
-  int locked;
-  int skip_accumulate;
+  bool locked;
+  bool skip_accumulate;
 
   int oldest_unlocked_block; /* EBP-0x18 */
   unsigned int oldest_unlocked_stamp; /* EBP-0x38 */
   unsigned int block_stamp;
 
-  int have_best; /* EBP+0xf */
+  bool have_best; /* EBP+0xf */
   int best_block_index; /* EBP-0x30 */
   unsigned int best_max_stamp; /* EBP-0x2c */
   int best_start_page; /* EBP-0x28 */
@@ -1550,7 +1550,7 @@ int FUN_0011de10(void *cache, unsigned int size)
   int region_end;
   int block_end;
 
-  shift = (int)((unsigned char)c->page_size_bits) & 0x1f;
+  shift = c->page_size_bits & 0x1f;
   desired_page_count = (int)size >> shift;
   if ((size & ((1u << shift) - 1u)) != 0) {
     desired_page_count = desired_page_count + 1;

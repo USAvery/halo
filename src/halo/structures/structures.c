@@ -3428,12 +3428,13 @@ void leaf_map_build_portal_from_leaves(void *structure /* @<edi> */,
   }
 
   area = FUN_00106330(vertex_count, coord_buffer);
-  if (area < 0.0025f) {
-    leaf_map_mark_portal_designators(structure, (uint32_t)portal_index);
-    return;
-  }
-  perimeter = convex_hull2d_perimeter(vertex_count, coord_buffer);
-  if (sqrtf(area) / perimeter < 0.01f) {
+  if (!(area < 0.0025f)) {
+    perimeter = convex_hull2d_perimeter(vertex_count, coord_buffer);
+    if (sqrtf(area) / perimeter < 0.01f) {
+      leaf_map_mark_portal_designators(structure, (uint32_t)portal_index);
+      return;
+    }
+  } else {
     leaf_map_mark_portal_designators(structure, (uint32_t)portal_index);
     return;
   }

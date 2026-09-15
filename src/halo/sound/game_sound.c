@@ -690,27 +690,27 @@ bool FUN_001c7a10(int object_handle, void *attachment_data, void *source)
   return false;
 }
 
-bool sound_cluster_is_audible(void *location)
+bool sound_cluster_is_audible(void *location /* @<esi> */)
 {
   int16_t cluster_index;
 
-  cluster_index = *(int16_t *)((char *)location + 4);
-  if (cluster_index >= -1) {
-    if ((int)cluster_index < *(int *)((char *)scenario_get() + 0x134)) {
-      if (cluster_index != -1 &&
-          ((((uint32_t *)0x5054a0)[(int)cluster_index >> 5] &
-            (1u << ((uint8_t)cluster_index & 0x1f))) != 0)) {
-        return true;
-      }
-      return false;
-    }
+  if (*(int16_t *)((char *)location + 4) < -1 ||
+      (int)*(int16_t *)((char *)location + 4) >=
+        *(int *)((char *)scenario_get() + 0x134)) {
+    display_assert(
+      "location->cluster_index>=NONE && "
+      "location->cluster_index<global_structure_bsp_get()->clusters.count",
+      "c:\\halo\\SOURCE\\sound\\game_sound.c", 0x364, 1);
+    system_exit(-1);
   }
 
-  display_assert(
-    "location->cluster_index>=NONE && "
-    "location->cluster_index<global_structure_bsp_get()->clusters.count",
-    "c:\\halo\\SOURCE\\sound\\game_sound.c", 0x364, 1);
-  system_exit(-1);
+  cluster_index = *(int16_t *)((char *)location + 4);
+  if (cluster_index != -1 &&
+      ((((uint32_t *)0x5054a0)[(int)cluster_index >> 5] &
+        (1u << ((uint8_t)cluster_index & 0x1f))) != 0)) {
+    return true;
+  }
+  return false;
 }
 
 /* Detach a scripted looping sound from its lsnd tag (0x1c7ca0).

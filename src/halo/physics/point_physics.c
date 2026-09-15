@@ -345,19 +345,19 @@ char FUN_001547d0(float *out_pos, float *out_vel, void *point_phys, float dt,
                   float target_pos, float accel)
 {
   float initial_pos;
+  float remaining;
 
   initial_pos = *out_pos;
-  *(float *)&point_phys = FUN_001546f0(*out_pos, dt, target_pos, point_phys);
-  if (*(float *)&point_phys > 0.0f) {
+  remaining = FUN_001546f0(*out_pos, dt, target_pos, point_phys);
+  if (remaining > 0.0f) {
     FUN_00154540(out_vel, (char *)point_phys + 8,
-                 *(float *)&point_phys * accel);
+                 remaining * accel);
     FUN_001544d0(out_pos, (float *)point_phys, *(char *)&dt, *out_vel);
     if (FUN_001546f0(initial_pos, dt, target_pos, point_phys) <=
-        *(float *)&point_phys) {
+        remaining) {
       return 0;
     }
   }
-
   *out_pos = target_pos;
   *out_vel = 0.0f;
   return 1;

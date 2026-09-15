@@ -1983,7 +1983,7 @@ void FUN_00077ff0(void *bitmap, short filter_radius, short *filter_coefficients)
   short y, x;
   short k;
   short width;
-  unsigned char shift;
+  short shift;
   int rounding;
   int row_base;
   int wrap_x;
@@ -2009,8 +2009,8 @@ void FUN_00077ff0(void *bitmap, short filter_radius, short *filter_coefficients)
                    "c:\\halo\\SOURCE\\bitmaps\\bitmap_utilities.c", 0x252, 1);
     system_exit(-1);
   }
-  if ((filter_radius <= *(short *)((char *)bitmap + 4)) &&
-      (filter_radius <= *(short *)((char *)bitmap + 6))) {
+  if ((*(short *)((char *)bitmap + 4) >= filter_radius) &&
+      (*(short *)((char *)bitmap + 6) >= filter_radius)) {
     pix_size = (unsigned int)bitmap_get_pixel_data_size(bitmap);
     pixels = bitmap_mipmap_address(bitmap, 0);
     tmp = debug_malloc(pix_size, 0,
@@ -2026,7 +2026,7 @@ void FUN_00077ff0(void *bitmap, short filter_radius, short *filter_coefficients)
       do {
         x = 0;
         if (0 < width) {
-          shift = (unsigned char)filter_radius * 2;
+          shift = filter_radius * 2;
           k = -filter_radius;
           rounding = 1 << (shift - 1);
           do {
@@ -2044,14 +2044,14 @@ void FUN_00077ff0(void *bitmap, short filter_radius, short *filter_coefficients)
                   *(unsigned int *)((char *)pixels +
                                     ((short)(wrap_x % (int)width) + row_base) *
                                       4);
-                coeff = (int)*kptr;
+                kptr++;
+                coeff = (int)kptr[-1];
                 a += (pix >> 24) * coeff;
                 r += ((pix >> 16) & 0xff) * coeff;
                 g += ((pix >> 8) & 0xff) * coeff;
                 b += (pix & 0xff) * coeff;
                 wrap_x++;
                 count--;
-                kptr++;
                 width = *(short *)((char *)bitmap + 4);
               } while (count != 0);
             }
@@ -2075,7 +2075,7 @@ void FUN_00077ff0(void *bitmap, short filter_radius, short *filter_coefficients)
       do {
         x = 0;
         if (0 < width) {
-          shift = (unsigned char)filter_radius * 2;
+          shift = filter_radius * 2;
           k = -filter_radius;
           rounding = 1 << (shift - 1);
           do {
@@ -2096,14 +2096,14 @@ void FUN_00077ff0(void *bitmap, short filter_radius, short *filter_coefficients)
                                        (int)width +
                                      (int)x) *
                                       4);
-                coeff = (int)*kptr;
+                kptr++;
+                coeff = (int)kptr[-1];
                 a += (pix >> 24) * coeff;
                 r += ((pix >> 16) & 0xff) * coeff;
                 g += ((pix >> 8) & 0xff) * coeff;
                 b += (pix & 0xff) * coeff;
                 y_wrap++;
                 count--;
-                kptr++;
               } while (count != 0);
             }
             *(unsigned int *)((char *)pixels +

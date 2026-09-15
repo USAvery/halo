@@ -877,7 +877,8 @@ bool player_try_to_enter_vehicle(int player_handle /* @<eax> */)
   player = (char *)datum_get(player_data, player_handle);
   object_get_and_verify_type(*(int *)(player + 0x34), 3);
 
-  if (*(short *)(player + 0x28) == 6) {
+  switch ((int)*(short *)(player + 0x28) - 6) {
+  case 0:
     /* Enter vehicle seat */
     if (!unit_set_in_vehicle(*(int *)(player + 0x34), 1))
       return true;
@@ -888,13 +889,16 @@ bool player_try_to_enter_vehicle(int player_handle /* @<eax> */)
       player_clear_aim_assist(*(int *)(player + 0x34));
     }
     return true;
-  } else if (*(short *)(player + 0x28) == 7) {
+  case 1:
     /* Interact with seat object */
     if (unit_enter_seat(*(int *)(player + 0x34), *(int *)(player + 0x24), 1)) {
       vehicle_obj =
         (int *)object_get_and_verify_type(*(int *)(player + 0x24), 4);
       hud_player_set_vehicle(*(unsigned short *)(player + 0x2), *vehicle_obj);
     }
+    break;
+  default:
+    break;
   }
   return false;
 }

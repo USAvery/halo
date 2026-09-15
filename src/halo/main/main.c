@@ -2644,8 +2644,6 @@ void main_update_time(void)
   int16_t *failure_counts;
   int64_t *target_history;
 
-  typedef char *(__cdecl * fn_csstrcpy_t)(char *destination,
-                                          const char *source);
   typedef void(__cdecl * fn_store_frame_seconds_t)(float frame_seconds);
   typedef void(__cdecl * fn_store_frame_overshoot_t)(int overshoot_ms);
   typedef void(__cdecl * fn_rdtsc_marker_t)(void);
@@ -2654,9 +2652,10 @@ void main_update_time(void)
   end_ms = system_milliseconds();
   previous_target = unk_time_globals.unk_8;
   present_target = unk_time_globals.unk_32;
-  chosen_target = present_target;
-  if (present_target < previous_target) {
+  if (previous_target > present_target) {
     chosen_target = previous_target;
+  } else {
+    chosen_target = present_target;
   }
 
   if (*(char *)0x32568d == '\0') {
@@ -2676,7 +2675,7 @@ void main_update_time(void)
     failure_counts = (int16_t *)0x46dd9e;
     target_history = (int64_t *)0x46ddb0;
 
-    ((fn_csstrcpy_t)0x8dff0)(debug_buffer, "");
+    csstrcpy(debug_buffer, "");
     if (*(char *)0x31fa96 != '\0' && *(int16_t *)0x325690 >= 0) {
       requested_rate = *(int16_t *)0x325690;
       if (requested_rate == 0) {

@@ -174,7 +174,7 @@
   "comment": "[NAME: action_guard_setup_current_position — name_source=2276-symbol-dump method=exact_address tier=confirmed (T1), cea-apply-unified 2026-09-14]"
  },
  "0x15900": {
-  "decl": "int action_guard_setup_find_position(int actor_handle, short param_2, char *state_data);",
+  "decl": "int action_guard_setup_find_position(int actor_handle, int param_2, char *state_data);",
   "name": "action_guard_setup_find_position",
   "obj": "actor_looking.obj",
   "ported": true,
@@ -2055,7 +2055,7 @@
     },
     {
      "addr": "0x1e3a50",
-     "decl": "void __ascii_stricmp(void);",
+     "decl": "int __ascii_stricmp(const char *a, const char *b);",
      "comment": "[NAME: __ascii_stricmp — name_source=2276-symbol-dump method=exact_address tier=confirmed (T1), cea-apply-unified 2026-09-14]"
     },
     {
@@ -3715,7 +3715,7 @@
     },
     {
      "addr": "0x15900",
-     "decl": "int action_guard_setup_find_position(int actor_handle, short param_2, char *state_data);",
+     "decl": "int action_guard_setup_find_position(int actor_handle, int param_2, char *state_data);",
      "ported": true,
      "comment": "[NAME: action_guard_setup_find_position — name_source=2276-symbol-dump method=exact_address tier=confirmed (T1), cea-apply-unified 2026-09-14]"
     },
@@ -8065,7 +8065,7 @@
     },
     {
      "addr": "0xdc8c0",
-     "decl": "int16_t FUN_000dc8c0(int16_t state@<eax>);",
+     "decl": "int FUN_000dc8c0(int16_t state@<eax>);",
      "ported": true
     },
     {
@@ -21283,12 +21283,12 @@
     },
     {
      "addr": "0x17c8c0",
-     "decl": "int rasterizer_windows_begin(void);",
+     "decl": "void rasterizer_windows_begin(void);",
      "ported": true
     },
     {
      "addr": "0x17c8d0",
-     "decl": "int rasterizer_window_begin(window_parameters_t *a1);",
+     "decl": "void rasterizer_window_begin(window_parameters_t *a1);",
      "ported": true
     },
     {

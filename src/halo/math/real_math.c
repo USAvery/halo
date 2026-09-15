@@ -1131,16 +1131,28 @@ void FUN_00109f40(float *matrix, float *euler)
 {
   float cosine_pitch;
 
+#if defined(_MSC_VER) && !defined(__clang__)
+#define HALO_REAL_ATAN2 atan2
+#define HALO_REAL_ATAN2F(y, x) ((float)HALO_REAL_ATAN2((double)(y), (double)(x)))
+#else
+#define HALO_REAL_ATAN2F(y, x) x87_fatan2f((y), (x))
+#endif
+
   euler[1] = -(float)asin(matrix[7]);
   cosine_pitch = x87_fcos(euler[1]);
 
   if (cosine_pitch > 0.0001) {
-    euler[2] = x87_fatan2f(-matrix[8] / cosine_pitch, matrix[9] / cosine_pitch);
-    euler[0] = x87_fatan2f(-matrix[4] / cosine_pitch, matrix[1] / cosine_pitch);
+    euler[2] = HALO_REAL_ATAN2F(-matrix[8] / cosine_pitch,
+                                 matrix[9] / cosine_pitch);
+    euler[0] = HALO_REAL_ATAN2F(-matrix[4] / cosine_pitch,
+                                 matrix[1] / cosine_pitch);
   } else {
     euler[2] = 0.0f;
-    euler[0] = x87_fatan2f(matrix[2], matrix[5]);
+    euler[0] = HALO_REAL_ATAN2F(matrix[2], matrix[5]);
   }
+
+#undef HALO_REAL_ATAN2
+#undef HALO_REAL_ATAN2F
 }
 
 /* Convert a 4x3 matrix rotation part to a unit quaternion (Shepperd's method).
@@ -1244,7 +1256,7 @@ void FUN_0010a240(float *matrix, float *plane, int out)
 {
   float d;
 
-  if (*matrix == 0.0f) {
+  if (*matrix <= 0.0f) {
     *(int *)(out + 0xc) = 0;
     real_matrix3x3_transform_vector(matrix, (void *)plane, (void *)out);
     return;
@@ -3769,35 +3781,51 @@ char point_from_planes3d(float *p1, float *p2, float *p3, float *out)
  * param_4 receives the cross of the input planes. */
 char line_from_planes3d(float *p1, float *p2, float *out, float *cross_out)
 {
-  float local_direction[3];
-  float determinant;
-  float inverse_determinant;
-  float distance;
+  float fVar1;
+  float fVar2;
+  float fVar3;
+  float fVar4;
+  float fVar5;
+  float fVar6;
+  float fVar7;
+  float fVar8;
+  float fVar9;
+  float fVar10;
 
-  cross_out[0] = p1[1] * p2[2] - p1[2] * p2[1];
-  cross_out[1] = p1[2] * p2[0] - p1[0] * p2[2];
-  cross_out[2] = p1[0] * p2[1] - p1[1] * p2[0];
-
-  determinant = cross_out[0] * cross_out[0] + cross_out[1] * cross_out[1] + cross_out[2] * cross_out[2];
-  if (!(real_math_fabs_double_from_float(determinant) < *(double *)0x2533d0)) {
-    local_direction[0] = p2[1] * cross_out[2] - p2[2] * cross_out[1];
-    local_direction[1] = p2[2] * cross_out[0] - p2[0] * cross_out[2];
-    local_direction[2] = p2[0] * cross_out[1] - p2[1] * cross_out[0];
-
-    distance = p1[3];
-    out[0] = local_direction[0] * distance;
-    out[1] = local_direction[1] * distance;
-    out[2] = local_direction[2] * distance;
-
-    local_direction[0] = cross_out[1] * p1[2] - cross_out[2] * p1[1];
-    local_direction[1] = cross_out[2] * p1[0] - cross_out[0] * p1[2];
-    local_direction[2] = cross_out[0] * p1[1] - cross_out[1] * p1[0];
-
-    distance = p2[3];
-    inverse_determinant = 1.0f / determinant;
-    out[0] = (local_direction[0] * distance + out[0]) * inverse_determinant;
-    out[1] = (local_direction[1] * distance + out[1]) * inverse_determinant;
-    out[2] = (local_direction[2] * distance + out[2]) * inverse_determinant;
+  fVar8 = *p1 * p2[1] - p1[1] * *p2;
+  fVar9 = *p2 * p1[2] - *p1 * p2[2];
+  fVar1 = p1[1];
+  fVar2 = p2[2];
+  fVar3 = p1[2];
+  fVar4 = p2[1];
+  *cross_out = fVar1 * fVar2 - fVar3 * fVar4;
+  cross_out[1] = fVar9;
+  cross_out[2] = fVar8;
+  fVar1 = fVar8 * fVar8 + fVar9 * fVar9 + *cross_out * *cross_out;
+  if (!(real_math_fabs_double_from_float(fVar1) < *(double *)0x2533d0)) {
+    fVar10 = p1[3];
+    fVar2 = p2[2];
+    fVar3 = *cross_out;
+    fVar4 = *p2;
+    fVar5 = *p2;
+    fVar6 = *cross_out;
+    fVar7 = p2[1];
+    *out = (fVar8 * p2[1] - fVar9 * p2[2]) * fVar10;
+    out[1] = (fVar2 * fVar3 - fVar8 * fVar4) * fVar10;
+    out[2] = (fVar9 * fVar5 - fVar6 * fVar7) * fVar10;
+    fVar2 = *p1;
+    fVar3 = cross_out[2];
+    fVar4 = p1[2];
+    fVar8 = *cross_out;
+    fVar9 = p1[1];
+    fVar5 = *cross_out;
+    fVar6 = cross_out[1];
+    fVar7 = *p1;
+    fVar10 = p2[3];
+    fVar1 = 1.0f / fVar1;
+    *out = ((cross_out[1] * p1[2] - p1[1] * cross_out[2]) * fVar10 + *out) * fVar1;
+    out[1] = ((fVar2 * fVar3 - fVar4 * fVar8) * fVar10 + out[1]) * fVar1;
+    out[2] = ((fVar9 * fVar5 - fVar6 * fVar7) * fVar10 + out[2]) * fVar1;
     return 1;
   }
   return 0;

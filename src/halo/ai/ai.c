@@ -1483,17 +1483,15 @@ int ai_get_race_from_team_index(short param_1)
  * triples (5×3=15 args, 15×4=60=0x3c). */
 void ai_initialize_for_new_map(void)
 {
-  int *g = *(int **)0x632574;
-
-  csmemset(g, 0, 0x8dc);
-  *(char *)((char *)g + 0x00) = 1;
-  *(char *)((char *)g + 0x02) = 1;
-  *(int *)((char *)g + 0x08) = -1;
-  *(char *)((char *)g + 0x3b4) = 1;
-  *(char *)((char *)g + 0x10) = 1;
-  csmemset((char *)g + 0x14, -1, 8);
-  csmemset((char *)g + 0x1c, -1, 8);
-  csmemset((char *)g + 0x24, -1, 8);
+  csmemset(*(int **)0x632574, 0, 0x8dc);
+  *(char *)((char *)*(int **)0x632574 + 0x00) = 1;
+  *(char *)((char *)*(int **)0x632574 + 0x02) = 1;
+  *(int *)((char *)*(int **)0x632574 + 0x08) = -1;
+  *(char *)((char *)*(int **)0x632574 + 0x3b4) = 1;
+  *(char *)((char *)*(int **)0x632574 + 0x10) = 1;
+  csmemset((char *)*(int **)0x632574 + 0x14, -1, 8);
+  csmemset((char *)*(int **)0x632574 + 0x1c, -1, 8);
+  csmemset((char *)*(int **)0x632574 + 0x24, -1, 8);
 
   ai_debug_initialize_for_new_map();
   FUN_00053650();
@@ -1504,12 +1502,12 @@ void ai_initialize_for_new_map(void)
   ai_script_initialize_for_new_map();
   ai_communication_initialize_for_new_map();
 
-  *(int16_t *)((char *)g + 0x132) = 0;
-  *(int16_t *)((char *)g + 0x130) = 0;
-  csmemset((char *)g + 0x134, 0, 0x280);
+  *(int16_t *)((char *)*(int **)0x632574 + 0x132) = 0;
+  *(int16_t *)((char *)*(int **)0x632574 + 0x130) = 0;
+  csmemset((char *)*(int **)0x632574 + 0x134, 0, 0x280);
 
   /* mark AI subsystem active */
-  *(char *)((char *)g + 0x01) = 1;
+  *(char *)((char *)*(int **)0x632574 + 0x01) = 1;
 }
 
 /* ai_update: per-tick AI update dispatcher.

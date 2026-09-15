@@ -145,30 +145,80 @@ char *csprintf(char *buffer, const char *format, ...)
 void display_assert(const char *reason, const char *filepath, int lineno,
                     bool halt)
 {
-  error(2, "EXCEPTION %s in %s,#%d: %s [rev=%s]", halt ? "halt" : "warn",
-        filepath, lineno, reason ? reason : "<no reason given>",
-        build_rev ? build_rev : "unknown");
   if (halt) {
     stack_walk(0);
   }
+  error(2, "EXCEPTION %s in %s,#%d: %s [rev=%s]", halt ? "halt" : "warn",
+        filepath, lineno, reason ? reason : "<no reason given>",
+        build_rev ? build_rev : "unknown");
 }
+
+/* Freestanding fallbacks for compiler-generated libcalls.  The Xbox image
+ * has no hosted CRT, but Clang may lower builtin memory operations to these
+ * symbols when the size is not a small compile-time constant. */
+int memcmp(const void *a, const void *b, size_t size)
+{
+  const uint8_t *pa;
+  const uint8_t *pb;
+  size_t i;
+
+  pa = (const uint8_t *)a;
+  pb = (const uint8_t *)b;
+  for (i = 0; i < size; i++) {
+    if (pa[i] != pb[i])
+      return pa[i] < pb[i] ? -1 : 1;
+  }
+  return 0;
+}
+
+void *memset(void *buffer, int c, size_t size)
+{
+  uint8_t *p;
+  size_t i;
+
+  p = (uint8_t *)buffer;
+  for (i = 0; i < size; i++)
+    p[i] = (uint8_t)c;
+  return buffer;
+}
+
+#ifdef memcpy
+#undef memcpy
+#endif
+void *memcpy(void *destination, const void *source, size_t size)
+{
+  uint8_t *dst;
+  const uint8_t *src;
+  size_t i;
+
+  dst = (uint8_t *)destination;
+  src = (const uint8_t *)source;
+  for (i = 0; i < size; i++)
+    dst[i] = src[i];
+  return destination;
+}
+#define memcpy xbox_memcpy
 
 /* Byte-compare two buffers with assertions on non-null pointers and
  * reasonable size. Returns 0 if equal, non-zero otherwise. */
 int csmemcmp(const void *a, const void *b, int size)
 {
-  const uint8_t *pa = a;
-  const uint8_t *pb = b;
-  int i;
-
-  assert_halt(a && b);
-  assert_halt((unsigned int)size <= 0x10000000);
-
-  for (i = 0; i < size; i++) {
-    if (pa[i] != pb[i])
-      return (pa[i] < pb[i]) ? -1 : 1;
+  if (!(a && b)) {
+    stack_walk(0);
+    error(2, "EXCEPTION %s in %s,#%d: %s", "halt",
+          "c:\\halo\\SOURCE\\cseries\\cseries.c", 255,
+          "p1 && p2");
+    system_exit(-1);
   }
-  return 0;
+  if ((unsigned int)size > 0x10000000) {
+    stack_walk(0);
+    error(2, "EXCEPTION %s in %s,#%d: %s", "halt",
+          "c:\\halo\\SOURCE\\cseries\\cseries.c", 256,
+          "size>=0 && size<=MAXIMUM_MEMCMP_SIZE");
+    system_exit(-1);
+  }
+
+  return __builtin_memcmp(a, b, (size_t)size);
 }
 
 void csmemmove(void *destination, const void *source, unsigned int size)
@@ -210,7 +260,13 @@ int csstrcmp(const char *s1, const char *s2)
 {
   unsigned char c1, c2;
 
-  assert_halt(s1 && s2);
+  if (!(s1 && s2)) {
+    stack_walk(0);
+    error(2, "EXCEPTION %s in %s,#%d: %s", "halt",
+          "c:\\halo\\SOURCE\\cseries\\cseries.c", 0x12c,
+          "s1 && s2");
+    system_exit(-1);
+  }
 
   for (;;) {
     c1 = *(unsigned char *)s1;
@@ -238,9 +294,20 @@ int csstrcmp(const char *s1, const char *s2)
 /* csstrcat — bounded string concatenation with assertions. */
 char *csstrcat(char *destination, const char *source, size_t max_size)
 {
-  if (!destination || !source)
-    return NULL;
-  assert_halt(max_size < MAXIMUM_STRING_SIZE);
+  if (!(destination && source)) {
+    stack_walk(0);
+    error(2, "EXCEPTION %s in %s,#%d: %s", "halt",
+          "c:\\halo\\SOURCE\\cseries\\cseries.c", 0x137,
+          "s1 && s2");
+    system_exit(-1);
+  }
+  if (!(max_size < MAXIMUM_STRING_SIZE)) {
+    stack_walk(0);
+    error(2, "EXCEPTION %s in %s,#%d: %s", "halt",
+          "c:\\halo\\SOURCE\\cseries\\cseries.c", 0x138,
+          "size>=0 && size<MAXIMUM_STRING_SIZE");
+    system_exit(-1);
+  }
 
   crt_strncat(destination, source, max_size);
   return destination;

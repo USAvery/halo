@@ -1,3 +1,8 @@
+extern unsigned long __cdecl _exception_code(void);
+extern void *__cdecl _exception_info(void);
+#define GetExceptionCode _exception_code
+#define GetExceptionInformation() ((void *)_exception_info())
+
 void shell_idle(void)
 {
 }
@@ -70,21 +75,27 @@ void update_loaded_module_section_attributes(void)
 
 int main(int argc, const char **argv, const char **envp)
 {
+  __try {
 #if DEBUG_BUILD && !defined(HALO_RETAIL64)
-  update_loaded_module_section_attributes();
+    update_loaded_module_section_attributes();
 #endif
-  rasterizer_preinitialize();
-  physical_memory_allocate();
-  if (shell_initialize()) {
+    rasterizer_preinitialize();
+    physical_memory_allocate();
+    if (shell_initialize()) {
 #ifndef TEST_HARNESS
-    main_loop();
+      main_loop();
 #else
-    extern void run_tests(void);
-    run_tests();
-    for (;;) {
-    }
+      extern void run_tests(void);
+      run_tests();
+      for (;;) {
+      }
 #endif
-    shell_dispose();
+      shell_dispose();
+    }
+  }
+  __except (FUN_0008e5f0((uint32_t)GetExceptionCode(),
+                         (int)GetExceptionInformation())) {
+    halt_and_catch_fire();
   }
   return 0;
 }

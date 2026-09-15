@@ -2351,7 +2351,7 @@ int FUN_0006a5d0(unsigned char *r, unsigned char *g,
 {
   int nsamples;
   int i;
-  int idx;
+  unsigned char idx;
   unsigned long *p;
 
   /* 0x6a5d4-0x6a5e1: signed `mov eax,8; cdq; idiv ecx` on the file-static

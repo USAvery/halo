@@ -25,31 +25,6 @@
  * the halo.xbe.def export names that the linker resolves against). */
 
 /* Parse a hex digit; returns 0-15 or -1 on non-hex. */
-static int hex_digit(int c)
-{
-  if (c >= '0' && c <= '9')
-    return c - '0';
-  if (c >= 'a' && c <= 'f')
-    return c - 'a' + 10;
-  if (c >= 'A' && c <= 'F')
-    return c - 'A' + 10;
-  return -1;
-}
-
-/* Parse a hex string (no "0x" prefix) into a uint32_t. */
-static uint32_t parse_hex(const char *s)
-{
-  uint32_t val;
-  int d;
-
-  val = 0;
-  while (*s && (d = hex_digit((int)(unsigned char)*s)) >= 0) {
-    val = (val << 4) | (uint32_t)d;
-    s++;
-  }
-  return val;
-}
-
 /* -----------------------------------------------------------------------
  * FUN_00092370 (0x92370) — walk EBP chain and collect return addresses.
  *
@@ -64,17 +39,63 @@ void __fastcall FUN_00092370(int skip, int32_t *frames, uint32_t max,
                              uint32_t *count)
 {
   uint32_t *frame;
-  uint32_t *base;
+  uint32_t return_address;
+  uint32_t i;
 
+#if defined(_MSC_VER) && !defined(__clang__)
+  frame = (uint32_t *)((char *)_AddressOfReturnAddress() - 4);
+#else
   frame = (uint32_t *)__builtin_frame_address(0);
-  base = *(uint32_t **)0x449efc;
-
+#endif
   *(uint32_t **)0x449ef8 = frame;
+  *(uint32_t **)0x449efc = (uint32_t *)((char *)frame - 0xc);
 
-  /* skip one extra to hide this wrapper frame */
-  FUN_000922a0(skip + 1, frames, max, count);
+  if (((uint32_t)frame & 3) != 0 ||
+      (uint32_t)frame >= (uint32_t)*(uint32_t **)0x449efc) {
+    frame = NULL;
+    *(uint32_t **)0x449ef8 = frame;
+  }
 
-  *(uint32_t **)0x449ef8 = (uint32_t *)base;
+  while (skip != 0) {
+    skip--;
+    if (skip == 0)
+      break;
+    if (frame != NULL) {
+      frame = (uint32_t *)*frame;
+      *(uint32_t **)0x449ef8 = frame;
+      if (((uint32_t)frame & 3) != 0 ||
+          (uint32_t)frame >= (uint32_t)*(uint32_t **)0x449efc) {
+        frame = NULL;
+        *(uint32_t **)0x449ef8 = frame;
+      }
+      *(uint32_t **)0x449efc = frame;
+    }
+  }
+
+  i = 0;
+  if (max != 0) {
+    for (;;) {
+      return_address = 0;
+      if (frame != NULL) {
+        return_address = frame[1];
+        frame = (uint32_t *)frame[0];
+        *(uint32_t **)0x449ef8 = frame;
+        if (((uint32_t)frame & 3) != 0 ||
+            (uint32_t)frame >= (uint32_t)*(uint32_t **)0x449efc) {
+          frame = NULL;
+          *(uint32_t **)0x449ef8 = frame;
+        }
+        *(uint32_t **)0x449efc = frame;
+      }
+      frames[i] = (int32_t)return_address;
+      if (return_address == 0)
+        break;
+      i++;
+      if (i >= max)
+        break;
+    }
+  }
+  *count = i;
 }
 
 /* -----------------------------------------------------------------------
@@ -115,187 +136,329 @@ void stack_walk_dispose(void)
 char stack_walk_with_context(int a1, int16_t depth, int a3)
 {
   int32_t frames[0x40];
-  uint32_t count;
   uint32_t i;
-  int32_t *symtab;
   char *sym;
-  int32_t offset;
+  int context;
+  uint32_t trace_address;
+  uint32_t eip_value;
+  uint32_t eip_byte_3;
+  char result;
 
-  count = 0;
-  FUN_00092370((int)depth, frames, 0x40, &count);
+  __builtin_memset(frames, 0, sizeof(frames));
+  context = a3;
 
-  symtab = stack_walk_symbols;
-  offset = stack_walk_bias;
+  if (a3 != 0) {
+    *(int *)0x449efc = *(int *)((char *)a3 + 0x230);
+    *(int *)0x449ef8 = *(int *)((char *)a3 + 0x220);
+    FUN_000922a0((int)depth, frames, 0x40, (uint32_t *)&a3);
+  } else {
+    FUN_00092370((int)depth, frames, 0x40, (uint32_t *)&a3);
+  }
 
-  for (i = 0; i < count; i++) {
-    sym = NULL;
-    if (offset != -1) {
-      sym = FUN_00092110(frames[i] - offset, symtab);
-    }
-    if (sym != NULL) {
-      error(2, "  [%d] 0x%08x  %s", (int)i, (unsigned int)frames[i], sym);
-    } else {
-      error(2, "  [%d] 0x%08x", (int)i, (unsigned int)frames[i]);
+  if (a1 == 0) {
+    error(2, "Printing stuff for Mat's edification");
+    i = (uint32_t)a3 - 1;
+    while ((int32_t)i >= (int32_t)depth) {
+      trace_address = (uint32_t)frames[i];
+      trace_address += *(uint32_t *)(trace_address - 4);
+      sym = NULL;
+      if (*(int32_t *)0x2ee788 != 0 && *(unsigned char *)0x2ee784 == 0) {
+        sym = FUN_00092110(trace_address, (int32_t *)0x2ee788);
+      }
+      if (sym == NULL)
+        sym = "?????";
+      error(2, "%08lX %s", trace_address, sym);
+      result = 1;
+      i--;
     }
   }
 
+  if (context != 0) {
+    eip_value = **(uint32_t **)(context + 0x224);
+    eip_byte_3 = eip_value >> 24;
+    error(2, "EAX: 0x%08lX", *(uint32_t *)(context + 0x21c));
+    error(2, "EBX: 0x%08lX", *(uint32_t *)(context + 0x210));
+    error(2, "ECX: 0x%08lX", *(uint32_t *)(context + 0x218));
+    error(2, "EDX: 0x%08lX", *(uint32_t *)(context + 0x214));
+    error(2, "EDI: 0x%08lX", *(uint32_t *)(context + 0x208));
+    error(2, "ESI: 0x%08lX", *(uint32_t *)(context + 0x20c));
+    error(2, "EBP: 0x%08lX", *(uint32_t *)(context + 0x220));
+    error(2, "ESP: 0x%08lX", *(uint32_t *)(context + 0x230));
+    sym = NULL;
+    if (*(int32_t *)0x2ee788 != 0 && *(unsigned char *)0x2ee784 == 0) {
+      sym = FUN_00092110(*(uint32_t *)(context + 0x224),
+                         (int32_t *)0x2ee788);
+    }
+    if (sym == NULL)
+      sym = "?????";
+    error(2, "EIP: 0x%08lX, %02lX %02lX %02lX %02lX %s",
+          *(uint32_t *)(context + 0x224),
+          eip_value & 0xff,
+          (eip_value >> 8) & 0xff,
+          (eip_value >> 16) & 0xff,
+          eip_byte_3,
+          sym);
+    result = 1;
+  }
+
+  i = (uint32_t)a3 - 1;
+  while ((int32_t)i >= (int32_t)depth) {
+    sym = NULL;
+    if (*(int32_t *)0x2ee788 != 0 && *(unsigned char *)0x2ee784 == 0) {
+      sym = FUN_00092110(frames[i], (int32_t *)0x2ee788);
+    }
+    if (sym == NULL)
+      sym = "?????";
+    if (a1 == 0) {
+      error(2, "%08lX %s", (unsigned int)frames[i], sym);
+      result = 1;
+    } else {
+      result = (char)crt_fprintf((void *)a1, "%08lX %s\n",
+                                 (unsigned int)frames[i], sym);
+    }
+    i--;
+  }
+
+  return result;
+}
+
+/* The callback at 0x92060 orders symbol records by their value field.  Its
+ * zero-value handling is unusual but is visible in the reference body: a
+ * zero first value, a zero second value, or a first value greater than the
+ * second all return 1; non-equal non-zero values return -1/1. */
+static int compare_symbol_entries(const void *a, const void *b)
+{
+  uint32_t value_a;
+  uint32_t value_b;
+
+  value_a = *(const uint32_t *)((const char *)a + 4);
+  if (value_a == 0)
+    return 1;
+
+  value_b = *(const uint32_t *)((const char *)b + 4);
+  if (value_a > value_b)
+    return 1;
+  if (value_b != 0) {
+    if (value_a < value_b)
+      return -1;
+    return 0;
+  }
   return 1;
 }
 
 /* -----------------------------------------------------------------------
  * load_symbol_table (0x92710) — parse an MSVC linker .map file.
  *
- * Reads the map file, locates the "_load_symbol_table" reference symbol
- * to compute the RVA->VA bias, then builds a sorted in-memory symbol
- * table via the profile.obj helper.
- *
- * Returns 1 on success, 0 on failure. Static buffers are safe because
- * this function is called once at startup on single-threaded Xbox.
- *
- * KNOWN INCOMPLETE (n_r=468 vs our 243 insns, 29.8% VC71): the third
- * parameter `build_timestamp` is declared to match the reference call site at
- * 0x92d30 (which pushes 0x268e30 = "Thu Aug 23 16:11:48 2001") but is not yet
- * consumed here.  The original almost certainly validates the .map file's
- * "Timestamp is ..." header line against it and bails on a mismatch; this
- * implementation instead derives the RVA->VA bias by scanning the map for
- * "_load_symbol_table".  Recovering the real body needs a first-pass RE pass
- * on 0x92710, not byte-accuracy levers.
+ * The parser follows the reference's two-stage header walk ("Lib:Object",
+ * timestamp, entry-point line, then "Static symbols") and stores each record
+ * in the debug-reallocated 0x10-byte entry array.  The name and library
+ * strings share the reference's growable storage pool; duplicate library
+ * names reuse the previous pool offset.
  * ----------------------------------------------------------------------- */
 int load_symbol_table(const char *map_path, int32_t *symtab_out,
                       const char *build_timestamp)
 {
+  typedef unsigned long (*strtoul_proc)(const char *, char **, int);
   void *f;
-  char line[0x100];
-  static char name_pool[0x4000];
-  static char obj_pool[0x4000];
-  static int32_t entries[0x800]; /* 0x200 symbols * 4 int32 each */
-  int32_t count;
-  int name_pool_pos;
-  int obj_pool_pos;
-  int in_entry_section;
-  char *seg_tok;
-  char *tok;
-  char *off_tok;
-  char *rva_tok;
-  char *name_tok;
-  char *obj_tok;
-  uint32_t rva;
-  int32_t bias;
-  int found_ref;
+  char line[0x4000] = { 0 };
+  char last_object[0x100];
+  char object_name[0x100];
+  char symbol_name[0x100];
+  char *token;
+  char *name_pool;
+  int32_t *entries;
+  int32_t *entry;
+  int32_t *symtab;
+  int entry_capacity;
+  int string_storage_size;
+  int string_storage_used;
+  int name_length;
+  int object_length;
+  int last_object_offset;
+  int value;
+  int rva;
 
-  f = crt_fopen(map_path, "rt");
+  line[0] = '\0';
+  symtab = symtab_out;
+  if (symtab == NULL) {
+    display_assert("symbol_table",
+                   "c:\\halo\\SOURCE\\cseries\\stack_walk_windows.c",
+                   0x100, 1);
+    system_exit(-1);
+  }
+  csmemset(symtab, 0, 0xc);
+  f = crt_fopen(map_path, "r");
   if (f == NULL) {
     error(2, "Couldn't read map file '%s'", map_path);
     return 0;
   }
 
-  count = 0;
-  name_pool_pos = 0;
-  obj_pool_pos = 0;
-  in_entry_section = 0;
-  bias = 0;
-  found_ref = 0;
+  if (crt_fgets(line, 0x4000, f) == NULL)
+    goto finish;
 
-  while (crt_fgets(line, (int)sizeof(line), f) != NULL) {
-    int len;
-    char *p;
-
-    len = csstrlen(line);
-    while (len > 0 && (line[len - 1] == '\r' || line[len - 1] == '\n' ||
-                       line[len - 1] == ' ' || line[len - 1] == '\t')) {
-      line[--len] = '\0';
+  while (1) {
+    if (crt_fgets(line, 0x4000, f) == NULL) {
+      error(2, "map file appears corrupt");
+      goto finish;
     }
-    p = line;
-    while (*p == ' ' || *p == '\t')
-      p++;
+    if (crt_strstr(line, "Lib:Object") != NULL)
+      break;
+    if (crt_strstr(line, "Timestamp") != NULL)
+      (void)crt_strstr(line, build_timestamp);
+  }
 
-    if (!in_entry_section) {
-      if (crt_strstr(p, "entry point at") != NULL)
-        in_entry_section = 1;
-      continue;
-    }
+  name_pool = (char *)symtab[1];
+  entries = (int32_t *)symtab[2];
+  entry_capacity = 0;
+  string_storage_size = 0;
+  string_storage_used = 0;
+  last_object_offset = -1;
+  csstrcpy(last_object, "nothing");
 
-    if (*p == '\0')
-      continue;
-    /* Skip "Static symbols" section header */
-    if (crt_strstr(p, "Static symbols") == p)
-      continue;
+  if (crt_fgets(line, 0x4000, f) == NULL)
+    goto finish;
 
-    /* Parse "SSSS:OOOOOOOO  name  RRRRRRRR  obj" */
-    seg_tok = crt_strtok(p, " \t");
-    if (seg_tok == NULL)
-      continue;
+parse_line:
+  token = csstrtok(line, ":");
+  if (token == NULL || *token != ' ')
+    goto corrupt;
 
-    tok = crt_strchr(seg_tok, ':');
-    if (tok == NULL)
-      continue;
-    *tok = '\0';
-    off_tok = tok + 1;
+  token = csstrtok(NULL, " \t\n\r");
+  if (token == NULL)
+    goto corrupt;
+  value = (int)((strtoul_proc)strtoul)(
+    token, (char **)&symtab_out, 16);
 
-    rva_tok = crt_strtok(NULL, " \t");
-    name_tok = crt_strtok(NULL, " \t");
-    obj_tok = crt_strtok(NULL, " \t");
-
-    if (rva_tok == NULL || name_tok == NULL)
-      continue;
-
-    rva = parse_hex(rva_tok);
-    if (rva == 0)
-      continue;
-
-    /* Use "_load_symbol_table" as reference to compute the VA bias */
-    if (!found_ref && csstrcmp(name_tok, "_load_symbol_table") == 0) {
-      bias = (int32_t)rva - 0x92710;
-      found_ref = 1;
-    }
-
-    if (count >= 0x200)
-      continue;
-
-    {
-      int name_len;
-      int obj_len;
-      int base_idx;
-
-      name_len = csstrlen(name_tok) + 1;
-      obj_len = obj_tok != NULL ? csstrlen(obj_tok) + 1 : 1;
-
-      if (name_pool_pos + name_len > (int)sizeof(name_pool))
-        continue;
-      if (obj_pool_pos + obj_len > (int)sizeof(obj_pool))
-        continue;
-
-      base_idx = count * 4;
-      entries[base_idx + 0] = (int32_t)parse_hex(off_tok);
-      entries[base_idx + 1] = (int32_t)rva;
-      entries[base_idx + 2] = name_pool_pos;
-      entries[base_idx + 3] = obj_pool_pos;
-
-      csmemcpy(name_pool + name_pool_pos, name_tok, (size_t)name_len);
-      name_pool_pos += name_len;
-
-      if (obj_tok != NULL) {
-        csmemcpy(obj_pool + obj_pool_pos, obj_tok, (size_t)obj_len);
-      } else {
-        obj_pool[obj_pool_pos] = '\0';
-      }
-      obj_pool_pos += obj_len;
-      count++;
+  token = csstrtok(NULL, " \t\n\r");
+  if (token != NULL) {
+    csstrncpy(symbol_name, token, 0xff);
+    symbol_name[0xff] = '\0';
+  } else {
+    if (crt_strstr(line, "entry point at") == NULL)
+      goto corrupt;
+    (void)crt_fgets(line, 0x4000, f);
+    if (!crt_isspace((int)line[0]))
+      goto corrupt;
+    (void)crt_fgets(line, 0x4000, f);
+    if (crt_strstr(line, "Static symbols") == NULL)
+      goto corrupt;
+    (void)crt_fgets(line, 0x4000, f);
+    if (!crt_isspace((int)line[0]))
+      goto corrupt;
+    (void)crt_fgets(line, 0x4000, f);
+    token = csstrtok(line, ":");
+    if (token == NULL || *token != ' ')
+      goto corrupt;
+    token = csstrtok(NULL, " \t\n\r");
+    if (token == NULL)
+      goto corrupt;
+    value = (int)((strtoul_proc)strtoul)(
+      token, (char **)&symtab_out, 16);
+    token = csstrtok(NULL, " \t\n\r");
+    if (token != NULL) {
+      csstrncpy(symbol_name, token, 0xff);
+      symbol_name[0xff] = '\0';
     }
   }
 
+  token = csstrtok(NULL, " \t\n\r");
+  if (token == NULL)
+    goto corrupt;
+  rva = (int)((strtoul_proc)strtoul)(
+    token, (char **)&symtab_out, 16);
+  if (csstrcmp(symbol_name, "_load_symbol_table") == 0)
+    stack_walk_bias = rva - 0x92710;
+  if (symtab_out == NULL)
+    goto corrupt;
+
+  token = csstrtok((char *)symtab_out + 5, " \t\n\r");
+  if (token == NULL)
+    goto corrupt;
+  csstrncpy(object_name, token, 0xff);
+  object_name[0xff] = '\0';
+
+  if (symtab[0] >= entry_capacity) {
+    entry_capacity += 0x1000;
+    entries = (int32_t *)debug_realloc(
+      entries, entry_capacity * 0x10,
+      "c:\\halo\\SOURCE\\cseries\\stack_walk_windows.c", 0x1c6);
+    if (entries == NULL)
+      goto allocation_failure;
+    symtab[2] = (int32_t)entries;
+  }
+
+  object_length = csstrlen(object_name);
+  name_length = csstrlen(symbol_name);
+  if (string_storage_used + object_length + name_length + 2 >=
+      string_storage_size) {
+    string_storage_size += 0x4000;
+    name_pool = (char *)debug_realloc(
+      name_pool, string_storage_size,
+      "c:\\halo\\SOURCE\\cseries\\stack_walk_windows.c", 0x1d7);
+    if (name_pool == NULL)
+      goto allocation_failure;
+    symtab[1] = (int32_t)name_pool;
+  }
+  if (!(string_storage_used + object_length + name_length + 2 <
+        string_storage_size)) {
+    display_assert(
+      "string_storage_used + strlen(symbol_name) + 1 + strlen(library_object_file_name) + 1 < string_storage_size",
+      "c:\\halo\\SOURCE\\cseries\\stack_walk_windows.c", 0x1e2, 1);
+    system_exit(-1);
+  }
+
+  entry = entries + symtab[0] * 4;
+  symtab[0] = symtab[0] + 1;
+  entry[0] = value;
+  entry[1] = rva;
+  csstrcpy(name_pool + string_storage_used, symbol_name);
+  entry[2] = string_storage_used;
+  name_length = csstrlen(symbol_name);
+  string_storage_used += name_length + 1;
+
+  if (csstrcmp(object_name, last_object) == 0) {
+    entry[3] = last_object_offset;
+  } else {
+    object_length = csstrlen(object_name);
+    if (!(string_storage_used + object_length + 1 < string_storage_size)) {
+      display_assert(
+        "string_storage_used + strlen(library_object_file_name) + 1 < string_storage_size",
+        "c:\\halo\\SOURCE\\cseries\\stack_walk_windows.c", 0x1f5, 1);
+      system_exit(-1);
+    }
+    entry[3] = string_storage_used;
+    csstrcpy(name_pool + string_storage_used, object_name);
+    last_object_offset = entry[3];
+    object_length = csstrlen(object_name);
+    string_storage_used += object_length + 1;
+  }
+  csstrcpy(last_object, object_name);
+
+  if (crt_fgets(line, 0x4000, f) != NULL)
+    goto parse_line;
+
+finish:
   crt_fclose(f);
+  if (symtab[0] > 0) {
+    qsort(entries, (size_t)symtab[0], 0x10, compare_symbol_entries);
+    entry = entries + (symtab[0] - 1) * 4;
+    if (entry[3] == 0) {
+      do {
+        symtab[0] = symtab[0] - 1;
+        entry = entries + (symtab[0] - 1) * 4;
+      } while (entry[3] == 0);
+    }
+  }
+  return symtab[0] > 0;
 
-  if (count == 0 || !found_ref)
-    return 0;
-
-  symtab_out[0] = count;
-  symtab_out[1] = (int32_t)name_pool;
-  symtab_out[2] = (int32_t)entries;
-  symbol_table_dispose(symtab_out);
-
-  stack_walk_bias = bias;
-  return 1;
+allocation_failure:
+  error(2, "could not allocate enough memory for map file");
+  symbol_table_dispose(symtab);
+  goto finish;
+corrupt:
+  error(2, "map file appears corrupt");
+  symbol_table_dispose(symtab);
+  goto finish;
 }
 
 /* -----------------------------------------------------------------------

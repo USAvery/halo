@@ -227,18 +227,26 @@ done:
  * y' = x*sin + y*cos, computed in double and narrowed to float on store. */
 #define debug_circle_angle (*(double *)0x2b17e8) /* pi/8 = 2*pi/16 */
 
+#if defined(_MSC_VER) && !defined(__clang__)
+#define HALO_DEBUG_TRIG_SIN sin
+#define HALO_DEBUG_TRIG_COS cos
+#else
+#define HALO_DEBUG_TRIG_SIN x87_fsin_d
+#define HALO_DEBUG_TRIG_COS x87_fcos_d
+#endif
+
 void FUN_00188bf0(float *table, float radius)
 {
-  double sn;
-  double cs;
+  x87_wide_t sn;
+  x87_wide_t cs;
   short i;
   int idx;
 
-  sn = x87_fsin_d(debug_circle_angle);
-  table[0] = radius;
+  sn = HALO_DEBUG_TRIG_SIN(debug_circle_angle);
+  memcpy(&table[0], &radius, sizeof(radius));
   table[1] = 0.0f;
   idx = 0;
-  cs = x87_fcos_d(debug_circle_angle);
+  cs = HALO_DEBUG_TRIG_COS(debug_circle_angle);
   i = 0;
   do {
     i = (short)(i + 1);
@@ -249,6 +257,9 @@ void FUN_00188bf0(float *table, float radius)
   table[0x20] = table[0];
   table[0x21] = table[1];
 }
+
+#undef HALO_DEBUG_TRIG_SIN
+#undef HALO_DEBUG_TRIG_COS
 
 /* Build a debug coordinate frame from a direction vector (0x188c60). Given a
  * forward direction (EAX) and an origin position, fills a 13-float frame:

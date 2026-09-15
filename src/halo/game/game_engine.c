@@ -420,14 +420,14 @@ int FUN_000a8970(int *scores)
   data = (char *)scores[1];
   result = 0;
   i = 0;
-  if (count > 3) {
+  if (3 < count) {
     do {
       result = (int)((float)result + *(float *)(data + i * 0x54 + 0x20));
       result = (int)((float)result + *(float *)(data + (i + 1) * 0x54 + 0x20));
       result = (int)((float)result + *(float *)(data + (i + 2) * 0x54 + 0x20));
       result = (int)((float)result + *(float *)(data + (i + 3) * 0x54 + 0x20));
       i += 4;
-    } while (i < count);
+    } while (i + 3 < count);
   }
   if (i < count) {
     do {
@@ -799,11 +799,7 @@ void game_engine_rasterize_message(int text, float alpha)
   color[2] = 0.7294118f;
   color[3] = 1.0f;
   rect2d_offset((int16_t *)rect, -screen_bounds_left, -screen_bounds_top);
-  {
-    long long product =
-      (long long)((int16_t)rect[0] * 5 + (int)(int16_t)rect[1]) * 0x2aaaaaab;
-    y_pos = ((int16_t)(product >> 32) + 9) - (int16_t)(product >> 63);
-  }
+  y_pos = (int16_t)(((int16_t)rect[0] * 5 + (int16_t)rect[1]) / 6 + 9);
   *(int16_t *)((char *)rect + 4) = y_pos;
   *(int16_t *)rect = y_pos - 0xf;
   draw_string_set_font(font_tag, -1, 2, 8, (const void *)color);
@@ -840,47 +836,40 @@ bool game_engine_unit_can_enter_seat(int unit_handle, int seat_object_handle)
 
   result = true;
 
-  if (!current_game_engine)
-    return result;
+  if (current_game_engine) {
+    seat_obj = (char *)object_try_and_get_and_verify_type(seat_object_handle, 4);
+    if (seat_obj && weapon_is_flag(seat_object_handle)) {
+      /* If bit 0x20 of object flags was already set, clear it and call
+       * vtable slot +0x40 (notify-of-seat-exit). */
+      if (*(uint32_t *)(seat_obj + 0x1dc) & 0x20) {
+        void (*slot_0x40)(int) = ((void (**)(int))current_game_engine)[0x40 / 4];
+        *(uint32_t *)(seat_obj + 0x1dc) &= ~0x20u;
+        if (slot_0x40)
+          slot_0x40(seat_object_handle);
+      }
 
-  seat_obj = (char *)object_try_and_get_and_verify_type(seat_object_handle, 4);
-  if (!seat_obj)
-    return result;
+      /* Set bit 0x20 to mark seat as occupied */
+      *(uint32_t *)(seat_obj + 0x1dc) |= 0x20;
 
-  if (!weapon_is_flag(seat_object_handle))
-    return result;
+      /* Check per-engine entry gate at vtable slot +0x3c */
+      gate = ((int (**)(int, int))current_game_engine)[0x3c / 4];
+      if (gate) {
+        int player_idx = player_index_from_unit_index(unit_handle);
+        result = (bool)gate(seat_object_handle, player_idx);
+      }
 
-  /* If bit 0x20 of object flags was already set, clear it and call
-   * vtable slot +0x40 (notify-of-seat-exit). */
-  if (*(uint32_t *)(seat_obj + 0x1dc) & 0x20) {
-    void (*slot_0x40)(int) = ((void (**)(int))current_game_engine)[0x40 / 4];
-    *(uint32_t *)(seat_obj + 0x1dc) &= ~0x20u;
-    if (slot_0x40)
-      slot_0x40(seat_object_handle);
-  }
-
-  /* Set bit 0x20 to mark seat as occupied */
-  *(uint32_t *)(seat_obj + 0x1dc) |= 0x20;
-
-  /* Check per-engine entry gate at vtable slot +0x3c */
-  gate = ((int (**)(int, int))current_game_engine)[0x3c / 4];
-  if (gate) {
-    int player_idx = player_index_from_unit_index(unit_handle);
-    result = (bool)gate(seat_object_handle, player_idx);
-    if (!result)
-      return false;
-  }
-
-  /* Assert: if weapon has the "must-be-readied" bit AND the unit already
-   * has a weapon with that flag, something is wrong. */
-  if ((*(uint8_t *)(seat_obj + 0x1dc) & 8) &&
-      unit_has_weapon_with_flag(unit_handle, 3)) {
-    display_assert(
-      "!allow_pick_up || "
-      "!TEST_FLAG(weapon->weapon.flags, _weapon_must_be_readied_bit) || "
-      "!unit_has_weapon_with_flag(unit_index, _weapon_must_be_readied_bit)",
-      "c:\\halo\\SOURCE\\game\\game_engine.c", 0xed2, true);
-    system_exit(-1);
+      /* Assert: if weapon has the "must-be-readied" bit AND the unit already
+       * has a weapon with that flag, something is wrong. */
+      if (result && (*(uint8_t *)(seat_obj + 0x1dc) & 8) &&
+          unit_has_weapon_with_flag(unit_handle, 3)) {
+        display_assert(
+          "!allow_pick_up || "
+          "!TEST_FLAG(weapon->weapon.flags, _weapon_must_be_readied_bit) || "
+          "!unit_has_weapon_with_flag(unit_index, _weapon_must_be_readied_bit)",
+          "c:\\halo\\SOURCE\\game\\game_engine.c", 0xed2, true);
+        system_exit(-1);
+      }
+    }
   }
 
   return result;
@@ -919,9 +908,9 @@ int16_t game_engine_player_get_custom_motion_sensor_positions(int param_1,
                                                               int param_3,
                                                               int16_t param_4)
 {
-  int16_t count;
+  int count;
   int player;
-  char flag_idx;
+  int flag_idx;
   int *flag_ptr;
 
   count = 0;
@@ -1041,20 +1030,21 @@ void game_engine_set_goal_position(int flag_index, int *position, float height,
                                    int player)
 {
   int idx;
+  char *goal;
   int16_t icon;
 
-  idx = (int)flag_index;
-  *(int *)(0x456710 + idx * 0x20) = player;
+  idx = (int)(int16_t)flag_index;
+  goal = (char *)(0x4566f8 + idx * 0x20);
+  *(int *)(goal + 0x18) = player;
   icon = (int16_t)hud_find_nav_point_by_name((const char *)name);
-  *(int16_t *)(0x456714 + idx * 0x20) = icon;
-  *(char *)(0x456704 + idx * 0x20) = 1;
-  *(int *)(0x4566f8 + idx * 0x20) = position[0];
-  *(int *)(0x4566fc + idx * 0x20) = position[1];
-  *(int *)(0x456700 + idx * 0x20) = position[2];
-  *(int16_t *)(0x45670c + idx * 0x20) = team;
-  *(float *)(0x456700 + idx * 0x20) =
-    height + *(float *)(0x456700 + idx * 0x20) + *(float *)0x26b814;
-  *(int *)(0x456708 + idx * 0x20) = target;
+  *(int16_t *)(goal + 0x1c) = icon;
+  *(char *)(goal + 0xc) = 1;
+  *(int *)(goal + 0x0) = position[0];
+  *(int *)(goal + 0x4) = position[1];
+  *(int *)(goal + 0x8) = position[2];
+  *(int16_t *)(goal + 0x14) = team;
+  *(float *)(goal + 0x8) = height + *(float *)(goal + 0x8) + *(float *)0x26b814;
+  *(int *)(goal + 0x10) = target;
 }
 
 /* game_engine_clear_goal_position (0xa9460)
@@ -1073,6 +1063,7 @@ void game_engine_render_nav_points(int param_1)
   int player_saved;
   int *flag_ptr;
   char head_position[12];
+  int flag_index;
   int player_index;
 
   if (current_game_engine && *(int *)0x456b1c == 1 && (int16_t)param_1 != -1) {
@@ -1083,10 +1074,9 @@ void game_engine_render_nav_points(int param_1)
         player_saved = player;
         unit_get_head_position(*(int *)(player + 0x34), (float *)head_position);
         flag_ptr = (int *)0x4566f8;
+        flag_index = 0;
         do {
-          if (FUN_000a9190(player,
-                           (int)((char *)flag_ptr - (char *)0x4566f8) / 0x20,
-                           player_index)) {
+          if (FUN_000a9190(player, flag_index, player_index)) {
             {
               int dist = ((int (*)(int, void *, int *, int))FUN_000d6550)(
                 param_1, head_position, flag_ptr, -1);
@@ -1095,6 +1085,7 @@ void game_engine_render_nav_points(int param_1)
             }
           }
           flag_ptr += 8;
+          flag_index++;
           player = player_saved;
         } while ((int)flag_ptr < 0x456af8);
       }
@@ -1456,21 +1447,17 @@ float *game_engine_player_get_change_color(float *param_1, int param_2)
 
   player = (int)datum_get(player_data, param_2);
 
-  if (*(char *)0x456b14 == 0) {
+  if (*(char *)0x456b14 != 0) {
+    if (*(int *)(player + 0x20) == 0)
+      color = *(float **)0x2ee714;
+    else
+      color = *(float **)0x2ee71c;
+  } else {
     color_index = *(int16_t *)(player + 0x60);
-
     if (*(int16_t *)0x2efe20 != -1)
-
       color_index = *(int16_t *)0x2efe20;
-
     color = (float *)((float *(*)(float *, int))FUN_001c0ee0)(local_10,
                                                               (int)color_index);
-
-  } else if (*(int *)(player + 0x20) == 0) {
-    color = *(float **)0x2ee714;
-
-  } else {
-    color = *(float **)0x2ee71c;
   }
 
   param_1[0] = color[0];
@@ -2129,7 +2116,7 @@ game_variant_t *game_engine_team_oddball_default(game_variant_t *variant)
    * RMW reads uninitialized stack. We zero-init the local (matching the
    * intended/safe image and the prior lift); this adds a zeroing prologue
    * not present in the reference, capping VC71 match. */
-  game_variant_t v = { 0 };
+  game_variant_t v;
   *(int32_t *)((char *)&v + 0x20) =
     (*(int32_t *)((char *)&v + 0x20) & 0xffffffe3) | 0x23;
   *(int32_t *)((char *)&v + 0x38) = 0;
@@ -2701,11 +2688,11 @@ void FUN_000ab090(int text, char highlight, int row, int state)
       *(float *)(state + 4) = *(float *)(state + 4) + *(float *)0x253524;
       *(float *)(state + 8) = *(float *)(state + 8) + *(float *)0x253524;
       *(float *)(state + 0xc) = *(float *)(state + 0xc) + *(float *)0x253524;
-      if (1.0f < *(float *)(state + 4))
+      if (*(float *)(state + 4) > 1.0f)
         *(int *)(state + 4) = 0x3f800000;
-      if (1.0f < *(float *)(state + 8))
+      if (*(float *)(state + 8) > 1.0f)
         *(int *)(state + 8) = 0x3f800000;
-      if (1.0f < *(float *)(state + 0xc))
+      if (*(float *)(state + 0xc) > 1.0f)
         *(int *)(state + 0xc) = 0x3f800000;
     }
     row_top = (int16_t)(row + (split < 2 ? 4 : 0) + 4) * char_height;
@@ -2893,6 +2880,7 @@ void game_engine_variant_cleanup(game_variant_t *variant)
   char saved[0x68];
   char *v = (char *)variant;
   int game_type;
+  int positive_value;
 
   qmemcpy(saved, variant, 0x68);
 
@@ -2908,16 +2896,16 @@ void game_engine_variant_cleanup(game_variant_t *variant)
   *(uint8_t *)(v + 0x1c) = (*(uint8_t *)(v + 0x1c) != 0);
   *(uint8_t *)(v + 0x28) = (*(uint8_t *)(v + 0x28) != 0);
 
-  if (*(int *)(v + 0x2c) <= 0)
-    *(int *)(v + 0x2c) = 0;
-  if (*(int *)(v + 0x30) <= 0)
-    *(int *)(v + 0x30) = 0;
-  if (*(int *)(v + 0x34) <= 0)
-    *(int *)(v + 0x34) = 0;
-  if (*(int *)(v + 0x38) <= 0)
-    *(int *)(v + 0x38) = 0;
+  positive_value = *(int *)(v + 0x2c);
+  *(int *)(v + 0x2c) = positive_value & -(positive_value > 0);
+  positive_value = *(int *)(v + 0x30);
+  *(int *)(v + 0x30) = positive_value & -(positive_value > 0);
+  positive_value = *(int *)(v + 0x34);
+  *(int *)(v + 0x34) = positive_value & -(positive_value > 0);
+  positive_value = *(int *)(v + 0x38);
+  *(int *)(v + 0x38) = positive_value & -(positive_value > 0);
 
-  if (!(*(float *)0x25337c < *(float *)(v + 0x3c)))
+  if (*(float *)(v + 0x3c) < *(float *)0x25337c)
     *(float *)(v + 0x3c) = *(float *)0x25337c;
   else if (*(float *)(v + 0x3c) > *(float *)0x2533d8)
     *(float *)(v + 0x3c) = *(float *)0x2533d8;
@@ -3260,11 +3248,14 @@ int FUN_000abb90(int param_1)
  * players/teams are on the same side (no competition left). */
 bool game_engine_game_over(void)
 {
+  bool result;
+
+  result = false;
   if (current_game_engine) {
     if (!game_engine_teams_still_playing())
-      return true;
+      result = true;
   }
-  return false;
+  return result;
 }
 
 /* Compute a sortable score key with tie-breaking flags.
@@ -3693,7 +3684,7 @@ void FUN_000ac3e0(int player_handle)
      *   CALL _CIpow (0x1d9e70); FMUL [0x253398]=0.5f.
      * pow(0,exp)=0 (CRT/x87 handle base==0), so hold_time==0 -> alpha 0. */
     alpha =
-      (float)(pow((double)hold_time * *(float *)0x25496c, *(double *)0x26b678) *
+      (float)(pow(hold_time * *(float *)0x25496c, *(double *)0x26b678) *
               *(float *)0x253398);
     game_engine_rasterize_message((int)target_name, alpha);
   }
@@ -3961,16 +3952,10 @@ bool match_game_type(int player_index, int count, int16_t *entries)
   int i;
   bool result;
 
-  if (current_game_engine == NULL) {
-    /* No engine: true only if every entry is 0 */
-    result = true;
-    for (i = 0; i < count; i++) {
-      result = result & (entries[i] == 0);
-    }
-  } else {
-    /* Engine active: true if any entry matches the engine type */
-    result = false;
-    for (i = 0; i < count; i++) {
+    if (current_game_engine != NULL) {
+      /* Engine active: true if any entry matches the engine type */
+      result = false;
+      for (i = 0; i < count; i++) {
       int16_t entry = entries[i];
       result = result | (entry == player_index);
       if (entry == 0xC) {
@@ -3978,10 +3963,16 @@ bool match_game_type(int player_index, int count, int16_t *entries)
       } else if (entry == 0xD) {
         result = result | (player_index != 1);
       } else if (entry == 0xE) {
-        result = result | (player_index != 1 && player_index != 5);
+          result = result | (player_index != 1 && player_index != 5);
+        }
+      }
+    } else {
+      /* No engine: true only if every entry is 0 */
+      result = true;
+      for (i = 0; i < count; i++) {
+        result = result & (entries[i] == 0);
       }
     }
-  }
   return result;
 }
 
@@ -4329,16 +4320,18 @@ void game_engine_player_event(int param_1, int param_2, int param_3)
   data_iter_t iter;
   int player;
 
-  if (param_1 == -1) {
-    data_iterator_new(&iter, player_data);
+  if (param_1 != -1) {
+    if (param_2 != -1)
+      game_engine_hud_update_player(param_1, param_3, param_2);
+    return;
+  }
+
+  data_iterator_new(&iter, player_data);
+  player = (int)data_iterator_next(&iter);
+  while (player != 0) {
+    if (param_2 != -1)
+      game_engine_hud_update_player(iter.datum_handle, param_3, param_2);
     player = (int)data_iterator_next(&iter);
-    while (player != 0) {
-      if (param_2 != -1)
-        game_engine_hud_update_player(iter.datum_handle, param_3, param_2);
-      player = (int)data_iterator_next(&iter);
-    }
-  } else if (param_2 != -1) {
-    game_engine_hud_update_player(param_1, param_3, param_2);
   }
 }
 
@@ -5108,8 +5101,14 @@ int FUN_000ae340(int team)
 /* Post-game team announcement. SI = team index. */
 void FUN_000ae3c0(int param_1, int param_2, int16_t team)
 {
-  game_show_score(0, param_1);
-  error(2, (char *)param_2, (int)team);
+  int found_index;
+
+  found_index = -1;
+  find_netgame_flags(0, 0.0f, 0.0f, (int16_t)param_2, team, 1,
+                     &found_index);
+  if (found_index == -1) {
+    error(2, (char *)param_1, (int)team);
+  }
 }
 
 /* Validate a player handle for CTF purposes (aff70 already above). */
@@ -6413,17 +6412,15 @@ int FUN_000afe50(float *position)
 /* CTF: swap defense/offense team assignments (aff20). EAX = initial team. */
 void FUN_000aff20(int team)
 {
-  uint32_t t0;
-  uint32_t t1;
-
-  t0 = team & 0x80000001;
-  if ((int)t0 < 0)
-    t0 = (t0 - 1 | 0xfffffffe) + 1;
-  game_show_score_team(t0, 0x2d);
-  t1 = (team + 1) & 0x80000001;
-  if ((int)t1 < 0)
-    t1 = (t1 - 1 | 0xfffffffe) + 1;
-  game_show_score_team(t1, 0x2c);
+  team = team & 0x80000001;
+  if ((team & 0x80000000) != 0)
+    team = (team - 1 | 0xfffffffe) + 1;
+  game_show_score_team(team, 0x2d);
+  team++;
+  team = team & 0x80000001;
+  if ((team & 0x80000000) != 0)
+    team = (team - 1 | 0xfffffffe) + 1;
+  game_show_score_team(team, 0x2c);
 }
 
 /* FUN_000aceb0 has register args (EAX→ESI, ECX→EDI, EBX) — deferred */
@@ -6560,8 +6557,6 @@ int ctf_get_score_hud_text(int param_1, int param_2, int param_3, wchar_t *param
 
   uint32_t other_team;
 
-  wchar_t *msg;
-
 
   player = (int)datum_get(player_data, param_1);
 
@@ -6620,9 +6615,9 @@ int ctf_get_score_hud_text(int param_1, int param_2, int param_3, wchar_t *param
 
   case 0x23:
 
-    msg = L"You returned the flag.";
+    unicode_sprintf(param_4, param_5, L"You returned the flag.");
 
-    break;
+    return 1;
 
   case 0x24:
 
@@ -6640,9 +6635,9 @@ int ctf_get_score_hud_text(int param_1, int param_2, int param_3, wchar_t *param
 
   case 0x27:
 
-    msg = L"Your ally has the flag.";
+    unicode_sprintf(param_4, param_5, L"Your ally has the flag.");
 
-    break;
+    return 1;
 
   case 0x28:
 
@@ -6658,9 +6653,9 @@ int ctf_get_score_hud_text(int param_1, int param_2, int param_3, wchar_t *param
 
   case 0x2a:
 
-    msg = L"The enemy's flag was returned.";
+    unicode_sprintf(param_4, param_5, L"The enemy's flag was returned.");
 
-    break;
+    return 1;
 
   case 0x2b:
 
@@ -6676,18 +6671,15 @@ int ctf_get_score_hud_text(int param_1, int param_2, int param_3, wchar_t *param
 
   case 0x2d:
 
-    msg = L"You are on defense.";
+    unicode_sprintf(param_4, param_5, L"You are on defense.");
 
-    break;
+    return 1;
 
   default:
 
     return 0;
   }
 
-  unicode_sprintf(param_4, param_5, msg);
-
-  return 1;
 }
 
 /* ---------------------------------------------------------------------------
@@ -7545,9 +7537,9 @@ void FUN_000b1760(void)
       state = 2;
     } else {
       if (team0_count != 0) {
-        *(int *)0x456d38 = 4;
         if (300 < *(int *)0x456d3c)
           game_engine_post_event(0x27);
+        *(int *)0x456d38 = 4;
         *(int *)0x456d3c = 0;
         return;
       }
@@ -7586,23 +7578,24 @@ void FUN_000b1760(void)
     } while (player != 0);
     state = 1;
     if (1 < on_hill_count) {
-      *(int *)0x456d38 = 4;
       if (300 < *(int *)0x456d3c)
         game_engine_post_event(0x27);
+      *(int *)0x456d38 = 4;
       *(int *)0x456d3c = 0;
       *(int *)0x456d40 = -1;
       return;
     }
-    if (on_hill_count == 0) {
+    if (on_hill_count != 0) {
+      if (*(int *)0x456d38 != 1 || last_player != *(uint32_t *)0x456d40) {
+        *(int *)0x456d3c = 0;
+        *(uint32_t *)0x456d40 = last_player;
+        goto update;
+      }
+    } else {
       *(int *)0x456d38 = 0;
       *(int *)0x456d3c = 0;
       *(int *)0x456d40 = -1;
       return;
-    }
-    if (*(int *)0x456d38 != 1 || last_player != *(uint32_t *)0x456d40) {
-      *(int *)0x456d3c = 0;
-      *(uint32_t *)0x456d40 = last_player;
-      goto update;
     }
   }
   *(int *)0x456d3c = *(int *)0x456d3c + 1;
@@ -8062,7 +8055,7 @@ void FUN_000b2010(void)
       }
       mag =
         xbox_sqrtf(cross_x * cross_x + cross_y * cross_y + cross_z * cross_z);
-      if (*(double *)0x2533d0 <= (mag < 0 ? -mag : mag)) {
+      if (!(x87_fabs(mag) < *(double *)0x2533d0)) {
         inv_mag = *(float *)0x2533c8 / mag;
         cross_x *= inv_mag;
         cross_y *= inv_mag;
@@ -8278,7 +8271,7 @@ void oddball_player_added(int param_1)
 void FUN_000b2740(int player_handle)
 {
   int player;
-  char event;
+  int event;
 
   player = (int)datum_get(player_data, player_handle);
   *(int *)(0x456e4c + (player_handle & 0xffff) * 4) =
@@ -8317,20 +8310,14 @@ int FUN_000b2890(int param_1)
 
   variant = (int)game_engine_get_variant();
 
+  if (*(int *)(variant + 0x60) <= 0)
+    return 0;
   i = 0;
-
-  if (i < *(int *)(variant + 0x60)) {
-    while (*(int *)(0x456ecc + i * 4) != param_1) {
-      i++;
-
-      if (*(int *)(variant + 0x60) <= i)
-
-        return 0;
-    }
-
-    return 1;
-  }
-
+  do {
+    if (*(int *)(0x456ecc + i * 4) == param_1)
+      return 1;
+    i++;
+  } while (i < *(int *)(variant + 0x60));
   return 0;
 }
 
@@ -8342,23 +8329,21 @@ int FUN_000b28c0(void)
   int variant;
 
   int i;
+  int count;
 
 
   variant = (int)game_engine_get_variant();
 
+  count = *(int *)(variant + 0x60);
   i = 0;
 
-  if (i < *(int *)(variant + 0x60)) {
-    while (*(int *)(0x456e8c + i * 4) != 0 ||
-           *(int *)(0x456ecc + i * 4) != -1) {
+  if (0 < count) {
+    do {
+      if (*(int *)(0x456e8c + i * 4) == 0 &&
+          *(int *)(0x456ecc + i * 4) == -1)
+        return 1;
       i++;
-
-      if (*(int *)(variant + 0x60) <= i)
-
-        return 0;
-    }
-
-    return 1;
+    } while (i < count);
   }
 
   return 0;
@@ -8508,11 +8493,12 @@ char FUN_000b2bc0(void)
 
   variant = (int)game_engine_get_variant();
 
-  if (*(int *)(variant + 0x5c) - 2 == 0)
-
+  switch (*(int *)(variant + 0x5c)) {
+  case 2:
     return 1;
-
-  return 0;
+  default:
+    return 0;
+  }
 }
 
 /* Oddball: check return type based on variant mode (b2be0). */
@@ -8521,9 +8507,9 @@ char FUN_000b2be0(int param_1)
   int variant;
   char result = 0;
 
-  if (param_1 == 1) {
+  if (param_1 - 1 == 0) {
     variant = (int)game_engine_get_variant();
-    if (*(int *)(variant + 0x5c) == 2)
+    if (*(int *)(variant + 0x5c) - 2 == 0)
       result = 1;
   }
   return result;
@@ -8629,6 +8615,8 @@ wchar_t *oddball_get_team_score_string(int param_1, wchar_t *param_2)
   return param_2;
 }
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wsometimes-uninitialized"
 /* Find a spawn position for the oddball from netgame flags (b2d30). */
 void FUN_000b2d30(int *param_1, int param_2)
 {
@@ -8638,10 +8626,10 @@ void FUN_000b2d30(int *param_1, int param_2)
   int flag_count;
   int16_t i;
   int elem;
-  int16_t rng_pick;
-  int local_14 = 0;
-  int local_10 = 0;
-  int local_c = 0;
+  int rng_pick;
+  int local_14;
+  int local_10;
+  int local_c;
   int *flag_elem;
 
   scenario = (int)global_scenario_get();
@@ -8703,6 +8691,7 @@ output:
   param_1[1] = local_10;
   param_1[2] = local_c;
 }
+#pragma clang diagnostic pop
 
 /* Oddball: create a ball object at a random spawn local_10. DI = team/slot
  * index. */
@@ -8814,12 +8803,17 @@ int FUN_000b3120(int param_1)
     if (*(int *)(variant + 0x54) != 1)
       game_engine_player_depower_active_camo(param_1);
     variant = (int)game_engine_get_variant();
-    if (*(int *)(variant + 0x50) == 1)
+    switch (*(int *)(variant + 0x50)) {
+    case 1:
       *(int *)(player + 0x6c) = 0x3f800000;
-    else if (*(int *)(variant + 0x50) == 2)
+      break;
+    case 2:
       *(int *)(player + 0x6c) = 0x3fa00000;
-    else
+      break;
+    default:
       *(int *)(player + 0x6c) = 0x3f400000;
+      break;
+    }
   }
   if (game_engine_can_score()) {
     variant = (int)game_engine_get_variant();
@@ -9282,7 +9276,7 @@ char FUN_000b3b30(int flag_index, int param_1)
 {
   int player;
   int variant;
-  uint32_t unvisited;
+	uint32_t unvisited;
   int idx;
   int i;
 
@@ -9304,12 +9298,12 @@ char FUN_000b3b30(int flag_index, int param_1)
   variant = (int)game_engine_get_variant();
   if (*(int *)(variant + 0x4c) != 0)
     return 1;
-  for (i = 0; i < 0x20; i++) {
-    if (i == flag_index)
-      return 1;
-    if ((unvisited & (1u << ((uint8_t)i & 0x1f))) != 0)
-      return 0;
-  }
+	for (i = 0; i < 0x20; i++) {
+		if (i == flag_index)
+			return 1;
+		if ((unvisited & (1u << ((uint8_t)i & 0x1f))) != 0)
+			return 0;
+	}
   display_assert("itr < MAXIMUM_RACE_FLAGS",
                  "c:\\halo\\SOURCE\\game\\game_engine_race.c", 0x289, 1);
   system_exit(-1);

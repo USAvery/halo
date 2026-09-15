@@ -61,7 +61,7 @@ int system_unique_identifiers_equal(const void *id1, const void *id2)
 
 uint32_t system_milliseconds(void)
 {
-  return ((uint32_t(*)(void))0x1d0581)();
+  return (uint32_t)FUN_001d0581();
 }
 
 uint32_t system_seconds(void)

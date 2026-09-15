@@ -1248,24 +1248,23 @@ void item_detonate(int item_handle)
 void FUN_000f6b80(int item_handle)
 {
   char *item_obj;
-  float x, y, z;
   float mag;
   float inv_mag;
 
   item_obj = (char *)object_get_and_verify_type(item_handle, 0x1c);
-  x = *(float *)(item_obj + 0x3c);
-  y = *(float *)(item_obj + 0x40);
-  z = *(float *)(item_obj + 0x44);
-  mag = sqrtf(x * x + y * y + z * z);
+  mag = sqrtf(
+    *(float *)(item_obj + 0x3c) * *(float *)(item_obj + 0x3c) +
+    *(float *)(item_obj + 0x40) * *(float *)(item_obj + 0x40) +
+    *(float *)(item_obj + 0x44) * *(float *)(item_obj + 0x44));
 
   if (mag != 0.0f) {
     *(uint32_t *)(item_obj + 0x1a4) = *(uint32_t *)(item_obj + 0x1a4) | 4;
 
     if (!(*(uint8_t *)(item_obj + 0x4) & 0x20)) {
       inv_mag = 1.0f / mag;
-      *(float *)(item_obj + 0x1c8) = inv_mag * x;
-      *(float *)(item_obj + 0x1cc) = inv_mag * y;
-      *(float *)(item_obj + 0x1d0) = inv_mag * z;
+      *(float *)(item_obj + 0x1c8) = inv_mag * *(float *)(item_obj + 0x3c);
+      *(float *)(item_obj + 0x1cc) = inv_mag * *(float *)(item_obj + 0x40);
+      *(float *)(item_obj + 0x1d0) = inv_mag * *(float *)(item_obj + 0x44);
     }
 
     *(float *)(item_obj + 0x1d4) = x87_fsin(mag);

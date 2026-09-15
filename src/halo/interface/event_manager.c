@@ -734,38 +734,58 @@ void FUN_000dc730(int param_1, short *param_2, int *param_3)
 /* Map a game-event type to a UI-widget event type. */
 int16_t FUN_000dc800(int event)
 {
+  int result;
+
   switch ((int16_t)event) {
   case 0:
-    return 6;
+    result = 6;
+    break;
   case 1:
-    return 7;
+    result = 7;
+    break;
   case 2:
-    return 8;
+    result = 8;
+    break;
   case 3:
-    return 9;
+    result = 9;
+    break;
   case 4:
-    return 10;
+    result = 10;
+    break;
   case 5:
-    return 11;
+    result = 11;
+    break;
   case 6:
-    return 12;
+    result = 12;
+    break;
   case 9:
-    return 13;
+    result = 13;
+    break;
   case 10:
-    return 14;
+    result = 14;
+    break;
   case 11:
-    return 18;
+    result = 18;
+    break;
   case 12:
-    return 19;
+    result = 19;
+    break;
   case 14:
-    return 4;
+    result = 4;
+    break;
   case 15:
-    return 1;
+    result = 1;
+    break;
   case 17:
-    return 20;
+    result = 20;
+    break;
   case 16:
-    return 23;
+    result = 23;
+    break;
   default:
-    return -1;
+    result = -1;
+    break;
   }
+
+  return (int16_t)result;
 }

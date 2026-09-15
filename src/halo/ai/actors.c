@@ -1576,6 +1576,7 @@ char FUN_00038370(int actor_handle)
   int prop_handle;
   short switching_timer;
   short change_timer;
+  short action;
   char should_crouch;
   int iter[2]; /* 8-byte iterator state at EBP-0x18 */
   float vec_result[3]; /* subtract result at EBP-0x24, EBP-0x20, EBP-0x1c */
@@ -1599,12 +1600,14 @@ char FUN_00038370(int actor_handle)
   firing_variant = actor_combat_get_firing_variant_definition(actor_handle);
 
   /* Early exit: actor is busy or in flood-specific suppressed state */
-  if (unit_is_busy(((actor_t *)actor)->field_018) ||
-      actor_path_has_path(actor_handle) || ((actor_t *)actor)->field_06a < 3) {
+  if (unit_is_busy(((actor_t *)actor)->field_018) == 0 &&
+      actor_path_has_path(actor_handle) == 0) {
   exit_1:
     ((actor_t *)actor)->field_362 = 0;
     return 1;
   }
+  if (((actor_t *)actor)->field_06a < 3)
+    goto exit_1;
 
   /* Early exit: not enough ammo */
   if (((actor_t *)actor)->field_06e < 5) {
@@ -1657,10 +1660,11 @@ char FUN_00038370(int actor_handle)
     goto exit_0;
   }
 
-  switch (*(short *)(actv_tag + 0x4c)) {
-  case 0:
+  action = *(short *)(actv_tag + 0x4c);
+  if (action == 0) {
     goto exit_0;
-  case 1:
+  }
+  if (action == 1) {
     goto exit_1;
   }
 
@@ -1762,10 +1766,10 @@ char FUN_00038370(int actor_handle)
                   vec_result[2] * *(float *)(prop + 0xe8);
             if (dot > *(float *)0x00256870) {
               ahead_count++;
-            } else if (dot >= *(float *)0x0025686c) {
-              lateral_count++;
-            } else {
+            } else if (dot < *(float *)0x0025686c) {
               behind_count++;
+            } else {
+              lateral_count++;
             }
           }
         }
@@ -1798,7 +1802,7 @@ char FUN_00038370(int actor_handle)
                      "c:\\halo\\SOURCE\\ai\\actor_type_flood.c", 0x100, 1);
       system_exit(-1);
     }
-    ((actor_t *)actor)->field_364 = (short)(change_timer - 1);
+    --((actor_t *)actor)->field_364;
     if (((actor_t *)actor)->field_364 != 0) {
       goto return_current;
     }
@@ -2259,8 +2263,11 @@ void FUN_00038e60(int actor_handle)
       cooldown =
         random_real_range(get_global_random_seed_address(), 6.0f, 8.0f) /
         icount * TICKS_PER_SECOND;
-      if (cooldown <= *(float *)0x254640)
+      if (cooldown > *(float *)0x254640) {
+        /* keep the computed cooldown */
+      } else {
         cooldown = *(float *)0x254640;
+      }
       *(short *)(swarm + 8) = (short)(int)cooldown;
       special_index = random_range(
         (unsigned int *)get_global_random_seed_address(), 0, count);
@@ -7702,9 +7709,11 @@ void FUN_0003e7a0(int actor_handle /* @<eax> */)
   }
 
   /* Validate throttle components are all <= 1.0 */
-  if (fabsf(*(float *)(control + 0x0c)) > (float)*(double *)0x2573d8 ||
-      fabsf(*(float *)(control + 0x10)) > (float)*(double *)0x2573d8 ||
-      fabsf(*(float *)(control + 0x14)) > (float)*(double *)0x2573d8) {
+  if (fabs((double)*(float *)(control + 0x0c)) <= *(double *)0x2573d8 &&
+      fabs((double)*(float *)(control + 0x10)) <= *(double *)0x2573d8 &&
+      fabs((double)*(float *)(control + 0x14)) <= *(double *)0x2573d8) {
+    /* all throttle components are within range */
+  } else {
     display_assert("(fabs(control_data.throttle.i) <= 1.0f) && "
                    "(fabs(control_data.throttle.j) <= 1.0f) && "
                    "(fabs(control_data.throttle.k) <= 1.0f)",

@@ -251,13 +251,13 @@ float particle_get_radius(int datum_handle)
 bool valid_real_point3d(float *point)
 {
   uint32_t *p = (uint32_t *)point;
-  if ((p[0] & 0x7f800000) == 0x7f800000)
-    return false;
-  if ((p[1] & 0x7f800000) == 0x7f800000)
-    return false;
-  if ((p[2] & 0x7f800000) == 0x7f800000)
-    return false;
-  return true;
+  if ((p[0] & 0x7f800000) != 0x7f800000) {
+    if ((p[1] & 0x7f800000) != 0x7f800000) {
+      if ((p[2] & 0x7f800000) != 0x7f800000)
+        return true;
+    }
+  }
+  return false;
 }
 
 /* Validate an ARGB color (0xa1710).
@@ -271,11 +271,11 @@ bool valid_real_argb_color(float *color)
     return false;
 
   /* Check alpha >= 0.0 */
-  if (*color < 0.0f)
+  if (!(*color >= *(float *)0x2533c0))
     return false;
 
   /* Check alpha <= 1.0 */
-  if (*color > 1.0f)
+  if (!(*color <= *(float *)0x2533c8))
     return false;
 
   /* Validate RGB components */

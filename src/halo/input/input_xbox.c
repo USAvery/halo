@@ -106,26 +106,36 @@ co(input_gamepad_state, stick_ly, 0x22);
 co(input_gamepad_state, stick_rx, 0x24);
 co(input_gamepad_state, stick_ry, 0x26);
 
-static const input_change_flag_mapping k_gamepad_removal_change_flags[4] = {
+#if defined(__clang__) || defined(__GNUC__)
+#define INPUT_UNUSED __attribute__((unused))
+#else
+#define INPUT_UNUSED
+#endif
+
+static INPUT_UNUSED const input_change_flag_mapping
+k_gamepad_removal_change_flags[4] = {
   { 0x1, 0x1 },
   { 0x2, 0x2 },
   { 0x4, 0x4 },
   { 0x8, 0x8 },
 };
 
-static const input_change_flag_mapping k_gamepad_insertion_change_flags[4] = {
+static INPUT_UNUSED const input_change_flag_mapping
+k_gamepad_insertion_change_flags[4] = {
   { 0x1, 0x1000 },
   { 0x2, 0x2000 },
   { 0x4, 0x4000 },
   { 0x8, 0x8000 },
 };
 
-static const input_change_flag_mapping k_mu_removal_change_flags[8] = {
+static INPUT_UNUSED const input_change_flag_mapping
+k_mu_removal_change_flags[8] = {
   { 0x1, 0x10 },  { 0x10000, 0x20 },  { 0x2, 0x40 },  { 0x20000, 0x80 },
   { 0x4, 0x100 }, { 0x40000, 0x200 }, { 0x8, 0x400 }, { 0x80000, 0x800 },
 };
 
-static const input_change_flag_mapping k_mu_insertion_change_flags[8] = {
+static INPUT_UNUSED const input_change_flag_mapping
+k_mu_insertion_change_flags[8] = {
   { 0x1, 0x10000 },     { 0x10000, 0x20000 },  { 0x2, 0x40000 },
   { 0x20000, 0x80000 }, { 0x4, 0x100000 },     { 0x40000, 0x200000 },
   { 0x8, 0x400000 },    { 0x80000, 0x800000 },
@@ -286,7 +296,7 @@ static uint8_t input_saturating_increment(uint8_t value)
   return value + 1;
 }
 
-static uint32_t
+static INPUT_UNUSED uint32_t
 input_apply_change_flags(uint32_t change_flags, uint32_t source_mask,
                          const input_change_flag_mapping *mappings,
                          int mapping_count)
@@ -374,7 +384,7 @@ static int16_t input_normalize_stick(int16_t value)
  * deterministic replay loop that needs no player death. Set in
  * input_check_state_mode, consumed in input_state_process_packet (mode 4 EOF).
  */
-static int core_loop_enabled = 0;
+static INPUT_UNUSED int core_loop_enabled = 0;
 #endif
 
 /* 0x000ce4a0 — close the input-state recording/playback file.
@@ -414,7 +424,7 @@ void input_check_state_mode(void)
     *input_state_mode() = 3;
     return;
   }
-#ifdef DECOMP_CUSTOM
+#if 0 /* DECOMP_CUSTOM core-loop sentinel is not present in debug build 2276. */
   if (file_get_full_attributes("d:\\core_loop.xts") != -1) {
     *input_state_mode() = 4;
     core_loop_enabled = 1;
@@ -512,14 +522,6 @@ void input_state_process_packet(void *state)
     bytes_transferred = 0;
     ReadFile(*input_state_file_handle(), state, sizeof(input_gamepad_state),
              &bytes_transferred, NULL);
-#ifdef DECOMP_CUSTOM
-    /* core-loop: recording exhausted (EOF) and a core is loaded -> request a
-     * core reload. The load-core dispatch in main_loop then rewinds playback to
-     * packet 0, so the stored input re-executes. No player death required. */
-    if (core_loop_enabled && bytes_transferred == 0 && core_name[0]) {
-      game_state_load_core_pending = 1;
-    }
-#endif
     break;
   case 5:
     FUN_000ce530(state);
@@ -613,11 +615,15 @@ bool input_key_is_down(uint16_t key_code)
   case 0: /* left stick X */
     a = *input_stick_axis_key_pos_lx();
     b = *input_stick_axis_key_neg_lx();
-    return a < b ? b : a;
+    if (b <= a)
+      return a;
+    return b;
   case 1: /* left stick Y */
     a = *input_stick_axis_key_pos_ly();
     b = *input_stick_axis_key_neg_ly();
-    return a < b ? b : a;
+    if (b <= a)
+      return a;
+    return b;
   case 2: /* right stick X */
     /* The binary uses <= here, unlike the left-stick cases. Preserve that tie
      * behavior. */
@@ -673,16 +679,19 @@ bool input_has_gamepad(int16_t gamepad_index)
 
 void *input_get_gamepad_state(int16_t gamepad_index)
 {
+  void *result;
   int16_t index;
 
+  result = NULL;
   index = gamepad_index;
   assert_halt(index >= 0 && index < MAXIMUM_GAMEPADS);
   if (input_gamepad_handles()[index] != 0) {
     if (*input_suppressed())
-      return suppressed_gamepad_state();
-    return &input_gamepad_states()[index];
+      result = suppressed_gamepad_state();
+    else
+      result = &input_gamepad_states()[index];
   }
-  return NULL;
+  return result;
 }
 
 void input_set_rumble(int16_t gamepad_index, uint16_t left, uint16_t right)
@@ -699,15 +708,10 @@ void input_set_rumble(int16_t gamepad_index, uint16_t left, uint16_t right)
 
 void input_tick(void)
 {
-  bool pending_cleared;
-
-  pending_cleared = *input_update_event_pending() == 0;
-  if (!pending_cleared) {
+  if (*input_update_event_pending() != 0) {
     ((xset_event_fn)0x1cfeaa)(*input_update_event_handle());
-    pending_cleared = *input_update_event_pending() == 0;
   }
-
-  *input_update_event_pending() = pending_cleared;
+  *input_update_event_pending() = *input_update_event_pending() == 0;
 }
 
 void input_get_device_states(void)
@@ -731,35 +735,44 @@ void input_get_device_states(void)
     ((xinput_get_changes_fn)0x24c954)((void *)0x24b29c, &insertions, &removals);
   if (result != 0) {
     handles = input_gamepad_handles();
-    for (i = 0; i < MAXIMUM_GAMEPADS; i++) {
+    i = 0;
+    j = MAXIMUM_GAMEPADS;
+    do {
       mask = 1 << i;
       if (removals & mask) {
-        if (handles[i] == 0) {
+        if (*handles == 0) {
           display_assert("input_globals.gamepad_handles[gamepad_index]",
                          "c:\\halo\\SOURCE\\input\\input_xbox.c", 0x217, 1);
           system_exit(-1);
         }
-        ((xinput_close_fn)0x24c1b8)(handles[i]);
-        handles[i] = 0;
+        ((xinput_close_fn)0x24c1b8)(*handles);
+        *handles = 0;
       }
       if (insertions & mask) {
-        if (handles[i] != 0) {
+        if (*handles != 0) {
           display_assert("input_globals.gamepad_handles[gamepad_index]==NULL",
                          "c:\\halo\\SOURCE\\input\\input_xbox.c", 0x21e, 1);
           system_exit(-1);
         }
-        handles[i] = ((xinput_open_fn)0x24c143)((void *)0x24b29c, i, 0, 0);
-        if (handles[i] == 0) {
+        *handles = ((xinput_open_fn)0x24c143)((void *)0x24b29c, i, 0, 0);
+        if (*handles == 0) {
           result = ((int(__stdcall *)(void))0x1d2240)();
           error(2, "XInputOpen (gamepad) failed (#%d) during input_update()",
                 result);
         }
       }
-    }
-    change_flags = input_apply_change_flags(change_flags, removals,
-                                            k_gamepad_removal_change_flags, 4);
-    change_flags = input_apply_change_flags(
-      change_flags, insertions, k_gamepad_insertion_change_flags, 4);
+      handles++;
+      i++;
+      j--;
+    } while (j != 0);
+    if ((removals & 0x1) != 0) change_flags |= 0x1;
+    if ((removals & 0x2) != 0) change_flags |= 0x2;
+    if ((removals & 0x4) != 0) change_flags |= 0x4;
+    if ((removals & 0x8) != 0) change_flags |= 0x8;
+    if ((insertions & 0x1) != 0) change_flags |= 0x1000;
+    if ((insertions & 0x2) != 0) change_flags |= 0x2000;
+    if ((insertions & 0x4) != 0) change_flags |= 0x4000;
+    if ((insertions & 0x8) != 0) change_flags |= 0x8000;
   }
 
   result = ((xinput_get_changes_fn)0x24c954)((void *)0x24b218, &mu_insertions,
@@ -781,10 +794,22 @@ void input_get_device_states(void)
      *   bit 3  (slot D) → 0x400  MU D removed  │  0x400000  MU D inserted
      *   bit 19 (MU D)   → 0x800  MU D port gone │  0x800000  MU D port added
      */
-    change_flags = input_apply_change_flags(change_flags, mu_removals,
-                                            k_mu_removal_change_flags, 8);
-    change_flags = input_apply_change_flags(change_flags, mu_insertions,
-                                            k_mu_insertion_change_flags, 8);
+    if ((mu_removals & 0x1) != 0) change_flags |= 0x10;
+    if ((mu_removals & 0x10000) != 0) change_flags |= 0x20;
+    if ((mu_removals & 0x2) != 0) change_flags |= 0x40;
+    if ((mu_removals & 0x20000) != 0) change_flags |= 0x80;
+    if ((mu_removals & 0x4) != 0) change_flags |= 0x100;
+    if ((mu_removals & 0x40000) != 0) change_flags |= 0x200;
+    if ((mu_removals & 0x8) != 0) change_flags |= 0x400;
+    if ((mu_removals & 0x80000) != 0) change_flags |= 0x800;
+    if ((mu_insertions & 0x1) != 0) change_flags |= 0x10000;
+    if ((mu_insertions & 0x10000) != 0) change_flags |= 0x20000;
+    if ((mu_insertions & 0x2) != 0) change_flags |= 0x40000;
+    if ((mu_insertions & 0x20000) != 0) change_flags |= 0x80000;
+    if ((mu_insertions & 0x4) != 0) change_flags |= 0x100000;
+    if ((mu_insertions & 0x40000) != 0) change_flags |= 0x200000;
+    if ((mu_insertions & 0x8) != 0) change_flags |= 0x400000;
+    if ((mu_insertions & 0x80000) != 0) change_flags |= 0x800000;
   }
 
   ((void (*)(uint32_t))0xce840)(change_flags);
@@ -1041,16 +1066,16 @@ void input_get_raw_data_string(char *buffer, int16_t size)
 
 void input_update(void)
 {
-  int i;
-
   *input_suppressed() = 0;
   if (!*input_initialized()) {
-    ((void(__stdcall *)(int))0x1cfaec)(*input_update_callback_arg());
+    ResumeThread(*input_update_callback_arg());
     *input_initialized() = 1;
   }
   input_update_keyboard_devices();
-  for (i = 0; i < MAXIMUM_GAMEPADS; i++)
-    input_state_process_packet(&input_gamepad_states()[i]);
+  input_state_process_packet(&input_gamepad_states()[0]);
+  input_state_process_packet(&input_gamepad_states()[1]);
+  input_state_process_packet(&input_gamepad_states()[2]);
+  input_state_process_packet(&input_gamepad_states()[3]);
 }
 
 void input_frame_begin(void)

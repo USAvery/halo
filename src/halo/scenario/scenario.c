@@ -533,7 +533,6 @@ void FUN_0018b990(void *volume)
   Cv = (float *)((char *)volume + 0x28);
   P = (float *)((char *)volume + 0x34);
   r = *(float *)((char *)volume + 0x40);
-  r4 = r * 4.0f;
 
   /* plane 0: +C, d = dot(C,P) - r*0.5 (dot accumulates z,y,x per the original)
    */
@@ -541,8 +540,9 @@ void FUN_0018b990(void *volume)
   planes[0] = Cv[0];
   planes[1] = Cv[1];
   planes[2] = Cv[2];
-  planes[3] = dot - r * 0.5f;
+  planes[3] = dot - r * *(const float *)0x253398;
   /* plane 1: -C, d = -dot(C,P) - r*4.0 */
+  r4 = r * *(const float *)0x2533d8;
   planes[4] = -Cv[0];
   planes[5] = -Cv[1];
   planes[6] = -Cv[2];
@@ -574,44 +574,56 @@ void FUN_0018b990(void *volume)
 
   /* per-component absolute values of the A and B axes (FCOM 0 + FCHS) */
   ax = A[0];
-  if (ax < 0.0f)
+  if (ax >= 0.0f) {
+  } else {
     ax = -ax;
+  }
   bx = B[0];
-  if (bx < 0.0f)
+  if (bx >= 0.0f) {
+  } else {
     bx = -bx;
+  }
   ay = A[1];
-  if (ay < 0.0f)
+  if (ay >= 0.0f) {
+  } else {
     ay = -ay;
+  }
   by = B[1];
-  if (by < 0.0f)
+  if (by >= 0.0f) {
+  } else {
     by = -by;
+  }
   az = A[2];
-  if (az < 0.0f)
+  if (az >= 0.0f) {
+  } else {
     az = -az;
+  }
   bz = B[2];
-  if (bz < 0.0f)
+  if (bz >= 0.0f) {
+  } else {
     bz = -bz;
+  }
 
   /* direction-axis sign-selected multipliers for the x/y expanded bounds */
-  mlx = -0.5f;
-  if (Cv[0] <= 0.0f)
-    mlx = 4.0f;
-  mhx = -0.5f;
-  if (Cv[0] > 0.0f)
-    mhx = 4.0f;
-  mly = -0.5f;
-  if (Cv[1] <= 0.0f)
-    mly = 4.0f;
-  mhy = -0.5f;
-  if (Cv[1] > 0.0f)
-    mhy = 4.0f;
+  mlx = -*(const float *)0x255964;
+  if (Cv[0] <= *(const float *)0x2533c0)
+    mlx = *(const float *)0x2533d8;
+  mhx = -*(const float *)0x255964;
+  if (Cv[0] > *(const float *)0x2533c0)
+    mhx = *(const float *)0x2533d8;
+  mly = -*(const float *)0x255964;
+  if (Cv[1] <= *(const float *)0x2533c0)
+    mly = *(const float *)0x2533d8;
+  mhy = -*(const float *)0x255964;
+  if (Cv[1] > *(const float *)0x2533c0)
+    mhy = *(const float *)0x2533d8;
 
   scalars[0] = (Cv[0] * mlx + -(bx + ax)) * r + P[0];
   scalars[1] = (Cv[0] * mhx + bx + ax) * r + P[0];
   scalars[2] = (Cv[1] * mly + -(by + ay)) * r + P[1];
   scalars[3] = (Cv[1] * mhy + by + ay) * r + P[1];
-  scalars[4] = (Cv[2] * 4.0f + -(bz + az)) * r + P[2];
-  scalars[5] = ((bz + az) - Cv[2] * 0.5f) * r + P[2];
+  scalars[4] = (Cv[2] * *(const float *)0x2533d8 + -(bz + az)) * r + P[2];
+  scalars[5] = ((bz + az) - Cv[2] * *(const float *)0x255964) * r + P[2];
 
   render_structure_shadows(P, r4, scalars, 6, planes);
   FUN_0017cd00();
@@ -2523,7 +2535,7 @@ void scenario_initialize_for_new_map(void)
 
 void scenario_dispose_from_old_map(void)
 {
-  *(char *)0x5057c0 = 0;
+  FUN_0018fef0();
 }
 
 /* scenario_frame_update is a direct trampoline to the wind update at
@@ -3302,19 +3314,34 @@ bool scenario_load(const char *map_name)
   int tag_index;
   int matg_index;
   char *scenario_tag;
+  char *path;
+  char *nl;
   bool result = 0;
 
-  ((void (*)(void *, const char *))0x8e770)((void *)0x326a6c, "scenario_load");
-  tag_index = ((int (*)(const char *))0x1b9e70)(map_name);
+  memory_check((uint32_t *)0x326a6c, (const char *)0x2b224c);
+  tag_index = FUN_001b9e70(map_name);
   *(int *)0x326a08 = tag_index;
 
-  if (tag_index == -1) {
+  if (tag_index != -1) {
+    scenario_tag = (char *)tag_get(0x73636e72, tag_index);
+    *(char **)0x5064e4 = scenario_tag;
+
+    if (*(int *)(scenario_tag + 0x5a4) >= 1) {
+      /* load game globals tag ("matg") */
+      matg_index = tag_loaded(0x6d617467, "globals\\globals");
+      *(char **)0x5064d4 = (char *)tag_get(0x6d617467, matg_index);
+
+      if (scenario_switch_structure_bsp(0))
+        result = 1;
+    } else {
+      error(1, "scenario has no structure bsps");
+    }
+  } else {
     /* map not found — print error with map path line by line */
-    char *path = (char *)0x25386f;
-    char *nl;
+    path = (char *)0x25386f;
     error(1, "couldn't open map file");
     do {
-      nl = ((char *(*)(const char *, int))0x1d95d0)(path, '\n');
+      nl = crt_strchr(path, '\n');
       if (nl)
         *nl = 0;
       error(1, "%s", path);
@@ -3323,23 +3350,7 @@ bool scenario_load(const char *map_name)
       *nl = '\n';
       path = nl + 1;
     } while (path);
-    return result;
   }
-
-  scenario_tag = (char *)tag_get(0x73636e72, tag_index);
-  *(char **)0x5064e4 = scenario_tag;
-
-  if (*(int *)(scenario_tag + 0x5a4) < 1) {
-    error(1, "scenario has no structure bsps");
-    return result;
-  }
-
-  /* load game globals tag ("matg") */
-  matg_index = tag_loaded(0x6d617467, "globals\\globals");
-  *(char **)0x5064d4 = (char *)tag_get(0x6d617467, matg_index);
-
-  if (scenario_switch_structure_bsp(0))
-    return 1;
 
   return result;
 }
@@ -4119,7 +4130,7 @@ void FUN_0018fbc0(int16_t window_index, int structure_bsp_index,
 }
 
 /* 0x18fef0 — reset a scenario module's global byte flag at 0x5057c0 to 0. */
-void FUN_0018fef0(void)
+__declspec(noinline) void FUN_0018fef0(void)
 {
   *(char *)0x5057c0 = 0;
 }

@@ -284,6 +284,7 @@ bool FUN_000efde0(void *widget, void *event_data, bool *widget_deleted)
 
   (void)widget;
   (void)widget_deleted;
+  validated = false;
 
   controller_index = *(short *)((char *)event_data + 2);
   if (controller_index == -1) {
@@ -293,17 +294,13 @@ bool FUN_000efde0(void *widget, void *event_data, bool *widget_deleted)
   saved_game_file_get_useable_untitled_profile_name(untitled_name);
   if (untitled_name[0] == L'\0') {
     error(2, "unable to create a new untitled profile");
-    display_error_deferred(0x25, -1, true, false);
-    ui_play_audio_feedback_sound(4);
-    return false;
+    goto failure;
   }
 
   profile_index = FUN_001c1720(controller_index, untitled_name);
   if (profile_index == -1) {
     error(2, "failed to create a new player profile");
-    display_error_deferred(0x25, -1, true, false);
-    ui_play_audio_feedback_sound(4);
-    return false;
+    goto failure;
   }
 
   player_ui_begin_editing_profile(profile_index);
@@ -311,14 +308,13 @@ bool FUN_000efde0(void *widget, void *event_data, bool *widget_deleted)
   if (edit_name == NULL) {
     error(2, "failed to retrieve editable player profile!");
     player_ui_end_editing_profile();
-    display_error_deferred(0x25, -1, true, false);
-    ui_play_audio_feedback_sound(4);
-    return false;
+    goto failure;
   }
 
   ustrncpy((wchar_t *)edit_name, untitled_name, 0xb);
   ((wchar_t *)edit_name)[0xb] = L'\0';
   validated = virtual_keyboard_set_validation((wchar_t *)edit_name, 0x18, 8);
+failure:
   if (!validated) {
     display_error_deferred(0x25, -1, true, false);
     ui_play_audio_feedback_sound(4);

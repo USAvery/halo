@@ -225,7 +225,7 @@ char FUN_000a6030(float *cone_spec, float *point, float *direction, float *arg4,
   for (i = 0; i < count; i++) {
     elem = local_buffer + (int)i * 0x38;
     if (FUN_000a5830(point, elem + 4, arg4, *(int *)elem)) {
-      csmemcpy(out_struct, elem, 0x38);
+      qmemcpy(out_struct, elem, 0x38);
       return 1;
     }
   }

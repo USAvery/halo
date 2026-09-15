@@ -144,16 +144,15 @@ void observer_apply_acceleration(int16_t local_player_index)
 
   for (comp = 0; comp < 5; comp++) {
     float t = *timers - *(float *)0x335718;
-    int16_t size = *sizes;
 
     if (t <= 0.0f) {
-      csmemset(output, 0, (int)size << 2);
+      csmemset(output, 0, (int)*sizes << 2);
     } else {
       float t_sq = t * t;
       float t_cu = t_sq * t;
       int16_t j;
 
-      for (j = 0; j < size; j++) {
+      for (j = 0; j < *sizes; j++) {
         float result = t_cu * snap_ptr[j] * *(float *)0x254cd0 +
                        t_sq * jerk_ptr[j] * *(float *)0x254cc8 +
                        t * accel_ptr[j] * *(float *)0x254640 + vel_ptr[j] +
@@ -173,11 +172,11 @@ void observer_apply_acceleration(int16_t local_player_index)
       }
     }
 
-    snap_ptr += size;
-    jerk_ptr += size;
-    output += size;
-    accel_ptr += size;
-    vel_ptr += size;
+    snap_ptr += *sizes;
+    jerk_ptr += *sizes;
+    output += *sizes;
+    accel_ptr += *sizes;
+    vel_ptr += *sizes;
     timers++;
     thresholds++;
     sizes++;
@@ -219,16 +218,7 @@ void observer_integrate(int16_t local_player_index)
     float t = *timers - *(float *)0x335718;
     int16_t size = *sizes;
 
-    if (t <= 0.0f) {
-      uint32_t mode = *(uint32_t *)(observer + 0x8);
-      if ((mode & 1) && ((*byte_flags & 2) || (mode & 8))) {
-        csmemset(output, 0, (int)size << 2);
-      } else if ((mode & 1) && size > 0) {
-        int16_t i;
-        for (i = 0; i < size; i++)
-          output[i] = -(ratio * result_ptr[i]);
-      }
-    } else {
+    if (t > 0.0f) {
       float t_sq = t * t;
       float t_cu = t_sq * t;
       float t_q4 = t_cu * t;
@@ -239,6 +229,15 @@ void observer_integrate(int16_t local_player_index)
         output[i] = v + v + t_sq * accel_ptr[i] * *(float *)0x254644 +
                     t_cu * jerk_ptr[i] * *(float *)0x2533d8 +
                     t_q4 * snap_ptr[i] * *(float *)0x254cc4 + pos_ptr[i];
+      }
+    } else {
+      uint32_t mode = *(uint32_t *)(observer + 0x8);
+      if ((mode & 1) && ((*byte_flags & 2) || (mode & 8))) {
+        csmemset(output, 0, (int)size << 2);
+      } else if ((mode & 1) && size > 0) {
+        int16_t i;
+        for (i = 0; i < size; i++)
+          output[i] = -(ratio * result_ptr[i]);
       }
     }
 
@@ -1017,26 +1016,27 @@ void FUN_0008c150(float *up, float *focus_distance, float near_plane_dist,
  * Register args: result @<eax>, state @<ecx>. Stack arg: velocities. */
 void FUN_0008c440(void *velocities, void *result, void *state)
 {
-  float *velocities_f;
-  float *result_f;
-  float *state_f;
-  int i;
+  volatile int i;
 
-  velocities_f = (float *)velocities;
-  result_f = (float *)result;
-  state_f = (float *)state;
+  i = 8;
+  do {
+    *(float *)result = *(float *)velocities - *(float *)state;
+    velocities = (char *)velocities + 4;
+    state = (char *)state + 4;
+    result = (char *)result + 4;
+    i--;
+  } while (i != 0);
 
-  /* Loop 1: 8 iterations — linear component subtraction */
-  for (i = 0; i < 8; i++) {
-    result_f[i] = velocities_f[i] - state_f[i];
-  }
-
-  /* Loop 2: 1 iteration — angular component via orientation matrices */
-  FUN_0008c030(velocities_f + 8, /* forward1 */
-               result_f + 8, /* result_angular output */
-               state_f + 8, /* forward0 */
-               state_f + 8 + 3, /* up0 (= state+0x2c from base) */
-               velocities_f + 8 + 3); /* up1 (= velocities+0x2c from base) */
+  i = 1;
+  do {
+    FUN_0008c030((float *)velocities, (float *)result, (float *)state,
+                 (float *)((char *)state + 0xc),
+                 (float *)((char *)velocities + 0xc));
+    velocities = (char *)velocities + 0x18;
+    state = (char *)state + 0x18;
+    result = (char *)result + 0xc;
+    i--;
+  } while (i != 0);
 }
 
 /* Derive the final observer camera result from staged and integrated state

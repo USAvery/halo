@@ -160,12 +160,12 @@ char action_charge_setup(int actor_handle, int action_type, void *charge_state)
             else
               is_secondary = 0;
             *(char *)((char *)charge_state + 0xa) = (char)is_secondary;
-            if (*(float *)(encounter + 0x11c) <
-                *(float *)(actr_tag + 0x384)) {
-              is_secondary = 0;
-            } else {
+            if (*(float *)(actr_tag + 0x384) <=
+                *(float *)(encounter + 0x11c)) {
               if (is_secondary)
                 action_type = 3;
+            } else {
+              is_secondary = 0;
             }
           } else {
             *(char *)((char *)charge_state + 0xa) = 1;
@@ -206,7 +206,7 @@ char action_charge_setup(int actor_handle, int action_type, void *charge_state)
 
             min_speed = ((short)action_type == 3) ? *(float *)0x2533d8
                                                   : *(float *)0x2533ec;
-            if (speed < min_speed)
+            if (min_speed > speed)
               speed = min_speed;
 
             if (actor_move_to_prop(
@@ -376,20 +376,20 @@ void action_converse_control(int actor_handle)
   char *actor;
   char *conversation;
   int16_t *move_type;
-  int prop_handle_init;
   int prop_handle;
 
   actor = (char *)datum_get(actor_data, actor_handle);
   conversation = NULL;
-  prop_handle_init = *(int *)(actor + 0xac);
+  prop_handle = -1;
   if (*(int *)(actor + 0x9c) != -1)
     conversation =
       (char *)datum_get(*(data_t **)0x6324ec, *(int *)(actor + 0x9c));
-  prop_handle = prop_handle_init;
-  if (prop_handle == -1 && conversation != NULL &&
-      *(int *)(conversation + 0x10) != -1)
-    prop_handle = prop_get_active_by_unit_index(actor_handle,
-                                                *(int *)(conversation + 0x10));
+  if (*(int *)(actor + 0xac) != -1) {
+    prop_handle = *(int *)(actor + 0xac);
+  } else if (conversation != NULL && *(int *)(conversation + 0x10) != -1) {
+    prop_handle = prop_get_active_by_unit_index(
+      actor_handle, *(int *)(conversation + 0x10));
+  }
   ((actor_t *)actor)->field_3fc = 1;
   if (prop_handle != -1) {
     move_type = (int16_t *)(actor + 0x3e8);
@@ -1499,7 +1499,7 @@ int action_flee_perform(int actor_handle)
   if (((actor_t *)actor)->field_006 == '\0') {
     /* Update look_type counter if we are in animated flee range [9,12] */
     look_anim = *(int16_t *)(state + 0xc);
-    if (look_anim > 8 && look_anim < 0xd) {
+    if (look_anim >= 9 && look_anim <= 12) {
       *(int16_t *)(state + 0x0) = 0xb4;
     }
 
@@ -1602,7 +1602,7 @@ int action_flee_perform(int actor_handle)
 skip_mark_unable:
   /* Clear flee_sound_played if still in flee anim range and unit not talking */
   look_anim = *(int16_t *)(state + 0xc);
-  if (look_anim > 8 && look_anim < 0xd) {
+  if (look_anim >= 9 && look_anim <= 12) {
     if (((actor_t *)actor)->field_018 != -1) {
       if ((char)FUN_001a6bc0(((actor_t *)actor)->field_018) == 0) {
         *(char *)(state + 0x10) = 0;
@@ -1718,7 +1718,7 @@ int action_guard_setup_current_position(int actor_handle, char *state_data)
  * Confirmed: csmemset(state_data, 0, 0x44) at 0x1594b.
  * Confirmed: all branch conditions and field offsets from raw disassembly.
  */
-int action_guard_setup_find_position(int actor_handle, short param_2, char *state_data)
+int action_guard_setup_find_position(int actor_handle, int param_2, char *state_data)
 {
   char *actor;
   actor = (char *)datum_get(actor_data, actor_handle);
@@ -1730,8 +1730,8 @@ int action_guard_setup_find_position(int actor_handle, short param_2, char *stat
   csmemset(state_data, 0, 0x44);
   if ((((actor_t *)actor)->field_160 == '\0') &&
       (*(char *)(actor + 6) == '\0')) {
-    *(short *)state_data = param_2;
-    if (param_2 == 0) {
+    *(short *)state_data = (short)param_2;
+    if ((short)param_2 == 0) {
       *(char *)(state_data + 0xe) = 1;
       *(short *)(state_data + 0x24) = 0;
       *(int *)(state_data + 0x3c) = -1;
@@ -4906,6 +4906,8 @@ void action_search_control(int actor_handle)
   int timer;
   int remain;
   int threshold;
+  int *src;
+  int *dst;
 
   actor = (char *)datum_get(actor_data, actor_handle);
   tag = (char *)tag_get(0x61637472, ((actor_t *)actor)->field_058);
@@ -4925,9 +4927,11 @@ void action_search_control(int actor_handle)
       } else if (*(short *)(actor + 0xa4) == 1) {
         ((actor_t *)actor)->field_3e8 = 3;
         ((actor_t *)actor)->field_3ec = 3;
-        ((actor_t *)actor)->field_3f0 = *(int *)(actor + 0xb0);
-        ((actor_t *)actor)->field_3f4 = *(int *)(actor + 0xb4);
-        ((actor_t *)actor)->field_3f8 = ((actor_t *)actor)->field_0b8;
+        src = (int *)(actor + 0xb0);
+        dst = (int *)(actor + 0x3f0);
+        dst[0] = src[0];
+        dst[1] = src[1];
+        dst[2] = src[2];
       } else {
         ((actor_t *)actor)->field_3e8 = 1;
       }
@@ -5518,10 +5522,10 @@ void action_uncover_begin(int actor_handle)
   hi = *(float *)(tag + 0x340);
   lo = *(float *)(tag + 0x33c);
   if (((actor_t *)actor)->field_09f == '\0') {
-    if (lo <= *(float *)(tag + 0x344)) {
+    if (!(lo > *(float *)(tag + 0x344))) {
       lo = *(float *)(tag + 0x344);
     }
-    if (hi <= *(float *)(tag + 0x348)) {
+    if (!(hi > *(float *)(tag + 0x348))) {
       hi = *(float *)(tag + 0x348);
     }
   }
@@ -9429,7 +9433,7 @@ void actor_move_keep_moving_past_destination(int actor_handle)
  * Confirmed: cdecl, single stack arg (actor_handle).
  * Confirmed: datum_get(actor_data=DAT_006325a4, actor_handle) at 0x2a3de.
  * Confirmed: MOV AL,byte ptr [EAX+0x4a8] at 0x2a3e3; ADD ESP,0x8; RET. */
-char actor_path_has_path(int actor_handle)
+__declspec(noinline) char actor_path_has_path(int actor_handle)
 {
   char *actor = (char *)datum_get(actor_data, actor_handle);
   return actor[0x4a8];

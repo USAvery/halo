@@ -447,51 +447,51 @@ void antenna_debug_data_relocate_marker(void *world_pos_out, void *rec,
                                         void *location_out)
 {
   unsigned char buf[0x80];
-  float *m;
-  float *w;
-  float *last_pos;
   float dx;
   float dy;
   float dz;
-  int idx;
-  int idy;
-  int idz;
+  int abs_delta;
 
   object_get_markers_by_string_id(*(int *)((char *)rec + 0xc), tag_def, buf, 1);
 
-  m = (float *)marker_pos;
-  m[0] = *(float *)(buf + 0x60);
-  m[1] = *(float *)(buf + 0x64);
-  m[2] = *(float *)(buf + 0x68);
+  *(int *)((char *)marker_pos + 0x00) = *(int *)(buf + 0x60);
+  *(int *)((char *)marker_pos + 0x04) = *(int *)(buf + 0x64);
+  *(int *)((char *)marker_pos + 0x08) = *(int *)(buf + 0x68);
 
-  w = (float *)world_pos_out;
-  w[0] = *(float *)(buf + 0x3c);
-  w[1] = *(float *)(buf + 0x40);
-  w[2] = *(float *)(buf + 0x44);
+  *(int *)((char *)world_pos_out + 0x00) = *(int *)(buf + 0x3c);
+  *(int *)((char *)world_pos_out + 0x04) = *(int *)(buf + 0x40);
+  *(int *)((char *)world_pos_out + 0x08) = *(int *)(buf + 0x44);
 
   scenario_location_from_point(location_out, buf + 0x60);
 
-  last_pos = (float *)((char *)rec + 0x10);
-  dx = m[0] - last_pos[0];
-  dy = m[1] - last_pos[1];
-  dz = m[2] - last_pos[2];
+  dx = *(float *)(buf + 0x60) - *(float *)((char *)rec + 0x10);
+  dy = *(float *)(buf + 0x64) - *(float *)((char *)rec + 0x14);
+  dz = *(float *)(buf + 0x68) - *(float *)((char *)rec + 0x18);
 
-  idx = (int)dx;
-  idx = (idx ^ (idx >> 0x1f)) - (idx >> 0x1f); /* abs(idx) */
-  idy = (int)dy;
-  idy = (idy ^ (idy >> 0x1f)) - (idy >> 0x1f); /* abs(idy) */
-  idz = (int)dz;
-  idz = (idz ^ (idz >> 0x1f)) - (idz >> 0x1f); /* abs(idz) */
+  abs_delta = (int)dx;
+  abs_delta = (abs_delta ^ (abs_delta >> 0x1f)) - (abs_delta >> 0x1f);
+  if ((float)abs_delta > *(float *)0x2533c8)
+    goto relocate;
 
-  if ((float)idx > *(float *)0x2533c8 || (float)idy > *(float *)0x2533c8 ||
-      (float)idz > *(float *)0x2533c8) {
+  abs_delta = (int)dy;
+  abs_delta = (abs_delta ^ (abs_delta >> 0x1f)) - (abs_delta >> 0x1f);
+  if ((float)abs_delta > *(float *)0x2533c8)
+    goto relocate;
+
+  abs_delta = (int)dz;
+  abs_delta = (abs_delta ^ (abs_delta >> 0x1f)) - (abs_delta >> 0x1f);
+  if (!((float)abs_delta > *(float *)0x2533c8))
+    goto no_relocate;
+
+relocate:
+  {
     int count;
 
-    count = *(int *)((char *)tag_def + 0xc4);
-    if (count + 1 > 0) {
+    count = *(int *)((char *)tag_def + 0xc4) + 1;
+    if (count > 0) {
       int i;
 
-      for (i = 0; i < count + 1; i++) {
+      for (i = 0; i < count; i++) {
         float *elem;
 
         elem = (float *)((char *)rec + 0x1c + i * 0x20);
@@ -502,9 +502,11 @@ void antenna_debug_data_relocate_marker(void *world_pos_out, void *rec,
     }
   }
 
-  last_pos[0] = m[0];
-  last_pos[1] = m[1];
-  last_pos[2] = m[2];
+no_relocate:
+
+  *(float *)((char *)rec + 0x10) = *(float *)(buf + 0x60);
+  *(float *)((char *)rec + 0x14) = *(float *)(buf + 0x64);
+  *(float *)((char *)rec + 0x18) = *(float *)(buf + 0x68);
 }
 
 /*
