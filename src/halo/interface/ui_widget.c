@@ -400,6 +400,43 @@ void ui_widget_pending_load_push_internal(int *head, void *record);
 
 void ui_widget_pending_load_pop(int *head, void *output);
 
+/* ui_widget_add_child (0xe4800) — appends child to the end of parent's
+ * sibling list. `child` arrives in EBX (see kb.json @<ebx>), `parent` on the
+ * stack at [EBP+8]. Asserts the child is unlinked (prev_sibling +0x28 and
+ * next_sibling +0x2c both NULL, ui_widget.c:0xa9f), then walks
+ * parent->first_child (+0x34) along next_sibling (+0x2c) to find the tail.
+ * With a tail, asserts tail->next == NULL (ui_widget.c:0xaa9) and links
+ * tail->next = child / child->previous = tail; with an empty list, sets
+ * parent->first_child = child. Note the original never sets child->parent
+ * (+0x30) here. */
+void ui_widget_add_child(void *child, void *parent)
+{
+  int *tail_child;
+  int *cursor;
+
+  assert_halt_msg_at("(child->previous == NULL) && (child->next == NULL)",
+                     "c:\\halo\\SOURCE\\interface\\ui_widget.c", 0xa9f,
+                     *(int *)((char *)child + 0x28) == 0 &&
+                       *(int *)((char *)child + 0x2c) == 0);
+
+  tail_child = NULL;
+  cursor = *(int **)((char *)parent + 0x34);
+  while (cursor != NULL) {
+    tail_child = cursor;
+    cursor = *(int **)((char *)cursor + 0x2c);
+  }
+
+  if (tail_child != NULL) {
+    assert_halt_msg_at("tail_child->next == NULL",
+                       "c:\\halo\\SOURCE\\interface\\ui_widget.c", 0xaa9,
+                       *(int *)((char *)tail_child + 0x2c) == 0);
+    *(int **)((char *)tail_child + 0x2c) = (int *)child;
+    *(int **)((char *)child + 0x28) = tail_child;
+  } else {
+    *(int **)((char *)parent + 0x34) = (int *)child;
+  }
+}
+
 /* ui_widget_close_children — walks the first_child linked list of a widget
  * and closes each child via ui_widget_close. Asserts that each child's
  * prev_sibling is NULL (since it should be the head of the sibling list)
