@@ -1,0 +1,53 @@
+diff --git c/kb.json w/kb.json
+index 5695ed52..2f2f9759 100644
+--- c/kb.json
++++ w/kb.json
+@@ -11168,7 +11168,7 @@
+         },
+         {
+           "addr": "0xc95c0",
+-          "decl": "void FUN_000c95c0(void);"
++          "decl": "char FUN_000c95c0(int a1);"
+         },
+         {
+           "addr": "0xc95d0",
+@@ -17379,7 +17379,8 @@
+         },
+         {
+           "addr": "0xbdef0",
+-          "decl": "void FUN_000bdef0(void);"
++          "decl": "void FUN_000bdef0(int16_t function_index, int thread_datum, char init);",
++          "ported": true
+         },
+         {
+           "addr": "0xbdf40",
+diff --git c/src/halo/game/players.c w/src/halo/game/players.c
+index 6092c6ee..9a0ca873 100644
+--- c/src/halo/game/players.c
++++ w/src/halo/game/players.c
+@@ -2357,3 +2357,25 @@ void players_update_after_game(void)
+   if (*(char *)0x449ef1 != 0 && *(char *)0x2f0e90 != 0)
+     profile_exit_private((void *)0x2f0e88);
+ }
++
++/* FUN_000bdef0 @ 0x000bdef0 — evaluate a script macro function and post its
++ * byte result back to the calling script thread.
++ *
++ * hs_macro_function_evaluate returns a POINTER to the evaluated result object
++ * (EAX; TEST EAX,EAX / JZ), or NULL when the evaluation yields no value. When
++ * non-NULL, the object's first byte (XOR EDX,EDX; MOV DL,[EAX]) is passed
++ * through FUN_000c95c0, whose AL return is zero-extended and returned to the
++ * thread via hs_return(thread_datum, value).
++ */
++void FUN_000bdef0(int16_t function_index, int thread_datum, char init)
++{
++  int result;
++  unsigned int hs_value;
++
++  result = hs_macro_function_evaluate(function_index, thread_datum, init);
++  if (result != 0) {
++    hs_value =
++      (unsigned int)(unsigned char)FUN_000c95c0(*(unsigned char *)result);
++    hs_return(thread_datum, hs_value);
++  }
++}

@@ -1,0 +1,23 @@
+{
+  "name": "FUN_000ba850",
+  "addr": "0xba850",
+  "obj": "players.obj",
+  "source_path": "/mnt/g/dev/halo-bugs/src/halo/game/players.c",
+  "best_score": 76.4,
+  "best_patch": "artifacts/parked/patches/FUN_000ba850-20260714-152956.patch",
+  "status": "parked",
+  "first_parked": "2026-07-14T15:29:56+00:00",
+  "last_updated": "2026-07-14T15:29:56+00:00",
+  "promoted_commit": null,
+  "attempts": [
+    {
+      "ts": "2026-07-14T15:29:56+00:00",
+      "model": "opus",
+      "effort": "high",
+      "score": 76.4,
+      "cap_hypothesis": "reg_defining_prologue: decl has an @<ax> parameter; VC71 cannot emit the register-reading prologue (permanent sub-bar). Score 76.4% (29 candidate/26 reference insns) sits squarely in the ~65-80% register-arg ceiling band; the ~3-insn delta is the AX->local move the standalone VC71 compile cannot reproduce.",
+      "reason": "structural_cap",
+      "patch": "artifacts/parked/patches/FUN_000ba850-20260714-152956.patch"
+    }
+  ]
+}

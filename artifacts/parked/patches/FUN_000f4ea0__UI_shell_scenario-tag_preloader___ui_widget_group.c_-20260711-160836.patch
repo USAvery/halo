@@ -1,0 +1,47 @@
+diff --git c/kb.json w/kb.json
+index 57dbc301..c49b6b48 100644
+--- c/kb.json
++++ w/kb.json
+@@ -12807,10 +12807,6 @@
+           "addr": "0xf4cf0",
+           "decl": "void FUN_000f4cf0(void);"
+         },
+-        {
+-          "addr": "0xf4ea0",
+-          "decl": "void FUN_000f4ea0(void);"
+-        },
+         {
+           "addr": "0xf52f0",
+           "decl": "wchar_t *FUN_000f52f0(void *widget);",
+@@ -38846,6 +38842,19 @@
+           "decl": "char FUN_0001b280(int actor_handle@<ecx>, int object_handle@<eax>, float *in_attach0, float *in_attach1, float *in_attach2, int param_6, float *out_position, int *out_handle);"
+         }
+       ]
++    },
++    {
++      "name": "ui_widget_group.obj",
++      "source": "interface/ui_widget_group.c",
++      "data": [],
++      "functions": [
++        {
++          "addr": "0xf4ea0",
++          "decl": "void FUN_000f4ea0(int scenario_tag_index);",
++          "name": "FUN_000f4ea0",
++          "ported": true
++        }
++      ]
+     }
+   ],
+   "0x1a080": {
+diff --git c/src/CMakeLists.txt w/src/CMakeLists.txt
+index 24bb9a0d..a60847b8 100644
+--- c/src/CMakeLists.txt
++++ w/src/CMakeLists.txt
+@@ -74,6 +74,7 @@
+ 	halo/interface/ui_widget.c
+ 	halo/interface/ui_widget_event_handler_functions.c
+ 	halo/interface/ui_widget_game_data_input_functions.c
++	halo/interface/ui_widget_group.c
+ 	halo/items/items.c
+ 	halo/items/projectiles.c
+ 	halo/items/weapons.c

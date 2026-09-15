@@ -1,0 +1,54 @@
+diff --git c/kb.json w/kb.json
+index 43ccad01..a2bfbe82 100644
+--- c/kb.json
++++ w/kb.json
+@@ -21320,7 +21320,8 @@
+     },
+     {
+      "addr": "0x184570",
+-     "decl": "char FUN_00184570(void *group);"
++     "decl": "char FUN_00184570(void *group);",
++     "ported": true
+     },
+     {
+      "addr": "0x1845b0",
+diff --git c/src/halo/rasterizer/rasterizer_text.c w/src/halo/rasterizer/rasterizer_text.c
+index 2adb7575..3bd3d40b 100644
+--- c/src/halo/rasterizer/rasterizer_text.c
++++ w/src/halo/rasterizer/rasterizer_text.c
+@@ -2503,4 +2503,4 @@ short rasterizer_transparent_geometry_group_to_presorted_index(
+     }
+   }
+   return index;
+-}
++}
+\ No newline at end of file
+diff --git c/src/halo/render/render.c w/src/halo/render/render.c
+index b42082e3..38bd5e35 100644
+--- c/src/halo/render/render.c
++++ w/src/halo/render/render.c
+@@ -304,3 +304,24 @@ void render_frame(void *a2, __int16 a3, _WORD *a4, _WORD *a5, void *a6,
+   rasterizer_windows_end();
+   rasterizer_frame_end();
+ }
++
++/* FUN_00184570: predicate over the presorted transparent-geometry group
++ * bitmap at 0x4d0cbc (0x30-byte / 384-bit table, zeroed at rasterizer_text.c
++ * init). Maps the group pointer to its presorted index; returns 1 when the
++ * index is invalid (-1) or the group's bit is clear, 0 when the bit is set.
++ * Bit layout: dword = index>>5, bit = index&0x1f. (0x184570) */
++char FUN_00184570(void *group)
++{
++  short index;
++  int idx;
++
++  index = rasterizer_transparent_geometry_group_to_presorted_index(
++    (unsigned int)group);
++  if (index != -1) {
++    idx = (int)index;
++    return (char)('\x01' -
++                  (((1 << (idx & 0x1f)) &
++                    *(unsigned int *)(0x4d0cbc + (idx >> 5) * 4)) != 0));
++  }
++  return '\x01';
++}

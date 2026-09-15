@@ -1,0 +1,43 @@
+diff --git c/kb.json w/kb.json
+index 934f1002..8f845c87 100644
+--- c/kb.json
++++ w/kb.json
+@@ -9813,7 +9813,8 @@
+         },
+         {
+           "addr": "0xc0e90",
+-          "decl": "void FUN_000c0e90(void);"
++          "decl": "void FUN_000c0e90(int16_t function_index, int thread_datum, char init);",
++          "ported": true
+         },
+         {
+           "addr": "0xc0ed0",
+diff --git c/src/halo/hs/hs.c w/src/halo/hs/hs.c
+index 794af3ee..4c41a483 100644
+--- c/src/halo/hs/hs.c
++++ w/src/halo/hs/hs.c
+@@ -90,6 +90,24 @@ void FUN_000c0dd0(int16_t function_index, int thread_datum, char init)
+   }
+ }
+ 
++/* 0xc0e90 — HS script function handler: evaluate a macro function and dispose
++ * its result. Twin of 0xc0c30's family (identical evaluator/return skeleton),
++ * but instead of dispatching a handle+value pair it derefs the first dword of
++ * the result block and passes that value to FUN_00058220 (a dispose/release
++ * helper). On success calls FUN_00058220(result[0]) then returns void to the
++ * HS thread via hs_return(thread_datum, 0). */
++void FUN_000c0e90(int16_t function_index, int thread_datum, char init)
++{
++  int *result;
++
++  result =
++    (int *)hs_macro_function_evaluate(function_index, thread_datum, init);
++  if (result != NULL) {
++    FUN_00058220(result[0]);
++    hs_return(thread_datum, 0);
++  }
++}
++
+ /* HaloScript (hs) subsystem — scripting engine init/dispose/update/evaluate. */
+ 
+ /* Allocate and initialize the hs_syntax data table used to store script

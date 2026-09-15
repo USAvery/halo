@@ -1,0 +1,96 @@
+diff --git c/kb.json w/kb.json
+index d535891b..fc9633e9 100644
+--- c/kb.json
++++ w/kb.json
+@@ -6659,7 +6659,7 @@
+         {
+           "addr": "0x9ca70",
+           "decl": "void effects_information_get(int effect_ptr@<ebx>, uint32_t flags_hi@<edi>, unsigned int *seed, float *velocity_out, float min_val, float max_val, uint32_t flags_lo);",
+-          "note": "hidden reg deps (EDI=flags_hi, EBX=effect_ptr) — callers pass these in registers; all known callers inlined",
++          "note": "hidden reg deps (EDI=flags_hi, EBX=effect_ptr) \u2014 callers pass these in registers; all known callers inlined",
+           "ported": true
+         },
+         {
+@@ -6720,7 +6720,7 @@
+         {
+           "addr": "0x9dcf0",
+           "decl": "void FUN_0009dcf0(float *position, void *effect, void *location, void *part, float *forward, float *up, float scale);",
+-          "note": "4 reg args (EAX,EDX,ECX,ESI) — inlined into FUN_0009e310, cannot be thunked separately",
++          "note": "4 reg args (EAX,EDX,ECX,ESI) \u2014 inlined into FUN_0009e310, cannot be thunked separately",
+           "ported": true
+         },
+         {
+@@ -12835,7 +12835,8 @@
+         },
+         {
+           "addr": "0xf5660",
+-          "decl": "void FUN_000f5660(void);"
++          "decl": "char FUN_000f5660(void);",
++          "ported": true
+         },
+         {
+           "addr": "0xf56b0",
+@@ -24880,7 +24881,7 @@
+         },
+         {
+           "addr": "0xe5ab0",
+-          "decl": "void ui_play_audio_feedback_sound(void);"
++          "decl": "void ui_play_audio_feedback_sound(short sound_index);"
+         },
+         {
+           "addr": "0xe5b10",
+@@ -39217,4 +39218,4 @@
+   "0x11cfd0": {
+     "ported": true
+   }
+-}
++}
+\ No newline at end of file
+diff --git c/src/halo/items/items.c w/src/halo/items/items.c
+index a7bf74cc..c98e9357 100644
+--- c/src/halo/items/items.c
++++ w/src/halo/items/items.c
+@@ -110,6 +110,43 @@ bool virtual_keyboard_initialize(void)
+   return *(void **)0x46cef4 != (void *)0;
+ }
+ 
++/*
++ * FUN_000f5660 @ 0xf5660  (items.obj)
++ *
++ * Step the UI item-variant selector BACKWARD to the previous entry whose
++ * table value differs from the current one, then play audio feedback.
++ *
++ * Globals (all confirmed from disassembly, raw pointer access):
++ *   *(short *)0x46cef8   row/set selector           (MOVSX word)
++ *   *(short *)0x46cefa   current variant index      (MOVSX word; cycles 0..10)
++ *   (char *)0x28a790     byte table[row*11 + index] (BYTE loads/compares)
++ *
++ * The original caches the current cell value in a register (DL) and keeps the
++ * decrementing index in AX, writing it back to the global only once after the
++ * loop; the local `current_value`/`index` reproduce that. Decrement wraps
++ * 0 -> -1 -> 10 (DEC AX; JNS; MOV AX,10). Always returns 1 (MOV AL,1).
++ * Tail call passes sound id 1 (PUSH 1; CALL 0xe5ab0; ADD ESP,4).
++ */
++char FUN_000f5660(void)
++{
++  int row_base;
++  short index;
++  char current_value;
++
++  row_base = (int)*(short *)0x46cef8 * 0xb;
++  index = *(short *)0x46cefa;
++  current_value = *(char *)(0x28a790 + row_base + index);
++  do {
++    index--;
++    if (index < 0) {
++      index = 10;
++    }
++  } while (*(char *)(0x28a790 + row_base + index) == current_value);
++  *(short *)0x46cefa = index;
++  ui_play_audio_feedback_sound(1);
++  return 1;
++}
++
+ #include "x87_math.h"
+ 
+ /* Activate the pickup sound effect for an equipment item.

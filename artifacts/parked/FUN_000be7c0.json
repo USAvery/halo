@@ -1,0 +1,23 @@
+{
+  "name": "FUN_000be7c0",
+  "addr": "0xbe7c0",
+  "obj": "players.obj",
+  "source_path": "src/halo/hs/hs.c",
+  "best_score": 84.2,
+  "best_patch": "artifacts/parked/patches/FUN_000be7c0-20260714-133501.patch",
+  "status": "promoted",
+  "first_parked": "2026-07-14T13:35:01+00:00",
+  "last_updated": "2026-07-20T22:15:01+00:00",
+  "promoted_commit": "cc2eade5",
+  "attempts": [
+    {
+      "ts": "2026-07-14T13:35:01+00:00",
+      "model": "opus",
+      "effort": "high",
+      "score": 84.2,
+      "cap_hypothesis": "Structural movzx/zero-extend scheduling ceiling shared by the entire HaloScript macro-handler shim family: the delinked reference emits register zero-extends (movzwl 0x4(%eax),%edx for the u16 field; movzbl %al,%ecx for the byte return) while VC71-recompiled source emits xorl %edx,%edx + movw and a movb %al,-0x4(%ebp) stack round-trip \u2014 a fixed ~5-insn gap. Sibling FUN_000be500 is a documented permanent cap at 85.2% (permuter 100+ attempts could not cross). Inlining the consumer call into hs_return did not change the score. classify_cap.py returned inconclusive; cap asserted by whole-family evidence and agent judgment.",
+      "reason": "structural_cap",
+      "patch": "artifacts/parked/patches/FUN_000be7c0-20260714-133501.patch"
+    }
+  ]
+}

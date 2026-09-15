@@ -1,0 +1,57 @@
+diff --git c/kb.json w/kb.json
+index 55cd465c..8d607e67 100644
+--- c/kb.json
++++ w/kb.json
+@@ -12843,7 +12843,8 @@
+         },
+         {
+           "addr": "0xf5700",
+-          "decl": "char FUN_000f5700(void);"
++          "decl": "char FUN_000f5700(void);",
++          "ported": true
+         },
+         {
+           "addr": "0xf5750",
+diff --git c/src/halo/items/items.c w/src/halo/items/items.c
+index a84d7712..002c39e6 100644
+--- c/src/halo/items/items.c
++++ w/src/halo/items/items.c
+@@ -110,6 +110,38 @@ bool virtual_keyboard_initialize(void)
+   return *(void **)0x46cef4 != (void *)0;
+ }
+ 
++/* FUN_000f5700 (0xf5700): virtual keyboard "move up" handler (dispatch
++ * action 2, see virtual_keyboard_process_input). Decrements the keymap
++ * cursor row (0x46cef8), wrapping -1 -> 4, and repeats until the character
++ * at the new row differs from the character at the starting row -- i.e. skip
++ * over rows whose keymap cell duplicates the current one. The starting-row
++ * character is loop-invariant (held in DL in the original). Always accepts
++ * the move: plays the cursor feedback sound and returns 1.
++ *
++ * Binary note: the original passes selector 1 to ui_play_audio_feedback_sound
++ * (push 1; call 0xe5ab0). On this branch that callee is declared void(void)
++ * and every existing caller drops the selector, so we match the established
++ * branch convention (a void->int retype of the callee is a cross-cutting
++ * change outside this single-function lift). */
++char FUN_000f5700(void)
++{
++  short row;
++  int col;
++  char old_char;
++
++  row = *(short *)0x46cef8;
++  col = *(short *)0x46cefa;
++  old_char = ((char *)0x28a790)[col + row * 0xb];
++  do {
++    row = row - 1;
++    if (row < 0)
++      row = 4;
++  } while (((char *)0x28a790)[col + row * 0xb] == old_char);
++  *(short *)0x46cef8 = row;
++  ui_play_audio_feedback_sound();
++  return 1;
++}
++
+ /* Virtual on-screen keyboard input pump (virtual_keyboard.obj).
+  * TU: c:\halo\SOURCE\interface\virtual_keyboard.c (__FILE__ assert
+  * @0x28a790..).

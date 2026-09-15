@@ -1,0 +1,77 @@
+{
+  "name": "FUN_000f5660",
+  "addr": "0xf5660",
+  "obj": "items.obj",
+  "source_path": "src/halo/items/items.c",
+  "best_score": 74.4,
+  "best_patch": "artifacts/parked/patches/FUN_000f5660-20260721-181729.patch",
+  "status": "parked",
+  "first_parked": "2026-07-11T10:10:41+00:00",
+  "last_updated": "2026-07-22T05:54:29+00:00",
+  "promoted_commit": null,
+  "attempts": [
+    {
+      "ts": "2026-07-11T10:10:41+00:00",
+      "model": "opus",
+      "effort": "high",
+      "score": 74.4,
+      "cap_hypothesis": "MSVC register-width / sign-flag-fusion scheduling difference for the int16 loop counter. Reference keeps the short counter strictly 16-bit: `mov ax,[0x46cefa]` (plain load), `dec ax`, `jns`, `mov ax,0xa`, with on-demand `movsx edx/esi,ax` for each table index. Candidate promotes to 32-bit: `xor eax,eax`+`mov ax,[..]` (zero-extend load), `dec eax`, `test ax,ax`+`jge`, `mov eax,0xa`. Identical control flow, globals (0x46cef8 short row, 0x46cefa short counter, 0x28a790 byte table stride 11), table byte-access, tail call ui_play_audio_feedback_sound(1), and `mov al,1` return. Behaviorally byte-identical (equivalence 100/100, 0 diverged). This is the int16-width scheduling structural-cap family, not a logic bug; two source forms ((short)(index-1) and index--) both yield the same 32-bit codegen. Classifier returned inconclusive (no @reg rule); cap is agent judgment.",
+      "reason": "structural_cap",
+      "patch": "artifacts/parked/patches/FUN_000f5660-20260711-101041.patch"
+    },
+    {
+      "ts": "2026-07-11T14:02:38+00:00",
+      "model": "opus",
+      "effort": "high",
+      "score": 74.4,
+      "cap_hypothesis": "int16-width scheduling structural-cap family (classifier: high, ledger_prior_cap confirms same 74.4% ceiling). Reference keeps the 0x46cefa column counter strictly 16-bit (mov ax / dec ax / jns / mov ax,0xa; on-demand movsx per table index); clang promotes to 32-bit (xor eax,eax+mov ax load / dec eax / test ax,ax+jge / mov eax,0xa). Identical control flow, globals, table byte-access, tail call, and mov al,1 return. Not a logic bug: equivalence 100/100, 0 diverged. Both source forms yield the same 32-bit codegen.",
+      "reason": "structural_cap",
+      "patch": "artifacts/parked/patches/FUN_000f5660-20260711-140238.patch"
+    },
+    {
+      "ts": "2026-07-11T18:38:59+00:00",
+      "model": "opus",
+      "effort": "high",
+      "score": 69.8,
+      "cap_hypothesis": "int16-width scheduling structural-cap family (classifier high; ledger_prior_cap confirms same ~74.4% ceiling). Reference keeps the 0x46cefa column counter strictly 16-bit (mov ax / dec ax / jns / mov ax,0xa; on-demand movsx per table index); VC71 promotes to 32-bit (xor eax,eax+mov ax / dec eax / test ax,ax+jge / mov eax,0xa), adding a testw the fused decw;jns avoids. Both source phrasings yield identical codegen. Decrement/negative-compare caps ~13pp below the equality-compare inc-siblings (FUN_000f5750=82.6%). Identical control flow, globals, table byte-access, tail call, mov al,1 return; equivalence 100/100, 0 diverged.",
+      "reason": "structural_cap",
+      "patch": "artifacts/parked/patches/FUN_000f5660-20260711-183859.patch"
+    },
+    {
+      "ts": "2026-07-12T11:08:20+00:00",
+      "model": "opus",
+      "effort": "high",
+      "score": 71.4,
+      "cap_hypothesis": "ledger_prior_cap: prior attempt capped at 74.4% (now 71.4%); int16-width scheduling structural-cap family. Reference keeps the 0x46cefa column counter strictly 16-bit (mov ax/dec ax/jns/mov ax,0xa; on-demand movsx per table index); VC71 promotes to 32-bit and adds a testw the fused decw;jns avoids. Both source phrasings yield identical codegen. Decrement/negative-compare caps ~13pp below the equality-compare inc-siblings (FUN_000f5750=82.6%). Identical control flow, globals, byte table access, tail call, mov al,1 return; equivalence 100/100 0 diverged.",
+      "reason": "structural_cap",
+      "patch": "artifacts/parked/patches/FUN_000f5660-20260712-110820.patch"
+    },
+    {
+      "ts": "2026-07-12T12:29:39+00:00",
+      "model": "opus",
+      "effort": "high",
+      "score": 69.8,
+      "cap_hypothesis": "ledger_prior_cap (prior 74.4%, now 69.8%) + int16-width scheduling structural-cap family: reference keeps the 0x46cefa column counter strictly 16-bit (mov ax/dec ax/jns/mov ax,0xa; on-demand movsx per table index); VC71 promotes to 32-bit and adds a testw the fused decw;jns avoids. Decrement/negative-compare form caps ~13pp below the equality-compare increment siblings (FUN_000f5750=82.6%, FUN_000f5700=75.6%). Both source phrasings (literal table[col+row*0xb] vs hoisted row_base[col]) yield identical codegen; row_base hoist scored 68.2% (worse) and was reverted. Identical control flow, globals, byte table access, tail call, mov al,1 return; equivalence 100/100 0 diverged.",
+      "reason": "structural_cap",
+      "patch": "artifacts/parked/patches/FUN_000f5660-20260712-122939.patch"
+    },
+    {
+      "ts": "2026-07-21T18:17:29+00:00",
+      "model": "opus",
+      "effort": "high",
+      "score": 74.4,
+      "cap_hypothesis": "ledger_prior_cap: prior attempt capped at 74.4% (no improvement now). int16-width scheduling structural-cap family: reference keeps the 0x46cefa column counter strictly 16-bit (mov ax/dec ax/jns/mov ax,0xa; on-demand movsx per table index); VC71 promotes to 32-bit and adds a testw the fused decw;jns avoids. Decrement/negative-compare form caps ~13pp below equality-compare increment siblings (FUN_000f5750=82.6%, FUN_000f5700=75.6%). row_base hoist phrasing tried, scored 68.2% (worse), reverted. Identical control flow, globals, byte-table access, tail call, mov al,1 return; equivalence 100/100 0 diverged.",
+      "reason": "structural_cap",
+      "patch": "artifacts/parked/patches/FUN_000f5660-20260721-181729.patch"
+    },
+    {
+      "ts": "2026-07-22T05:54:29+00:00",
+      "model": "opus",
+      "effort": "high",
+      "score": 69.8,
+      "cap_hypothesis": "ledger_prior_cap: prior attempt capped at 74.4% (no improvement now at 69.8%). int16-width scheduling structural-cap family: reference keeps the 0x46cefa column counter strictly 16-bit (mov ax/dec ax/jns/mov ax,0xa; on-demand movsx per table index); VC71 promotes to 32-bit and adds a testw the fused decw;jns avoids. Decrement/negative-compare form caps ~13pp below equality-compare increment siblings (FUN_000f5750=82.6%, FUN_000f5700=75.6%, both structural twins in same TU). row_base hoist phrasing previously tried, scored 68.2% (worse), reverted. Identical control flow, globals, byte-table access, tail call, mov al,1 return; equivalence 100/100 0 diverged. classify_cap.py returned cap_confidence=high (authoritative), do not escalate.",
+      "reason": "structural_cap",
+      "patch": "artifacts/parked/patches/FUN_000f5660-20260722-055429.patch"
+    }
+  ]
+}

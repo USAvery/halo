@@ -1,0 +1,74 @@
+diff --git c/kb.json w/kb.json
+index d535891b..9af2e919 100644
+--- c/kb.json
++++ w/kb.json
+@@ -12839,7 +12839,8 @@
+         },
+         {
+           "addr": "0xf56b0",
+-          "decl": "void FUN_000f56b0(void);"
++          "decl": "char FUN_000f56b0(void);",
++          "ported": true
+         },
+         {
+           "addr": "0xf5700",
+@@ -24880,7 +24881,7 @@
+         },
+         {
+           "addr": "0xe5ab0",
+-          "decl": "void ui_play_audio_feedback_sound(void);"
++          "decl": "void ui_play_audio_feedback_sound(short sound_index);"
+         },
+         {
+           "addr": "0xe5b10",
+diff --git c/src/halo/items/items.c w/src/halo/items/items.c
+index a7bf74cc..dec6a45f 100644
+--- c/src/halo/items/items.c
++++ w/src/halo/items/items.c
+@@ -110,6 +110,46 @@ bool virtual_keyboard_initialize(void)
+   return *(void **)0x46cef4 != (void *)0;
+ }
+ 
++/*
++ * Advance the virtual keyboard's sound-variant selector to the next distinct
++ * entry, then play a UI audio-feedback click.  (0x000f56b0, __cdecl)
++ *
++ * virtual_keyboard_globals at 0x46cef0:
++ *   +0x08  int16  row selector (0x46cef8)  -- signed word, selects an 11-column
++ *                                            row (MOVSX in the original)
++ *   +0x0a  int16  column index (0x46cefa)  -- current variant 0..10, all
++ *                                            increment/wrap arithmetic is
++ * 16-bit
++ *
++ * The sound table at 0x0028a790 is byte[rows][11] (stride 0xb bytes).  Starting
++ * from the current column, the column index is advanced (wrapping 0xb -> 0)
++ * until the byte at the new column differs from the byte at the starting
++ * column, so the same sound variant is never replayed back-to-back.  The chosen
++ * index is stored back and feedback sound variant 1 is played.
++ *
++ * Return: always 1 (char; original tail is MOV AL,1 / RET).
++ * ABI: no args, no register args; one cdecl callee (pushes int 1, ADD ESP,4).
++ */
++char FUN_000f56b0(void)
++{
++  int row_base;
++  short col;
++  unsigned char start_sound;
++
++  row_base = *(short *)0x46cef8 * 0xb;
++  col = *(short *)0x46cefa;
++  start_sound = ((unsigned char *)0x28a790)[row_base + col];
++  do {
++    col++;
++    if (col == 0xb) {
++      col = 0;
++    }
++  } while (((unsigned char *)0x28a790)[row_base + col] == start_sound);
++  *(short *)0x46cefa = col;
++  ui_play_audio_feedback_sound(1);
++  return 1;
++}
++
+ #include "x87_math.h"
+ 
+ /* Activate the pickup sound effect for an equipment item.

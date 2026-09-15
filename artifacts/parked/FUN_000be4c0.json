@@ -1,0 +1,23 @@
+{
+  "name": "FUN_000be4c0",
+  "addr": "0xbe4c0",
+  "obj": "players.obj",
+  "source_path": "src/halo/game/players.c",
+  "best_score": 0.0,
+  "best_patch": "artifacts/parked/patches/FUN_000be4c0-20260714-101754.patch",
+  "status": "promoted",
+  "first_parked": "2026-07-14T10:17:54+00:00",
+  "last_updated": "2026-07-20T21:57:42+00:00",
+  "promoted_commit": "60936761",
+  "attempts": [
+    {
+      "ts": "2026-07-14T10:17:54+00:00",
+      "model": "opus",
+      "effort": "high",
+      "score": 0.0,
+      "cap_hypothesis": "VC71 unmeasured: no delinked reference could be produced; not a lift failure",
+      "reason": "verify_skipped_no_ref",
+      "patch": "artifacts/parked/patches/FUN_000be4c0-20260714-101754.patch"
+    }
+  ]
+}

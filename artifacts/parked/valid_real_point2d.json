@@ -1,0 +1,23 @@
+{
+  "name": "valid_real_point2d",
+  "addr": "0x60c40",
+  "obj": "path_obstacle_avoidance.obj",
+  "source_path": "src/halo/ai/path_obstacle_avoidance.c",
+  "best_score": 59.5,
+  "best_patch": "artifacts/parked/patches/valid_real_point2d-20260710-201808.patch",
+  "status": "parked",
+  "first_parked": "2026-07-10T20:18:08+00:00",
+  "last_updated": "2026-07-10T20:18:08+00:00",
+  "promoted_commit": null,
+  "attempts": [
+    {
+      "ts": "2026-07-10T20:18:08+00:00",
+      "model": "opus",
+      "effort": "high",
+      "score": 59.5,
+      "cap_hypothesis": "",
+      "reason": "below_65pct",
+      "patch": "artifacts/parked/patches/valid_real_point2d-20260710-201808.patch"
+    }
+  ]
+}

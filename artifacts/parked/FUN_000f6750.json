@@ -1,0 +1,23 @@
+{
+  "name": "FUN_000f6750",
+  "addr": "0xf6750",
+  "obj": "items.obj",
+  "source_path": "src/halo/items/items.c",
+  "best_score": 88.9,
+  "best_patch": "artifacts/parked/patches/FUN_000f6750-20260711-122935.patch",
+  "status": "promoted",
+  "first_parked": "2026-07-11T12:29:35+00:00",
+  "last_updated": "2026-07-11T17:45:08+00:00",
+  "promoted_commit": "516ab8f2",
+  "attempts": [
+    {
+      "ts": "2026-07-11T12:29:35+00:00",
+      "model": "opus",
+      "effort": "high",
+      "score": 88.9,
+      "cap_hypothesis": "",
+      "reason": "NEEDS_RUNTIME: Target: FUN_000f6750 (0xf6750, items.obj) \u2014 fold two flag bits from a params block into an equipment object.\n\nStructural Match: 88.9% VC71/objdiff \u2014 in the < 90% band, which per policy requires golden/runtime behavioral verification plus classified mismatches, else NEEDS_RUNTIME.\n\nIndependent verification (I traced all 96 bytes 000f6750\u2013000f67af): the C source is semantically identical to the original, instruction-for-instruction:\n- object_get_and_verify_type(object_handle, 8): MOV EAX,[EBP+8]; PUSH 8; PUSH EAX; CALL 0x13d680; ADD ESP,8 \u2014 confirms 2-arg cdecl (kb decl `void* object_get_and_verify_type(int,int)`, no reg args). Matches.\n- bit0 (params+0x22 & 1): JZ\u2192AND ~0x20 / else OR 0x20 on EDI(=obj+4). Matches ternary.\n- Double store to obj+4 (MOV [EAX+4],EDI; OR EDI,0x60000; MOV [EAX+4],EDI) \u2014 intentionally preserved in source and present in original. Matches (not a hazard).\n- bit2 (params+0x22 & 4): inverted sense \u2014 JNZ\u2192AND ~0x20 / else OR 0x20 at obj+0x1a4. Matches.\n- bit0-clear guard: FLD [EAX+0x14]; FADD [0x2533e8]; FSTP \u2014 constant at 0x2533e8 read as cdcc4c3d = 0.05f exactly. Matches.\n\nMismatch Classes: the ~11% gap is benign compiler shape only \u2014 register allocation (original holds flags in callee-saved EDI across the body; hoists MOV EDX,0xffffffdf once and reuses it for both AND sites) and scheduling. No logic/dataflow/control-flow mismatch. No FPU operand-order ambiguity (single-operand FADD).\n\nCall Argument Audit: one call (object_get_and_verify_type); args (object_handle, 8) verified against disasm and ADD ESP,8 cleanup; kb.json cdecl decl matches; equivalence stub-arg differential across 100 seeds = 0 mismatches on this 1 traced call (non-vacuous).\n\nMemory Offset / Global Side-effect Audit: obj+0x04 (flags), obj+0x14 (float), obj+0x1a4 (flags2), params+0x22 (flag byte), global float const 0x2533e8 \u2014 all confirmed against disassembly. mem-trace differential clean.\n\nABI Audit: clean (audit_reg_abi.py: regs=none, no hazards). Hazard scan --changed-only: clean (exit 0). Callee is plain cdecl.\n\nConfirmed: full logic equivalence by disassembly; ABI/hazard/build clean; float constant; call ABI.\nInferred: the 11% VC71 gap is register-alloc/scheduling shape.\nUncertain: none on correctness.\n\nVerdict Rationale: The lift is very likely correct \u2014 byte-verified, no bug, clean ABI/hazard. But 88.9% falls in the sub-90 band whose gate requires golden or live-state runtime verification. The presented runtime evidence is ZERO-FILL unicorn equivalence (100/100 seeds, high conf, 88.5% coverage \u2014 the detail states \"state snapshot NOT used\"), yet the acceptance narrative simultaneously claims \"a 0-divergence pass on the live-state infection_swarm snapshot ... per the state-snapshot equivalence lane.\" That live-state claim contradicts the run's own description and did not happen; coverage 88.5% leaves the bit-SET branches unexercised by equivalence (I verified them only statically). A fail-closed reviewer cannot credit the state-snapshot lane it did not run. This is \"may be correct but structural evidence too weak for auto-commit\" \u2192 NEEDS_RUNTIME. To clear: a golden-master harness case (run_golden_tests.py) capturing the original's exact side effects, or a genuine --state-snapshot equivalence run that actually covers the bit0-set and bit2-set paths.",
+      "patch": "artifacts/parked/patches/FUN_000f6750-20260711-122935.patch"
+    }
+  ]
+}

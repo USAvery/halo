@@ -1,0 +1,45 @@
+diff --git c/kb.json w/kb.json
+index 934f1002..ad7e5007 100644
+--- c/kb.json
++++ w/kb.json
+@@ -9805,7 +9805,9 @@
+         },
+         {
+           "addr": "0xc0e10",
+-          "decl": "void FUN_000c0e10(void);"
++          "decl": "void FUN_000c0e10(int16_t function_index, int thread_datum, char init);",
++          "ported": true,
++          "source_path": "src/halo/hs/hs.c"
+         },
+         {
+           "addr": "0xc0e50",
+diff --git c/src/halo/hs/hs.c w/src/halo/hs/hs.c
+index 794af3ee..596a2ac1 100644
+--- c/src/halo/hs/hs.c
++++ w/src/halo/hs/hs.c
+@@ -90,6 +90,25 @@ void FUN_000c0dd0(int16_t function_index, int thread_datum, char init)
+   }
+ }
+ 
++/* 0xc0e10 — HS script function handler: apply a change via FUN_00058110.
++ * Same evaluate-then-dispatch shape as the 0xc0d50/0xc0dd0 twins, but the
++ * result block is consumed with a single dword load: `MOV EDX,[EAX]; PUSH EDX`
++ * in the original passes only *result (result[0], the first int) to
++ * FUN_00058110 — no second field is read. Evaluates the macro arguments; on
++ * success calls FUN_00058110(*result) then returns void to the HS thread via
++ * hs_return(thread_datum, 0). */
++void FUN_000c0e10(int16_t function_index, int thread_datum, char init)
++{
++  int *result;
++
++  result =
++    (int *)hs_macro_function_evaluate(function_index, thread_datum, init);
++  if (result != NULL) {
++    FUN_00058110(*result);
++    hs_return(thread_datum, 0);
++  }
++}
++
+ /* HaloScript (hs) subsystem — scripting engine init/dispose/update/evaluate. */
+ 
+ /* Allocate and initialize the hs_syntax data table used to store script

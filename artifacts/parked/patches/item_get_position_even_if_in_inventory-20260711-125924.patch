@@ -1,0 +1,67 @@
+diff --git c/kb.json w/kb.json
+index 55cd465c..c59e8d0b 100644
+--- c/kb.json
++++ w/kb.json
+@@ -12941,7 +12941,9 @@
+         },
+         {
+           "addr": "0xf6a60",
+-          "decl": "void item_get_position_even_if_in_inventory(void);"
++          "decl": "void item_get_position_even_if_in_inventory(int item_handle, float *out_position);",
++          "name": "item_get_position_even_if_in_inventory",
++          "ported": true
+         },
+         {
+           "addr": "0xf6af0",
+diff --git c/src/halo/items/items.c w/src/halo/items/items.c
+index a84d7712..6868f1fd 100644
+--- c/src/halo/items/items.c
++++ w/src/halo/items/items.c
+@@ -439,6 +439,47 @@ void item_attach_to_unit(int item_handle, int unit_handle)
+   }
+ }
+ 
++/* Fetch an item's world position, even while it is carried in a unit's
++ * inventory (0xf6a60). out_position is zero-filled up front. If the item
++ * is not in inventory (flag bit0 at +0x1a4 clear), copies the item's own
++ * position at +0x50/+0x54/+0x58. If it is in inventory, resolves the
++ * owning player (handle at +0x70) via the player_data pool, then that
++ * player's unit object (handle at +0x34) and copies the unit's position.
++ * Positions are raw dword copies; no FPU math. Faithful to the original:
++ * the in-inventory branch dereferences the datum_get() result without a
++ * NULL check. */
++void item_get_position_even_if_in_inventory(int item_handle,
++                                            float *out_position)
++{
++  char *item_obj;
++  char *player;
++  char *unit_obj;
++
++  item_obj = (char *)object_try_and_get_and_verify_type(item_handle, 0x1c);
++  out_position[0] = 0;
++  out_position[1] = 0;
++  out_position[2] = 0;
++  if (item_obj != NULL) {
++    if ((*(unsigned char *)(item_obj + 0x1a4) & 1) != 0) {
++      if (*(int *)(item_obj + 0x70) != NONE) {
++        player =
++          (char *)datum_get(*(data_t **)0x5aa6d4, *(int *)(item_obj + 0x70));
++        if (*(int *)(player + 0x34) != NONE) {
++          unit_obj =
++            (char *)object_get_and_verify_type(*(int *)(player + 0x34), 3);
++          out_position[0] = *(float *)(unit_obj + 0x50);
++          out_position[1] = *(float *)(unit_obj + 0x54);
++          out_position[2] = *(float *)(unit_obj + 0x58);
++        }
++      }
++    } else {
++      out_position[0] = *(float *)(item_obj + 0x50);
++      out_position[1] = *(float *)(item_obj + 0x54);
++      out_position[2] = *(float *)(item_obj + 0x58);
++    }
++  }
++}
++
+ /* Initialize the danger countdown for an item (0xf6af0).
+  * If the item's danger count at +0x1a8 is zero, spawns an effect using
+  * the tag reference at +0x2f4 of the 'item' tag definition (detonation

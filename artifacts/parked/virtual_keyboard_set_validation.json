@@ -1,0 +1,23 @@
+{
+  "name": "virtual_keyboard_set_validation",
+  "addr": "0xf5500",
+  "obj": "items.obj (TU string is c:\\halo\\SOURCE\\interface\\virtual_keyboard.c \u2014 kb assigns 0xf5500 to items.obj but the __FILE__ evidence is interface/virtual_keyboard.c; source belongs in interface/)",
+  "source_path": "src/halo/items/items.c",
+  "best_score": 81.5,
+  "best_patch": "artifacts/parked/patches/virtual_keyboard_set_validation-20260711-095247.patch",
+  "status": "promoted",
+  "first_parked": "2026-07-11T09:52:47+00:00",
+  "last_updated": "2026-07-11T16:25:59+00:00",
+  "promoted_commit": "0f8e1ffa",
+  "attempts": [
+    {
+      "ts": "2026-07-11T09:52:47+00:00",
+      "model": "opus",
+      "effort": "high",
+      "score": 81.5,
+      "cap_hypothesis": "Decl-forced gap: the original binary calls halt_and_catch_fire(-1) at both assert tails (push $0xffffffff; call FUN_001029a0; add esp,0x14 cleaning display_assert's 16 bytes + the 4-byte int arg), but the immutable project decl is void halt_and_catch_fire(void) (main.c definition + 7+ 0-arg callers), so the push -1 and matching add-esp immediate cannot be emitted from C (~2 insns/site x2). The remaining gap is MSVC register-zero reuse (original zeroes EBX once and stores via bl/bx; VC71 emits mixed immediates) and jump-to-shared-epilogue block layout vs inline ret. classify_cap returned inconclusive; judged capped by the decl-mismatch + regalloc/layout scheduling patterns. Flattening nested asserts to expanded early-exit guards already recovered 62.7% -> 81.5%.",
+      "reason": "structural_cap",
+      "patch": "artifacts/parked/patches/virtual_keyboard_set_validation-20260711-095247.patch"
+    }
+  ]
+}

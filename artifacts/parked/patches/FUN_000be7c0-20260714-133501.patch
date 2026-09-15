@@ -1,0 +1,81 @@
+diff --git c/kb.json w/kb.json
+index 85a47841..23b83fda 100644
+--- c/kb.json
++++ w/kb.json
+@@ -6659,7 +6659,7 @@
+         {
+           "addr": "0x9ca70",
+           "decl": "void effects_information_get(int effect_ptr@<ebx>, uint32_t flags_hi@<edi>, unsigned int *seed, float *velocity_out, float min_val, float max_val, uint32_t flags_lo);",
+-          "note": "hidden reg deps (EDI=flags_hi, EBX=effect_ptr) \u2014 callers pass these in registers; all known callers inlined",
++          "note": "hidden reg deps (EDI=flags_hi, EBX=effect_ptr) — callers pass these in registers; all known callers inlined",
+           "ported": true
+         },
+         {
+@@ -6720,7 +6720,7 @@
+         {
+           "addr": "0x9dcf0",
+           "decl": "void FUN_0009dcf0(float *position, void *effect, void *location, void *part, float *forward, float *up, float scale);",
+-          "note": "4 reg args (EAX,EDX,ECX,ESI) \u2014 inlined into FUN_0009e310, cannot be thunked separately",
++          "note": "4 reg args (EAX,EDX,ECX,ESI) — inlined into FUN_0009e310, cannot be thunked separately",
+           "ported": true
+         },
+         {
+@@ -17536,7 +17536,9 @@
+         },
+         {
+           "addr": "0xbe7c0",
+-          "decl": "void FUN_000be7c0(void);"
++          "decl": "void FUN_000be7c0(int16_t function_index, int thread_datum, char init);",
++          "ported": true,
++          "source_path": "src/halo/hs/hs.c"
+         },
+         {
+           "addr": "0xbe810",
+@@ -21145,7 +21147,7 @@
+         },
+         {
+           "addr": "0x95660",
+-          "decl": "void recorded_animation_play_and_delete(void);"
++          "decl": "char recorded_animation_play_and_delete(int arg0, int arg1);"
+         },
+         {
+           "addr": "0x95680",
+@@ -39363,4 +39365,4 @@
+   "0x11cfd0": {
+     "ported": true
+   }
+-}
+\ No newline at end of file
++}
+diff --git c/src/halo/hs/hs.c w/src/halo/hs/hs.c
+index 151a2049..0694eef8 100644
+--- c/src/halo/hs/hs.c
++++ w/src/halo/hs/hs.c
+@@ -280,6 +280,27 @@ void FUN_000be5a0(int16_t function_index, int thread_datum, char init)
+   }
+ }
+ 
++/* 0xbe7c0 — HS script "recorded animation playback" macro handler.
++ * Evaluates the macro arguments via hs_macro_function_evaluate; on success the
++ * result block holds a dword at +0x0 and a zero-extended u16 at +0x4 (disasm:
++ * XOR EDX; MOV DX,[EAX+4] — do NOT sign-extend). Passes both to
++ * recorded_animation_play_and_delete (2-arg cdecl, returns a byte in AL), then
++ * returns that byte to the script thread. A single ADD ESP,0x10 at 0xbe800
++ * merges the consumer's and hs_return's cleanups, confirming the 2-arg call.
++ */
++void FUN_000be7c0(int16_t function_index, int thread_datum, char init)
++{
++  int *result;
++
++  result =
++    (int *)hs_macro_function_evaluate(function_index, thread_datum, init);
++  if (result != NULL) {
++    hs_return(thread_datum,
++              (unsigned char)recorded_animation_play_and_delete(
++                result[0], *(uint16_t *)(result + 1)));
++  }
++}
++
+ /* 0xc0c30 — HS script function handler: apply an encounter state change.
+  * Evaluates the macro arguments; on success the result block holds an
+  * encounter handle at +0x0 (int) and a state value at +0x4 (int16). Calls

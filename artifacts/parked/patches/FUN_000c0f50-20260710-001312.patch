@@ -1,0 +1,215 @@
+diff --git c/kb.json w/kb.json
+index cd8e20e2..53566346 100644
+--- c/kb.json
++++ w/kb.json
+@@ -9833,7 +9833,8 @@
+         },
+         {
+           "addr": "0xc0f50",
+-          "decl": "void FUN_000c0f50(void);"
++          "decl": "void FUN_000c0f50(int16_t function_index, int thread_datum, char init);",
++          "ported": true
+         },
+         {
+           "addr": "0xc0f90",
+diff --git c/src/halo/hs/hs.c w/src/halo/hs/hs.c
+index a17e0896..de1dbbb6 100644
+--- c/src/halo/hs/hs.c
++++ w/src/halo/hs/hs.c
+@@ -84,16 +84,16 @@ void FUN_000c0cd0(int16_t function_index, int thread_datum, char init)
+  * FUN_00057f90(handle, distance) then returns void to the HS thread via
+  * hs_return(thread_datum, 0). */
+ struct hs_handle_distance_result {
+-  int handle;      /* +0x0 */
+-  float distance;  /* +0x4 */
++  int handle; /* +0x0 */
++  float distance; /* +0x4 */
+ };
+ 
+ void FUN_000c0d10(int16_t function_index, int thread_datum, char init)
+ {
+   struct hs_handle_distance_result *result;
+ 
+-  result = (struct hs_handle_distance_result *)
+-    hs_macro_function_evaluate(function_index, thread_datum, init);
++  result = (struct hs_handle_distance_result *)hs_macro_function_evaluate(
++    function_index, thread_datum, init);
+   if (result != NULL) {
+     FUN_00057f90(result->handle, result->distance);
+     hs_return(thread_datum, 0);
+@@ -214,6 +214,97 @@ void FUN_000c0e90(int16_t function_index, int thread_datum, char init)
+   }
+ }
+ 
++/* 0xc0ed0 — Evaluate an HS macro-function call and post its result to the
++ * calling thread. Dispatches to hs_macro_function_evaluate; when that returns
++ * a non-NULL result record, forwards the record's value (dword @ +0x0) and its
++ * type byte (@ +0x4) to the result-commit helper, then signals the thread to
++ * return with value 0.
++ *
++ * Callees (hardcoded addresses, all ported):
++ *   0xcc560 = hs_macro_function_evaluate(int16 function_index,
++ *                                        int thread_datum, char init)
++ *               -> result record* or NULL
++ *   0x58270 = FUN_00058270(int value, char type) -> void
++ *   0xcbf80 = hs_return(int thread_datum, int value) -> void
++ *
++ * Pointer arith: result is int* (dword-strided), so (result + 1) addresses the
++ * byte at +0x4. The second arg to FUN_00058270 is a single BYTE (char-width),
++ * NOT a dword. thread_datum is forwarded unchanged to both callees.
++ */
++void FUN_000c0ed0(int16_t function_index, int thread_datum, char init)
++{
++  int *result;
++
++  result =
++    (int *)hs_macro_function_evaluate(function_index, thread_datum, init);
++  if (result != (int *)0) {
++    FUN_00058270(*result, *(char *)(result + 1));
++    hs_return(thread_datum, 0);
++  }
++  return;
++}
++
++/* Evaluate a script macro function for side effects, discarding its value,
++ * then commit a zero return to the calling thread.
++ *
++ * Calls hs_macro_function_evaluate(function_index, thread_datum, init), which
++ * returns a pointer to the evaluated value block (or NULL). When non-NULL, the
++ * first dword of that block is passed to FUN_00058310 (0x58310), then the
++ * thread result is committed as 0 via hs_return(thread_datum, 0).
++ *
++ * The evaluator's return is declared int in kb.json (0xcc560) but is used here
++ * as a pointer, so it is cast.
++ *
++ * Callees:
++ *   0xcc560 = hs_macro_function_evaluate(short, int, char) -> void* (used as
++ * ptr) 0x58310 = FUN_00058310(uint) -> void 0xcbf80 = hs_return(int
++ * thread_handle, int value) -> void [ported]
++ */
++void FUN_000c0f10(int16_t function_index, int thread_datum, char init)
++{
++  unsigned int *result;
++
++  result = (unsigned int *)hs_macro_function_evaluate(function_index,
++                                                      thread_datum, init);
++  if (result != (unsigned int *)0) {
++    FUN_00058310(*result);
++    hs_return(thread_datum, 0);
++  }
++  return;
++}
++
++/* Evaluate a script macro function for side effects, discarding its value,
++ * then commit a zero return to the calling thread.
++ *
++ * Calls hs_macro_function_evaluate(function_index, thread_datum, init), which
++ * returns a pointer to the evaluated value block (or NULL). When non-NULL, the
++ * first dword of that block is passed to FUN_00058390 (0x58390), then the
++ * thread result is committed as 0 via hs_return(thread_datum, 0).
++ *
++ * Identical in shape to FUN_000c0f10 (0xc0f10); the only difference is the
++ * per-value-block callee (0x58390 here vs 0x58310 there).
++ *
++ * The evaluator's return is declared int in kb.json (0xcc560) but is used here
++ * as a pointer, so it is cast.
++ *
++ * Callees:
++ *   0xcc560 = hs_macro_function_evaluate(short, int, char) -> void* (used as
++ * ptr) 0x58390 = FUN_00058390(uint) -> void 0xcbf80 = hs_return(int
++ * thread_handle, int value) -> void [ported]
++ */
++void FUN_000c0f50(int16_t function_index, int thread_datum, char init)
++{
++  unsigned int *result;
++
++  result = (unsigned int *)hs_macro_function_evaluate(function_index,
++                                                      thread_datum, init);
++  if (result != (unsigned int *)0) {
++    FUN_00058390(*result);
++    hs_return(thread_datum, 0);
++  }
++  return;
++}
++
+ /* HaloScript (hs) subsystem — scripting engine init/dispose/update/evaluate. */
+ 
+ /* Allocate and initialize the hs_syntax data table used to store script
+@@ -1070,61 +1161,3 @@ bool hs_source_offset_valid(int offset)
+   }
+   return true;
+ }
+-/* 0xc0ed0 — Evaluate an HS macro-function call and post its result to the
+- * calling thread. Dispatches to hs_macro_function_evaluate; when that returns
+- * a non-NULL result record, forwards the record's value (dword @ +0x0) and its
+- * type byte (@ +0x4) to the result-commit helper, then signals the thread to
+- * return with value 0.
+- *
+- * Callees (hardcoded addresses, all ported):
+- *   0xcc560 = hs_macro_function_evaluate(int16 function_index,
+- *                                        int thread_datum, char init)
+- *               -> result record* or NULL
+- *   0x58270 = FUN_00058270(int value, char type) -> void
+- *   0xcbf80 = hs_return(int thread_datum, int value) -> void
+- *
+- * Pointer arith: result is int* (dword-strided), so (result + 1) addresses the
+- * byte at +0x4. The second arg to FUN_00058270 is a single BYTE (char-width),
+- * NOT a dword. thread_datum is forwarded unchanged to both callees.
+- */
+-void FUN_000c0ed0(int16_t function_index, int thread_datum, char init)
+-{
+-  int *result;
+-
+-  result = (int *)hs_macro_function_evaluate(function_index, thread_datum, init);
+-  if (result != (int *)0) {
+-    FUN_00058270(*result, *(char *)(result + 1));
+-    hs_return(thread_datum, 0);
+-  }
+-  return;
+-}
+-
+-/* Evaluate a script macro function for side effects, discarding its value,
+- * then commit a zero return to the calling thread.
+- *
+- * Calls hs_macro_function_evaluate(function_index, thread_datum, init), which
+- * returns a pointer to the evaluated value block (or NULL). When non-NULL, the
+- * first dword of that block is passed to FUN_00058310 (0x58310), then the
+- * thread result is committed as 0 via hs_return(thread_datum, 0).
+- *
+- * The evaluator's return is declared int in kb.json (0xcc560) but is used here
+- * as a pointer, so it is cast.
+- *
+- * Callees:
+- *   0xcc560 = hs_macro_function_evaluate(short, int, char) -> void* (used as ptr)
+- *   0x58310 = FUN_00058310(uint) -> void
+- *   0xcbf80 = hs_return(int thread_handle, int value) -> void
+- * [ported]
+- */
+-void FUN_000c0f10(int16_t function_index, int thread_datum, char init)
+-{
+-  unsigned int *result;
+-
+-  result = (unsigned int *)hs_macro_function_evaluate(function_index,
+-                                                      thread_datum, init);
+-  if (result != (unsigned int *)0) {
+-    FUN_00058310(*result);
+-    hs_return(thread_datum, 0);
+-  }
+-  return;
+-}
+diff --git c/src/halo/hs/hs_runtime.c w/src/halo/hs/hs_runtime.c
+index 8384e41b..31903ec7 100644
+--- c/src/halo/hs/hs_runtime.c
++++ w/src/halo/hs/hs_runtime.c
+@@ -1,3 +1,4 @@
++
+ /* Validate the syntax tree after loading a scenario. Iterates all syntax
+  * nodes and checks for consistency: valid types, valid source offsets,
+  * valid script indices, and correct function references. If any node fails
+@@ -3031,4 +3032,4 @@ int FUN_000ce450(int param_1, int *param_2)
+     }
+   }
+   return -1;
+-}
++}
+\ No newline at end of file

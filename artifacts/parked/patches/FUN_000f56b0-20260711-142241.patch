@@ -1,0 +1,108 @@
+diff --git c/kb.json w/kb.json
+index 55cd465c..4c2c2d0c 100644
+--- c/kb.json
++++ w/kb.json
+@@ -6659,7 +6659,7 @@
+         {
+           "addr": "0x9ca70",
+           "decl": "void effects_information_get(int effect_ptr@<ebx>, uint32_t flags_hi@<edi>, unsigned int *seed, float *velocity_out, float min_val, float max_val, uint32_t flags_lo);",
+-          "note": "hidden reg deps (EDI=flags_hi, EBX=effect_ptr) \u2014 callers pass these in registers; all known callers inlined",
++          "note": "hidden reg deps (EDI=flags_hi, EBX=effect_ptr) — callers pass these in registers; all known callers inlined",
+           "ported": true
+         },
+         {
+@@ -6720,7 +6720,7 @@
+         {
+           "addr": "0x9dcf0",
+           "decl": "void FUN_0009dcf0(float *position, void *effect, void *location, void *part, float *forward, float *up, float scale);",
+-          "note": "4 reg args (EAX,EDX,ECX,ESI) \u2014 inlined into FUN_0009e310, cannot be thunked separately",
++          "note": "4 reg args (EAX,EDX,ECX,ESI) — inlined into FUN_0009e310, cannot be thunked separately",
+           "ported": true
+         },
+         {
+@@ -12839,7 +12839,9 @@
+         },
+         {
+           "addr": "0xf56b0",
+-          "decl": "char FUN_000f56b0(void);"
++          "decl": "char FUN_000f56b0(void);",
++          "ported": true,
++          "name": "FUN_000f56b0"
+         },
+         {
+           "addr": "0xf5700",
+@@ -24887,7 +24889,7 @@
+         },
+         {
+           "addr": "0xe5ab0",
+-          "decl": "void ui_play_audio_feedback_sound(void);"
++          "decl": "void ui_play_audio_feedback_sound(int selector);"
+         },
+         {
+           "addr": "0xe5b10",
+@@ -39224,4 +39226,4 @@
+   "0x11cfd0": {
+     "ported": true
+   }
+-}
+\ No newline at end of file
++}
+diff --git c/src/halo/items/items.c w/src/halo/items/items.c
+index a84d7712..c541ec07 100644
+--- c/src/halo/items/items.c
++++ w/src/halo/items/items.c
+@@ -110,6 +110,36 @@ bool virtual_keyboard_initialize(void)
+   return *(void **)0x46cef4 != (void *)0;
+ }
+ 
++/* Virtual on-screen keyboard column-cursor advance handler (0xf56b0).
++ * TU: c:\halo\SOURCE\interface\virtual_keyboard.c.
++ *
++ * Dispatch case 1 (analog +X / "next") of virtual_keyboard_process_input.
++ * Advances the column cursor (0x46cefa) forward with wraparound at 11,
++ * skipping keymap entries identical to the starting key so the cursor lands
++ * on a genuinely different character, then plays the UI "cursor" feedback
++ * sound (selector 1). Keymap at 0x28a790 is signed bytes indexed
++ * [col + row*0xb]; row selector is 0x46cef8. The starting entry is loop-
++ * invariant (hoisted). Always accepts the move: returns 1 in AL. */
++char FUN_000f56b0(void)
++{
++  int row;
++  short cur;
++  char target;
++
++  row = (int)*(short *)0x46cef8 * 0xb;
++  cur = *(short *)0x46cefa;
++  target = ((char *)0x28a790)[cur + row];
++  do {
++    cur = cur + 1;
++    if (cur == 0xb) {
++      cur = 0;
++    }
++  } while (((char *)0x28a790)[cur + row] == target);
++  *(short *)0x46cefa = cur;
++  ui_play_audio_feedback_sound(1);
++  return 1;
++}
++
+ /* Virtual on-screen keyboard input pump (virtual_keyboard.obj).
+  * TU: c:\halo\SOURCE\interface\virtual_keyboard.c (__FILE__ assert
+  * @0x28a790..).
+@@ -200,7 +230,7 @@ void virtual_keyboard_process_input(void)
+             csmemset(*(char **)0x46cf08, 0, (unsigned int)*(short *)0x46cefc);
+             *(char **)0x46cf0c = *(char **)0x46cf08;
+             *(unsigned char *)0x46cf07 = 0;
+-            ui_play_audio_feedback_sound();
++            ui_play_audio_feedback_sound(1);
+             moved = 1;
+           } else {
+             FUN_000f5f30();
+@@ -214,7 +244,7 @@ void virtual_keyboard_process_input(void)
+             *(char **)0x46cf0c -= 1;
+         cursor_moved:
+           *(unsigned char *)0x46cf07 = 0;
+-          ui_play_audio_feedback_sound();
++          ui_play_audio_feedback_sound(1);
+           moved = 1;
+         }
+         break;

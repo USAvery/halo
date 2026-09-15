@@ -1,0 +1,44 @@
+diff --git c/kb.json w/kb.json
+index 934f1002..2863f8fe 100644
+--- c/kb.json
++++ w/kb.json
+@@ -9809,7 +9809,8 @@
+         },
+         {
+           "addr": "0xc0e50",
+-          "decl": "void FUN_000c0e50(void);"
++          "decl": "void FUN_000c0e50(int16_t function_index, int thread_datum, char init);",
++          "ported": true
+         },
+         {
+           "addr": "0xc0e90",
+diff --git c/src/halo/hs/hs.c w/src/halo/hs/hs.c
+index 794af3ee..b9be63da 100644
+--- c/src/halo/hs/hs.c
++++ w/src/halo/hs/hs.c
+@@ -90,6 +90,25 @@ void FUN_000c0dd0(int16_t function_index, int thread_datum, char init)
+   }
+ }
+ 
++/* 0xc0e50 — HS script function handler: apply a change via FUN_000581b0.
++ * Same family as 0xc0cd0/0xc0dd0 (identical codegen; differs only in the
++ * dispatch callee). Evaluates the macro arguments; on success the result
++ * block holds a handle at +0x0 (int) and a value at +0x4, both read as full
++ * int32 (puVar1[1] on an undefined4* — a 4-byte load — matching
++ * FUN_000581b0's `int` second parameter). Calls FUN_000581b0(handle, value)
++ * then returns void to the HS thread via hs_return(thread_datum, 0). */
++void FUN_000c0e50(int16_t function_index, int thread_datum, char init)
++{
++  int *result;
++
++  result =
++    (int *)hs_macro_function_evaluate(function_index, thread_datum, init);
++  if (result != NULL) {
++    FUN_000581b0(result[0], result[1]);
++    hs_return(thread_datum, 0);
++  }
++}
++
+ /* HaloScript (hs) subsystem — scripting engine init/dispose/update/evaluate. */
+ 
+ /* Allocate and initialize the hs_syntax data table used to store script

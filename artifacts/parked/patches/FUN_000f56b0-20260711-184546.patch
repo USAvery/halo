@@ -1,0 +1,62 @@
+diff --git c/kb.json w/kb.json
+index 9f185541..049f43ae 100644
+--- c/kb.json
++++ w/kb.json
+@@ -12840,7 +12840,9 @@
+         },
+         {
+           "addr": "0xf56b0",
+-          "decl": "char FUN_000f56b0(void);"
++          "decl": "char FUN_000f56b0(void);",
++          "ported": true,
++          "source_path": "src/halo/items/items.c"
+         },
+         {
+           "addr": "0xf5700",
+diff --git c/src/halo/items/items.c w/src/halo/items/items.c
+index c67c2b72..f31ddd31 100644
+--- c/src/halo/items/items.c
++++ w/src/halo/items/items.c
+@@ -192,6 +192,42 @@ bool virtual_keyboard_set_validation(wchar_t *text_buffer,
+   return true;
+ }
+ 
++/* Virtual keyboard cursor move handler: advance the keymap column cursor
++ * rightward (0xf56b0, virtual_keyboard.obj TU).
++ *
++ * Increments the column cursor at 0x46cefa modulo 0xb (11 keymap columns),
++ * skipping columns whose key character (keymap byte at
++ * 0x28a790[col + row*0xb]) equals the character under the pre-move cursor, so
++ * duplicate/merged keys are stepped over in one press. Stores the new column,
++ * plays the UI cursor-move sound (selector 1), and returns 1 (move accepted ->
++ * caller latches last_move_dir/last_move_time). Sibling of
++ * FUN_000f5700/5750/57a0/5fb0.
++ *
++ * Disasm notes: col (0x46cefa) is held in AX for the whole loop (16-bit
++ * inc/cmp/xor) and stored to the global once after the loop; the pre-move key
++ * byte is cached in DL before the loop; row (0x46cef8) is MOVSX-loaded once and
++ * IMUL'd by 0xb. Ghidra dropped the PUSH 0x1 to the audio call; the disasm
++ * passes selector 1. MOV AL,1 before RET -> returns char 1. */
++char FUN_000f56b0(void)
++{
++  short row;
++  short col;
++  char original_key;
++
++  row = *(short *)0x46cef8;
++  col = *(short *)0x46cefa;
++  original_key = ((char *)0x28a790)[(int)col + row * 0xb];
++  do {
++    col = (short)(col + 1);
++    if (col == 0xb) {
++      col = 0;
++    }
++  } while (((char *)0x28a790)[(int)col + row * 0xb] == original_key);
++  *(short *)0x46cefa = col;
++  ui_play_audio_feedback_sound(1);
++  return 1;
++}
++
+ /* Virtual keyboard cursor move handler: advance the keymap row cursor
+  * downward (0xf5750, virtual_keyboard.obj TU).
+  *

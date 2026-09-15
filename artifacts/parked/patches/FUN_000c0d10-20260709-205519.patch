@@ -1,0 +1,62 @@
+diff --git c/kb.json w/kb.json
+index 2d4576a6..16b74a6c 100644
+--- c/kb.json
++++ w/kb.json
+@@ -9787,7 +9787,8 @@
+         },
+         {
+           "addr": "0xc0d10",
+-          "decl": "void FUN_000c0d10(void);"
++          "decl": "void FUN_000c0d10(int16_t function_index, int thread_datum, char init);",
++          "ported": true
+         },
+         {
+           "addr": "0xc0d50",
+diff --git c/src/halo/hs/hs.c w/src/halo/hs/hs.c
+index 92d8fe00..0aebd3f1 100644
+--- c/src/halo/hs/hs.c
++++ w/src/halo/hs/hs.c
+@@ -51,6 +51,27 @@ void FUN_000c0cd0(int16_t function_index, int thread_datum, char init)
+   }
+ }
+ 
++/* 0xc0d10 — HS script function handler: set a vehicle entry's enterable
++ * distance. Twin of 0xc0c30/0xc0cd0, but the result block's +0x4 field is a
++ * float (the distance), passed by its raw IEEE-754 bits — NOT an int->float
++ * numeric conversion. Verified against disassembly: the original does
++ * `fld dword [eax+4]; push ecx; fstp dword [esp]` (a reinterpret via FLD, not
++ * FILD), so *(float *)(result + 1) reads the dword as float bits directly.
++ * Evaluates the macro arguments; on success the result block holds a handle at
++ * +0x0 (int) and a float distance at +0x4. Calls FUN_00057f90(handle, distance)
++ * then returns void to the HS thread via hs_return(thread_datum, 0). */
++void FUN_000c0d10(int16_t function_index, int thread_datum, char init)
++{
++  int *result;
++
++  result =
++    (int *)hs_macro_function_evaluate(function_index, thread_datum, init);
++  if (result != NULL) {
++    FUN_00057f90(result[0], *(float *)(result + 1));
++    hs_return(thread_datum, 0);
++  }
++}
++
+ /* HaloScript (hs) subsystem — scripting engine init/dispose/update/evaluate. */
+ 
+ /* Allocate and initialize the hs_syntax data table used to store script
+diff --git c/src/halo/hs/hs_runtime.c w/src/halo/hs/hs_runtime.c
+index 8384e41b..31903ec7 100644
+--- c/src/halo/hs/hs_runtime.c
++++ w/src/halo/hs/hs_runtime.c
+@@ -1,3 +1,4 @@
++
+ /* Validate the syntax tree after loading a scenario. Iterates all syntax
+  * nodes and checks for consistency: valid types, valid source offsets,
+  * valid script indices, and correct function references. If any node fails
+@@ -3031,4 +3032,4 @@ int FUN_000ce450(int param_1, int *param_2)
+     }
+   }
+   return -1;
+-}
++}
+\ No newline at end of file

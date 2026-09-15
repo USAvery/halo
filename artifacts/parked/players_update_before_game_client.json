@@ -1,0 +1,23 @@
+{
+  "name": "players_update_before_game_client",
+  "addr": "0xbc920",
+  "obj": "players.obj",
+  "source_path": "src/halo/game/players.c",
+  "best_score": 83.9,
+  "best_patch": "artifacts/parked/patches/players_update_before_game_client-20260714-193031.patch",
+  "status": "parked",
+  "first_parked": "2026-07-14T19:30:31+00:00",
+  "last_updated": "2026-07-14T19:30:31+00:00",
+  "promoted_commit": null,
+  "attempts": [
+    {
+      "ts": "2026-07-14T19:30:31+00:00",
+      "model": "opus",
+      "effort": "high",
+      "score": 83.9,
+      "cap_hypothesis": "reg_defining_prologue: decl has an @<ebx> parameter; VC71 cannot emit the register-reading prologue (permanent sub-bar). classify_cap.py returned high confidence. Content matches (108 candidate vs 109 reference insns, near-equal) but sequence ordering diverges due to the custom __usercall arg-reading prologue and MSVC skip-flag scheduling.",
+      "reason": "structural_cap",
+      "patch": "artifacts/parked/patches/players_update_before_game_client-20260714-193031.patch"
+    }
+  ]
+}

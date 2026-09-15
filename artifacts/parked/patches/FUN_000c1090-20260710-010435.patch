@@ -1,0 +1,46 @@
+diff --git c/kb.json w/kb.json
+index bf3a1e3f..f49ed8ff 100644
+--- c/kb.json
++++ w/kb.json
+@@ -9859,7 +9859,9 @@
+         },
+         {
+           "addr": "0xc1090",
+-          "decl": "void FUN_000c1090(void);"
++          "decl": "void FUN_000c1090(int16_t function_index, int thread_datum, char init);",
++          "ported": true,
++          "source_path": "src/halo/hs/hs.c"
+         },
+         {
+           "addr": "0xc10d0",
+diff --git c/src/halo/hs/hs.c w/src/halo/hs/hs.c
+index 4c56a857..489f4aaa 100644
+--- c/src/halo/hs/hs.c
++++ w/src/halo/hs/hs.c
+@@ -332,6 +332,26 @@ void FUN_000c1050(int16_t function_index, int thread_datum, char init)
+   }
+ }
+ 
++/* 0xc1090 — HS native-function-call evaluator (16-bit result variant). Twin of
++ * 0xc1050 (identical codegen; differs only in the dispatch callee). Drives
++ * hs_macro_function_evaluate to evaluate the call's argument expressions; when
++ * the values array is ready (non-null return), reads the first evaluated value
++ * as a zero-extended 16-bit quantity and passes it to the native builtin
++ * FUN_000586a0, then commits a zero result to the thread via hs_return. While
++ * arguments are still being evaluated the return is null and nothing is
++ * dispatched this tick. */
++void FUN_000c1090(int16_t function_index, int thread_datum, char init)
++{
++  unsigned short *result;
++
++  result = (unsigned short *)hs_macro_function_evaluate(function_index,
++                                                        thread_datum, init);
++  if (result != (unsigned short *)0x0) {
++    FUN_000586a0(*result);
++    hs_return(thread_datum, 0);
++  }
++}
++
+ /* HaloScript (hs) subsystem — scripting engine init/dispose/update/evaluate. */
+ 
+ /* Allocate and initialize the hs_syntax data table used to store script

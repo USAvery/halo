@@ -1,0 +1,23 @@
+{
+  "name": "virtual_keyboard_initialize",
+  "addr": "0xf53a0",
+  "obj": "items.obj",
+  "source_path": "src/halo/items/items.c",
+  "best_score": 76.5,
+  "best_patch": "artifacts/parked/patches/virtual_keyboard_initialize-20260711-091228.patch",
+  "status": "promoted",
+  "first_parked": "2026-07-11T09:12:28+00:00",
+  "last_updated": "2026-07-11T09:30:47+00:00",
+  "promoted_commit": "6662dbcc",
+  "attempts": [
+    {
+      "ts": "2026-07-11T09:12:28+00:00",
+      "model": "opus",
+      "effort": "high",
+      "score": 76.5,
+      "cap_hypothesis": "classify_cap returned inconclusive. Remaining 5-insn gap at 76.5% is MSVC block-ordering/register-allocation: original emits `jne` to the else/stores block (error-call inline as fall-through) and hoists -1 into a register reused across the 0x46cefe/0x46cf00 word stores; my source compiles to `je` with the error block out-of-line. Modeling the 0xffff fields as short=-1 raised the score 75.9->76.5. NOT declared a hard cap because an untested lever remains: inverting the C to `if (keyboard_tag != -1) { stores } else { error }` may flip MSVC's block layout to match the original inline-error ordering. Escalation agent should try that before accepting a cap.",
+      "reason": "pre_escalation",
+      "patch": "artifacts/parked/patches/virtual_keyboard_initialize-20260711-091228.patch"
+    }
+  ]
+}

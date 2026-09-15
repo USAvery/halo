@@ -1,0 +1,90 @@
+diff --git c/kb.json w/kb.json
+index 55cd465c..007e7ae0 100644
+--- c/kb.json
++++ w/kb.json
+@@ -12847,7 +12847,8 @@
+         },
+         {
+           "addr": "0xf5750",
+-          "decl": "char FUN_000f5750(void);"
++          "decl": "char FUN_000f5750(void);",
++          "ported": true
+         },
+         {
+           "addr": "0xf57a0",
+@@ -24887,7 +24888,7 @@
+         },
+         {
+           "addr": "0xe5ab0",
+-          "decl": "void ui_play_audio_feedback_sound(void);"
++          "decl": "void ui_play_audio_feedback_sound(int);"
+         },
+         {
+           "addr": "0xe5b10",
+@@ -39224,4 +39225,4 @@
+   "0x11cfd0": {
+     "ported": true
+   }
+-}
+\ No newline at end of file
++}
+diff --git c/src/halo/items/items.c w/src/halo/items/items.c
+index a84d7712..5a376781 100644
+--- c/src/halo/items/items.c
++++ w/src/halo/items/items.c
+@@ -110,6 +110,37 @@ bool virtual_keyboard_initialize(void)
+   return *(void **)0x46cef4 != (void *)0;
+ }
+ 
++/* Virtual keyboard "cursor down" move handler (virtual_keyboard.obj, 0xf5750).
++ * Advances the keymap cursor row (virtual_keyboard_globals cursor @0x46cef8,
++ * a signed 16-bit index in [0,5)) to the next row whose keymap byte differs
++ * from the current row's byte, wrapping 4 -> 0. The keymap byte is read from
++ * the char[5][0xb] dispatch table at 0x28a790 as table[col + row*0xb], where
++ * col is the cursor column @0x46cefa (signed 16-bit). The current row's byte
++ * is cached once before the loop (DL in the original); the cursor is held in a
++ * register and written back to the global only after the loop settles. Then a
++ * UI cursor feedback sound (selector 1) is played. Always returns 1 ("moved").
++ * Binary: MOV AL,1; RET. */
++char FUN_000f5750(void)
++{
++  short cursor;
++  int col;
++  char row_byte;
++
++  cursor = *(short *)0x46cef8;
++  col = *(short *)0x46cefa;
++  row_byte = ((char *)0x28a790)[col + cursor * 0xb];
++
++  do {
++    cursor = cursor + 1;
++    if (cursor == 5)
++      cursor = 0;
++  } while (((char *)0x28a790)[col + cursor * 0xb] == row_byte);
++
++  *(short *)0x46cef8 = (short)cursor;
++  ui_play_audio_feedback_sound(1);
++  return 1;
++}
++
+ /* Virtual on-screen keyboard input pump (virtual_keyboard.obj).
+  * TU: c:\halo\SOURCE\interface\virtual_keyboard.c (__FILE__ assert
+  * @0x28a790..).
+@@ -200,7 +231,7 @@ void virtual_keyboard_process_input(void)
+             csmemset(*(char **)0x46cf08, 0, (unsigned int)*(short *)0x46cefc);
+             *(char **)0x46cf0c = *(char **)0x46cf08;
+             *(unsigned char *)0x46cf07 = 0;
+-            ui_play_audio_feedback_sound();
++            ui_play_audio_feedback_sound(1);
+             moved = 1;
+           } else {
+             FUN_000f5f30();
+@@ -214,7 +245,7 @@ void virtual_keyboard_process_input(void)
+             *(char **)0x46cf0c -= 1;
+         cursor_moved:
+           *(unsigned char *)0x46cf07 = 0;
+-          ui_play_audio_feedback_sound();
++          ui_play_audio_feedback_sound(1);
+           moved = 1;
+         }
+         break;

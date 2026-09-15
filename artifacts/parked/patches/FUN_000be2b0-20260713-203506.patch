@@ -1,0 +1,357 @@
+diff --git c/kb.json w/kb.json
+index c97ccc92..c3b98828 100644
+--- c/kb.json
++++ w/kb.json
+@@ -6659,7 +6659,7 @@
+         {
+           "addr": "0x9ca70",
+           "decl": "void effects_information_get(int effect_ptr@<ebx>, uint32_t flags_hi@<edi>, unsigned int *seed, float *velocity_out, float min_val, float max_val, uint32_t flags_lo);",
+-          "note": "hidden reg deps (EDI=flags_hi, EBX=effect_ptr) — callers pass these in registers; all known callers inlined",
++          "note": "hidden reg deps (EDI=flags_hi, EBX=effect_ptr) \u2014 callers pass these in registers; all known callers inlined",
+           "ported": true
+         },
+         {
+@@ -6720,7 +6720,7 @@
+         {
+           "addr": "0x9dcf0",
+           "decl": "void FUN_0009dcf0(float *position, void *effect, void *location, void *part, float *forward, float *up, float scale);",
+-          "note": "4 reg args (EAX,EDX,ECX,ESI) — inlined into FUN_0009e310, cannot be thunked separately",
++          "note": "4 reg args (EAX,EDX,ECX,ESI) \u2014 inlined into FUN_0009e310, cannot be thunked separately",
+           "ported": true
+         },
+         {
+@@ -17447,7 +17447,9 @@
+         },
+         {
+           "addr": "0xbe2b0",
+-          "decl": "void FUN_000be2b0(void);"
++          "decl": "void FUN_000be2b0(int16_t function_index, int thread_datum, char init);",
++          "ported": true,
++          "source_path": "src/halo/game/players.c"
+         },
+         {
+           "addr": "0xbe2f0",
+@@ -39349,4 +39351,4 @@
+   "0x11cfd0": {
+     "ported": true
+   }
+-}
++}
+\ No newline at end of file
+diff --git c/src/halo/game/players.c w/src/halo/game/players.c
+index 6092c6ee..5b51e4e4 100644
+--- c/src/halo/game/players.c
++++ w/src/halo/game/players.c
+@@ -2357,3 +2357,165 @@ void players_update_after_game(void)
+   if (*(char *)0x449ef1 != 0 && *(char *)0x2f0e90 != 0)
+     profile_exit_private((void *)0x2f0e88);
+ }
++
++/* 0xbdf40 — HS script function handler: evaluate a macro function and, on a
++ * non-null result record, forward the record's first dword to FUN_000c95d0,
++ * then commit a 0 result to the calling HS thread. Unlike the 0xc135x float
++ * trampolines, no value is read back from the callee — hs_return always
++ * commits 0. Same evaluator ABI (function_index, thread_datum, init) as the
++ * other hs_evaluate_* handlers.
++ *
++ * ABI (verified against disassembly 0xbdf40): cdecl, plain RET. thread_datum
++ * (arg 2, cached in ESI) flows to both the evaluate call (arg 2) and the
++ * hs_return call (arg 1). Call site does MOV EDX,[EAX]; PUSH EDX; CALL
++ * 0xc95d0 — passing *result (the record's first dword). The combined
++ * ADD ESP,0xc after the two trailing calls confirms 0xc95d0 takes exactly
++ * one stack arg (Ghidra's void(void) decl dropped it).
++ *
++ * NOTE: kb groups 0xbdf40 under players.obj, but it is a HaloScript
++ * macro-function handler byte-identical in shape to the hs.obj handlers below
++ * and calls hs_macro_function_evaluate/hs_return. Placed in hs.c per lift
++ * directive (players.c does not compile under VC71 — clang-only __attribute__
++ * / raw fnptr casts — so it would be permanently unmeasurable there).
++ *
++ * Callees (all cdecl, in kb.json):
++ *   0xcc560 = hs_macro_function_evaluate(int16 fn_index, int thread_datum,
++ *             char init) -> int* (result record, NULL on failure)
++ *   0xc95d0 = FUN_000c95d0(int) -> void (record first-dword consumer)
++ *   0xcbf80 = hs_return(int thread_handle, int value) */
++void FUN_000bdf40(int16_t function_index, int thread_datum, char init)
++{
++  int *result;
++
++  result =
++    (int *)hs_macro_function_evaluate(function_index, thread_datum, init);
++  if (result != NULL) {
++    FUN_000c95d0(result[0]);
++    hs_return(thread_datum, 0);
++  }
++}
++
++/* 0xbdfa0 — HS script function handler: evaluate a macro function and, on a
++ * non-null result record, forward two 16-bit fields to FUN_000ca430, then
++ * commit a 0 result to the calling HS thread. Same evaluator ABI
++ * (function_index, thread_datum, init) as the other hs_evaluate_* handlers.
++ *
++ * ABI (verified against disassembly 0xbdfa0): cdecl, plain RET. thread_datum
++ * (arg 2, cached in ESI) flows to both the evaluate call (arg 2) and the
++ * hs_return call (arg 1). The call site reads MOVSX EAX,word[result+0]
++ * (signed int16 -> int) and MOVZX EDX,word[result+4] (unsigned int16 -> int),
++ * then PUSH EDX; PUSH EAX; CALL 0xca430 — two cdecl int args (Ghidra's
++ * void(void) decl dropped both). The combined ADD ESP,0x10 after the two
++ * trailing calls (ca430's 2 + hs_return's 2) confirms the arg counts. Note
++ * result is int*, so the +0x4 read is at (char *)result + 4, a narrow int16.
++ *
++ * Callees (all cdecl, in kb.json):
++ *   0xcc560 = hs_macro_function_evaluate(int16 fn_index, int thread_datum,
++ *             char init) -> int* (result record, NULL on failure)
++ *   0xca430 = FUN_000ca430(int, int) -> void (two-field consumer)
++ *   0xcbf80 = hs_return(int thread_handle, int value) */
++void FUN_000bdfa0(int16_t function_index, int thread_datum, char init)
++{
++  int *result;
++
++  result =
++    (int *)hs_macro_function_evaluate(function_index, thread_datum, init);
++  if (result != NULL) {
++    FUN_000ca430(*(short *)result, *(unsigned short *)((char *)result + 4));
++    hs_return(thread_datum, 0);
++  }
++}
++
++/* 0xbdfe0 — HS script function handler: evaluate a macro function and, on a
++ * non-null result record, forward a cluster index + object handle to
++ * FUN_0018ef00, then commit that call's boolean result to the calling HS
++ * thread. Same evaluator ABI (function_index, thread_datum, init) as the other
++ * hs_evaluate_* handlers.
++ *
++ * ABI (verified against disassembly 0xbdfe0): cdecl, plain RET. thread_datum
++ * (arg 2, cached in ESI) flows to both the evaluate call (arg 2) and the
++ * hs_return call (arg 1). On a non-null result the call site reads
++ * MOVSX EAX,word[result+0] (SIGNED int16 -> int cluster index) and
++ * MOV EDX,dword[result+4] (full int object handle), then PUSH EDX; PUSH EAX;
++ * CALL 0x18ef00 -> char in AL. AL is MOVZX-widened into local_8 and becomes
++ * hs_return's value arg. The combined ADD ESP,0x10 after the two trailing calls
++ * (18ef00's 2 + hs_return's 2) confirms the arg counts. Note result[+0] is a
++ * SIGNED int16 (MOVSX), so (int)*result on a short* must stay signed; result[+4]
++ * is a full int (dword), unlike the narrow int16 +4 read in FUN_000bdfa0.
++ *
++ * Callees (all cdecl, in kb.json):
++ *   0xcc560 = hs_macro_function_evaluate(int16 fn_index, int thread_datum,
++ *             char init) -> int* (result record, NULL on failure)
++ *   0x18ef00 = FUN_0018ef00(int cluster_index, int object_handle) -> char
++ *   0xcbf80 = hs_return(int thread_handle, int value) */
++void FUN_000bdfe0(int16_t function_index, int thread_datum, char init)
++{
++  short *result;
++  unsigned char eval_result;
++
++  result =
++    (short *)hs_macro_function_evaluate(function_index, thread_datum, init);
++  if (result != NULL) {
++    eval_result =
++      (unsigned char)FUN_0018ef00((int)*result, *(int *)(result + 2));
++    hs_return(thread_datum, (int)eval_result);
++  }
++}
++
++/* 0xbe030 — HS script function handler: evaluate a macro function and commit a
++ * byte predicate result to the calling HS thread. Evaluates the macro
++ * arguments via hs_macro_function_evaluate; on a non-null result record, reads
++ * a signed int16 at +0x0 (MOVSX word ptr) and an int at +0x4, passes both to
++ * FUN_000ca0f0 (returns a byte in AL), zero-extends that byte and returns it to
++ * the thread via hs_return. The dword result slot is pre-zeroed and only the
++ * low byte is written (zero-init-then-narrow-store idiom) — modeled with a
++ * union so the widened value is the zero-extended byte.
++ *
++ * ABI (verified against disassembly 0xbe030): cdecl, plain RET. thread_datum
++ * (arg 2, cached in ESI) flows to both the evaluate call (arg 2) and the
++ * hs_return call (arg 1). Result record: int16 @ +0x0 (signed load), int @ +0x4.
++ * Callees:
++ *   0xcc560 = hs_macro_function_evaluate(int16 fn_index, int thread_datum,
++ *             char init) -> short* (result record, NULL on failure)
++ *   0xca0f0 = FUN_000ca0f0(int16_t word0, int dword4) -> unsigned char
++ *   0xcbf80 = hs_return(int thread_handle, int value) */
++void FUN_000be030(int16_t function_index, int thread_datum, char init)
++{
++  short *result;
++  union {
++    int i;
++    unsigned char b;
++  } value;
++
++  result =
++    (short *)hs_macro_function_evaluate(function_index, thread_datum, init);
++  if (result != NULL) {
++    value.i = 0;
++    value.b = FUN_000ca0f0(*result, *(int *)(result + 2));
++    hs_return(thread_datum, value.i);
++  }
++}
++
++/* 0xbe2b0 — HS script function handler: evaluate a macro function's arguments
++ * and, when the evaluation succeeds, invoke a side-effecting helper before
++ * returning void to the calling HS thread. hs_macro_function_evaluate returns a
++ * non-null result record on success (checked as a plain nonzero int here — the
++ * record is never dereferenced); on success FUN_000ca410() is called with no
++ * arguments and the thread is completed via hs_return(thread_datum, 0).
++ *
++ * ABI (cdecl, plain RET): thread_datum (arg 2) flows to both the evaluate call
++ * (arg 2) and the hs_return call (arg 1). Callees:
++ *   0xcc560 = hs_macro_function_evaluate(int16 fn_index, int thread_datum,
++ *             char init) -> int (nonzero result record on success)
++ *   0xca410 = FUN_000ca410(void)
++ *   0xcbf80 = hs_return(int thread_handle, int value) */
++void FUN_000be2b0(int16_t function_index, int thread_datum, char init)
++{
++  int result;
++
++  result = hs_macro_function_evaluate(function_index, thread_datum, init);
++  if (result != 0) {
++    FUN_000ca410();
++    hs_return(thread_datum, 0);
++  }
++}
+diff --git c/src/halo/hs/hs.c w/src/halo/hs/hs.c
+index 3c95eb7d..ad14df62 100644
+--- c/src/halo/hs/hs.c
++++ w/src/halo/hs/hs.c
+@@ -1,142 +1,4 @@
+ 
+-/* 0xbdf40 — HS script function handler: evaluate a macro function and, on a
+- * non-null result record, forward the record's first dword to FUN_000c95d0,
+- * then commit a 0 result to the calling HS thread. Unlike the 0xc135x float
+- * trampolines, no value is read back from the callee — hs_return always
+- * commits 0. Same evaluator ABI (function_index, thread_datum, init) as the
+- * other hs_evaluate_* handlers.
+- *
+- * ABI (verified against disassembly 0xbdf40): cdecl, plain RET. thread_datum
+- * (arg 2, cached in ESI) flows to both the evaluate call (arg 2) and the
+- * hs_return call (arg 1). Call site does MOV EDX,[EAX]; PUSH EDX; CALL
+- * 0xc95d0 — passing *result (the record's first dword). The combined
+- * ADD ESP,0xc after the two trailing calls confirms 0xc95d0 takes exactly
+- * one stack arg (Ghidra's void(void) decl dropped it).
+- *
+- * NOTE: kb groups 0xbdf40 under players.obj, but it is a HaloScript
+- * macro-function handler byte-identical in shape to the hs.obj handlers below
+- * and calls hs_macro_function_evaluate/hs_return. Placed in hs.c per lift
+- * directive (players.c does not compile under VC71 — clang-only __attribute__
+- * / raw fnptr casts — so it would be permanently unmeasurable there).
+- *
+- * Callees (all cdecl, in kb.json):
+- *   0xcc560 = hs_macro_function_evaluate(int16 fn_index, int thread_datum,
+- *             char init) -> int* (result record, NULL on failure)
+- *   0xc95d0 = FUN_000c95d0(int) -> void (record first-dword consumer)
+- *   0xcbf80 = hs_return(int thread_handle, int value) */
+-void FUN_000bdf40(int16_t function_index, int thread_datum, char init)
+-{
+-  int *result;
+-
+-  result =
+-    (int *)hs_macro_function_evaluate(function_index, thread_datum, init);
+-  if (result != NULL) {
+-    FUN_000c95d0(result[0]);
+-    hs_return(thread_datum, 0);
+-  }
+-}
+-
+-/* 0xbdfa0 — HS script function handler: evaluate a macro function and, on a
+- * non-null result record, forward two 16-bit fields to FUN_000ca430, then
+- * commit a 0 result to the calling HS thread. Same evaluator ABI
+- * (function_index, thread_datum, init) as the other hs_evaluate_* handlers.
+- *
+- * ABI (verified against disassembly 0xbdfa0): cdecl, plain RET. thread_datum
+- * (arg 2, cached in ESI) flows to both the evaluate call (arg 2) and the
+- * hs_return call (arg 1). The call site reads MOVSX EAX,word[result+0]
+- * (signed int16 -> int) and MOVZX EDX,word[result+4] (unsigned int16 -> int),
+- * then PUSH EDX; PUSH EAX; CALL 0xca430 — two cdecl int args (Ghidra's
+- * void(void) decl dropped both). The combined ADD ESP,0x10 after the two
+- * trailing calls (ca430's 2 + hs_return's 2) confirms the arg counts. Note
+- * result is int*, so the +0x4 read is at (char *)result + 4, a narrow int16.
+- *
+- * Callees (all cdecl, in kb.json):
+- *   0xcc560 = hs_macro_function_evaluate(int16 fn_index, int thread_datum,
+- *             char init) -> int* (result record, NULL on failure)
+- *   0xca430 = FUN_000ca430(int, int) -> void (two-field consumer)
+- *   0xcbf80 = hs_return(int thread_handle, int value) */
+-void FUN_000bdfa0(int16_t function_index, int thread_datum, char init)
+-{
+-  int *result;
+-
+-  result =
+-    (int *)hs_macro_function_evaluate(function_index, thread_datum, init);
+-  if (result != NULL) {
+-    FUN_000ca430(*(short *)result, *(unsigned short *)((char *)result + 4));
+-    hs_return(thread_datum, 0);
+-  }
+-}
+-
+-/* 0xbdfe0 — HS script function handler: evaluate a macro function and, on a
+- * non-null result record, forward a cluster index + object handle to
+- * FUN_0018ef00, then commit that call's boolean result to the calling HS
+- * thread. Same evaluator ABI (function_index, thread_datum, init) as the other
+- * hs_evaluate_* handlers.
+- *
+- * ABI (verified against disassembly 0xbdfe0): cdecl, plain RET. thread_datum
+- * (arg 2, cached in ESI) flows to both the evaluate call (arg 2) and the
+- * hs_return call (arg 1). On a non-null result the call site reads
+- * MOVSX EAX,word[result+0] (SIGNED int16 -> int cluster index) and
+- * MOV EDX,dword[result+4] (full int object handle), then PUSH EDX; PUSH EAX;
+- * CALL 0x18ef00 -> char in AL. AL is MOVZX-widened into local_8 and becomes
+- * hs_return's value arg. The combined ADD ESP,0x10 after the two trailing calls
+- * (18ef00's 2 + hs_return's 2) confirms the arg counts. Note result[+0] is a
+- * SIGNED int16 (MOVSX), so (int)*result on a short* must stay signed; result[+4]
+- * is a full int (dword), unlike the narrow int16 +4 read in FUN_000bdfa0.
+- *
+- * Callees (all cdecl, in kb.json):
+- *   0xcc560 = hs_macro_function_evaluate(int16 fn_index, int thread_datum,
+- *             char init) -> int* (result record, NULL on failure)
+- *   0x18ef00 = FUN_0018ef00(int cluster_index, int object_handle) -> char
+- *   0xcbf80 = hs_return(int thread_handle, int value) */
+-void FUN_000bdfe0(int16_t function_index, int thread_datum, char init)
+-{
+-  short *result;
+-  unsigned char eval_result;
+-
+-  result =
+-    (short *)hs_macro_function_evaluate(function_index, thread_datum, init);
+-  if (result != NULL) {
+-    eval_result =
+-      (unsigned char)FUN_0018ef00((int)*result, *(int *)(result + 2));
+-    hs_return(thread_datum, (int)eval_result);
+-  }
+-}
+-
+-/* 0xbe030 — HS script function handler: evaluate a macro function and commit a
+- * byte predicate result to the calling HS thread. Evaluates the macro
+- * arguments via hs_macro_function_evaluate; on a non-null result record, reads
+- * a signed int16 at +0x0 (MOVSX word ptr) and an int at +0x4, passes both to
+- * FUN_000ca0f0 (returns a byte in AL), zero-extends that byte and returns it to
+- * the thread via hs_return. The dword result slot is pre-zeroed and only the
+- * low byte is written (zero-init-then-narrow-store idiom) — modeled with a
+- * union so the widened value is the zero-extended byte.
+- *
+- * ABI (verified against disassembly 0xbe030): cdecl, plain RET. thread_datum
+- * (arg 2, cached in ESI) flows to both the evaluate call (arg 2) and the
+- * hs_return call (arg 1). Result record: int16 @ +0x0 (signed load), int @ +0x4.
+- * Callees:
+- *   0xcc560 = hs_macro_function_evaluate(int16 fn_index, int thread_datum,
+- *             char init) -> short* (result record, NULL on failure)
+- *   0xca0f0 = FUN_000ca0f0(int16_t word0, int dword4) -> unsigned char
+- *   0xcbf80 = hs_return(int thread_handle, int value) */
+-void FUN_000be030(int16_t function_index, int thread_datum, char init)
+-{
+-  short *result;
+-  union {
+-    int i;
+-    unsigned char b;
+-  } value;
+-
+-  result =
+-    (short *)hs_macro_function_evaluate(function_index, thread_datum, init);
+-  if (result != NULL) {
+-    value.i = 0;
+-    value.b = FUN_000ca0f0(*result, *(int *)(result + 2));
+-    hs_return(thread_datum, value.i);
+-  }
+-}
+-
+ /* 0xc0c30 — HS script function handler: apply an encounter state change.
+  * Evaluates the macro arguments; on success the result block holds an
+  * encounter handle at +0x0 (int) and a state value at +0x4 (int16). Calls

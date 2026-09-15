@@ -1,0 +1,32 @@
+{
+  "name": "FUN_000c0d10",
+  "addr": "0xc0d10",
+  "obj": "hs.obj",
+  "source_path": "src/halo/hs/hs.c",
+  "best_score": 92.0,
+  "best_patch": "artifacts/parked/patches/FUN_000c0d10-20260709-205519.patch",
+  "status": "promoted",
+  "first_parked": "2026-07-09T20:55:19+00:00",
+  "last_updated": "2026-07-10T00:00:00+00:00",
+  "promoted_commit": "f8e29209",
+  "attempts": [
+    {
+      "ts": "2026-07-09T20:55:19+00:00",
+      "model": "opus",
+      "effort": "high",
+      "score": 0.0,
+      "cap_hypothesis": "",
+      "reason": "below_65pct",
+      "patch": "artifacts/parked/patches/FUN_000c0d10-20260709-205519.patch"
+    },
+    {
+      "ts": "2026-07-10T00:00:00+00:00",
+      "model": "fable",
+      "effort": "high",
+      "score": 92.0,
+      "cap_hypothesis": "float-arg copy idiom: our VC71 emits MOV/PUSH, original FLD/FSTP; bit-exact",
+      "reason": "promoted: original 0.0 was a verify artifact (no delinked ref); per-fn refs exported, re-verified",
+      "patch": "artifacts/parked/patches/FUN_000c0d10-20260709-205519.patch"
+    }
+  ]
+}

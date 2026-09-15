@@ -1,0 +1,23 @@
+{
+  "name": "item_get_position_even_if_in_inventory",
+  "addr": "0xf6a60",
+  "obj": "items.obj",
+  "source_path": "src/halo/items/items.c",
+  "best_score": 80.4,
+  "best_patch": "artifacts/parked/patches/item_get_position_even_if_in_inventory-20260711-125924.patch",
+  "status": "parked",
+  "first_parked": "2026-07-11T12:59:24+00:00",
+  "last_updated": "2026-07-11T12:59:24+00:00",
+  "promoted_commit": null,
+  "attempts": [
+    {
+      "ts": "2026-07-11T12:59:24+00:00",
+      "model": "opus",
+      "effort": "high",
+      "score": 80.4,
+      "cap_hypothesis": "classify_cap returned inconclusive; applied agent judgment. Residual gap is a vc71 per-function-chunk reference artifact, not a lift bug: the reference chunk disassembles the item-position copy with direct addressing (movl 0x50(%eax),%edx), but the live binary bytes at the copy block are 83 c0 50 = add eax,0x50 followed by [eax]/[eax+4]/[eax+8] pointer-increment addressing (confirmed via read_memory decode), which my candidate reproduces exactly. My freshly exported per-function ref 000f6a60.obj contains the correct add-form bytes (objdump: 57: add $0x50,%eax), but vc71 scored against a truncated whole-object reference showing the wrong addressing mode. 50/52 insns present, branch order matches the live binary after the inversion, and pipeline equivalence is 100/100. Matching the reference's direct addressing would require diverging from the source-of-truth binary, so I did not.",
+      "reason": "structural_cap",
+      "patch": "artifacts/parked/patches/item_get_position_even_if_in_inventory-20260711-125924.patch"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "name": "FUN_000becd0",
+  "addr": "0xbecd0",
+  "obj": "players.obj",
+  "source_path": "src/halo/game/players.c",
+  "best_score": 88.9,
+  "best_patch": "artifacts/parked/patches/FUN_000becd0-20260721-000624.patch",
+  "status": "parked",
+  "first_parked": "2026-07-21T00:06:24+00:00",
+  "last_updated": "2026-07-21T00:06:24+00:00",
+  "promoted_commit": null,
+  "attempts": [
+    {
+      "ts": "2026-07-21T00:06:24+00:00",
+      "model": "opus",
+      "effort": "high",
+      "score": 88.9,
+      "cap_hypothesis": "",
+      "reason": "NEEDS_RUNTIME: Target: FUN_000becd0 @ 0xbecd0 (players.obj / src/halo/game/players.c) \u2014 HaloScript byte-valued macro-function evaluator wrapper.\n\nStructural Match: 88.9% VC71 \u2014 below the 90% floor, so this lands in the <90% band, which per policy requires golden/runtime behavioral verification PLUS classified mismatches, and otherwise returns NEEDS_RUNTIME.\n\nThe lift itself is disasm-faithful: I verified the full disassembly and every CALL. Arg forwarding, the zero-extended byte semantics, the pre-zeroed local, and the folded cdecl cleanup all match. Hazard scan clean, ABI audit clean (regs=none), no globals touched, no FPU. I found no concrete likely bug \u2014 so this is not a REJECT.\n\nBut the runtime lane that the acceptance path leans on is both misrepresented and vacuous:\n1. Misrepresented: the equivalence detail says the infection_swarm.json template was ABSENT and the run fell back to ZERO-FILL, while the closing sentence claims a \"0-divergence pass on the live-state infection_swarm snapshot (populated datum tables, real actor handles).\" Those contradict; no live-state run occurred.\n2. Vacuous: under zero-fill, hs_macro_function_evaluate returns NULL, so JZ 0xbed0e is taken and the entire committed path (byte load -> lights_enable -> hs_return) never executes. Coverage 61.2% and \"stub-arg differential recorded 0 calls\" confirm the meaningful path was never exercised. The 100/100 high-confidence pass reflects only the NULL early-exit branch.\n\nTherefore the <90% band's required behavioral evidence is effectively empty, and the sole novel ABI inference (lights_enable byte-return, INCONCLUSIVE at arg-count) plus all argument forwarding is proven only by disasm, not at runtime. The correct fail-closed action is to withhold auto-commit and require a genuine golden/dual-oracle or live-state (populated datum table, non-NULL evaluate record) run that drives the lights_enable/hs_return path.\n\nConfirmed: reg-ABI clean; hazard scan clean (0 findings); call-arg forwarding matches disasm for all 3 cdecl callees; no global side effects; zero-extend byte semantics correct; decl change affects no other caller.\nInferred: lights_enable is cdecl byte->byte (folded cleanup, single site); its semantic name is uncertain (comment concedes this).\nUncertain (blocking): mismatches unclassified at 88.9%; runtime evidence is zero-fill misrepresented as live-state; committed path untested; arg forwarding not differentially proven.\n\nAUTOLIFT_REVIEW: NEEDS_RUNTIME",
+      "patch": "artifacts/parked/patches/FUN_000becd0-20260721-000624.patch"
+    }
+  ]
+}

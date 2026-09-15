@@ -1,0 +1,75 @@
+diff --git c/kb.json w/kb.json
+index 622b63a2..0dfbc058 100644
+--- c/kb.json
++++ w/kb.json
+@@ -36435,7 +36435,9 @@
+       "functions": [
+         {
+           "addr": "0x62960",
+-          "decl": "void FUN_00062960(void *obstacles, float radius);"
++          "decl": "void path_obstacles_debug_render(void *obstacles, float radius);",
++          "name": "path_obstacles_debug_render",
++          "ported": true
+         },
+         {
+           "addr": "0x62b20",
+@@ -36463,15 +36465,22 @@
+         },
+         {
+           "addr": "0x63710",
+-          "decl": "void structure_test_ray2d(void);"
++          "decl": "char structure_test_ray2d(void *structure_bsp, char ignore_breakable, float *point, int surface_index, float *direction, float t, void *out_result);",
++          "name": "structure_test_ray2d",
++          "ported": true
+         },
+         {
+           "addr": "0x638f0",
+-          "decl": "void FUN_000638f0(void);"
++          "decl": "bool FUN_000638f0(int def, float *point, int surf_a, int surf_b);",
++          "name": "FUN_000638f0",
++          "ported": true
+         },
+         {
+           "addr": "0x63970",
+-          "decl": "void FUN_00063970(void);"
++          "decl": "int FUN_00063970(float *a, float *b, float lo, float hi);",
++          "name": "FUN_00063970",
++          "ported": true,
++          "source_path": "src/halo/ai/path_smoothing.c"
+         },
+         {
+           "addr": "0x639e0",
+diff --git c/src/CMakeLists.txt w/src/CMakeLists.txt
+index c9e091a6..cba03354 100644
+--- c/src/CMakeLists.txt
++++ w/src/CMakeLists.txt
+@@ -14,6 +14,7 @@
+ 	halo/ai/ai_profile.c
+ 	halo/ai/encounters.c
+ 	halo/ai/path.c
++	halo/ai/path_smoothing.c
+ 	halo/ai/props.c
+ 	halo/bitmaps/bitmap_utilities.c
+ 	halo/bitmaps/bitmaps.c
+diff --git c/src/halo/structures/structures.c w/src/halo/structures/structures.c
+index 598af38a..e7e46ffd 100644
+--- c/src/halo/structures/structures.c
++++ w/src/halo/structures/structures.c
+@@ -30,7 +30,7 @@ extern double __cdecl fabs(double);
+  *     EAX=0x5ab250 (end point2d), plus 9 cdecl stack args.  ADD ESP,0x24
+  *     (36 bytes = 9 args) proves the split is 0 (scenario_get) + 9, not 7+2.
+  *   - FUN_000615b0 takes @eax=0x331f68 (the record); its return is discarded.
+- *   - FUN_00062960(&0x3334a0 obstacles, 0x5ab240 radius) and
++ *   - path_obstacles_debug_render(&0x3334a0 obstacles, 0x5ab240 radius) and
+  *     FUN_000609e0(&0x331f68 path) are clean cdecl (ADD ESP,0xc = 2+1).
+  */
+ void FUN_00061ca0(void)
+@@ -58,7 +58,7 @@ void FUN_00061ca0(void)
+         FUN_000615b0((void *)0x331f68);
+       }
+     }
+-    FUN_00062960((void *)0x3334a0, *(float *)0x5ab240);
++    path_obstacles_debug_render((void *)0x3334a0, *(float *)0x5ab240);
+     FUN_000609e0((void *)0x331f68);
+   }
+   return;

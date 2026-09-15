@@ -1,0 +1,44 @@
+diff --git c/kb.json w/kb.json
+index c97ccc92..6bea8f7e 100644
+--- c/kb.json
++++ w/kb.json
+@@ -17431,7 +17431,9 @@
+         },
+         {
+           "addr": "0xbe1d0",
+-          "decl": "void FUN_000be1d0(void);"
++          "decl": "void FUN_000be1d0(int16_t function_index, int thread_datum, char init);",
++          "ported": true,
++          "source_path": "src/halo/game/players.c"
+         },
+         {
+           "addr": "0xbe210",
+diff --git c/src/halo/game/players.c w/src/halo/game/players.c
+index 6092c6ee..92d6f4c6 100644
+--- c/src/halo/game/players.c
++++ w/src/halo/game/players.c
+@@ -2357,3 +2357,24 @@ void players_update_after_game(void)
+   if (*(char *)0x449ef1 != 0 && *(char *)0x2f0e90 != 0)
+     profile_exit_private((void *)0x2f0e88);
+ }
++
++/* 0xbe1d0 — HS macro-function evaluator dispatch wrapper. Evaluates a macro
++ * (built-in) function for the given thread via hs_macro_function_evaluate. If
++ * that evaluation reports it produced a result (nonzero return), finalizes the
++ * current expression frame (FUN_000ca140) and commits a 0 result back to the
++ * thread with hs_return(thread_datum, 0).
++ *
++ * Cdecl stack params: [esp+4]=int16_t function_index, [esp+8]=int thread_datum,
++ * [esp+0xc]=char init. Ghidra mis-declared this (void); the three params flow
++ * directly into the callees (thread_datum is reused as hs_return's handle arg).
++ */
++void FUN_000be1d0(int16_t function_index, int thread_datum, char init)
++{
++  int result;
++
++  result = hs_macro_function_evaluate(function_index, thread_datum, init);
++  if (result != 0) {
++    FUN_000ca140();
++    hs_return(thread_datum, 0);
++  }
++}

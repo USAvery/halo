@@ -1,0 +1,23 @@
+{
+  "name": "FUN_000f4ea0 (UI/shell scenario-tag preloader \u2014 ui_widget_group.c)",
+  "addr": "0xf4ea0",
+  "obj": "items.obj (per task); NOTE: Ghidra TU marker says c:\\halo\\SOURCE\\interface\\ui_widget_group.c (__FILE__ assert xref, confirmed) \u2014 verify obj placement",
+  "source_path": "src/halo/interface/ui_widget_group.c",
+  "best_score": 87.8,
+  "best_patch": "artifacts/parked/patches/FUN_000f4ea0__UI_shell_scenario-tag_preloader___ui_widget_group.c_-20260711-160836.patch",
+  "status": "parked",
+  "first_parked": "2026-07-11T16:08:36+00:00",
+  "last_updated": "2026-07-11T16:08:36+00:00",
+  "promoted_commit": null,
+  "attempts": [
+    {
+      "ts": "2026-07-11T16:08:36+00:00",
+      "model": "opus",
+      "effort": "high",
+      "score": 87.8,
+      "cap_hypothesis": "",
+      "reason": "NEEDS_RUNTIME: Structural match is 87.8%, which falls in the < 90% band. My policy for that band requires golden/runtime behavior verification PLUS classified mismatches; absent runtime evidence the verdict is NEEDS_RUNTIME.\n\nThe mismatch is classified (benign movswl-vs-movw shape). The static/ABI side is solid: delinked ref present, ABI regs=none with zero drift, all call arguments match callee decls, the single memory offset matches oracle width, hazard scan clean, no FPU. There is no concrete likely bug, so this is not a REJECT.\n\nBut the runtime/golden requirement is NOT met, and the acceptance narrative's claim that it was met is false. equivalence.json for run 20260711-160410 is a zero-fill smoke run (log FUN_000f4ea0_smoke.log), coverage_pct=11.1, confidence=weak, heap_matched=0, no --state-snapshot. There is no live-state infection_swarm run recorded anywhere \u2014 the narrative's \"0-divergence pass on the live-state infection_swarm snapshot (populated datum tables, real actor handles)\" is contradicted by its own artifact and by the run's opening \"state snapshot not applicable.\" This is the third same-day instance of this fabricated live-state sentence in the interface/items cluster (also FUN_000f6750, FUN_000f57a0), so I treat the boilerplate claim as unproven on sight.\n\nThe coverage gap is not cosmetic. The covered PCs exercise only the entry block plus the type==0 solo tail arm (under zero-fill scnr+0x3c reads 0). The type==1 multiplayer arm and the entire type==2 main_menu inline block \u2014 ~25 FUN_001b9b00 tag loads with long string literals, the dominant body of the function and the part most able to hide a wrong/dropped/reordered tag load \u2014 have ZERO runtime coverage and rest on VC71 alone. The pipeline itself flagged this: verify_policy said \"verify-recommended-but-inputs-missing\" (score 6 \u2265 3), verify_lift was skipped (no payload), and low_match_policy explicitly returned \"goal90: 87.8% in 85-89 band \u2014 permuter recommended before commit.\" No structural objdiff beyond VC71 exists.\n\nThe lift may well be correct, but for a < 90% match the evidence is too weak to auto-commit without runtime coverage of the untested arms. Remedy: drive the type==1 and type==2 arms via a synthetic state-snapshot (force scenario_type=1 and 2 under --allow-stubs, lift-synthetic-equivalence lane) so the stub-arg differential verifies the main_menu tag sequence, or run a golden/dual-oracle harness case. Until then: NEEDS_RUNTIME.",
+      "patch": "artifacts/parked/patches/FUN_000f4ea0__UI_shell_scenario-tag_preloader___ui_widget_group.c_-20260711-160836.patch"
+    }
+  ]
+}

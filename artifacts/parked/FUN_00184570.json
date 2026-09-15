@@ -1,0 +1,23 @@
+{
+  "name": "FUN_00184570",
+  "addr": "0x184570",
+  "obj": "render.obj",
+  "source_path": "src/halo/render/render.c",
+  "best_score": 84.0,
+  "best_patch": "artifacts/parked/patches/FUN_00184570-20260722-061230.patch",
+  "status": "parked",
+  "first_parked": "2026-07-22T06:12:30+00:00",
+  "last_updated": "2026-07-22T06:12:30+00:00",
+  "promoted_commit": null,
+  "attempts": [
+    {
+      "ts": "2026-07-22T06:12:30+00:00",
+      "model": "opus",
+      "effort": "high",
+      "score": 84.0,
+      "cap_hypothesis": "MSVC two-return-path constant-hoist scheduling difference (~87% ceiling class). Reference (24 insns) hoists `mov cl,1` before the `je` and shares the return-1 constant between paths (`mov al,cl` on the index==-1 path); it also derives bit-index and dword-index from a single `movsx edx,ax`. All three faithful C89 variants I tried (temporaries; inline decomp-ordered expression; single signed idx reused for both shifts) compiled under VC71 to the identical 26-insn shape at exactly 84.0%. Both sides use the same VC71 `1-(bool)` idiom (neg/sbb/inc al) \u2014 the gap is register-allocation/scheduling of the shared return constant, not steerable from C89 source. Not a logic bug (equivalence 100/100, 0 divergences). Score 84 is below the [85,89] permute band so permuter cannot recover it.",
+      "reason": "structural_cap",
+      "patch": "artifacts/parked/patches/FUN_00184570-20260722-061230.patch"
+    }
+  ]
+}

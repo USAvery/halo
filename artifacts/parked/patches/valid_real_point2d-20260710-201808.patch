@@ -1,0 +1,51 @@
+diff --git c/kb.json w/kb.json
+index 622b63a2..f140b115 100644
+--- c/kb.json
++++ w/kb.json
+@@ -6659,7 +6659,7 @@
+         {
+           "addr": "0x9ca70",
+           "decl": "void effects_information_get(int effect_ptr@<ebx>, uint32_t flags_hi@<edi>, unsigned int *seed, float *velocity_out, float min_val, float max_val, uint32_t flags_lo);",
+-          "note": "hidden reg deps (EDI=flags_hi, EBX=effect_ptr) \u2014 callers pass these in registers; all known callers inlined",
++          "note": "hidden reg deps (EDI=flags_hi, EBX=effect_ptr) — callers pass these in registers; all known callers inlined",
+           "ported": true
+         },
+         {
+@@ -6720,7 +6720,7 @@
+         {
+           "addr": "0x9dcf0",
+           "decl": "void FUN_0009dcf0(float *position, void *effect, void *location, void *part, float *forward, float *up, float scale);",
+-          "note": "4 reg args (EAX,EDX,ECX,ESI) \u2014 inlined into FUN_0009e310, cannot be thunked separately",
++          "note": "4 reg args (EAX,EDX,ECX,ESI) — inlined into FUN_0009e310, cannot be thunked separately",
+           "ported": true
+         },
+         {
+@@ -36486,7 +36486,8 @@
+       "functions": [
+         {
+           "addr": "0x60c40",
+-          "decl": "void valid_real_point2d(void);"
++          "decl": "bool valid_real_point2d(float *point);",
++          "ported": true
+         },
+         {
+           "addr": "0x60c80",
+@@ -39194,4 +39195,4 @@
+   "0x11cfd0": {
+     "ported": true
+   }
+-}
+\ No newline at end of file
++}
+diff --git c/src/CMakeLists.txt w/src/CMakeLists.txt
+index c9e091a6..197c16e0 100644
+--- c/src/CMakeLists.txt
++++ w/src/CMakeLists.txt
+@@ -14,6 +14,7 @@
+ 	halo/ai/ai_profile.c
+ 	halo/ai/encounters.c
+ 	halo/ai/path.c
++	halo/ai/path_obstacle_avoidance.c
+ 	halo/ai/props.c
+ 	halo/bitmaps/bitmap_utilities.c
+ 	halo/bitmaps/bitmaps.c

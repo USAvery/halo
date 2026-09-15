@@ -1,0 +1,69 @@
+diff --git c/kb.json w/kb.json
+index 4af6b6f5..4774a377 100644
+--- c/kb.json
++++ w/kb.json
+@@ -12851,7 +12851,8 @@
+         },
+         {
+           "addr": "0xf57a0",
+-          "decl": "void FUN_000f57a0(void);"
++          "decl": "bool virtual_keyboard_close(void);",
++          "ported": true
+         },
+         {
+           "addr": "0xf5800",
+@@ -24883,7 +24884,7 @@
+         },
+         {
+           "addr": "0xe5ab0",
+-          "decl": "void ui_play_audio_feedback_sound(void);"
++          "decl": "void ui_play_audio_feedback_sound(int16_t sound_type);"
+         },
+         {
+           "addr": "0xe5b10",
+diff --git c/src/halo/items/items.c w/src/halo/items/items.c
+index 9b0ab37f..76f710ac 100644
+--- c/src/halo/items/items.c
++++ w/src/halo/items/items.c
+@@ -110,6 +110,41 @@ bool virtual_keyboard_initialize(void)
+   return *(void **)0x46cef4 != (void *)0;
+ }
+ 
++/* Virtual on-screen keyboard close/commit (items.obj).
++ * TU: c:\halo\SOURCE\interface\virtual_keyboard.c.
++ *
++ * Clears the keyboard-active flag byte (+0x00, 0x46cef0). If an output
++ * destination pointer (+0x18, 0x46cf08) is registered, copies the edit
++ * buffer (0x46cf18) into it -- count = capacity_bytes(+0x0c, 0x46cefc) >> 1
++ * wchars -- then NUL-terminates the destination at its last wchar slot.
++ * Clears the destination pointer, the first wchar of the edit buffer, and
++ * the +0x16 byte (0x46cf06), plays the "back" UI feedback sound (type 3),
++ * and returns true.
++ *
++ * Store widths verified from disasm at 0xf57a0: 0x46cef0 and 0x46cf06 are
++ * byte stores (MOV [..],BL); 0x46cefc is read MOVZX word then SHR 1 (twice,
++ * recomputed across the ustrncpy call); 0x46cf18 first-wchar store is a word
++ * (MOV word [..],BX). Tail sets AL=1 (bool true) before RET. The 0xf57f2
++ * call pushes a stack arg (PUSH 3; ADD ESP,4): ui_play_audio_feedback_sound
++ * takes int16_t sound_type despite Ghidra rendering it void(void). */
++bool virtual_keyboard_close(void)
++{
++  wchar_t *out;
++
++  out = *(wchar_t **)0x46cf08;
++  *(unsigned char *)0x46cef0 = 0;
++  if (out != NULL) {
++    ustrncpy(out, (wchar_t *)0x46cf18,
++             (unsigned)*(unsigned short *)0x46cefc >> 1);
++    out[((unsigned)*(unsigned short *)0x46cefc >> 1) - 1] = 0;
++  }
++  *(wchar_t **)0x46cf08 = NULL;
++  *(short *)0x46cf18 = 0;
++  *(unsigned char *)0x46cf06 = 0;
++  ui_play_audio_feedback_sound(3);
++  return true;
++}
++
+ #include "x87_math.h"
+ 
+ /* Activate the pickup sound effect for an equipment item.

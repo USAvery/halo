@@ -1,0 +1,43 @@
+diff --git c/kb.json w/kb.json
+index df00a798..9d345c23 100644
+--- c/kb.json
++++ w/kb.json
+@@ -9773,7 +9773,8 @@
+         },
+         {
+           "addr": "0xc0c70",
+-          "decl": "void FUN_000c0c70(void);"
++          "decl": "void FUN_000c0c70(int16_t function_index, int thread_datum, char init);",
++          "ported": true
+         },
+         {
+           "addr": "0xc0cb0",
+diff --git c/src/halo/hs/hs.c w/src/halo/hs/hs.c
+index e03dabe5..8d1053d4 100644
+--- c/src/halo/hs/hs.c
++++ w/src/halo/hs/hs.c
+@@ -15,6 +15,24 @@ void FUN_000c0c30(int16_t function_index, int thread_datum, char init)
+   }
+ }
+ 
++/* 0xc0c70 — HS script function handler: apply an encounter state change.
++ * Evaluates the macro arguments; on success the result block holds an
++ * encounter handle at +0x0 (int) and a byte value at +0x4. Calls
++ * FUN_00057c70(encounter_handle, value) then returns void to the HS thread
++ * via hs_return(thread_datum, 0). The +0x4 read is a narrow byte (char) load
++ * — result is int*, so (result + 1) = +4 bytes, cast to char*. */
++void FUN_000c0c70(int16_t function_index, int thread_datum, char init)
++{
++  int *result;
++
++  result =
++    (int *)hs_macro_function_evaluate(function_index, thread_datum, init);
++  if (result != NULL) {
++    FUN_00057c70(result[0], *(char *)(result + 1));
++    hs_return(thread_datum, 0);
++  }
++}
++
+ /* HaloScript (hs) subsystem — scripting engine init/dispose/update/evaluate. */
+ 
+ /* Allocate and initialize the hs_syntax data table used to store script

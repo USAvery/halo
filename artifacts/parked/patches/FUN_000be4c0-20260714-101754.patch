@@ -1,0 +1,61 @@
+diff --git c/kb.json w/kb.json
+index 8da42989..d5033775 100644
+--- c/kb.json
++++ w/kb.json
+@@ -11264,7 +11264,7 @@
+         },
+         {
+           "addr": "0xc9f30",
+-          "decl": "void FUN_000c9f30(void);"
++          "decl": "void FUN_000c9f30(int param_1, int param_2);"
+         },
+         {
+           "addr": "0xc9f90",
+@@ -17478,7 +17478,8 @@
+         },
+         {
+           "addr": "0xbe4c0",
+-          "decl": "void FUN_000be4c0(void);"
++          "decl": "void FUN_000be4c0(int16_t function_index, int thread_handle, char init);",
++          "ported": true
+         },
+         {
+           "addr": "0xbe500",
+diff --git c/src/halo/game/players.c w/src/halo/game/players.c
+index 0b085063..2ccebc40 100644
+--- c/src/halo/game/players.c
++++ w/src/halo/game/players.c
+@@ -2386,3 +2386,33 @@ void player_rumble_initialize(int16_t function_index, int thread_handle,
+     hs_return(thread_handle, 0);
+   }
+ }
++
++/* FUN_000be4c0 @ 0x000be4c0
++ *
++ * HaloScript function-evaluator wrapper; sibling of player_rumble_initialize
++ * @ 0x000be400. Evaluates the script function via
++ * hs_macro_function_evaluate(function_index, thread_handle, init); on a
++ * non-NULL evaluation record it forwards the two record dwords to FUN_000c9f30
++ * and completes the thread with hs_return(thread_handle, 0).
++ *
++ * cdecl frame (PUSH EBP; MOV EBP,ESP; PUSH ESI):
++ *   function_index  int16_t  [EBP+0x08]  (loaded to ECX)
++ *   thread_handle   int      [EBP+0x0c]  (held in ESI across the whole fn)
++ *   init            char     [EBP+0x10]  (loaded to EAX)
++ *
++ * hs_macro_function_evaluate returns an evaluation-record pointer in EAX
++ * (kb decl types it int). When non-NULL the original loads EAX+0x00 and
++ * EAX+0x04 as full dwords (MOV EAX,[EAX]; MOV EDX,[EAX+0x4]) and pushes them
++ * right-to-left (PUSH EDX=+0x04; PUSH EAX=+0x00). FUN_000c9f30's 2-arg cdecl
++ * signature is recovered from this call site (its kb decl was previously
++ * void(void)). */
++void FUN_000be4c0(int16_t function_index, int thread_handle, char init)
++{
++  int record;
++
++  record = hs_macro_function_evaluate(function_index, thread_handle, init);
++  if (record != 0) {
++    FUN_000c9f30(*(int *)record, *(int *)(record + 4));
++    hs_return(thread_handle, 0);
++  }
++}

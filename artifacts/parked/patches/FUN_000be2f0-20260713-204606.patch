@@ -1,0 +1,36 @@
+diff --git c/kb.json w/kb.json
+index c97ccc92..6819f9d3 100644
+--- c/kb.json
++++ w/kb.json
+@@ -17451,7 +17451,8 @@
+         },
+         {
+           "addr": "0xbe2f0",
+-          "decl": "void FUN_000be2f0(void);"
++          "decl": "void FUN_000be2f0(int16_t function_index, int thread_datum, char init);",
++          "ported": true
+         },
+         {
+           "addr": "0xbe330",
+diff --git c/src/halo/game/players.c w/src/halo/game/players.c
+index 6092c6ee..d241b3fd 100644
+--- c/src/halo/game/players.c
++++ w/src/halo/game/players.c
+@@ -2357,3 +2357,17 @@ void players_update_after_game(void)
+   if (*(char *)0x449ef1 != 0 && *(char *)0x2f0e90 != 0)
+     profile_exit_private((void *)0x2f0e88);
+ }
++
++/* Evaluate a HaloScript macro function for a running thread. If the macro
++ * evaluator returns nonzero, run FUN_000c9c10() and terminate the thread's
++ * expression with hs_return(thread_datum, 0). */
++void FUN_000be2f0(int16_t function_index, int thread_datum, char init)
++{
++  int result;
++
++  result = hs_macro_function_evaluate(function_index, thread_datum, init);
++  if (result != 0) {
++    FUN_000c9c10();
++    hs_return(thread_datum, 0);
++  }
++}

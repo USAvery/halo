@@ -1,0 +1,152 @@
+diff --git c/kb.json w/kb.json
+index 49824181..7684dd0a 100644
+--- c/kb.json
++++ w/kb.json
+@@ -12809,7 +12809,8 @@
+         },
+         {
+           "addr": "0xf4ea0",
+-          "decl": "void FUN_000f4ea0(void);"
++          "decl": "void FUN_000f4ea0(int scenario_tag_index);",
++          "ported": true
+         },
+         {
+           "addr": "0xf5290",
+diff --git c/src/halo/items/items.c w/src/halo/items/items.c
+index 5ffecdaf..e8b06a37 100644
+--- c/src/halo/items/items.c
++++ w/src/halo/items/items.c
+@@ -393,3 +393,133 @@ void item_set_position(int item_handle, float *position, int flag)
+   }
+   *(int16_t *)0x4761d8 = *(int16_t *)0x4761d8 - 1;
+ }
++/* FUN_000f4ea0 — load the UI widget-group tags for a scenario.
++ *
++ * Reads the scenario tag ('scnr', tag index passed as the single cdecl stack
++ * argument) and, based on its scenario-type field (int16 at +0x3c: 0=solo,
++ * 1=multiplayer, 2=main_menu), loads the appropriate ui_widget_collection
++ * ('Soul') plus a fixed set of shared string-list, bitmap, sound and music
++ * tags. Each load calls FUN_001b9b00(tag_class, name, 0) which returns a tag
++ * index or -1; a failure is reported via error(2, message).
++ *
++ * TU: c:\halo\SOURCE\interface\ui_widget_group.c (confirmed by display_assert
++ * __FILE__ string). Faithful lift: control flow, tag classes/paths and
++ * side-effect order preserved; scenario_tag is dereferenced without a NULL
++ * guard exactly as in the original. error() is variadic but is only ever
++ * invoked here with the two fixed arguments (severity 2, message). */
++void FUN_000f4ea0(int scenario_tag_index)
++{
++  void *scenario_tag;
++  short scenario_type;
++  int tag_index;
++
++  scenario_tag = tag_get(0x73636e72 /* 'scnr' */, scenario_tag_index);
++
++  tag_index = FUN_001b9b00(0x75737472 /* 'ustr' */, "ui\\multiplayer_game_text", 0);
++  if (tag_index == -1) {
++    error(2, "failed to load the multiplayer game text string list tag");
++  }
++
++  tag_index = FUN_001b9b00(0x6269746d /* 'bitm' */, "ui\\shell\\bitmaps\\white", 0);
++  if (tag_index == -1) {
++    error(2, "generic white texture bitmap");
++  }
++
++  scenario_type = *(short *)((char *)scenario_tag + 0x3c);
++  if (scenario_type == 0) {
++    tag_index = FUN_001b9b00(0x536f756c /* 'Soul' */, "ui\\shell\\solo", 0);
++    if (tag_index == -1) {
++      error(2, "failed to load the solo scenario ui_widget_collection tag");
++    }
++  } else if (scenario_type == 1) {
++    tag_index = FUN_001b9b00(0x536f756c /* 'Soul' */, "ui\\shell\\multiplayer", 0);
++    if (tag_index == -1) {
++      error(2, "failed to load the multiplayer scenario ui_widget_collection tag");
++      return;
++    }
++  } else {
++    if (scenario_type != 2) {
++      display_assert("unknown scenario type",
++                     "c:\\halo\\SOURCE\\interface\\ui_widget_group.c", 0x1f5, true);
++      halt_and_catch_fire();
++    }
++    tag_index = FUN_001b9b00(0x536f756c /* 'Soul' */, "ui\\shell\\main_menu", 0);
++    if (tag_index == -1) {
++      error(2, "failed to load the main menu scenario ui_widget_collection_tag");
++    }
++    tag_index = FUN_001b9b00(0x76636b79 /* 'vcky' */, "ui\\english", 0);
++    if (tag_index == -1) {
++      error(2, "failed to load the browser's virtual keyboard tag");
++    }
++    tag_index = FUN_001b9b00(0x75737472 /* 'ustr' */, "ui\\random_player_names", 0);
++    if (tag_index == -1) {
++      error(2, "failed to load random player names string list tag");
++    }
++    tag_index = FUN_001b9b00(0x6d706c79 /* 'mply' */, "ui\\multiplayer_scenarios", 0);
++    if (tag_index == -1) {
++      error(2, "failed to load the multiplayer scenario description tag");
++    }
++    tag_index = FUN_001b9b00(0x75737472 /* 'ustr' */, "ui\\saved_game_file_strings", 0);
++    if (tag_index == -1) {
++      error(2, "failed to load the default saved game filename string list tag");
++    }
++    tag_index = FUN_001b9b00(0x75737472 /* 'ustr' */, "ui\\default_multiplayer_game_setting_names", 0);
++    if (tag_index == -1) {
++      error(2, "failed to load the default playlist profile names string list tag");
++    }
++    tag_index = FUN_001b9b00(0x75737472 /* 'ustr' */, "ui\\shell\\strings\\game_variant_descriptions", 0);
++    if (tag_index == -1) {
++      error(2, "failed to load the multiplayer variant description string list tag");
++    }
++    tag_index = FUN_001b9b00(0x75737472 /* 'ustr' */, "ui\\shell\\main_menu\\player_profiles_select\\difficulty_names", 0);
++    if (tag_index == -1) {
++      error(2, "failed to load the game difficulty name string list tag");
++    }
++    tag_index = FUN_001b9b00(0x75737472 /* 'ustr' */, "ui\\shell\\strings\\default_player_profile_names", 0);
++    if (tag_index == -1) {
++      error(2, "failed to load the default player profile names string list tag");
++    }
++    tag_index = FUN_001b9b00(0x75737472 /* 'ustr' */, "ui\\shell\\main_menu\\player_profiles_select\\button_set_long_descriptions", 0);
++    if (tag_index == -1) {
++      error(2, "failed to load the player profile button set long descriptions string list tag");
++    }
++    tag_index = FUN_001b9b00(0x75737472 /* 'ustr' */, "ui\\shell\\main_menu\\player_profiles_select\\button_set_short_descriptions", 0);
++    if (tag_index == -1) {
++      error(2, "failed to load the player profile short descriptions string list tag");
++    }
++    tag_index = FUN_001b9b00(0x75737472 /* 'ustr' */, "ui\\shell\\main_menu\\player_profiles_select\\joystick_set_defaults_descriptions", 0);
++    if (tag_index == -1) {
++      error(2, "failed to load the default player profile joystick set descriptions string list tag");
++    }
++    tag_index = FUN_001b9b00(0x75737472 /* 'ustr' */, "ui\\shell\\main_menu\\player_profiles_select\\joystick_set_short_descriptions", 0);
++    if (tag_index == -1) {
++      error(2, "failed to load the player profile joystick set short descriptions string list tag");
++    }
++    tag_index = FUN_001b9b00(0x75737472 /* 'ustr' */, "ui\\shell\\main_menu\\player_profiles_select\\profile_description_labels", 0);
++    if (tag_index == -1) {
++      error(2, "failed to load the player profile description labels string list tag");
++    }
++    tag_index = FUN_001b9b00(0x736e6421 /* 'snd!' */, "sound\\sfx\\ui\\cursor", 0);
++    if (tag_index == -1) {
++      error(2, "failed to load ui cursor sound tag");
++    }
++    tag_index = FUN_001b9b00(0x736e6421 /* 'snd!' */, "sound\\sfx\\ui\\forward", 0);
++    if (tag_index == -1) {
++      error(2, "failed to load ui forward sound tag");
++    }
++    tag_index = FUN_001b9b00(0x736e6421 /* 'snd!' */, "sound\\sfx\\ui\\back", 0);
++    if (tag_index == -1) {
++      error(2, "failed to load ui back sound tag");
++    }
++    tag_index = FUN_001b9b00(0x736e6421 /* 'snd!' */, "sound\\sfx\\ui\\flag_failure", 0);
++    if (tag_index == -1) {
++      error(2, "failed to load ui failure sound tag");
++    }
++    tag_index = FUN_001b9b00(0x6c736e64 /* 'lsnd' */, "sound\\music\\title1\\title1", 0);
++    if (tag_index == -1) {
++      error(2, "failed to load main menu title music");
++      return;
++    }
++  }
++  return;
++}

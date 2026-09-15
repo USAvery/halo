@@ -1,0 +1,134 @@
+diff --git c/kb.json w/kb.json
+index d535891b..111a6f28 100644
+--- c/kb.json
++++ w/kb.json
+@@ -6659,7 +6659,7 @@
+         {
+           "addr": "0x9ca70",
+           "decl": "void effects_information_get(int effect_ptr@<ebx>, uint32_t flags_hi@<edi>, unsigned int *seed, float *velocity_out, float min_val, float max_val, uint32_t flags_lo);",
+-          "note": "hidden reg deps (EDI=flags_hi, EBX=effect_ptr) — callers pass these in registers; all known callers inlined",
++          "note": "hidden reg deps (EDI=flags_hi, EBX=effect_ptr) \u2014 callers pass these in registers; all known callers inlined",
+           "ported": true
+         },
+         {
+@@ -6720,7 +6720,7 @@
+         {
+           "addr": "0x9dcf0",
+           "decl": "void FUN_0009dcf0(float *position, void *effect, void *location, void *part, float *forward, float *up, float scale);",
+-          "note": "4 reg args (EAX,EDX,ECX,ESI) — inlined into FUN_0009e310, cannot be thunked separately",
++          "note": "4 reg args (EAX,EDX,ECX,ESI) \u2014 inlined into FUN_0009e310, cannot be thunked separately",
+           "ported": true
+         },
+         {
+@@ -12823,7 +12823,8 @@
+         },
+         {
+           "addr": "0xf5500",
+-          "decl": "void virtual_keyboard_set_validation(void);"
++          "decl": "void virtual_keyboard_set_validation(wchar_t *text_buffer, uint16_t buffer_size, int16_t caption_index);",
++          "ported": true
+         },
+         {
+           "addr": "0xf5640",
+@@ -39217,4 +39218,4 @@
+   "0x11cfd0": {
+     "ported": true
+   }
+-}
++}
+\ No newline at end of file
+diff --git c/src/halo/items/items.c w/src/halo/items/items.c
+index a7bf74cc..c836b6b8 100644
+--- c/src/halo/items/items.c
++++ w/src/halo/items/items.c
+@@ -506,3 +506,90 @@ void item_set_position(int item_handle, float *position, int flag)
+   }
+   *(int16_t *)0x4761d8 = *(int16_t *)0x4761d8 - 1;
+ }
++/* virtual_keyboard.c — on-screen virtual keyboard input (interface).
++ *
++ * Lifted from Halo CE Xbox (cachebeta.xbe).
++ * TU: c:\halo\SOURCE\interface\virtual_keyboard.c (__FILE__ asserts).
++ * kb.json assigns 0xf5500 to items.obj, but the __FILE__ evidence places the
++ * source in interface/.  virtual_keyboard_globals lives at 0x46cef0; its
++ * initializer virtual_keyboard_initialize() currently lives in items.c.
++ */
++
++/* virtual_keyboard_set_validation (0xf5500, __cdecl) — begin an on-screen
++ * virtual-keyboard editing session over the caller-supplied wide text buffer.
++ *
++ * Validates the request (non-NULL buffer; non-zero, even byte size; keyboard
++ * not already active) and the caption string index (must be in
++ * [FIRST_VIRTUAL_KEYBOARD_CAPTION_STRING_INDEX=8,
++ *  NUMBER_OF_VIRTUAL_KEYBOARD_STRINGS=11) — i.e. 8..10 inclusive), then seeds
++ * virtual_keyboard_globals: clears the leading state words, marks it active,
++ * records the buffer start/end pointers, clamps the stored capacity to 0x40
++ * wchars, stamps the session start time (system_milliseconds), snapshots the
++ * current buffer title (0x20 wchars), and plays the UI feedback sound.  Bad
++ * arguments trip a display_assert and halt (noreturn).
++ *
++ * Global field widths (verified against Ghidra store widths — mixed
++ * byte/word/dword/ptr writes to one struct):
++ *   +0x00 active           u8   (guard-read, then set to 1)
++ *   +0x01/+0x02/+0x03      u8   = 0
++ *   +0x04 keyboard         ptr  (NULL guard — early return if not loaded)
++ *   +0x08/+0x0a            u16  = 0
++ *   +0x0c buffer_size      u16  (clamped to 0x40)
++ *   +0x0e                  u16  = 0xffff
++ *   +0x14 caption_index    i16
++ *   +0x16                  u8   = 0
++ *   +0x17                  u8   = 1
++ *   +0x18 text_buffer      wchar_t*
++ *   +0x1c text_end         wchar_t*  (= text_buffer + ustrlen)
++ *   +0x20 start_time       u32
++ *   +0x28 title[0x20]      wchar_t   (ustrncpy of text_buffer)
++ *   +0x66                  u16  = 0
++ */
++void virtual_keyboard_set_validation(wchar_t *text_buffer, uint16_t buffer_size,
++                                     int16_t caption_index)
++{
++  int text_length;
++
++  /* Expanded assert macros: the original jumps to an out-of-line assert block
++   * on guard FAILURE (jne/jle), so the session-setup body is the fall-through
++   * path.  Modelling the two asserts as early-exit guards reproduces that
++   * branch polarity and block layout. */
++  if (text_buffer == (wchar_t *)0 || buffer_size == 0 ||
++      (buffer_size & 1) != 0 || *(unsigned char *)0x46cef0 != 0) {
++    display_assert(
++        "text_buffer && buffer_size && !(buffer_size&1) && !virtual_keyboard_globals.active",
++        "c:\\halo\\SOURCE\\interface\\virtual_keyboard.c", 417, true);
++    halt_and_catch_fire();
++  }
++  if (caption_index <= 7 || caption_index >= 0xb) {
++    display_assert(
++        "(caption_index>=FIRST_VIRTUAL_KEYBOARD_CAPTION_STRING_INDEX) && (caption_index<NUMBER_OF_VIRTUAL_KEYBOARD_STRINGS)",
++        "c:\\halo\\SOURCE\\interface\\virtual_keyboard.c", 418, true);
++    halt_and_catch_fire();
++  }
++
++  if (*(void **)0x46cef4 == (void *)0)
++    return;
++
++  event_manager_flush();
++  *(unsigned short *)0x46cef8 = 0;
++  *(unsigned short *)0x46cefa = 0;
++  *(unsigned char *)0x46cef0 = 1;
++  *(wchar_t **)0x46cf08 = text_buffer;
++  text_length = ustrlen((const unsigned short *)text_buffer);
++  *(wchar_t **)0x46cf0c = text_buffer + text_length;
++  *(unsigned short *)0x46cefc = buffer_size;
++  if (buffer_size > 0x3f)
++    *(unsigned short *)0x46cefc = 0x40;
++  *(unsigned short *)0x46cefe = 0xffff;
++  *(unsigned int *)0x46cf10 = system_milliseconds();
++  *(short *)0x46cf04 = caption_index;
++  *(unsigned char *)0x46cef1 = 0;
++  *(unsigned char *)0x46cef2 = 0;
++  *(unsigned char *)0x46cef3 = 0;
++  *(unsigned char *)0x46cf07 = 1;
++  ustrncpy((wchar_t *)0x46cf18, text_buffer, 0x20);
++  *(unsigned short *)0x46cf56 = 0;
++  *(unsigned char *)0x46cf06 = 0;
++  ui_play_audio_feedback_sound();
++}

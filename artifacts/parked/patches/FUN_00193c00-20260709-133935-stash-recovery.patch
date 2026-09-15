@@ -1,0 +1,464 @@
+diff --git a/kb.json b/kb.json
+index 5daccabf..f634e5c2 100644
+--- a/kb.json
++++ b/kb.json
+@@ -23415,7 +23415,8 @@
+         },
+         {
+           "addr": "0x191500",
+-          "decl": "void FUN_00191500(void);"
++          "decl": "void FUN_00191500(int *globals, const char *name);",
++          "ported": true
+         },
+         {
+           "addr": "0x1915d0",
+@@ -23550,11 +23551,8 @@
+         {
+           "addr": "0x193bb0",
+           "decl": "void structure_detail_objects_initialize_for_new_map(void);",
+-          "ported": false
+-        },
+-        {
+-          "addr": "0x193c00",
+-          "decl": "void FUN_00193c00(void);"
++          "ported": true,
++          "name": "structure_detail_objects_initialize_for_new_map"
+         },
+         {
+           "addr": "0x194070",
+@@ -23615,7 +23613,9 @@
+         },
+         {
+           "addr": "0x195bc0",
+-          "decl": "void FUN_00195bc0(void);"
++          "decl": "void FUN_00195bc0(void);",
++          "ported": true,
++          "source_path": "src/halo/structures/structures.c"
+         },
+         {
+           "addr": "0x195c40",
+@@ -23627,7 +23627,9 @@
+         },
+         {
+           "addr": "0x195d00",
+-          "decl": "void FUN_00195d00(void);"
++          "decl": "void FUN_00195d00(void);",
++          "ported": true,
++          "source_path": "src/halo/structures/structures.c"
+         },
+         {
+           "addr": "0x195d40",
+@@ -23870,6 +23872,11 @@
+           "addr": "0x193b00",
+           "decl": "int FUN_00193b00(int param_1 /* @<ecx> */, short *param_2, int in_EAX /* @<eax> */);",
+           "ported": true
++        },
++        {
++          "addr": "0x193c00",
++          "decl": "void FUN_00193c00(void);",
++          "ported": true
+         }
+       ],
+       "name": "structure_detail_objects.obj",
+diff --git a/src/halo/structures/structure_detail_objects.c b/src/halo/structures/structure_detail_objects.c
+index 7c58ea82..178b9670 100644
+--- a/src/halo/structures/structure_detail_objects.c
++++ b/src/halo/structures/structure_detail_objects.c
+@@ -80,3 +80,252 @@ float FUN_00193b80(float *param_1, float *param_2)
+   return param_1[0] * param_2[0] + param_1[1] * param_2[1] +
+          param_1[2] * param_2[2] + param_1[3] * param_2[3];
+ }
++
++/*
++ * structure_detail_objects.c per-frame cell-grid rebuild (0x193c00).
++ * Rebuilds the visible detail-object cell cache for the 3x3x3 cell
++ * neighbourhood centred on the current view cell, when either the view
++ * cell moved, the cache was invalidated, or the definition's dirty bit
++ * (flags & 2) is set.  Asserts cite structure_detail_objects.c:198 (0xc6).
++ *
++ * Verified against disassembly 0x193c00-0x193e0f:
++ *   - two scenario_get() calls (count check + element fetch), NO args.
++ *   - cell coords: FLD src; FMUL [0x268ed0]; FSUB [0x253398];
++ *     FSTP tmp; FLD tmp; FISTP int  (float32 round-trip, round-to-nearest).
++ *   - lower/upper bound calls: p1@ecx = begin (first elem),
++ *     in_EAX@eax = end (last elem + 0x20); stack = &key.
++ *   - record float at +0xc stored via FSTP (float, NOT (int)).
++ */
++void FUN_00193c00(void)
++{
++  short player_count;
++  char *scn;
++  int *local_14; /* detail-object palette element (0x40 bytes) */
++  int *piVar10; /* tag-block ptr, then output record ptr */
++  int base; /* detail-objects data base (*0x4d8ea0) */
++  int base_l; /* working copy of base (iVar3) */
++  short coord[4]; /* view cell {x, y, z, 0} */
++  float ftmp;
++  int itmp;
++  short key[4]; /* search key {x, y, z, 0} passed to bounds */
++  int local_54;
++  int local_50;
++  int local_3c;
++  short *local_10; /* packed (y<<16|x)+1 in pass1; count cursor pass2 */
++  int local_8i; /* loop counter (float bit-pattern of int in orig) */
++  int local_c_ctr;
++  short cell_counts[0x20]; /* per-set running counts (local_94 + local_92[]) */
++  unsigned int local_2c; /* accumulated per-set type bitmask */
++  short *begin;
++  short *last;
++  int end;
++  short *psVar4;
++  short *psVar5;
++  short *psVar11;
++  short *local_44; /* cursor into cell_counts */
++  int local_30;
++  int local_38;
++  int local_48;
++  int local_34;
++  int local_4c;
++  int iVar7;
++  int idx38;
++  int diff;
++  int mask;
++  int *pz;
++  int zc;
++  float fr;
++  unsigned short *puVar6;
++  int *local_28p; /* base+0x5200 header block */
++  short comp_idx; /* compacted-record index (sVar2) */
++  short set_idx; /* set index 0..0x1f (sVar9) */
++  short cnt; /* per-set count (sVar1) */
++
++  player_count = local_player_count();
++  if ((player_count != 1) || (*(short *)0x506548 == -1)) {
++    return;
++  }
++
++  scn = (char *)scenario_get();
++  if (*(int *)(scn + 0x24c) == 0) {
++    local_14 = 0;
++  } else {
++    local_14 =
++      (int *)tag_block_get_element((char *)scenario_get() + 0x24c, 0, 0x40);
++  }
++  piVar10 = local_14;
++  base = *(int *)0x4d8ea0;
++
++  /* view cell coords: round-to-nearest( src * scale - bias ) */
++  ftmp = *(float *)0x506550 * *(float *)0x268ed0 - *(float *)0x253398;
++  itmp = (int)ftmp;
++  coord[0] = (short)itmp;
++  ftmp = *(float *)0x506554 * *(float *)0x268ed0 - *(float *)0x253398;
++  itmp = (int)ftmp;
++  coord[1] = (short)itmp;
++  ftmp = *(float *)0x506558 * *(float *)0x268ed0 - *(float *)0x253398;
++  itmp = (int)ftmp;
++  coord[2] = (short)itmp;
++  coord[3] = 0;
++
++  if (*(char *)((char *)local_14 + 0x30) == 0) {
++    return;
++  }
++
++  FUN_0017cb50(); /* enter/lock */
++
++  if ((coord[0] != *(short *)(base + 0x5208)) ||
++      (coord[1] != *(short *)(base + 0x520a)) ||
++      (coord[2] != *(short *)(base + 0x520c)) ||
++      (*(char *)(base + 0x520e) == 0) ||
++      ((*(unsigned char *)((char *)piVar10 + 0x30) & 2) != 0)) {
++    /* --- zero the 0x20-entry per-set count table --- */
++    cell_counts[0] = 0;
++    local_2c = 0;
++    pz = (int *)&cell_counts[1];
++    for (zc = 0xf; zc != 0; zc--) {
++      *pz = 0;
++      pz++;
++    }
++
++    *(unsigned char *)((char *)piVar10 + 0x30) = 1; /* set built flag */
++
++    /* cache the view cell coords (two dword stores over {x,y} and {z,pad}) */
++    *(int *)(base + 0x520c) = *(int *)&coord[2];
++    *(short *)pz = 0; /* final zero of table */
++    local_54 = *(int *)&coord[1] + 1; /* (z<<16|y)+1 */
++    *(int *)(base + 0x5208) = *(int *)&coord[0];
++    local_10 = (short *)(*(int *)&coord[0] + 1); /* (y<<16|x)+1 */
++    *(char *)(base + 0x520e) = 1; /* mark cache valid */
++
++    local_8i = 3;
++    local_c_ctr = 3;
++    local_3c = local_54;
++    key[2] = coord[2]; /* z */
++
++    while (1) {
++      do {
++        begin = (short *)tag_block_get_element(piVar10, 0, 0x20);
++        last = (short *)tag_block_get_element(piVar10, *piVar10 - 1, 0x20);
++        end = (int)((char *)last + 0x20);
++
++        key[2] = (short)(key[2] - 1); /* z - 1 (lower bound) */
++        key[0] = (short)(int)local_10;
++        key[1] = (short)local_3c;
++        key[3] = 0;
++        psVar4 = (short *)FUN_00193a80((int)begin, key, end);
++        key[2] = (short)(key[2] + 3); /* z + 2 (upper bound) */
++        psVar5 = (short *)FUN_00193b00((int)begin, key, end);
++        key[2] = coord[2]; /* reset z */
++
++        if (((*psVar4 == key[0]) && (psVar4[1] == key[1])) &&
++            ((psVar5[-0x10] == key[0]) && (psVar5[-0xf] == key[1]))) {
++          if (psVar5 - 0x10 < psVar4) {
++            display_assert(
++              "lower_bound_cell<=upper_bound_cell",
++              "c:\\halo\\SOURCE\\structures\\structure_detail_objects.c", 0xc6,
++              1);
++            system_exit(-1);
++          }
++
++          if (psVar4 < psVar5) {
++            psVar11 = psVar4 + 2; /* &cell.z */
++            local_50 =
++              (int)(((unsigned int)((int)psVar5 + (-1 - (int)psVar4))) >> 5) +
++              1;
++            do {
++              diff = (int)coord[2] - (int)*psVar11;
++              mask = diff >> 0x1f;
++              if (((diff ^ mask) - mask) < 2) { /* abs(z - cell.z) < 2 */
++                local_44 = &cell_counts[0];
++                local_30 = 0;
++                local_38 = 0;
++                local_2c = local_2c | *(unsigned int *)(psVar11 + 2);
++                local_48 = 0;
++                local_34 = 0;
++                local_4c = 0x20;
++                do {
++                  base_l = base;
++                  if ((*(unsigned int *)(psVar11 + 2) &
++                       (1u << ((unsigned char)local_48 & 0x1f))) != 0) {
++                    iVar7 = *local_44 + local_34;
++                    *local_44 = (short)(*local_44 + 1);
++                    piVar10 = (int *)(base_l + iVar7 * 0x18);
++                    *(short *)((char *)piVar10 + 8) = psVar11[-2]; /* cell.x */
++                    *(short *)((char *)piVar10 + 10) = psVar11[-1]; /* cell.y */
++                    idx38 = (int)(short)local_38;
++                    fr = (float)(int)psVar11[1] * *(float *)0x261518 +
++                         (float)(int)*psVar11;
++                    *(float *)((char *)piVar10 + 0xc) = fr;
++                    *piVar10 = *(int *)(psVar11 + 4) + local_30;
++                    puVar6 = (unsigned short *)tag_block_get_element(
++                      local_14 + 6, *(int *)(psVar11 + 6) + idx38, 2);
++                    piVar10[1] = *puVar6;
++                    if (local_14[9] == 0) {
++                      base_l = base + 0xa420;
++                    } else {
++                      base_l = (int)tag_block_get_element(
++                        local_14 + 9, *(int *)(psVar11 + 6) + idx38, 0x10);
++                    }
++                    piVar10[5] = base_l;
++                    local_30 = local_30 + piVar10[1];
++                    local_38 = local_38 + 1;
++                  }
++                  local_44 = local_44 + 1;
++                  local_4c = local_4c - 1;
++                  local_48 = local_48 + 1;
++                  local_34 = local_34 + 0x1b;
++                } while (local_4c != 0);
++              }
++              psVar11 = psVar11 + 0x10;
++              local_50 = local_50 - 1;
++            } while (local_50 != 0);
++          }
++        }
++
++        local_3c = local_3c - 1;
++        local_c_ctr = local_c_ctr - 1;
++        piVar10 = local_14;
++      } while (local_c_ctr != 0);
++
++      local_10 = (short *)((int)local_10 - 1);
++      local_8i = local_8i - 1;
++      if (local_8i == 0) {
++        break;
++      }
++      local_3c = local_54;
++      local_c_ctr = 3;
++    }
++
++    /* --- second pass: compact active per-set counts into +0x5100 records ---
++     */
++    local_28p = (int *)(base + 0x5200);
++    set_idx = 0;
++    *local_28p = base + 0x5100;
++    comp_idx = 0;
++    local_10 = &cell_counts[0];
++    *(short *)(base + 0x5204) = 0;
++    local_8i = 0;
++    base_l = base;
++    do {
++      if (((local_2c & (1u << (local_8i & 0x1f))) != 0) &&
++          ((cnt = *local_10) != 0)) {
++        piVar10 = (int *)(base + 0x5100 + comp_idx * 8);
++        comp_idx = comp_idx + 1;
++        *piVar10 = base_l;
++        *(short *)((char *)piVar10 + 4) = cnt;
++        *(short *)((char *)piVar10 + 6) = set_idx;
++        *(short *)(base + 0x5204) = (short)(*(short *)(base + 0x5204) + 1);
++      }
++      set_idx = set_idx + 1;
++      local_8i = local_8i + 1;
++      local_10 = local_10 + 1;
++      base_l = base_l + 0x288;
++    } while (set_idx < 0x20);
++
++    FUN_0017cb60(local_28p);
++  }
++
++  FUN_0017cb70((void *)(base + 0x5200));
++  FUN_0017cb80(); /* leave/unlock */
++}
+diff --git a/src/halo/structures/structures.c b/src/halo/structures/structures.c
+index 77a152c6..b845d580 100644
+--- a/src/halo/structures/structures.c
++++ b/src/halo/structures/structures.c
+@@ -991,6 +991,36 @@ void reference_list_remove(data_t *data, int *head, int value)
+   system_exit(-1);
+ }
+ 
++/* Allocate a cluster partition's global storage (0x191500).
++ * Reserves the per-cluster head array via game_state_malloc (0x800 bytes,
++ * named "cluster references"), then creates the two datum pools with names
++ * built from the caller-supplied base name: the per-cluster object references
++ * ("<name> cluster reference") into globals[1], and the per-object cluster
++ * references ("cluster <name> reference") into globals[2]. Each pool holds up
++ * to 0x800 elements of stride 0xc. Emits a non-fatal error() (level 0) if any
++ * of the three allocations failed. The malloc-before-formatting order and the
++ * (globals[0] || result || globals[1]) null-check shape are preserved from the
++ * decompilation for codegen fidelity; result holds the last data_new return.
++ */
++void FUN_00191500(int *globals, const char *name)
++{
++  int result;
++  char local_204[256];
++  char local_104[256];
++
++  globals[0] = (int)game_state_malloc(name, "cluster references", 0x800);
++  crt_sprintf(local_104, "cluster %s", name);
++  crt_sprintf(local_204, "%s reference", local_104);
++  globals[1] = (int)game_state_data_new(local_204, 0x800, 0xc);
++  crt_sprintf(local_104, "%s cluster", name);
++  crt_sprintf(local_204, "%s reference", local_104);
++  result = (int)game_state_data_new(local_204, 0x800, 0xc);
++  globals[2] = result;
++  if (globals[0] == 0 || result == 0 || globals[1] == 0) {
++    error(0, "couldn't allocate %s cluster partition globals", name);
++  }
++}
++
+ /* Clear a cluster partition (0x1915d0).
+  * Resets the per-cluster head array (partition[0], 0x800 bytes) to the empty
+  * sentinel (-1), then empties both datum pools: the per-object cluster
+@@ -1510,6 +1540,30 @@ void structure_detail_objects_initialize(void)
+   *(int *)(base + 0xa42c) = 0;
+ }
+ 
++/* FUN_00193bb0 (0x193bb0)
++ * structure_detail_objects_initialize_for_new_map
++ * Per-map reset of the detail-object global runtime data block. The block
++ * pointer lives at global 0x4d8ea0 (allocated by
++ * structure_detail_objects_initialize, above). Asserts the pointer is
++ * non-NULL, zeroes the whole 0xa430-byte block, then explicitly clears the
++ * byte at +0x520e (redundant after the memset but present in the original
++ * codegen -- kept to match). Assert reason/file/line verbatim from the
++ * original: "detail_object_global_runtime_data",
++ * c:\halo\SOURCE\structures\structure_detail_objects.c:109 (0x6d), halt=1.
++ * The global is re-read at each use to match the original DAT_ access shape.
++ */
++void structure_detail_objects_initialize_for_new_map(void)
++{
++  if (*(int *)0x4d8ea0 == 0) {
++    display_assert("detail_object_global_runtime_data",
++                   "c:\\halo\\SOURCE\\structures\\structure_detail_objects.c",
++                   0x6d, 1);
++    halt_and_catch_fire();
++  }
++  csmemset((void *)*(int *)0x4d8ea0, 0, 0xa430);
++  *(unsigned char *)(*(int *)0x4d8ea0 + 0x520e) = 0;
++}
++
+ /* FUN_00194360 (0x194360)
+  * qsort/bsort comparator. Two cdecl stack args are pointers to records.
+  * Reads a signed int16 field at offset +0x10 of each record and orders
+@@ -1753,6 +1807,72 @@ void FUN_00195b10(void)
+   }
+ }
+ 
++/* FUN_00195bc0 (0x195bc0)
++ *
++ * render_structure_diffuse_texture: thin render-orchestration wrapper (string
++ * ref "render_structure_diffuse_texture" @0x3281b0).  Profiles the scope, and
++ * when the map has a valid diffuse/lightmap pass (byte at 0x4d8eb0 != 0) it
++ * brackets a scope enter/exit pair (FUN_00162790 / FUN_00160950, reached in the
++ * original via 1-instr JMP thunks at 0x17cd20/0x17cd40) around the per-surface
++ * diffuse-texture draw walk (FUN_00195790).
++ *
++ * Notes from disasm/decompile:
++ *  - FUN_00195790 takes an @eax pointer (=0x5937d4, surface->material offset
++ *    table) plus 6 stack args.  arg1 (surface_count) is the zero-extended
++ *    uint16 at 0x5937d0 (XOR ECX,ECX; MOV CX,word ptr); arg2
++ *    (lightmap_pass_index) is the dword at 0x4d8eb4.  This variant has a single
++ *    callback: FUN_0017cd30 is the 5th param (surface_draw_cb);
++ *    material_begin_cb / pass_end_cb / param_7 are all 0.  (Confirmed via push
++ *    order: ADD ESP,0x18 = 6 stack dwords.)
++ */
++void FUN_00195bc0(void)
++{
++  if (*(char *)0x449ef1 != 0 && *(char *)0x3281b8 != 0) {
++    profile_enter_private((void *)0x3281b0);
++  }
++
++  if (*(char *)0x4d8eb0 != 0) {
++    FUN_00162790();
++    FUN_00195790((int *)0x5937d4, *(unsigned short *)0x5937d0, *(int *)0x4d8eb4,
++                 (void *)0, (void *)FUN_0017cd30, (void *)0, 0);
++    FUN_00160950();
++  }
++
++  if (*(char *)0x449ef1 != 0 && *(char *)0x3281b8 != 0) {
++    profile_exit_private((void *)0x3281b0);
++  }
++}
++
++/* FUN_00195d00 (0x195d00)
++ *
++ * render_structure_* draw-pass wrapper (barest variant in the family): unlike
++ * its siblings this one carries NO profiling scope -- only 3 CALLs total.  When
++ * the map has a valid lightmap/material pass (byte at 0x4d8eb0 != 0), it
++ * brackets a scope enter/exit pair (FUN_00160bd0 / FUN_00160be0, reached in the
++ * original via 1-instr JMP thunks at 0x17ce40/0x17ce60) around the per-surface
++ * draw walk (FUN_00195790).
++ *
++ * Notes from disasm/decompile:
++ *  - FUN_00195790 takes an @eax pointer (=0x5937d4, surface->material offset
++ *    table) plus 6 stack args.  arg1 (surface_count) is the zero-extended
++ * uint16 at 0x5937d0; arg2 (lightmap_pass_index) is the dword at 0x4d8eb4. This
++ *    variant has a single callback: FUN_0017ce50 is the 5th param
++ *    (surface_draw_cb); material_begin_cb / pass_end_cb / param_7 are all 0.
++ *    (Push order: ADD ESP,0x18 = 6 stack dwords.)  Ghidra elides the @eax arg;
++ *    every sibling confirms it is (int *)0x5937d4.
++ *  - The bracket calls hit the JMP thunks at 0x17ce40/0x17ce60 directly,
++ * matching the original CALL targets.
++ */
++void FUN_00195d00(void)
++{
++  if (*(char *)0x4d8eb0 != 0) {
++    FUN_0017ce40();
++    FUN_00195790((int *)0x5937d4, *(unsigned short *)0x5937d0, *(int *)0x4d8eb4,
++                 (void *)0, (void *)FUN_0017ce50, (void *)0, 0);
++    FUN_0017ce60();
++  }
++}
++
+ /* FUN_00195d40 (0x195d40)
+  *
+  * render_structure_reflections: thin render-orchestration wrapper (string ref

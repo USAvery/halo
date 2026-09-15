@@ -1,0 +1,23 @@
+{
+  "name": "FUN_00063970",
+  "addr": "0x63970",
+  "obj": "path_smoothing.obj (source: ai/path_smoothing.c)",
+  "source_path": "src/halo/ai/path_smoothing.c",
+  "best_score": 54.5,
+  "best_patch": "artifacts/parked/patches/FUN_00063970-20260710-200252.patch",
+  "status": "parked",
+  "first_parked": "2026-07-10T20:02:52+00:00",
+  "last_updated": "2026-07-10T20:02:52+00:00",
+  "promoted_commit": null,
+  "attempts": [
+    {
+      "ts": "2026-07-10T20:02:52+00:00",
+      "model": "opus",
+      "effort": "high",
+      "score": 54.5,
+      "cap_hypothesis": "",
+      "reason": "below_65pct",
+      "patch": "artifacts/parked/patches/FUN_00063970-20260710-200252.patch"
+    }
+  ]
+}

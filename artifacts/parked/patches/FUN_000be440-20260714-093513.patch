@@ -1,0 +1,74 @@
+diff --git c/kb.json w/kb.json
+index 8da42989..3c32518b 100644
+--- c/kb.json
++++ w/kb.json
+@@ -6659,7 +6659,7 @@
+         {
+           "addr": "0x9ca70",
+           "decl": "void effects_information_get(int effect_ptr@<ebx>, uint32_t flags_hi@<edi>, unsigned int *seed, float *velocity_out, float min_val, float max_val, uint32_t flags_lo);",
+-          "note": "hidden reg deps (EDI=flags_hi, EBX=effect_ptr) — callers pass these in registers; all known callers inlined",
++          "note": "hidden reg deps (EDI=flags_hi, EBX=effect_ptr) \u2014 callers pass these in registers; all known callers inlined",
+           "ported": true
+         },
+         {
+@@ -6720,7 +6720,7 @@
+         {
+           "addr": "0x9dcf0",
+           "decl": "void FUN_0009dcf0(float *position, void *effect, void *location, void *part, float *forward, float *up, float scale);",
+-          "note": "4 reg args (EAX,EDX,ECX,ESI) — inlined into FUN_0009e310, cannot be thunked separately",
++          "note": "4 reg args (EAX,EDX,ECX,ESI) \u2014 inlined into FUN_0009e310, cannot be thunked separately",
+           "ported": true
+         },
+         {
+@@ -17470,7 +17470,8 @@
+         },
+         {
+           "addr": "0xbe440",
+-          "decl": "void FUN_000be440(void);"
++          "decl": "void FUN_000be440(int16_t function_index, int thread_datum, char init);",
++          "ported": true
+         },
+         {
+           "addr": "0xbe480",
+@@ -39353,4 +39354,4 @@
+   "0x11cfd0": {
+     "ported": true
+   }
+-}
++}
+\ No newline at end of file
+diff --git c/src/halo/game/players.c w/src/halo/game/players.c
+index 0b085063..0d797083 100644
+--- c/src/halo/game/players.c
++++ w/src/halo/game/players.c
+@@ -2386,3 +2386,30 @@ void player_rumble_initialize(int16_t function_index, int thread_handle,
+     hs_return(thread_handle, 0);
+   }
+ }
++
++/* FUN_000be440 @ 0x000be440
++ *
++ * HaloScript function-evaluator wrapper, sibling of player_rumble_initialize
++ * (0x000be400). Evaluates the script function via
++ * hs_macro_function_evaluate(function_index, thread_datum, init); on a non-zero
++ * evaluation result it calls the no-argument helper FUN_000c9e50() and then
++ * completes the thread with hs_return(thread_datum, 0).
++ *
++ * cdecl frame:
++ *   function_index  int16_t  [ESP+0x04]
++ *   thread_datum    int      [ESP+0x08]
++ *   init            char     [ESP+0x0c]
++ *
++ * hs_macro_function_evaluate returns an evaluation record in EAX. Unlike the
++ * 0xbe400 sibling, this variant does not read any record fields; the result is
++ * used only as a non-NULL guard (iVar1 != 0). */
++void FUN_000be440(int16_t function_index, int thread_datum, char init)
++{
++  int record;
++
++  record = hs_macro_function_evaluate(function_index, thread_datum, init);
++  if (record != 0) {
++    FUN_000c9e50();
++    hs_return(thread_datum, 0);
++  }
++}

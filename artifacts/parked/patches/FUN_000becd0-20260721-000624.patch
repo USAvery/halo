@@ -1,0 +1,76 @@
+diff --git c/kb.json w/kb.json
+index e4a60656..76dbcece 100644
+--- c/kb.json
++++ w/kb.json
+@@ -17675,7 +17675,8 @@
+         },
+         {
+           "addr": "0xbecd0",
+-          "decl": "void FUN_000becd0(void);"
++          "decl": "void FUN_000becd0(int16_t function_index, int thread_datum, char init);",
++          "ported": true
+         },
+         {
+           "addr": "0xbed20",
+@@ -35693,7 +35694,7 @@
+         },
+         {
+           "addr": "0x139300",
+-          "decl": "void lights_enable(void);"
++          "decl": "unsigned char lights_enable(unsigned char value);"
+         },
+         {
+           "addr": "0x139350",
+diff --git c/src/halo/game/players.c w/src/halo/game/players.c
+index 5438022e..159bed28 100644
+--- c/src/halo/game/players.c
++++ w/src/halo/game/players.c
+@@ -3763,6 +3763,48 @@ void FUN_000bec90(int16_t function_index, int thread_datum, char init)
+   }
+ }
+ 
++/* FUN_000becd0 @ 0x000becd0
++ *
++ * HaloScript macro-function evaluator wrapper (byte-valued variant), a direct
++ * sibling of FUN_000bec90 / FUN_000bed20 above. Evaluates the script function
++ * via hs_macro_function_evaluate(function_index, thread_datum, init); while
++ * that returns NULL the evaluation is still pending and nothing is committed.
++ * Once a non-NULL evaluation record is returned, its first byte is passed
++ * through lights_enable (0x139300, a cdecl byte->byte helper) and the
++ * zero-extended result is committed to the calling thread with hs_return.
++ *
++ * cdecl frame (PUSH EBP; MOV EBP,ESP; PUSH ECX for one local):
++ *   function_index  int16_t  [EBP+0x08]  -> hs_macro_function_evaluate arg1
++ *   thread_datum    int      [EBP+0x0c]  -> arg2; held in ESI, reused for
++ *                                           hs_return arg1
++ *   init            char     [EBP+0x10]  -> arg3
++ *
++ * hs_macro_function_evaluate returns the record pointer in EAX. On non-NULL the
++ * original loads a single byte from it (XOR EDX,EDX; MOV DL,[EAX] = a
++ * zero-extended byte load, NOT a full dword) and passes it to lights_enable
++ * (PUSH EDX; CALL). That callee is plain cdecl returning a byte in AL: the
++ * caller stores only AL (MOV byte[EBP-4],AL) and forwards the zero-extended
++ * value. The lone PUSH EDX for lights_enable is not cleaned immediately; its
++ * 4-byte cleanup is folded into the ADD ESP,0xc after hs_return (0xc = 8 for
++ * hs_return's two cdecl args + 4 for lights_enable's arg), confirming
++ * lights_enable is cdecl with one stack arg. Ghidra modeled this void(void);
++ * the three cdecl params were unmodeled (in_stack_*) and lights_enable's
++ * argument/return were mis-declared void(void) (kb decl for both was
++ * previously void(void)). lights_enable's true name is uncertain; it behaves
++ * as a boolean toggle/setter returning a state byte. */
++void FUN_000becd0(int16_t function_index, int thread_datum, char init)
++{
++  unsigned char *result;
++  unsigned int value;
++
++  result = (unsigned char *)hs_macro_function_evaluate(function_index,
++                                                       thread_datum, init);
++  if (result != NULL) {
++    value = lights_enable(*result);
++    hs_return(thread_datum, (int)value);
++  }
++}
++
+ /* FUN_000bed20 @ 0x000bed20
+  *
+  * HaloScript macro-function evaluator wrapper (16-bit-valued variant), a direct

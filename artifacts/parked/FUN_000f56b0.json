@@ -1,0 +1,77 @@
+{
+  "name": "FUN_000f56b0",
+  "addr": "0xf56b0",
+  "obj": "items.obj",
+  "source_path": "src/halo/items/items.c",
+  "best_score": 81.8,
+  "best_patch": "artifacts/parked/patches/FUN_000f56b0-20260711-142241.patch",
+  "status": "parked",
+  "first_parked": "2026-07-11T10:25:05+00:00",
+  "last_updated": "2026-07-22T06:00:06+00:00",
+  "promoted_commit": null,
+  "attempts": [
+    {
+      "ts": "2026-07-11T10:25:05+00:00",
+      "model": "opus",
+      "effort": "high",
+      "score": 81.8,
+      "cap_hypothesis": "int16 register-width gap: MSVC kept the loop counter in the 16-bit AX sub-register (incw %ax / xorw %ax), but VC71 recompilation from equivalent C89 allocates 32-bit EAX (incl %eax / xorl %eax) with a preceding xor eax,eax to clear high bits. All 22/22 instructions present and semantically correct; only counter register width and the resulting LCS reorder diverge. Tried signed short, unsigned short, col++, (short)(col+1), and load reordering \u2014 all identical 81.8%. Matches documented \"int16 movswl / register-width permanent ~15pp gap\" cap. classify_cap.py returned inconclusive (no @reg prologue, not on parked ledger); this is agent judgment.",
+      "reason": "structural_cap",
+      "patch": "artifacts/parked/patches/FUN_000f56b0-20260711-102505.patch"
+    },
+    {
+      "ts": "2026-07-11T14:22:41+00:00",
+      "model": "opus",
+      "effort": "high",
+      "score": 81.8,
+      "cap_hypothesis": "int16 register-width gap, ledger-confirmed prior cap at exactly 81.8%. All 22/22 instructions present and semantically correct; MSVC keeps the loop counter in the 16-bit AX sub-register (incw/xorw ax) while VC71 recompilation from equivalent C89 allocates 32-bit EAX, causing an LCS reorder. Matches the documented \"int16 movswl / register-width permanent ~15pp gap\" cap pattern. Not escalatable.",
+      "reason": "structural_cap",
+      "patch": "artifacts/parked/patches/FUN_000f56b0-20260711-142241.patch"
+    },
+    {
+      "ts": "2026-07-11T18:45:46+00:00",
+      "model": "opus",
+      "effort": "high",
+      "score": 77.3,
+      "cap_hypothesis": "ledger_prior_cap: int16 register-width gap. All 22/22 instructions present and semantically correct; MSVC keeps the column loop counter in 16-bit AX (incw/xorw ax) while VC71 recompilation from equivalent C89 allocates 32-bit EAX, causing an LCS reorder. Matches documented int16 movswl / register-width permanent ~15pp cap pattern (vkbd move-handler family; siblings 5750=82.6%, 57a0=83.0%). Ledger-confirmed prior cap at 81.8%. Not escalatable.",
+      "reason": "structural_cap",
+      "patch": "artifacts/parked/patches/FUN_000f56b0-20260711-184546.patch"
+    },
+    {
+      "ts": "2026-07-12T11:13:59+00:00",
+      "model": "opus",
+      "effort": "high",
+      "score": 77.3,
+      "cap_hypothesis": "ledger_prior_cap: prior attempt capped at 81.8% (no improvement now at 77.3%); int16 register-width gap. All 22/22 instructions present and semantically correct; MSVC keeps the column loop counter in 16-bit AX (incw/xorw ax) while VC71 recompilation from equivalent C89 allocates 32-bit EAX, causing an LCS reorder. Documented int16 movswl / register-width permanent ~15pp cap pattern (vkbd move-handler family; siblings 5700=75.6%, 5750=82.6%, 57a0=83.0%). Not escalatable.",
+      "reason": "structural_cap",
+      "patch": "artifacts/parked/patches/FUN_000f56b0-20260712-111359.patch"
+    },
+    {
+      "ts": "2026-07-12T12:39:07+00:00",
+      "model": "opus",
+      "effort": "high",
+      "score": 77.3,
+      "cap_hypothesis": "ledger_prior_cap: prior attempt capped at 81.8%; int16 register-width gap. All 22/22 instructions present and semantically correct; MSVC keeps the column loop counter in 16-bit AX (incw/xorw ax) while VC71 recompilation from equivalent C89 allocates 32-bit EAX, an LCS reorder. Documented int16 register-width permanent ~15pp cap (vkbd move-handler family; siblings 5700=75.6%, 5750=82.6%, 57a0=83.0%). Not escalatable.",
+      "reason": "structural_cap",
+      "patch": "artifacts/parked/patches/FUN_000f56b0-20260712-123907.patch"
+    },
+    {
+      "ts": "2026-07-21T18:23:06+00:00",
+      "model": "opus",
+      "effort": "high",
+      "score": 77.3,
+      "cap_hypothesis": "ledger_prior_cap: prior attempt capped at 81.8%; int16 register-width gap. All 22/22 instructions present and semantically correct; MSVC keeps the column loop counter in 16-bit AX (incw/xorw ax) while VC71 recompilation from equivalent C89 allocates 32-bit EAX, an LCS reorder. Documented int16 register-width permanent ~15pp cap (vkbd move-handler family; siblings 5700=75.6%, 5750=82.6%, 57a0=83.0%). Not escalatable.",
+      "reason": "structural_cap",
+      "patch": "artifacts/parked/patches/FUN_000f56b0-20260721-182306.patch"
+    },
+    {
+      "ts": "2026-07-22T06:00:06+00:00",
+      "model": "opus",
+      "effort": "high",
+      "score": 77.3,
+      "cap_hypothesis": "ledger_prior_cap: prior attempt capped at 81.8% (no improvement now at 77.3%); int16 register-width gap. All 22/22 instructions present and semantically correct; MSVC keeps the column loop counter in 16-bit AX (incw/xorw ax) while VC71 recompilation from equivalent C89 allocates 32-bit EAX, an LCS reorder. Documented int16 register-width permanent ~15pp cap (vkbd move-handler family; siblings 5700=75.6%, 5750=82.6%, 57a0=83.0%). Not escalatable.",
+      "reason": "structural_cap",
+      "patch": "artifacts/parked/patches/FUN_000f56b0-20260722-060006.patch"
+    }
+  ]
+}

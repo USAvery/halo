@@ -1,0 +1,365 @@
+diff --git c/kb.json w/kb.json
+index 9f185541..5cbec660 100644
+--- c/kb.json
++++ w/kb.json
+@@ -6659,7 +6659,7 @@
+         {
+           "addr": "0x9ca70",
+           "decl": "void effects_information_get(int effect_ptr@<ebx>, uint32_t flags_hi@<edi>, unsigned int *seed, float *velocity_out, float min_val, float max_val, uint32_t flags_lo);",
+-          "note": "hidden reg deps (EDI=flags_hi, EBX=effect_ptr) \u2014 callers pass these in registers; all known callers inlined",
++          "note": "hidden reg deps (EDI=flags_hi, EBX=effect_ptr) — callers pass these in registers; all known callers inlined",
+           "ported": true
+         },
+         {
+@@ -6720,7 +6720,7 @@
+         {
+           "addr": "0x9dcf0",
+           "decl": "void FUN_0009dcf0(float *position, void *effect, void *location, void *part, float *forward, float *up, float scale);",
+-          "note": "4 reg args (EAX,EDX,ECX,ESI) \u2014 inlined into FUN_0009e310, cannot be thunked separately",
++          "note": "4 reg args (EAX,EDX,ECX,ESI) — inlined into FUN_0009e310, cannot be thunked separately",
+           "ported": true
+         },
+         {
+@@ -9580,7 +9580,7 @@
+         },
+         {
+           "addr": "0x1c0ed0",
+-          "decl": "void FUN_001c0ed0(void);"
++          "decl": "short FUN_001c0ed0(void);"
+         },
+         {
+           "addr": "0x1c0ee0",
+@@ -12797,7 +12797,8 @@
+         },
+         {
+           "addr": "0xf46e0",
+-          "decl": "void FUN_000f46e0(void);"
++          "decl": "void FUN_000f46e0(int *widget);",
++          "ported": true
+         },
+         {
+           "addr": "0xf4b60",
+@@ -25457,7 +25458,7 @@
+         },
+         {
+           "addr": "0xf3960",
+-          "decl": "void FUN_000f3960(void);"
++          "decl": "int FUN_000f3960(const void *a, const void *b);"
+         },
+         {
+           "addr": "0xf39c0",
+@@ -39233,4 +39234,4 @@
+   "0x11cfd0": {
+     "ported": true
+   }
+-}
+\ No newline at end of file
++}
+diff --git c/src/halo/interface/ui_widget_game_data_input_functions.c w/src/halo/interface/ui_widget_game_data_input_functions.c
+index 3f7978af..9b7b29a6 100644
+--- c/src/halo/interface/ui_widget_game_data_input_functions.c
++++ w/src/halo/interface/ui_widget_game_data_input_functions.c
+@@ -1,43 +1,43 @@
+-void ui_widget_game_data_function_invoke(
+-  void *widget, unsigned __int16 game_data_input_reference_function)
+-{
+-  assert_halt(widget);
+-
+-  if (game_data_input_reference_function > 40u) {
+-    error(2, "invalid game_data_input_reference_function");
+-  } else {
+-    ui_widget_game_data_function_table[game_data_input_reference_function](
+-      widget);
+-  }
+-}
+-
+-void ui_widget_game_data_build_version(int widget)
+-{
+-  wchar_t *v1, *v2; // eax
+-
+-  if (!ui_widget_game_data_build_version_wide_str[0]) {
+-    ascii_to_wide(
+-#if DECOMP_CUSTOM
+-      build_ui_widget_text,
+-#else
+-      "01.10.12.2276",
+-#endif
+-      ui_widget_game_data_build_version_wide_str,
+-      sizeof(ui_widget_game_data_build_version_wide_str));
+-  }
+-
+-  if (!*(uint32_t *)(widget + 60)) {
+-    v1 =
+-      ui_widget_realloc(0, sizeof(ui_widget_game_data_build_version_wide_str),
+-                        __FILE__, __LINE__);
+-    *(uint32_t *)(widget + 60) = (uint32_t)v1;
+-    if (v1) {
+-      csmemset(v1, 0, sizeof(ui_widget_game_data_build_version_wide_str));
+-    }
+-  }
+-  v2 = *(wchar_t **)(widget + 60);
+-  if (v2) {
+-    ustrncpy(v2, ui_widget_game_data_build_version_wide_str, 0x3Fu);
+-    *(wchar_t *)(*(uint32_t *)(widget + 60) + 126) = 0;
+-  }
+-}
++void ui_widget_game_data_function_invoke(
++  void *widget, unsigned __int16 game_data_input_reference_function)
++{
++  assert_halt(widget);
++
++  if (game_data_input_reference_function > 40u) {
++    error(2, "invalid game_data_input_reference_function");
++  } else {
++    ui_widget_game_data_function_table[game_data_input_reference_function](
++      widget);
++  }
++}
++
++void ui_widget_game_data_build_version(int widget)
++{
++  wchar_t *v1, *v2; // eax
++
++  if (!ui_widget_game_data_build_version_wide_str[0]) {
++    ascii_to_wide(
++#if DECOMP_CUSTOM
++      build_ui_widget_text,
++#else
++      "01.10.12.2276",
++#endif
++      ui_widget_game_data_build_version_wide_str,
++      sizeof(ui_widget_game_data_build_version_wide_str));
++  }
++
++  if (!*(uint32_t *)(widget + 60)) {
++    v1 =
++      ui_widget_realloc(0, sizeof(ui_widget_game_data_build_version_wide_str),
++                        __FILE__, __LINE__);
++    *(uint32_t *)(widget + 60) = (uint32_t)v1;
++    if (v1) {
++      csmemset(v1, 0, sizeof(ui_widget_game_data_build_version_wide_str));
++    }
++  }
++  v2 = *(wchar_t **)(widget + 60);
++  if (v2) {
++    ustrncpy(v2, ui_widget_game_data_build_version_wide_str, 0x3Fu);
++    *(wchar_t *)(*(uint32_t *)(widget + 60) + 126) = 0;
++  }
++}
+\ No newline at end of file
+diff --git c/src/halo/items/items.c w/src/halo/items/items.c
+index c67c2b72..a2033a01 100644
+--- c/src/halo/items/items.c
++++ w/src/halo/items/items.c
+@@ -1011,3 +1011,211 @@ void item_set_position(int item_handle, float *position, int flag)
+   }
+   *(int16_t *)0x4761d8 = *(int16_t *)0x4761d8 - 1;
+ }
++
++/*
++ * ui_widget_game_data_function_table entry for the "mp player settings select"
++ * / qtr-screen profile-select spinner-list. Validates the spinner-list widget
++ * and its container wrapper, then rebuilds the list's text-box/description
++ * buffers from the profile/ruleset descriptor table at 0x5aa3c0 (0x34-byte
++ * stride). If the current selection has no descriptor match, sorts the item-id
++ * array (moving -1 sentinels to the end via FUN_000f3960), recomputes the item
++ * count, clamps the selected index, and re-runs the whole validate/rebuild pass
++ * (outer do/while). widget is an int* view of the widget struct:
++ *   [0xc]=container ptr(+0x30), [0xf]=selected index short(+0x3c),
++ *   [0x10]=item-id array ptr(+0x40), (widget+0x11) ushort item count(+0x44),
++ *   [0x13]=text-box buffer ptr(+0x4c).
++ */
++void FUN_000f46e0(int *widget)
++{
++  unsigned short flags;
++  int iVar2;
++  short sVar3;
++  short *psVar4;
++  void *pvVar5;
++  int *piVar6;
++  unsigned int uVar7;
++  int iVar8;
++  wchar_t *pwVar9;
++  int iVar10;
++  unsigned short *puVar11;
++  int iVar12;
++  unsigned int uVar13;
++  char *pName;
++
++  do {
++    assert_halt_msg(
++      widget[0xc] != 0,
++      "expected qtr-screen profile select list to be wrapped in a container "
++      "widget");
++    psVar4 = (short *)tag_get(0x44654c61, *widget);
++    assert_halt_msg(
++      *psVar4 == 2,
++      "expected a spinner list for 'mp player settings select' widget");
++    assert_halt_msg(
++      *(int *)(psVar4 + 0x1f0) == 0,
++      "expected 0 children (1-wide spinner) for 'mp player settings select' "
++      "widget");
++    pvVar5 = tag_get(0x44654c61, *(int *)widget[0xc]);
++    assert_halt_msg(
++      *(int *)((int)pvVar5 + 0x3e0) == 3,
++      "expected qtr-screen profile select wrapper screen to have 3 child "
++      "widgets (pic, description, list... in that order)");
++    iVar8 = *(int *)(widget[0xc] + 0x34);
++    iVar2 = *(int *)(iVar8 + 0x2c);
++    assert_halt_msg(
++      widget == *(int **)(iVar2 + 0x2c),
++      "expected qtr-screen profile select wrapper screen to have 3 child "
++      "widgets (pic, description, list... in that order)");
++    assert_halt_msg(
++      (short)widget[0xf] >= 0 &&
++        (int)(short)widget[0xf] <
++          (int)(unsigned int)*(unsigned short *)(widget + 0x11),
++      "qtr-screen profile list has invalid list item index");
++    assert_halt_msg(
++      (short)widget[0xf] >= 0 &&
++        (int)(short)widget[0xf] <
++          (int)(unsigned int)*(unsigned short *)(widget + 0x11),
++      "invalid list item index");
++    iVar10 = *(int *)(widget[0x10] + (short)widget[0xf] * 4);
++    multiplayer_game_set_text_box_for_game_ruleset();
++    if (iVar10 != -1) {
++      iVar12 = 0;
++      piVar6 = (int *)0x5aa3c0;
++      do {
++        if (*piVar6 == iVar10) {
++          iVar12 = iVar12 * 0x34;
++          pName = (char *)(0x5aa3c4 + iVar12);
++          if ((wchar_t *)pName != (wchar_t *)0) {
++            pwVar9 = (wchar_t *)ui_widget_realloc(
++              widget[0x13], 0x18,
++              "c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
++              0x886);
++            widget[0x13] = (int)pwVar9;
++            if (pwVar9 == (wchar_t *)0) {
++              return;
++            }
++            flags = *(unsigned short *)(pName + 0x1a);
++            if ((flags & 1) == 0) {
++              ustrncpy(pwVar9, (wchar_t *)pName, 0xb);
++              *(short *)(widget[0x13] + 0x16) = 0;
++            } else {
++              iVar10 = tag_loaded(
++                0x75737472,
++                "ui\\shell\\strings\\default_player_profile_names");
++              pwVar9 = L"";
++              if (iVar10 != -1) {
++                pwVar9 =
++                  (wchar_t *)FUN_0019d420(iVar10, (unsigned int)(flags >> 8));
++              }
++              ustrncpy((wchar_t *)widget[0x13], pwVar9, 0xb);
++              *(short *)(widget[0x13] + 0x16) = 0;
++            }
++            if (*(short *)(pName + 0x18) < 0) {
++              sVar3 = 0;
++            } else {
++              sVar3 = *(short *)(pName + 0x18);
++              if ((int)((unsigned int)(unsigned short)FUN_001c0ed0() - 1) <
++                  (int)sVar3) {
++                sVar3 = (short)(FUN_001c0ed0() - 1);
++              }
++            }
++            *(short *)(iVar8 + 0x50) = sVar3;
++            pvVar5 = ui_widget_realloc(
++              *(int *)(iVar2 + 0x3c), 0x200,
++              "c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
++              0x89c);
++            *(void **)(iVar2 + 0x3c) = pvVar5;
++            if (pvVar5 == (void *)0) {
++              return;
++            }
++            if ((*(unsigned char *)(pName + 0x1a) & 1) == 0) {
++              iVar8 = tag_loaded(0x75737472,
++                                 "ui\\shell\\main_menu\\player_profiles_select"
++                                 "\\joystick_set_short_descriptions");
++              iVar10 = tag_loaded(0x75737472,
++                                  "ui\\shell\\main_menu\\player_profiles_select"
++                                  "\\button_set_short_descriptions");
++              if (iVar8 != -1 && iVar10 != -1) {
++                iVar8 = FUN_0019d420(
++                  iVar8, (unsigned int)*(unsigned char *)(pName + 0x29));
++                iVar10 = FUN_0019d420(
++                  iVar10, (unsigned int)*(unsigned char *)(pName + 0x28));
++                unicode_sprintf(*(wchar_t **)(iVar2 + 0x3c), 0xff, L"%s%hs%s",
++                                (wchar_t *)iVar8, (const char *)0x261f2c,
++                                (wchar_t *)iVar10);
++              }
++            } else {
++              iVar8 = tag_loaded(0x75737472,
++                                 "ui\\shell\\main_menu\\player_profiles_select"
++                                 "\\joystick_set_defaults_descriptions");
++              iVar10 = tag_loaded(0x75737472,
++                                  "ui\\shell\\main_menu\\player_profiles_select"
++                                  "\\button_set_long_descriptions");
++              if (iVar8 == -1 || iVar10 == -1) {
++                **(short **)(iVar2 + 0x3c) = 0;
++                *(short *)(*(int *)(iVar2 + 0x3c) + 0x1fe) = 0;
++                return;
++              }
++              iVar8 = FUN_0019d420(
++                iVar8, (unsigned int)*(unsigned char *)(pName + 0x29));
++              iVar10 = FUN_0019d420(
++                iVar10, (unsigned int)*(unsigned char *)(pName + 0x28));
++              unicode_sprintf(*(wchar_t **)(iVar2 + 0x3c), 0xff, L"%s%hs%s",
++                              (wchar_t *)iVar8, (const char *)0x261f2c,
++                              (wchar_t *)iVar10);
++              *(short *)(*(int *)(iVar2 + 0x3c) + 0x1fe) = 0;
++            }
++            *(short *)(*(int *)(iVar2 + 0x3c) + 0x1fe) = 0;
++            return;
++          }
++          break;
++        }
++        piVar6 = piVar6 + 0xd;
++        iVar12 = iVar12 + 1;
++      } while ((int)piVar6 < 0x5aa45c);
++    }
++    if (*(unsigned short *)(widget + 0x11) == 0) {
++      puVar11 = (unsigned short *)ui_widget_realloc(
++        widget[0x13], 4,
++        "c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
++        0x8d2);
++      widget[0x13] = (int)puVar11;
++      if (puVar11 != (unsigned short *)0) {
++        *puVar11 = 0;
++      }
++      *(short *)(iVar8 + 0x50) = 0;
++      puVar11 = (unsigned short *)ui_widget_realloc(
++        *(int *)(iVar2 + 0x3c), 4,
++        "c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
++        0x8d7);
++      *(unsigned short **)(iVar2 + 0x3c) = puVar11;
++      if (puVar11 != (unsigned short *)0) {
++        *puVar11 = 0;
++      }
++      return;
++    }
++    pvVar5 = (void *)widget[0x10];
++    uVar13 = (unsigned int)*(unsigned short *)(widget + 0x11);
++    qsort(pvVar5, uVar13, 4, FUN_000f3960);
++    uVar7 = 0;
++    if (uVar13 != 0) {
++      do {
++        if (*(int *)((int)pvVar5 + uVar7 * 4) == -1) {
++          break;
++        }
++        uVar7 = uVar7 + 1;
++      } while ((int)uVar7 < (int)uVar13);
++    }
++    sVar3 = (short)widget[0xf];
++    *(short *)(widget + 0x11) = (short)uVar7;
++    if (sVar3 < 0) {
++      *(short *)(widget + 0xf) = 0;
++    } else {
++      iVar8 = (int)((uVar7 & 0xffff) - 1);
++      if (sVar3 <= iVar8) {
++        iVar8 = (int)sVar3;
++      }
++      *(short *)(widget + 0xf) = (short)iVar8;
++    }
++  } while (1);
++}

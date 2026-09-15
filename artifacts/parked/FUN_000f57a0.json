@@ -1,0 +1,23 @@
+{
+  "name": "FUN_000f57a0",
+  "addr": "0xf57a0",
+  "obj": "",
+  "source_path": "src/halo/items/items.c",
+  "best_score": 86.8,
+  "best_patch": "artifacts/parked/patches/FUN_000f57a0-20260711-114438.patch",
+  "status": "promoted",
+  "first_parked": "2026-07-11T11:44:38+00:00",
+  "last_updated": "2026-07-11T17:55:41+00:00",
+  "promoted_commit": "1325f5c9",
+  "attempts": [
+    {
+      "ts": "2026-07-11T11:44:38+00:00",
+      "model": "opus",
+      "effort": "high",
+      "score": 86.8,
+      "cap_hypothesis": "",
+      "reason": "NEEDS_RUNTIME: Target: FUN_000f57a0 / virtual_keyboard_close (0xf57a0, items.obj, src/halo/items/items.c)\n\nStructural Match: 86.8% VC71 (asserted by loop; NOT reproducible from artifacts \u2014 pipeline vc71/objdiff both SKIPPED, low_match_policy stage returned ok=FALSE).\n\nMismatch Classes: Unclassified. No objdiff/vc71 hunk data exists; cannot classify from real diff, and vc71 cannot run in this sandbox.\n\nCall Argument Audit: Both calls (ustrncpy 3-arg cdecl; ui_play_audio_feedback_sound int16_t) CONFIRMED correct against disasm. The cited \"0 stub-arg mismatches\" is vacuous \u2014 the differential traced 0 calls.\n\nMemory Offset / Global Side-effect Audit: CONFIRMED by disasm (all byte/word/dword widths and the indexed wchar NUL-terminate match). Machine mem-trace verification did NOT run cleanly (the --mem-trace pipeline run errored on oracle extract).\n\nABI Audit: CLEAN. No reg args. Callee signature change to int16_t sound_type binary-verified (MOVSX word [EBP+8] into jump table); only one C caller, updated.\n\nConfirmed: line-for-line behavioral fidelity of the C to the 0xf57a0 disassembly (all 25 instructions traced); callee int16_t ABI; store widths/offsets; hazard scan clean (exit 0); build ok; no FPU/intrinsics.\n\nInferred: the ~13.2% structural gap is probably register-allocation / scheduling / constant-materialization shape (zero-register reuse, CSE of the capacity reload, bool return) \u2014 but inferred, not classified from diff.\n\nUncertain: (1) provenance/reproducibility of the 86.8% score \u2014 pipeline never produced it; (2) runtime behavioral evidence strength \u2014 the only successful equivalence run is the synthetic single-path snapshot: 100/100 seeds but ALL identical (0x0046cf01), weak confidence, 1 effective path, stub-arg diff over 0 calls, mem-trace result absent; (3) the narrative's \"live-state infection_swarm snapshot 0-divergence pass\" has NO supporting artifact.\n\nVerdict Rationale: The lift is very likely a faithful transcription \u2014 my independent disassembly audit is a clean line-for-line match and resolves every call-arg, offset, and ABI question, so there is no concrete bug and this is not a REJECT. But the score is < 90%, whose policy hard-requires golden/runtime behavior verification PLUS classified mismatches before an unattended commit. Neither is adequately present: there is no objdiff/vc71 mismatch breakdown to classify (pipeline skipped both; its own low_match_policy returned ok=FALSE), and the runtime evidence is a single-path synthetic snapshot with a vacuous (0-call) argument differential, unconfirmed mem-trace, and an uncorroborated live-state claim. Fail-closed: require real structural diff (the per-fn delink delinked/functions/000f57a0.obj now exists \u2014 re-run vc71/objdiff to classify) and a genuine golden or live-state runtime pass that (a) traces both call sites' args with N>0 and (b) shows a clean mem-trace over the copy+NUL branch. Until then, NEEDS_RUNTIME.\n\nAUTOLIFT_REVIEW: NEEDS_RUNTIME",
+      "patch": "artifacts/parked/patches/FUN_000f57a0-20260711-114438.patch"
+    }
+  ]
+}

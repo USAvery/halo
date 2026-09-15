@@ -1,0 +1,65 @@
+diff --git c/kb.json w/kb.json
+index ff513726..bf55254f 100644
+--- c/kb.json
++++ w/kb.json
+@@ -17173,7 +17173,8 @@
+         },
+         {
+           "addr": "0xba850",
+-          "decl": "void FUN_000ba850(void);"
++          "decl": "char FUN_000ba850(int16_t index @<ax>, int object_handle);",
++          "ported": true
+         },
+         {
+           "addr": "0xba890",
+diff --git c/src/halo/game/players.c w/src/halo/game/players.c
+index 45e5e427..fb3bad26 100644
+--- c/src/halo/game/players.c
++++ w/src/halo/game/players.c
+@@ -320,6 +320,31 @@ bool any_player_is_dead(void)
+   return false;
+ }
+ 
++/* Look up an 8-byte record by `index` in the scenario tag_block at offset 0x39C
++ * and test it against `object_handle` via FUN_0018ef00.
++ *
++ * index (AX)     -- element index into the tag_block (8-byte records); the
++ *                   sentinel -1 short-circuits to 0 (false).
++ * object_handle  -- forwarded unchanged as FUN_0018ef00's second argument.
++ *
++ * The record's first 16-bit field (record[0], zero-extended) is passed as
++ * FUN_0018ef00's first argument. Returns a normalized bool: 1 when index is
++ * valid and FUN_0018ef00 returns nonzero, otherwise 0. */
++char FUN_000ba850(int16_t index /* @<ax> */, int object_handle)
++{
++  void *scenario;
++  unsigned short *element;
++
++  if (index != -1) {
++    scenario = global_scenario_get();
++    element = (unsigned short *)tag_block_get_element((char *)scenario + 0x39c,
++                                                      (int)index, 8);
++    if (FUN_0018ef00((int)*element, object_handle) != 0)
++      return 1;
++  }
++  return 0;
++}
++
+ /* Update a combined PVS (potentially-visible-set) bit vector from the current
+  * player set (or, in editor mode, from the debug observer camera).
+  *
+diff --git c/tools/kb_reg_baseline.json w/tools/kb_reg_baseline.json
+index 318e4496..8c476ff9 100644
+--- c/tools/kb_reg_baseline.json
++++ w/tools/kb_reg_baseline.json
+@@ -658,6 +658,7 @@
+     "0x224904": "int __stdcall connect(void *xnet@<ecx>, unsigned int socket, const void *name, int namelen);",
+     "0x225021": "int __stdcall socket(void *xnet@<ecx>, int af, int type, int protocol);",
+     "0x2256bb": "int __stdcall recv(void *xnet@<ecx>, unsigned int socket, char *buf, int len, int flags);",
+-    "0x2258a4": "int __stdcall send(void *xnet@<ecx>, unsigned int socket, const char *buf, int len, int flags);"
++    "0x2258a4": "int __stdcall send(void *xnet@<ecx>, unsigned int socket, const char *buf, int len, int flags);",
++    "0xba850": "char FUN_000ba850(int16_t index @<ax>, int object_handle);"
+   }
+-}
++}
+\ No newline at end of file

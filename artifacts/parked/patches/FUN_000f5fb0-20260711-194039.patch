@@ -1,0 +1,265 @@
+diff --git c/kb.json w/kb.json
+index b4c3eec3..5af258dc 100644
+--- c/kb.json
++++ w/kb.json
+@@ -6659,7 +6659,7 @@
+         {
+           "addr": "0x9ca70",
+           "decl": "void effects_information_get(int effect_ptr@<ebx>, uint32_t flags_hi@<edi>, unsigned int *seed, float *velocity_out, float min_val, float max_val, uint32_t flags_lo);",
+-          "note": "hidden reg deps (EDI=flags_hi, EBX=effect_ptr) \u2014 callers pass these in registers; all known callers inlined",
++          "note": "hidden reg deps (EDI=flags_hi, EBX=effect_ptr) — callers pass these in registers; all known callers inlined",
+           "ported": true
+         },
+         {
+@@ -6720,7 +6720,7 @@
+         {
+           "addr": "0x9dcf0",
+           "decl": "void FUN_0009dcf0(float *position, void *effect, void *location, void *part, float *forward, float *up, float scale);",
+-          "note": "4 reg args (EAX,EDX,ECX,ESI) \u2014 inlined into FUN_0009e310, cannot be thunked separately",
++          "note": "4 reg args (EAX,EDX,ECX,ESI) — inlined into FUN_0009e310, cannot be thunked separately",
+           "ported": true
+         },
+         {
+@@ -12860,7 +12860,7 @@
+         },
+         {
+           "addr": "0xf5800",
+-          "decl": "void FUN_000f5800(void);"
++          "decl": "wchar_t FUN_000f5800(short code @<esi>);"
+         },
+         {
+           "addr": "0xf5900",
+@@ -12868,7 +12868,7 @@
+         },
+         {
+           "addr": "0xf5f10",
+-          "decl": "void object_get_type(void);"
++          "decl": "int object_get_type(void);"
+         },
+         {
+           "addr": "0xf5f30",
+@@ -12885,7 +12885,8 @@
+         },
+         {
+           "addr": "0xf5fb0",
+-          "decl": "char FUN_000f5fb0(void);"
++          "decl": "char FUN_000f5fb0(void);",
++          "ported": true
+         },
+         {
+           "addr": "0xf63f0",
+@@ -21595,7 +21596,7 @@
+         },
+         {
+           "addr": "0x1c2bf0",
+-          "decl": "void saved_game_file_name_unique(void);"
++          "decl": "char saved_game_file_name_unique(const wchar_t *name);"
+         },
+         {
+           "addr": "0x1c2c50",
+@@ -30513,7 +30514,7 @@
+         },
+         {
+           "addr": "0x19d6e0",
+-          "decl": "void align_to_character(void);"
++          "decl": "void align_to_character(wchar_t *param_1, wchar_t *param_2);"
+         },
+         {
+           "addr": "0x19d760",
+@@ -39234,4 +39235,4 @@
+   "0x11cfd0": {
+     "ported": true
+   }
+-}
+\ No newline at end of file
++}
+diff --git c/src/halo/items/items.c w/src/halo/items/items.c
+index 8dd98c25..9dd3b700 100644
+--- c/src/halo/items/items.c
++++ w/src/halo/items/items.c
+@@ -324,6 +324,172 @@ void FUN_000f5f30(void)
+   ui_play_audio_feedback_sound(1);
+ }
+ 
++/* Virtual keyboard "activate current key" handler (0xf5fb0, __cdecl).
++ * Dispatched as action 4 by FUN_000f63f0; returns char 1 in AL on every path
++ * (MOV AL,1 at the single epilogue), which latches last_move_dir/last_move_time
++ * in the caller. The kb decl "char FUN_000f5fb0(void)" is correct; Ghidra's
++ * "void" is wrong (it lost the AL return the caller reads).
++ *
++ * Resolves the key code from the layout table at 0x28a790, indexed
++ * [cursor_row(0x46cef8)*0xb + cursor_col(0x46cefa)] as a signed char, then
++ * dispatches. Codes 0x24-0x2b are special keys; everything else inserts a
++ * character. The layout lookup is recomputed inline in three places (switch
++ * subject, char-resolver arg, shift-clear epilogue) to match the original's
++ * three MOVSX/IMUL/MOVSX sequences rather than a cached local.
++ *
++ *   0x24 '$'  Done/OK: accept (0x46cf06=1) if the edit buffer equals the
++ *             confirm buffer (0x46cf18) or is a unique save name; else show
++ *             error 0x1d (empty) / 0x1b (dup) and reset via FUN_000f57a0.
++ *   0x25 '%'  toggle shift (0x46cef1); 0x26/0x27 toggle 0x46cef2/0x46cef3.
++ *   0x28      clear-all when dirty (0x46cf07==1) else backspace (FUN_000f5f30).
++ *   0x29/0x2a move the caret left/right within the buffer (2-byte wchar steps).
++ *   0x2b      insert a space: shift the tail right by one wchar then store L'
++ * '. default   insert the resolved wide char. FUN_000f5800 takes the key code
++ *             in ESI (@<esi>) and returns the shift/alt-resolved wchar in AX.
++ *             Typing ".fortune" seeds 0x46cf04 from system_milliseconds()%10.
++ *
++ * The epilogue clears shift (0x46cef1) unless the pressed key IS the shift key
++ * '%'. The three buffer_size>0 asserts reproduce the original display_assert +
++ * system_exit(-1) at source lines 0x355/0x378/0x391.
++ * Globals: 0x46cef8/0x46cefa row/col, 0x46cefc buffer_size (bytes, MOVZX),
++ * 0x46cf07 dirty flag, 0x46cf08 buffer base, 0x46cf0c caret, 0x46cf18 confirm
++ * buffer, 0x28aa44 = L".fortune". */
++char FUN_000f5fb0(void)
++{
++  char *cursor;
++  int shift_size;
++  unsigned int buf_cap;
++  unsigned int fortune_index;
++
++  switch (((char *)0x28a790)[*(short *)0x46cef8 * 0xb + *(short *)0x46cefa]) {
++  case 0x24: /* '$' : Done / OK */
++    if (ustrcmp((wchar_t *)0x46cf18, *(wchar_t **)0x46cf08) == 0) {
++      *(char *)0x46cf06 = 1;
++    } else if (**(wchar_t **)0x46cf08 == L'\0') {
++      ui_widget_display_error(0x1d, -1, 1, 0);
++      FUN_000f57a0();
++    } else if (saved_game_file_name_unique(*(wchar_t **)0x46cf08)) {
++      *(char *)0x46cf06 = 1;
++    } else {
++      ui_widget_display_error(0x1b, -1, 1, 0);
++      FUN_000f57a0();
++    }
++    ui_play_audio_feedback_sound(3);
++    *(char *)0x46cef0 = 0;
++    event_manager_flush();
++    break;
++  case 0x25: /* '%' : toggle shift */
++    ui_play_audio_feedback_sound(1);
++    *(char *)0x46cef1 = (*(char *)0x46cef1 == 0);
++    break;
++  case 0x26: /* toggle modifier */
++    ui_play_audio_feedback_sound(1);
++    *(char *)0x46cef2 = (*(char *)0x46cef2 == 0);
++    break;
++  case 0x27: /* toggle modifier */
++    ui_play_audio_feedback_sound(1);
++    *(char *)0x46cef3 = (*(char *)0x46cef3 == 0);
++    break;
++  case 0x28: /* clear-all / backspace */
++    if (*(char *)0x46cf07 == 1) {
++      if (*(short *)0x46cefc == 0) {
++        display_assert("virtual_keyboard_globals.buffer_size>0",
++                       "c:\\halo\\SOURCE\\interface\\virtual_keyboard.c", 0x355,
++                       true);
++        system_exit(-1);
++      }
++      csmemset(*(char **)0x46cf08, 0,
++               (unsigned int)*(unsigned short *)0x46cefc);
++      *(char **)0x46cf0c = *(char **)0x46cf08;
++      *(char *)0x46cf07 = 0;
++    } else {
++      FUN_000f5f30();
++    }
++    break;
++  case 0x29: /* caret left */
++    if (*(char **)0x46cf08 < *(char **)0x46cf0c)
++      *(char **)0x46cf0c -= 2;
++    *(char *)0x46cf07 = 0;
++    ui_play_audio_feedback_sound(1);
++    break;
++  case 0x2a: /* caret right */
++    if (**(short **)0x46cf0c != 0)
++      *(char **)0x46cf0c += 2;
++    *(char *)0x46cf07 = 0;
++    ui_play_audio_feedback_sound(1);
++    break;
++  case 0x2b: /* insert a space */
++    if (*(char *)0x46cf07 == 1) {
++      if (*(short *)0x46cefc == 0) {
++        display_assert("virtual_keyboard_globals.buffer_size>0",
++                       "c:\\halo\\SOURCE\\interface\\virtual_keyboard.c", 0x378,
++                       true);
++        system_exit(-1);
++      }
++      csmemset(*(char **)0x46cf08, 0,
++               (unsigned int)*(unsigned short *)0x46cefc);
++      *(char **)0x46cf0c = *(char **)0x46cf08;
++      *(char *)0x46cf07 = 0;
++    }
++    if (object_get_type() < 2) {
++      ui_play_audio_feedback_sound(4);
++    } else {
++      cursor = *(char **)0x46cf0c;
++      shift_size = ((int)*(unsigned short *)0x46cefc - (int)cursor) - 2 +
++                   (int)*(char **)0x46cf08;
++      csmemmove(cursor + 2, cursor, (unsigned int)shift_size);
++      **(wchar_t **)0x46cf0c = L' ';
++      *(char **)0x46cf0c += 2;
++      ui_play_audio_feedback_sound(2);
++    }
++    break;
++  default: /* insert the resolved character */
++    if (*(char *)0x46cf07 == 1) {
++      if (*(short *)0x46cefc == 0) {
++        display_assert("virtual_keyboard_globals.buffer_size>0",
++                       "c:\\halo\\SOURCE\\interface\\virtual_keyboard.c", 0x391,
++                       true);
++        system_exit(-1);
++      }
++      csmemset(*(char **)0x46cf08, 0,
++               (unsigned int)*(unsigned short *)0x46cefc);
++      *(char **)0x46cf0c = *(char **)0x46cf08;
++      *(char *)0x46cf07 = 0;
++    }
++    buf_cap = *(unsigned short *)0x46cefc;
++    if ((int)(buf_cap - (ustrlen(*(unsigned short **)0x46cf08) * 2 + 2)) < 2) {
++      ui_play_audio_feedback_sound(4);
++    } else {
++      cursor = *(char **)0x46cf0c;
++      shift_size = ((int)buf_cap - (int)cursor) - 2 + (int)*(char **)0x46cf08;
++      csmemmove(cursor + 2, cursor, (unsigned int)shift_size);
++      **(wchar_t **)0x46cf0c = FUN_000f5800(
++        ((char *)0x28a790)[*(short *)0x46cef8 * 0xb + *(short *)0x46cefa]);
++      *(char **)0x46cf0c += 2;
++      if (ustrcmp(*(wchar_t **)0x46cf08, (wchar_t *)0x28aa44) == 0) {
++        fortune_index = system_milliseconds() % 10;
++        if (fortune_index > 9)
++          fortune_index = 9;
++        *(short *)0x46cf04 = (short)(fortune_index + 0xb);
++        if (*(short *)0x46cf18 == 0) {
++          csmemset(*(char **)0x46cf08, 0,
++                   (unsigned int)*(unsigned short *)0x46cefc);
++          *(char **)0x46cf0c = *(char **)0x46cf08;
++        } else {
++          align_to_character(*(wchar_t **)0x46cf08, (wchar_t *)0x46cf18);
++          *(char **)0x46cf0c =
++            *(char **)0x46cf08 + ustrlen(*(unsigned short **)0x46cf08) * 2;
++        }
++      }
++      ui_play_audio_feedback_sound(2);
++    }
++  }
++
++  if (((char *)0x28a790)[*(short *)0x46cef8 * 0xb + *(short *)0x46cefa] != 0x25)
++    *(char *)0x46cef1 = 0;
++  return 1;
++}
++
+ /* Virtual on-screen keyboard input pump (virtual_keyboard.obj).
+  * TU: c:\halo\SOURCE\interface\virtual_keyboard.c (__FILE__ assert
+  * @0x28a790..).
+diff --git c/tools/kb_reg_baseline.json w/tools/kb_reg_baseline.json
+index b3c1f4b6..2b1e3182 100644
+--- c/tools/kb_reg_baseline.json
++++ w/tools/kb_reg_baseline.json
+@@ -643,6 +643,7 @@
+     "0x1d8750": "unsigned int FUN_001d8750(unsigned int val@<ecx>);",
+     "0x1e9350": "void D3DDevice_SetRenderState_Simple(uint32_t reg@<ecx>, uint32_t value@<edx>);",
+     "0x1e9380": "void D3DDevice_SetRenderState_Deferred(uint32_t reg_index@<ecx>, uint32_t value@<edx>);",
+-    "0x1e9410": "void __stdcall D3DDevice_SetTextureStageState(uint32_t stage@<ecx>, uint32_t state@<edx>, uint32_t value);"
++    "0x1e9410": "void __stdcall D3DDevice_SetTextureStageState(uint32_t stage@<ecx>, uint32_t state@<edx>, uint32_t value);",
++    "0xf5800": "wchar_t FUN_000f5800(short code @<esi>);"
+   }
+ }

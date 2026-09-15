@@ -1,0 +1,321 @@
+diff --git c/kb.json w/kb.json
+index 7842e04d..99e5c7a4 100644
+--- c/kb.json
++++ w/kb.json
+@@ -6659,7 +6659,7 @@
+         {
+           "addr": "0x9ca70",
+           "decl": "void effects_information_get(int effect_ptr@<ebx>, uint32_t flags_hi@<edi>, unsigned int *seed, float *velocity_out, float min_val, float max_val, uint32_t flags_lo);",
+-          "note": "hidden reg deps (EDI=flags_hi, EBX=effect_ptr) — callers pass these in registers; all known callers inlined",
++          "note": "hidden reg deps (EDI=flags_hi, EBX=effect_ptr) \u2014 callers pass these in registers; all known callers inlined",
+           "ported": true
+         },
+         {
+@@ -6720,7 +6720,7 @@
+         {
+           "addr": "0x9dcf0",
+           "decl": "void FUN_0009dcf0(float *position, void *effect, void *location, void *part, float *forward, float *up, float scale);",
+-          "note": "4 reg args (EAX,EDX,ECX,ESI) — inlined into FUN_0009e310, cannot be thunked separately",
++          "note": "4 reg args (EAX,EDX,ECX,ESI) \u2014 inlined into FUN_0009e310, cannot be thunked separately",
+           "ported": true
+         },
+         {
+@@ -9580,7 +9580,7 @@
+         },
+         {
+           "addr": "0x1c0ed0",
+-          "decl": "void FUN_001c0ed0(void);"
++          "decl": "unsigned short FUN_001c0ed0(void);"
+         },
+         {
+           "addr": "0x1c0ee0",
+@@ -12795,10 +12795,6 @@
+           "addr": "0xf4210",
+           "decl": "void multiplayer_settings_select_list_update_item(void);"
+         },
+-        {
+-          "addr": "0xf46e0",
+-          "decl": "void FUN_000f46e0(void);"
+-        },
+         {
+           "addr": "0xf4b60",
+           "decl": "void FUN_000f4b60(void);"
+@@ -25444,7 +25440,7 @@
+         },
+         {
+           "addr": "0xf3740",
+-          "decl": "void multiplayer_game_set_text_box_for_game_ruleset(void);"
++          "decl": "void multiplayer_game_set_text_box_for_game_ruleset(int *item_id, int a2);"
+         },
+         {
+           "addr": "0xf3850",
+@@ -25452,11 +25448,17 @@
+         },
+         {
+           "addr": "0xf3960",
+-          "decl": "void FUN_000f3960(void);"
++          "decl": "int FUN_000f3960(const void *a, const void *b);"
+         },
+         {
+           "addr": "0xf39c0",
+           "decl": "void FUN_000f39c0(void);"
++        },
++        {
++          "addr": "0xf46e0",
++          "decl": "void ui_widget_game_data_mp_player_settings_select(int *widget);",
++          "name": "ui_widget_game_data_mp_player_settings_select",
++          "ported": true
+         }
+       ],
+       "name": "ui_widget_game_data_input_functions.obj",
+@@ -39228,4 +39230,4 @@
+   "0x11cfd0": {
+     "ported": true
+   }
+-}
++}
+\ No newline at end of file
+diff --git c/src/halo/interface/ui_widget_game_data_input_functions.c w/src/halo/interface/ui_widget_game_data_input_functions.c
+index 3f7978af..5e068cac 100644
+--- c/src/halo/interface/ui_widget_game_data_input_functions.c
++++ w/src/halo/interface/ui_widget_game_data_input_functions.c
+@@ -41,3 +41,239 @@ void ui_widget_game_data_build_version(int widget)
+     *(wchar_t *)(*(uint32_t *)(widget + 60) + 126) = 0;
+   }
+ }
++
++/* game-data input reference function for the quarter-screen multiplayer
++ * player-settings profile-select spinner list. Validates the widget
++ * hierarchy, resolves the selected profile-preset id against the global
++ * preset table at 0x5aa3c0 (stride 0x34), fills the name/description text
++ * boxes, or rebuilds+re-sorts the list and re-runs when no selection matches.
++ * __FILE__ path is "c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c". */
++void ui_widget_game_data_mp_player_settings_select(int *widget)
++{
++  void *dela;
++  int *container;
++  int *menu_wrapper;
++  int *screen_wrapper;
++  int selection;
++  int count;
++  int item_id;
++  int selected_id;
++  int *id_array;
++  int idx;
++  int found;
++  char *entry;
++  unsigned short flags;
++  void *name_buf;
++  wchar_t *name_src;
++  int name_tag;
++  int menu_idx;
++  int clamped;
++  int t1, t2;
++  int s1, s2;
++  void *desc_buf;
++  int new_count;
++
++  while (1) {
++    container = *(int **)((char *)widget + 0x30);
++    if (container == 0) {
++      display_assert(
++        "expected qtr-screen profile select list to be wrapped in a container "
++        "widget",
++        "c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
++        0x85e, true);
++      system_exit(-1);
++    }
++
++    dela = tag_get(0x44654c61, *widget);
++    if (*(short *)dela != 2) {
++      display_assert(
++        "expected a spinner list for local player team display",
++        "c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
++        0x864, true);
++      system_exit(-1);
++    }
++    if (*(int *)((char *)dela + 0x3e0) != 0) {
++      display_assert(
++        "expected 0 children (1-wide spinner) for 'mp player settings select' "
++        "widget",
++        "c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
++        0x865, true);
++      system_exit(-1);
++    }
++    if (*(int *)((char *)tag_get(0x44654c61, *container) + 0x3e0) != 3) {
++      display_assert(
++        "expected qtr-screen profile select wrapper screen to have 3 child "
++        "widgets (pic, description, list... in that order)",
++        "c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
++        0x867, true);
++      system_exit(-1);
++    }
++
++    menu_wrapper = *(int **)((char *)container + 0x34);
++    screen_wrapper = *(int **)((char *)menu_wrapper + 0x2c);
++    if (widget != *(int **)((char *)screen_wrapper + 0x2c)) {
++      display_assert(
++        "expected qtr-screen profile select wrapper screen to have 3 child "
++        "widgets (pic, description, list... in that order)",
++        "c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
++        0x86d, true);
++      system_exit(-1);
++    }
++
++    selection = *(short *)((char *)widget + 0x3c);
++    if (selection < 0 ||
++        selection >= (int)*(unsigned short *)((char *)widget + 0x44)) {
++      display_assert(
++        "qtr-screen profile list has invalid list item index",
++        "c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
++        0x86f, true);
++      system_exit(-1);
++    }
++    selection = *(short *)((char *)widget + 0x3c);
++    if (selection < 0 ||
++        selection >= (int)*(unsigned short *)((char *)widget + 0x44)) {
++      display_assert(
++        "invalid list item index",
++        "c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
++        0x872, true);
++      system_exit(-1);
++    }
++
++    id_array = *(int **)((char *)widget + 0x40);
++    item_id = id_array[selection];
++    selected_id = item_id;
++    /* preserves the pre-call id (esi is callee-saved) for the search below */
++    multiplayer_game_set_text_box_for_game_ruleset(&item_id, 1);
++
++    if (selected_id != -1) {
++      int *scan = (int *)0x5aa3c0;
++      found = 0;
++      idx = 0;
++      while (scan < (int *)0x5aa45c) {
++        if (*scan == selected_id) {
++          found = 1;
++          break;
++        }
++        scan += 0xd; /* += 0x34 bytes */
++        idx++;
++      }
++
++      if (found) {
++        /* entry points at the preset's name buffer (table base + 4) */
++        entry = (char *)0x5aa3c4 + idx * 0x34;
++
++        name_buf = ui_widget_realloc(
++          (int)*(int *)((char *)widget + 0x4c), 0x18, __FILE__, 0x886);
++        *(int *)((char *)widget + 0x4c) = (int)name_buf;
++        if (name_buf == 0)
++          return;
++
++        flags = *(unsigned short *)(entry + 0x1a);
++        if (flags & 1) {
++          name_tag = tag_loaded(
++            0x75737472, "ui\\shell\\strings\\default_player_profile_names");
++          name_src = (wchar_t *)0x26cdf0;
++          if (name_tag != -1)
++            name_src = (wchar_t *)FUN_0019d420(name_tag, flags >> 8);
++          ustrncpy((wchar_t *)name_buf, name_src, 0xb);
++          *(short *)((char *)*(int *)((char *)widget + 0x4c) + 0x16) = 0;
++        } else {
++          ustrncpy((wchar_t *)name_buf, (wchar_t *)entry, 0xb);
++          *(short *)((char *)*(int *)((char *)widget + 0x4c) + 0x16) = 0;
++        }
++
++        if (*(short *)(entry + 0x18) < 0) {
++          clamped = 0;
++        } else {
++          menu_idx = *(short *)(entry + 0x18);
++          if (menu_idx > (int)(unsigned short)FUN_001c0ed0() - 1)
++            clamped = (int)(unsigned short)FUN_001c0ed0() - 1;
++          else
++            clamped = menu_idx;
++        }
++        *(short *)((char *)menu_wrapper + 0x50) = (short)clamped;
++
++        desc_buf = ui_widget_realloc(
++          (int)*(int *)((char *)screen_wrapper + 0x3c), 0x200, __FILE__, 0x89c);
++        *(int *)((char *)screen_wrapper + 0x3c) = (int)desc_buf;
++        if (desc_buf == 0)
++          return;
++
++        if (flags & 1) {
++          t1 = tag_loaded(0x75737472,
++                          "ui\\shell\\main_menu\\player_profiles_select"
++                          "\\joystick_set_defaults_descriptions");
++          t2 = tag_loaded(0x75737472,
++                          "ui\\shell\\main_menu\\player_profiles_select"
++                          "\\button_set_long_descriptions");
++          if (t1 == -1 || t2 == -1) {
++            desc_buf = *(void **)((char *)screen_wrapper + 0x3c);
++            *(short *)desc_buf = 0;
++            *(short *)((char *)desc_buf + 0x1fe) = 0;
++            return;
++          }
++          s1 = FUN_0019d420(t1, *(unsigned char *)(entry + 0x29));
++          s2 = FUN_0019d420(t2, *(unsigned char *)(entry + 0x28));
++          desc_buf = *(void **)((char *)screen_wrapper + 0x3c);
++          unicode_sprintf((wchar_t *)desc_buf, 0xff, L"%s%hs%s", s1,
++                          (wchar_t *)0x261f2c, s2);
++          *(short *)((char *)*(void **)((char *)screen_wrapper + 0x3c) +
++                     0x1fe) = 0;
++        } else {
++          t1 = tag_loaded(0x75737472,
++                          "ui\\shell\\main_menu\\player_profiles_select"
++                          "\\joystick_set_short_descriptions");
++          t2 = tag_loaded(0x75737472,
++                          "ui\\shell\\main_menu\\player_profiles_select"
++                          "\\button_set_short_descriptions");
++          if (t1 != -1 && t2 != -1) {
++            s1 = FUN_0019d420(t1, *(unsigned char *)(entry + 0x29));
++            s2 = FUN_0019d420(t2, *(unsigned char *)(entry + 0x28));
++            unicode_sprintf((wchar_t *)*(void **)((char *)screen_wrapper + 0x3c),
++                            0xff, L"%s%hs%s", s1, (wchar_t *)0x261f2c, s2);
++          }
++          *(short *)((char *)*(void **)((char *)screen_wrapper + 0x3c) +
++                     0x1fe) = 0;
++        }
++        return;
++      }
++    }
++
++    /* rebuild path: no selection matched (id == -1 or not found in table) */
++    count = *(unsigned short *)((char *)widget + 0x44);
++    if (count == 0) {
++      name_buf = ui_widget_realloc((int)*(int *)((char *)widget + 0x4c), 4,
++                                   __FILE__, 0x8d2);
++      *(int *)((char *)widget + 0x4c) = (int)name_buf;
++      if (name_buf)
++        *(short *)name_buf = 0;
++      *(short *)((char *)menu_wrapper + 0x50) = 0;
++      desc_buf = ui_widget_realloc(
++        (int)*(int *)((char *)screen_wrapper + 0x3c), 4, __FILE__, 0x8d7);
++      *(int *)((char *)screen_wrapper + 0x3c) = (int)desc_buf;
++      if (desc_buf)
++        *(short *)desc_buf = 0;
++      return;
++    }
++
++    id_array = *(int **)((char *)widget + 0x40);
++    qsort(id_array, count, 4, FUN_000f3960);
++    new_count = 0;
++    while (new_count < count && id_array[new_count] != -1)
++      new_count++;
++    *(unsigned short *)((char *)widget + 0x44) = (unsigned short)new_count;
++
++    selection = *(short *)((char *)widget + 0x3c);
++    if (selection < 0) {
++      *(short *)((char *)widget + 0x3c) = 0;
++      continue;
++    }
++    {
++      int max = new_count - 1;
++      if (selection > max)
++        selection = max;
++      *(short *)((char *)widget + 0x3c) = (short)selection;
++    }
++    /* loop: re-validate with the rebuilt/sorted list */
++  }
++}

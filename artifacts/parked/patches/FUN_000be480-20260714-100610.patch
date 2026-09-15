@@ -1,0 +1,73 @@
+diff --git c/kb.json w/kb.json
+index 8da42989..118f978c 100644
+--- c/kb.json
++++ w/kb.json
+@@ -11260,7 +11260,7 @@
+         },
+         {
+           "addr": "0xc9ec0",
+-          "decl": "void FUN_000c9ec0(void);"
++          "decl": "void FUN_000c9ec0(int param_1, uint16_t param_2);"
+         },
+         {
+           "addr": "0xc9f30",
+@@ -17474,7 +17474,8 @@
+         },
+         {
+           "addr": "0xbe480",
+-          "decl": "void FUN_000be480(void);"
++          "decl": "void FUN_000be480(int16_t function_index, int thread_datum, char init);",
++          "ported": true
+         },
+         {
+           "addr": "0xbe4c0",
+@@ -39353,4 +39354,4 @@
+   "0x11cfd0": {
+     "ported": true
+   }
+-}
++}
+\ No newline at end of file
+diff --git c/src/halo/hs/hs_runtime.c w/src/halo/hs/hs_runtime.c
+index 31903ec7..8dbc4d51 100644
+--- c/src/halo/hs/hs_runtime.c
++++ w/src/halo/hs/hs_runtime.c
+@@ -1,4 +1,38 @@
+ 
++/* HaloScript macro-function evaluation wrapper (0xbe480).
++ *
++ * Evaluates a HaloScript macro function via hs_macro_function_evaluate, which
++ * returns a pointer to a result record (or null). On success it forwards two
++ * fields of that record -- an int at +0 and a uint16 at +4 -- to FUN_000c9ec0,
++ * then commits a zero result on the thread via hs_return.
++ *
++ * Dispatched through the HS function table (no direct CALL sites in the XBE),
++ * so the cdecl stack args map 1:1 to hs_macro_function_evaluate:
++ *   [esp+4]   = function_index (int16_t)
++ *   [esp+8]   = thread_datum   (int)  -- reused as hs_return's thread_handle
++ *   [esp+0xc] = init           (char)
++ *
++ * The original reads [ret+4] with a zero-extend (XOR EDX,EDX; MOV DX), hence
++ * the uint16_t field read here. The combined `ADD ESP,0x10` after both calls
++ * masks FUN_000c9ec0's two-argument stack cleanup -- verified against disasm.
++ *
++ * Callees:
++ *   0xcc560 = hs_macro_function_evaluate(function_index, thread_datum, init) -> ptr
++ *   0xc9ec0 = FUN_000c9ec0(*(int*)ret, *(uint16*)(ret+4))
++ *   0xcbf80 = hs_return(thread_handle, value)
++ */
++void FUN_000be480(int16_t function_index, int thread_datum, char init)
++{
++  int *result;
++
++  result = (int *)hs_macro_function_evaluate(function_index, thread_datum, init);
++  if (result != (int *)0) {
++    FUN_000c9ec0(*result, *(uint16_t *)((char *)result + 4));
++    hs_return(thread_datum, 0);
++  }
++  return;
++}
++
+ /* Validate the syntax tree after loading a scenario. Iterates all syntax
+  * nodes and checks for consistency: valid types, valid source offsets,
+  * valid script indices, and correct function references. If any node fails

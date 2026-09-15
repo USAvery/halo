@@ -1,0 +1,23 @@
+{
+  "name": "FUN_000f5750",
+  "addr": "0xf5750",
+  "obj": "items.obj",
+  "source_path": "src/halo/items/items.c",
+  "best_score": 82.6,
+  "best_patch": "artifacts/parked/patches/FUN_000f5750-20260711-145414.patch",
+  "status": "promoted",
+  "first_parked": "2026-07-11T14:54:14+00:00",
+  "last_updated": "2026-07-11T15:05:10+00:00",
+  "promoted_commit": "26e8d380",
+  "attempts": [
+    {
+      "ts": "2026-07-11T14:54:14+00:00",
+      "model": "opus",
+      "effort": "high",
+      "score": 82.6,
+      "cap_hypothesis": "classify_cap.py returned inconclusive (no @reg, no tail-wrapper, no fucompp/movswl rule). 82.6% VC71 with exact 23/23 instruction-count parity and 0 equivalence divergences: logic is faithful. Remaining ~17% gap is MSVC do-while loop scheduling/register-allocation \u2014 leading PUSH ESI + JMP-into-loop and ESI allocation for the loop IMUL \u2014 not a correctness or load-width bug. Below 85% so permuter is N/A; a loop-shape rewrite by an escalation agent may recover a few points and cross 85% (then permute).",
+      "reason": "pre_escalation",
+      "patch": "artifacts/parked/patches/FUN_000f5750-20260711-145414.patch"
+    }
+  ]
+}

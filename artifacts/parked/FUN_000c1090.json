@@ -1,0 +1,32 @@
+{
+  "name": "FUN_000c1090",
+  "addr": "0xc1090",
+  "obj": "hs.obj",
+  "source_path": "src/halo/hs/hs.c",
+  "best_score": 93.6,
+  "best_patch": "artifacts/parked/patches/FUN_000c1090-20260710-010435.patch",
+  "status": "promoted",
+  "first_parked": "2026-07-10T01:04:35+00:00",
+  "last_updated": "2026-07-10T12:00:00+00:00",
+  "promoted_commit": "daa39ee6",
+  "attempts": [
+    {
+      "ts": "2026-07-10T01:04:35+00:00",
+      "model": "opus",
+      "effort": "high",
+      "score": 0.0,
+      "cap_hypothesis": "",
+      "reason": "below_65pct",
+      "patch": "artifacts/parked/patches/FUN_000c1090-20260710-010435.patch"
+    },
+    {
+      "ts": "2026-07-10T12:00:00+00:00",
+      "model": "fable",
+      "effort": "high",
+      "score": 93.6,
+      "cap_hypothesis": "movzwl vs xor+mov16 zero-extension idiom, twin-precedented (c1050)",
+      "reason": "promoted: 0.0 was verify artifact (5-hex ref filenames; verifier needs 8-hex). Canonicalized refs, re-verified.",
+      "patch": "artifacts/parked/patches/FUN_000c1090-20260710-010435.patch"
+    }
+  ]
+}

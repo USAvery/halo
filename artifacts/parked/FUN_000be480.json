@@ -1,0 +1,23 @@
+{
+  "name": "FUN_000be480",
+  "addr": "0xbe480",
+  "obj": "players.obj",
+  "source_path": "src/halo/hs/hs_runtime.c",
+  "best_score": 82.1,
+  "best_patch": "artifacts/parked/patches/FUN_000be480-20260714-100610.patch",
+  "status": "promoted",
+  "first_parked": "2026-07-14T10:06:10+00:00",
+  "last_updated": "2026-07-20T21:48:21+00:00",
+  "promoted_commit": "15db00b3",
+  "attempts": [
+    {
+      "ts": "2026-07-14T10:06:10+00:00",
+      "model": "opus",
+      "effort": "high",
+      "score": 82.1,
+      "cap_hypothesis": "Measured gap is a vc71_verify tooling artifact, not a lift deficiency. The delinked reference is an exact 26-instruction byte match to the authoritative XBE (objdump-confirmed), and my C maps 1:1 to those 26 instructions. The measured 82.1% (30/26 insns) is candidate-extraction bleed: FUN_000be480 is first-in-file in hs_runtime.c, immediately followed by hs_validate_syntax, and the candidate-side extraction grabs ~4 instructions from that neighbor (the diff's `movswl 0x18(%eax)` and offset 0x1a reads do not exist anywhere in my source). Proof of invariance: swapping params between (int16_t,int,char) and (int,int,int) produced identical 82.1%/30-insn output, so my function's own instructions already match the reference \u2014 the gap is entirely the bled neighbor code. Escalation cannot help because the bleed is on the tooling side, not the lift.",
+      "reason": "structural_cap",
+      "patch": "artifacts/parked/patches/FUN_000be480-20260714-100610.patch"
+    }
+  ]
+}

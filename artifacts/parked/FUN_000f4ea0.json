@@ -1,0 +1,23 @@
+{
+  "name": "FUN_000f4ea0",
+  "addr": "0xf4ea0",
+  "obj": "items.obj (BUT decompile TU assert says c:\\halo\\SOURCE\\interface\\ui_widget_group.c \u2014 likely belongs to a ui_widget_group/interface object, not items.obj; verify object mapping before committing)",
+  "source_path": "src/halo/items/items.c",
+  "best_score": 87.8,
+  "best_patch": "artifacts/parked/patches/FUN_000f4ea0-20260711-081606.patch",
+  "status": "promoted",
+  "first_parked": "2026-07-11T08:16:06+00:00",
+  "last_updated": "2026-07-11T20:00:07+00:00",
+  "promoted_commit": "4e31d631",
+  "attempts": [
+    {
+      "ts": "2026-07-11T08:16:06+00:00",
+      "model": "opus",
+      "effort": "high",
+      "score": 87.8,
+      "cap_hypothesis": "",
+      "reason": "NEEDS_RUNTIME: Target: FUN_000f4ea0 (0xf4ea0) \u2014 scenario UI widget-group tag loader; TU c:\\halo\\SOURCE\\interface\\ui_widget_group.c; lifted into src/halo/items/items.c.\n\nStructural Match: 87.8% VC71/objdiff \u2014 in the <90% band.\n\nMismatch Classes: control flow / args / offsets verified 1:1 against decompile; residual ~12% consistent with compiler-shape (literal pool, call scheduling, CRT frame) but not byte-classified from objdiff. Object/source_path unset in kb.json (ui_widget_group.c vs items.c placement) is an unresolved bookkeeping ambiguity over the delinked reference.\n\nCall Argument Audit: PASS \u2014 all tag_get/FUN_001b9b00/error/display_assert calls match decl and decompile; stub-arg diff 0 mismatches over 100 calls.\n\nMemory Offset / Global Side-effect Audit: PASS \u2014 only *(short*)(scenario_tag+0x3c) int16 load; no writes/globals beyond mirrored loads.\n\nABI Audit: PASS \u2014 cdecl stack arg confirmed via in_stack_00000004; regs=none; all callee decls match.\n\nConfirmed: cdecl stack-arg ABI; faithful control flow, FourCCs, tag paths, early returns, assert/halt path; hazard scan clean (exit 0); no FPU code (no ordering risk).\n\nInferred: the 12% residual is benign compiler shape (strong logical fidelity), though not byte-proven.\n\nUncertain: (1) behavioral correctness of the multiplayer (scenario_type==1) and main_menu (==2) branches \u2014 the bulk of the function \u2014 is UNVERIFIED; (2) which delinked object the 87.8% was measured against, given no object/source_path in kb.json.\n\nVerdict Rationale: All blocking audits (ABI, hazard, call-argument, memory-offset) pass and the C is a faithful 1:1 translation, so no REJECT trigger fires \u2014 no concrete bug, no missing ABI evidence, no FPU risk, no unresolved arg/offset uncertainty. But 87.8% is in the <90% band, which requires golden/runtime behavioral verification plus classified mismatches. The runtime lane meant to backstop this did NOT run as claimed: the acceptance narrative asserts a live-state infection_swarm snapshot 0-divergence pass, but the equivalence detail states that snapshot was ABSENT and it fell back to zero-fill at 11.1% coverage (weak). Zero-fill forces scenario_type==0, so only the solo branch executed; the multiplayer and main_menu branches (the majority of the code and the source of the mismatch) were never exercised. The lift is very likely correct, but the structural evidence is too weak for auto-commit without real golden/live-state verification that drives scenario_type==1 and ==2. Fix before re-review: provide the real UI-state snapshot (or a synthetic snapshot with scenario_tag+0x3c set to 1 and 2) and re-run equivalence to cover the multiplayer and main_menu branches, and resolve the items.obj vs ui_widget_group.c object/source_path mapping so the delinked reference is unambiguous.",
+      "patch": "artifacts/parked/patches/FUN_000f4ea0-20260711-081606.patch"
+    }
+  ]
+}

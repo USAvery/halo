@@ -1,0 +1,240 @@
+diff --git c/kb.json w/kb.json
+index 57dbc301..472933fc 100644
+--- c/kb.json
++++ w/kb.json
+@@ -12857,7 +12857,7 @@
+         },
+         {
+           "addr": "0xf5800",
+-          "decl": "void FUN_000f5800(void);"
++          "decl": "unsigned short FUN_000f5800(int keycode@<esi>);"
+         },
+         {
+           "addr": "0xf5900",
+@@ -12865,7 +12865,8 @@
+         },
+         {
+           "addr": "0xf5f10",
+-          "decl": "void object_get_type(void);"
++          "decl": "int FUN_000f5f10(void);",
++          "name": null
+         },
+         {
+           "addr": "0xf5f30",
+@@ -12882,7 +12883,8 @@
+         },
+         {
+           "addr": "0xf5fb0",
+-          "decl": "char FUN_000f5fb0(void);"
++          "decl": "char FUN_000f5fb0(void);",
++          "ported": true
+         },
+         {
+           "addr": "0xf63f0",
+@@ -21588,7 +21590,7 @@
+         },
+         {
+           "addr": "0x1c2bf0",
+-          "decl": "void saved_game_file_name_unique(void);"
++          "decl": "bool saved_game_file_name_unique(const wchar_t *name);"
+         },
+         {
+           "addr": "0x1c2c50",
+@@ -30506,7 +30508,7 @@
+         },
+         {
+           "addr": "0x19d6e0",
+-          "decl": "void align_to_character(void);"
++          "decl": "void align_to_character(void *buffer, void *reference);"
+         },
+         {
+           "addr": "0x19d760",
+diff --git c/src/halo/items/items.c w/src/halo/items/items.c
+index afebb7f3..5a9bee4e 100644
+--- c/src/halo/items/items.c
++++ w/src/halo/items/items.c
+@@ -174,6 +174,171 @@ void FUN_000f5f30(void)
+   ui_play_audio_feedback_sound(1);
+ }
+ 
++/* FUN_000f5fb0 (0xf5fb0, virtual_keyboard.obj).
++ * TU: c:\halo\SOURCE\interface\virtual_keyboard.c (__FILE__ assert @0x28a854).
++ *
++ * Handler run when the user presses A (virtual_keyboard_process_input action 4)
++ * to act on the currently highlighted key. The key's meaning is the signed byte
++ * at keymap[row*0xb + col] (table 0x28a790):
++ *   0x24        accept / OK
++ *   0x25..0x27  toggle state flags (0x46cef1 / cef2 / cef3)
++ *   0x28        clear (whole buffer if pristine-default, else delete one char)
++ *   0x29        cursor left
++ *   0x2a        cursor right
++ *   0x2b        space
++ *   default     insert the mapped character (0x00..0x23 configurable keys)
++ * Always returns 1; the caller latches it as an accepted move.
++ *
++ * virtual_keyboard_globals (0x46cef0), see virtual_keyboard_initialize:
++ *   cef0 byte active flag, cef1/cef2/cef3 byte toggles,
++ *   cefc uint16 buffer_size (bytes, MOVZX), cf04 short fortune index,
++ *   cf06 byte accepted, cf07 byte buffer_dirty,
++ *   cf08 char* buffer base, cf0c char* cursor, cf18 wchar[] default text.
++ * Return-type notes (kb.json fixed): FUN_000f5800 maps a keycode passed in ESI
++ * to a wide char in AX; FUN_000f5f10 returns ustrlen(buffer) in EAX;
++ * saved_game_file_name_unique returns a bool in AL. */
++char FUN_000f5fb0(void)
++{
++  unsigned int fortune;
++
++  switch (*(char *)(0x28a790 + (int)*(short *)0x46cef8 * 0xb +
++                    (int)*(short *)0x46cefa)) {
++  case 0x24: /* accept / OK */
++    if (ustrcmp((const wchar_t *)0x46cf18,
++                (const wchar_t *)*(char **)0x46cf08) == 0) {
++      *(unsigned char *)0x46cf06 = 1;
++    } else if (*(unsigned short *)*(char **)0x46cf08 == 0) {
++      ui_widget_display_error(0x1d, -1, 1, 0);
++      FUN_000f57a0();
++    } else if (saved_game_file_name_unique(
++                 (const wchar_t *)*(char **)0x46cf08)) {
++      *(unsigned char *)0x46cf06 = 1;
++    } else {
++      ui_widget_display_error(0x1b, -1, 1, 0);
++      FUN_000f57a0();
++    }
++    ui_play_audio_feedback_sound(3);
++    *(unsigned char *)0x46cef0 = 0;
++    event_manager_flush();
++    break;
++  case 0x25: /* toggle flag A */
++    ui_play_audio_feedback_sound(1);
++    *(unsigned char *)0x46cef1 = (*(unsigned char *)0x46cef1 == 0);
++    break;
++  case 0x26: /* toggle flag B */
++    ui_play_audio_feedback_sound(1);
++    *(unsigned char *)0x46cef2 = (*(unsigned char *)0x46cef2 == 0);
++    break;
++  case 0x27: /* toggle flag C */
++    ui_play_audio_feedback_sound(1);
++    *(unsigned char *)0x46cef3 = (*(unsigned char *)0x46cef3 == 0);
++    break;
++  case 0x28: /* clear */
++    if (*(unsigned char *)0x46cf07 == 1) {
++      if (*(short *)0x46cefc == 0) {
++        display_assert("virtual_keyboard_globals.buffer_size>0",
++                       "c:\\halo\\SOURCE\\interface\\virtual_keyboard.c", 0x355,
++                       true);
++        system_exit(-1);
++      }
++      csmemset(*(char **)0x46cf08, 0,
++               (unsigned int)*(unsigned short *)0x46cefc);
++      *(char **)0x46cf0c = *(char **)0x46cf08;
++      *(unsigned char *)0x46cf07 = 0;
++    } else {
++      FUN_000f5f30();
++    }
++    break;
++  case 0x29: /* cursor left */
++    if (*(char **)0x46cf0c > *(char **)0x46cf08)
++      *(char **)0x46cf0c -= 2;
++    *(unsigned char *)0x46cf07 = 0;
++    ui_play_audio_feedback_sound(1);
++    break;
++  case 0x2a: /* cursor right */
++    if (*(unsigned short *)*(char **)0x46cf0c != 0)
++      *(char **)0x46cf0c += 2;
++    *(unsigned char *)0x46cf07 = 0;
++    ui_play_audio_feedback_sound(1);
++    break;
++  case 0x2b: /* space */
++    if (*(unsigned char *)0x46cf07 == 1) {
++      if (*(short *)0x46cefc == 0) {
++        display_assert("virtual_keyboard_globals.buffer_size>0",
++                       "c:\\halo\\SOURCE\\interface\\virtual_keyboard.c", 0x378,
++                       true);
++        system_exit(-1);
++      }
++      csmemset(*(char **)0x46cf08, 0,
++               (unsigned int)*(unsigned short *)0x46cefc);
++      *(char **)0x46cf0c = *(char **)0x46cf08;
++      *(unsigned char *)0x46cf07 = 0;
++    }
++    if (FUN_000f5f10() < 2) {
++      ui_play_audio_feedback_sound(4);
++    } else {
++      csmemmove(*(char **)0x46cf0c + 2, *(char **)0x46cf0c,
++                (unsigned int)(((int)*(unsigned short *)0x46cefc -
++                                (int)*(char **)0x46cf0c) +
++                               (int)*(char **)0x46cf08 - 2));
++      *(unsigned short *)*(char **)0x46cf0c = 0x20;
++      *(char **)0x46cf0c += 2;
++      ui_play_audio_feedback_sound(2);
++    }
++    break;
++  default: /* insert configurable character */
++    if (*(unsigned char *)0x46cf07 == 1) {
++      if (*(short *)0x46cefc == 0) {
++        display_assert("virtual_keyboard_globals.buffer_size>0",
++                       "c:\\halo\\SOURCE\\interface\\virtual_keyboard.c", 0x391,
++                       true);
++        system_exit(-1);
++      }
++      csmemset(*(char **)0x46cf08, 0,
++               (unsigned int)*(unsigned short *)0x46cefc);
++      *(char **)0x46cf0c = *(char **)0x46cf08;
++      *(unsigned char *)0x46cf07 = 0;
++    }
++    if ((int)*(unsigned short *)0x46cefc -
++          (ustrlen((const unsigned short *)*(char **)0x46cf08) * 2 + 2) >=
++        2) {
++      csmemmove(*(char **)0x46cf0c + 2, *(char **)0x46cf0c,
++                (unsigned int)(((int)*(unsigned short *)0x46cefc -
++                                (int)*(char **)0x46cf0c) +
++                               (int)*(char **)0x46cf08 - 2));
++      *(unsigned short *)*(char **)0x46cf0c =
++        FUN_000f5800(*(char *)(0x28a790 + (int)*(short *)0x46cef8 * 0xb +
++                               (int)*(short *)0x46cefa));
++      *(char **)0x46cf0c += 2;
++      if (ustrcmp((const wchar_t *)*(char **)0x46cf08, L".fortune") == 0) {
++        fortune = system_milliseconds() % 10;
++        if (fortune > 9)
++          fortune = 9;
++        *(short *)0x46cf04 = (short)(fortune + 0xb);
++        if (*(short *)0x46cf18 == 0) {
++          csmemset(*(char **)0x46cf08, 0,
++                   (unsigned int)*(unsigned short *)0x46cefc);
++          *(char **)0x46cf0c = *(char **)0x46cf08;
++        } else {
++          align_to_character(*(char **)0x46cf08, (void *)0x46cf18);
++          *(char **)0x46cf0c =
++            *(char **)0x46cf08 +
++            ustrlen((const unsigned short *)*(char **)0x46cf08) * 2;
++        }
++      }
++      ui_play_audio_feedback_sound(2);
++    } else {
++      ui_play_audio_feedback_sound(4);
++    }
++    break;
++  }
++
++  if (*(char *)(0x28a790 + (int)*(short *)0x46cef8 * 0xb +
++                (int)*(short *)0x46cefa) != 0x25)
++    *(unsigned char *)0x46cef1 = 0;
++  return 1;
++}
++
+ /* Virtual on-screen keyboard input pump (virtual_keyboard.obj).
+  * TU: c:\halo\SOURCE\interface\virtual_keyboard.c (__FILE__ assert
+  * @0x28a790..).
+diff --git c/tools/kb_reg_baseline.json w/tools/kb_reg_baseline.json
+index b3c1f4b6..855503e3 100644
+--- c/tools/kb_reg_baseline.json
++++ w/tools/kb_reg_baseline.json
+@@ -643,6 +643,7 @@
+     "0x1d8750": "unsigned int FUN_001d8750(unsigned int val@<ecx>);",
+     "0x1e9350": "void D3DDevice_SetRenderState_Simple(uint32_t reg@<ecx>, uint32_t value@<edx>);",
+     "0x1e9380": "void D3DDevice_SetRenderState_Deferred(uint32_t reg_index@<ecx>, uint32_t value@<edx>);",
+-    "0x1e9410": "void __stdcall D3DDevice_SetTextureStageState(uint32_t stage@<ecx>, uint32_t state@<edx>, uint32_t value);"
++    "0x1e9410": "void __stdcall D3DDevice_SetTextureStageState(uint32_t stage@<ecx>, uint32_t state@<edx>, uint32_t value);",
++    "0xf5800": "unsigned short FUN_000f5800(int keycode@<esi>);"
+   }
+ }

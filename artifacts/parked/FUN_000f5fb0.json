@@ -1,0 +1,32 @@
+{
+  "name": "FUN_000f5fb0",
+  "addr": "0xf5fb0",
+  "obj": "virtual_keyboard.obj (NOTE: task said items.obj, but Ghidra TU header + assert strings confirm c:\\halo\\SOURCE\\interface\\virtual_keyboard.c)",
+  "source_path": "src/halo/items/items.c",
+  "best_score": 85.1,
+  "best_patch": "artifacts/parked/patches/FUN_000f5fb0-20260711-194039.patch",
+  "status": "parked",
+  "first_parked": "2026-07-11T15:42:23+00:00",
+  "last_updated": "2026-07-11T19:40:39+00:00",
+  "promoted_commit": null,
+  "attempts": [
+    {
+      "ts": "2026-07-11T15:42:23+00:00",
+      "model": "opus",
+      "effort": "high",
+      "score": 83.5,
+      "cap_hypothesis": "classify_cap inconclusive; agent judgment. 270 candidate vs 269 reference insns (near-1:1 parity) confirms faithful structure/logic \u2014 the 16.5% LCS gap is distributed MSVC-vs-clang scheduling across a 9-case jump-table switch plus pervasive int16 MOVSX/MOVZX narrow loads of row/col/buffer_size (LOADW permanent-gap pattern). TU precedent: sibling switch-handler virtual_keyboard_process_input caps at 63.9%; 83.5% is the highest switch-handler score in this TU. No reg args into the function; not a wrapper. Score below 85 so permuter/equivalence bands do not apply.",
+      "reason": "structural_cap",
+      "patch": "artifacts/parked/patches/FUN_000f5fb0-20260711-154223.patch"
+    },
+    {
+      "ts": "2026-07-11T19:40:39+00:00",
+      "model": "opus",
+      "effort": "high",
+      "score": 85.1,
+      "cap_hypothesis": "",
+      "reason": "NEEDS_RUNTIME: Target: FUN_000f5fb0 (0xf5fb0) -> src/halo/items/items.c, committed under items.obj (source is virtual_keyboard.c \"activate current key\" handler; delinked/items.obj contains the symbol).\n\nStructural Match: 85.1% VC71 (269/269 insns), independently re-verified with `vc71_verify.py --no-cache`. NOTE: the most recent lift_run summary.json falsely headlines \"vc71 100%\" while two earlier runs for the same target report \"VC71 compilation or comparison failed\" \u2014 do not trust the summary; 85.1% is the true figure. No FPU/LOADW/IMM warnings on this function.\n\nMismatch Classes: all harmless compiler shape (regalloc SETZ CL/DL/AL, jump-table vs switch, global reload scheduling, LCS ordering). Instruction count identical.\n\nCall Argument Audit: every CALL, push order, and the FUN_000f5800 @<esi> register arg confirmed against original disassembly. All callee targets resolve into the original's real call set.\n\nMemory Offset / Global Side-effect Audit: all 0x46cefX/0x46cf0X globals and the 0x28a790 layout table verified; caret 2-byte steps, capacity math, fortune %10 branch faithful.\n\nABI Audit: clean; target cdecl/void-param/char-in-AL; the lone new @<esi> callee claim confirmed; delinked ref present.\n\nConfirmed: full structural faithfulness of logic, control flow, call args, offsets, and ABI (register arg + return) against binary evidence.\n\nInferred: the 14.9% VC71 gap is entirely codegen-shape, not behavior.\n\nUncertain: none in the code logic. Non-blocking hygiene note: still committed as `char FUN_000f5fb0(void)` with no name/object assignment (virtual_keyboard.c code under items.obj) \u2014 naming debt, not a correctness issue.\n\nVerdict Rationale: The lift is very likely correct \u2014 my full manual call-site/ABI/offset audit found no defect, so this is NOT a REJECT (no concrete bug, no FPU-ordering risk, no unclassified control-flow/dataflow mismatch, no unsafe call-arg/offset uncertainty). But structural match is 85.1%, which is below the 90% floor, and the decision policy requires golden/runtime behavior verification for a sub-90% lift to be committed unattended. That lane is empty: equivalence errored on all 100 seeds (ORACLE-CRASH UC_ERR_FETCH_UNMAPPED) because this non-leaf (37 calls) was emulated zero-fill without --allow-stubs/state-snapshot, and there is no golden/dual-oracle case. Manual structural proof does not substitute for the mandated runtime evidence below 90%. Unblock is mechanical: re-run unicorn_diff.py --allow-stubs (plus a state snapshot for the buffer/caret globals), or add a golden/dual-oracle harness case; on a behavioral pass this becomes AUTO_ACCEPT.\n\nAUTOLIFT_REVIEW: NEEDS_RUNTIME",
+      "patch": "artifacts/parked/patches/FUN_000f5fb0-20260711-194039.patch"
+    }
+  ]
+}

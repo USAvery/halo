@@ -1,0 +1,83 @@
+diff --git c/kb.json w/kb.json
+index c97ccc92..278ce054 100644
+--- c/kb.json
++++ w/kb.json
+@@ -6659,7 +6659,7 @@
+         {
+           "addr": "0x9ca70",
+           "decl": "void effects_information_get(int effect_ptr@<ebx>, uint32_t flags_hi@<edi>, unsigned int *seed, float *velocity_out, float min_val, float max_val, uint32_t flags_lo);",
+-          "note": "hidden reg deps (EDI=flags_hi, EBX=effect_ptr) — callers pass these in registers; all known callers inlined",
++          "note": "hidden reg deps (EDI=flags_hi, EBX=effect_ptr) \u2014 callers pass these in registers; all known callers inlined",
+           "ported": true
+         },
+         {
+@@ -6720,7 +6720,7 @@
+         {
+           "addr": "0x9dcf0",
+           "decl": "void FUN_0009dcf0(float *position, void *effect, void *location, void *part, float *forward, float *up, float scale);",
+-          "note": "4 reg args (EAX,EDX,ECX,ESI) — inlined into FUN_0009e310, cannot be thunked separately",
++          "note": "4 reg args (EAX,EDX,ECX,ESI) \u2014 inlined into FUN_0009e310, cannot be thunked separately",
+           "ported": true
+         },
+         {
+@@ -11300,7 +11300,7 @@
+         },
+         {
+           "addr": "0xca3f0",
+-          "decl": "void FUN_000ca3f0(void);"
++          "decl": "void FUN_000ca3f0(int node_value, int node_type);"
+         },
+         {
+           "addr": "0xca410",
+@@ -17443,7 +17443,8 @@
+         },
+         {
+           "addr": "0xbe270",
+-          "decl": "void FUN_000be270(void);"
++          "decl": "void FUN_000be270(int16_t function_index, int thread_datum, char init);",
++          "ported": true
+         },
+         {
+           "addr": "0xbe2b0",
+@@ -39349,4 +39350,4 @@
+   "0x11cfd0": {
+     "ported": true
+   }
+-}
++}
+\ No newline at end of file
+diff --git c/src/halo/game/players.c w/src/halo/game/players.c
+index 6092c6ee..d09d094d 100644
+--- c/src/halo/game/players.c
++++ w/src/halo/game/players.c
+@@ -2357,3 +2357,30 @@ void players_update_after_game(void)
+   if (*(char *)0x449ef1 != 0 && *(char *)0x2f0e90 != 0)
+     profile_exit_private((void *)0x2f0e88);
+ }
++
++/* FUN_000be270 @ 0x000be270 (players.obj)
++ * HaloScript macro-function thread step. Evaluates the macro function for a
++ * script thread; if the evaluation yields a result node, dispatches it and
++ * returns from the thread.
++ *
++ * Signature recovered from disassembly (kb decl was `void(void)`): three cdecl
++ * stack args at [ebp+8]/[ebp+c]/[ebp+10].
++ *
++ * NOTE: hs_macro_function_evaluate is declared `int`-returning in kb but the
++ * body dereferences it as a pointer to a node { int value; int16 type; }.
++ * FUN_000ca3f0's kb decl was also wrong (`void(void)`); the call site pushes
++ * two args (node.value, node.type) — corrected to `void(int,int)` in kb.json.
++ */
++void FUN_000be270(int16_t function_index, int thread_datum, char init)
++{
++  int *result;
++
++  result =
++    (int *)hs_macro_function_evaluate(function_index, thread_datum, init);
++  if (result != 0) {
++    /* ca3f0(*(int*)(result+0), *(uint16*)(result+4)) — args from result node.
++     */
++    FUN_000ca3f0(result[0], *(unsigned short *)((char *)result + 4));
++    hs_return(thread_datum, 0);
++  }
++}

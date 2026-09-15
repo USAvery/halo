@@ -1,0 +1,23 @@
+{
+  "name": "FUN_000f5700",
+  "addr": "0xf5700",
+  "obj": "items.obj",
+  "source_path": "src/halo/items/items.c",
+  "best_score": 69.8,
+  "best_patch": "artifacts/parked/patches/FUN_000f5700-20260711-143721.patch",
+  "status": "promoted",
+  "first_parked": "2026-07-11T14:37:21+00:00",
+  "last_updated": "2026-07-11T18:59:21+00:00",
+  "promoted_commit": "83a6c931",
+  "attempts": [
+    {
+      "ts": "2026-07-11T14:37:21+00:00",
+      "model": "opus",
+      "effort": "high",
+      "score": 69.8,
+      "cap_hypothesis": "Forced dropped selector arg: original emits `push 1; call 0xe5ab0; add esp,4` but this branch declares ui_play_audio_feedback_sound as void(void) and all ~34 callers drop the selector, so the lift matches the branch convention (retyping to void(int) is a cross-cutting change that would break the build, out of scope for a single-function lift). Dropping those 2 instructions in a 22-instruction body, plus the resulting LCS tail misalignment and MSVC-7.1 scheduling, caps the match. Classifier returned inconclusive; judged capped by agent based on the concrete dropped-arg floor and tiny-function LCS sensitivity. Behavior confirmed correct by equivalence (100/100, 0 diverged).",
+      "reason": "structural_cap",
+      "patch": "artifacts/parked/patches/FUN_000f5700-20260711-143721.patch"
+    }
+  ]
+}
