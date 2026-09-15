@@ -1040,6 +1040,28 @@ void FUN_000b4b10(unsigned int player_handle)
   *(int *)(player + 0x88) = -1;
 }
 
+/* slayer_engine_adjust_score (0xb4d00) — add a delta to a player's two score
+ * counters (register args: player handle in EAX, delta in EDI).
+ *
+ * The write-side counterpart of FUN_000b4d50 below: the same two tables are
+ * bumped by the same delta — the 0x456fe0 table indexed by the player's int at
+ * offset 0x20 (team-ish index), and the 0x457020 table indexed by the player
+ * handle's low 16 bits.
+ *
+ * Disassembly (0xb4d00): PUSH ESI; MOV ESI,EAX; MOV EAX,[0x5aa6d4];
+ * PUSH ESI; PUSH EAX; CALL datum_get (0x119320);
+ * MOV EAX,[EAX+0x20]; ADD [EAX*4+0x456fe0],EDI;
+ * AND ESI,0xffff; MOV ECX,[ESI*4+0x457020]; LEA EAX,[ESI*4+0x457020];
+ * ADD ESP,8; ADD ECX,EDI; MOV [EAX],ECX; POP ESI; RET. */
+void slayer_engine_adjust_score(unsigned int player_handle, int score_delta)
+{
+  char *player;
+
+  player = (char *)datum_get(player_data, player_handle);
+  *(int *)(0x456fe0 + *(int *)(player + 0x20) * 4) += score_delta;
+  *(int *)(0x457020 + (player_handle & 0xffff) * 4) += score_delta;
+}
+
 /* FUN_000b4d50 (0xb4d50) — race score lookup
  *
  * Looks up a player's race score value. If param_2 == 1, reads score from

@@ -8459,8 +8459,9 @@
     },
     {
      "addr": "0xb4d00",
-     "decl": "void slayer_engine_adjust_score(void);",
-     "comment": "[NAME: slayer_engine_adjust_score \u2014 name_source=2276-symbol-dump method=exact_address tier=confirmed (T1), cea-apply-unified 2026-09-14]"
+     "decl": "void slayer_engine_adjust_score(unsigned int player_handle@<eax>, int score_delta@<edi>);",
+     "comment": "[NAME: slayer_engine_adjust_score \u2014 name_source=2276-symbol-dump method=exact_address tier=confirmed (T1), cea-apply-unified 2026-09-14]",
+     "ported": true
     },
     {
      "addr": "0xb4d50",

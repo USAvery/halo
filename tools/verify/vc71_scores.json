@@ -15853,6 +15853,21 @@
       "score": 100.0,
       "source": "src/halo/game/game.c"
     },
+    "FUN_000b4490": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 95.4,
+      "addr": "0xb4490",
+      "end": "0xb45c0",
+      "kind": "auto",
+      "n_r": 107,
+      "opnd_percent": 79.8,
+      "raw_mnemonic_pct": 95.4,
+      "ref": "synth",
+      "ref_sha": "63ced21d0f920339",
+      "score": 95.4,
+      "source": "src/halo/game/game.c"
+    },
     "FUN_000b45c0": {
       "abi_model": "raw",
       "abi_model_items": 0,
@@ -15871,16 +15886,16 @@
     "FUN_000b4960": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 69.5,
+      "abi_modeled_mnemonic_pct": 71.2,
       "addr": "0xb4960",
       "end": "0xb4a65",
       "kind": "auto",
       "n_r": 90,
-      "opnd_percent": 52.4,
-      "raw_mnemonic_pct": 69.5,
+      "opnd_percent": 55.0,
+      "raw_mnemonic_pct": 71.2,
       "ref": "synth",
       "ref_sha": "65f91bf3ff50e3cf",
-      "score": 69.5,
+      "score": 71.2,
       "source": "src/halo/game/game.c"
     },
     "FUN_000b4b10": {
@@ -15971,6 +15986,21 @@
       "ref": "synth",
       "ref_sha": "8ab2725e45895196",
       "score": 100.0,
+      "source": "src/halo/game/game.c"
+    },
+    "FUN_000b5040": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 89.7,
+      "addr": "0xb5040",
+      "end": "0xb520a",
+      "kind": "auto",
+      "n_r": 160,
+      "opnd_percent": 64.1,
+      "raw_mnemonic_pct": 89.7,
+      "ref": "synth",
+      "ref_sha": "bb08413f048f4dd3",
+      "score": 89.7,
       "source": "src/halo/game/game.c"
     },
     "FUN_000b5490": {
@@ -62188,6 +62218,21 @@
       "score": 86.1,
       "source": "src/halo/game/game_engine.c"
     },
+    "find_next_target": {
+      "abi_model": "regparam_stripped_saves",
+      "abi_model_items": 3,
+      "abi_modeled_mnemonic_pct": 99.6,
+      "addr": "0xb4e20",
+      "end": "0xb4fa4",
+      "kind": "auto",
+      "n_r": 133,
+      "opnd_percent": 98.9,
+      "raw_mnemonic_pct": 98.5,
+      "ref": "synth",
+      "ref_sha": "6dd4cb6b44a60bc9",
+      "score": 99.6,
+      "source": "src/halo/game/game.c"
+    },
     "find_objects_from_point_vector": {
       "abi_model": "raw",
       "abi_model_items": 0,
@@ -84987,6 +85032,36 @@
       "ref_sha": "ad77aedc5c293fb3",
       "score": 0.7,
       "source": "src/halo/unported_thunks.c"
+    },
+    "slayer_engine_adjust_score": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 82.1,
+      "addr": "0xb4d00",
+      "end": "0xb4d36",
+      "kind": "auto",
+      "n_r": 16,
+      "opnd_percent": 41.0,
+      "raw_mnemonic_pct": 82.1,
+      "ref": "synth",
+      "ref_sha": "d4ad338e781b522f",
+      "score": 82.1,
+      "source": "src/halo/game/game.c"
+    },
+    "slayer_engine_display_score": {
+      "abi_model": "raw",
+      "abi_model_items": 0,
+      "abi_modeled_mnemonic_pct": 95.2,
+      "addr": "0xb5210",
+      "end": "0xb5392",
+      "kind": "auto",
+      "n_r": 123,
+      "opnd_percent": 76.0,
+      "raw_mnemonic_pct": 95.2,
+      "ref": "synth",
+      "ref_sha": "e2d2c01cab3eeb0e",
+      "score": 95.2,
+      "source": "src/halo/game/game.c"
     },
     "sort_desired_local_player_controllers": {
       "abi_model": "raw",
