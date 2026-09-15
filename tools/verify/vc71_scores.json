@@ -51763,6 +51763,21 @@
       "score": 96.4,
       "source": "src/halo/ai/ai_communication.c"
     },
+    "ai_communication_find_specific_actor_to_talk": {
+      "abi_model": "regparam_stripped_saves",
+      "abi_model_items": 6,
+      "abi_modeled_mnemonic_pct": 87.3,
+      "addr": "0x45830",
+      "end": "0x458ef",
+      "kind": "auto",
+      "n_r": 78,
+      "opnd_percent": 63.0,
+      "raw_mnemonic_pct": 85.4,
+      "ref": "synth",
+      "ref_sha": "72fb8156980703cf",
+      "score": 87.3,
+      "source": "src/halo/ai/ai_communication.c"
+    },
     "ai_communication_get_player_rating": {
       "abi_model": "raw",
       "abi_model_items": 0,

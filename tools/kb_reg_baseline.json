@@ -6479,7 +6479,6 @@
   "0x44fd0": "void ai_communication_started(int unit_handle, uint16_t priority, uint16_t type, void *comm_data);",
   "0x45290": "void ai_communication_notify(int unit_handle, uint16_t priority, uint16_t type, void *comm_data);",
   "0x454a0": "float FUN_000454a0(int object_handle @<eax>, int actor_handle, float *param_3, int param_4, float *param_5, int param_6, int param_7, int param_8, int param_9, int param_10, int param_11, int param_12);",
-  "0x45830": "void FUN_00045830(void);",
   "0x458f0": "int ai_communication_find_global_actor_to_talk(int16_t param_1, int param_2, int param_3, int param_4, int param_5, int param_6, int param_7, int param_8, int param_9, int object_handle @<edi>, int16_t team @<bx>);",
   "0x45a10": "void ai_conversation_begin(void);",
   "0x460e0": "void FUN_000460e0(void);",
@@ -10037,7 +10036,8 @@
     "0x002256bb": "int __stdcall recv(void *xnet@<ecx>, unsigned int socket, char *buf, int len, int flags);",
     "0x2258a4": "int __stdcall send(void *xnet@<ecx>, unsigned int socket, const char *buf, int len, int flags);",
     "0x002258a4": "int __stdcall send(void *xnet@<ecx>, unsigned int socket, const char *buf, int len, int flags);",
-    "0xb4d00": "void slayer_engine_adjust_score(unsigned int player_handle@<eax>, int score_delta@<edi>);"
+    "0xb4d00": "void slayer_engine_adjust_score(unsigned int player_handle@<eax>, int score_delta@<edi>);",
+    "0x45830": "int ai_communication_find_specific_actor_to_talk(int param_1, int param_2, int param_3, int param_4, int param_5, int param_6, int param_7, unsigned int ai_index @<eax>, int other_object_handle @<esi>, int object_handle @<edi>);"
   },
   "0x57330": "short ai_scripting_command_list_status_internal(int16_t scenario_index@<eax>, void *record@<esi>, int field_1a8_val, int child_handle, int reserved);",
   "0x1631d0": "void FUN_001631d0(void);"

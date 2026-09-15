@@ -673,94 +673,6 @@ short ai_communication_consider_speech(int *sound_definition_index_reference,
   return play_type;
 }
 
-/* ai_conversation_unit_died (0x44660).
- *
- * Confirmed from disassembly:
- *   - Iterates the conversation data pool and resolves each conversation's
- *     scenario definition from scenario+0x468 with element size 0x74.
- *   - Clears matching unit handles at conversation offsets +0x54, +0x58,
- *     and +0x10; a +0x54 match also sets byte +0x63.
- *   - When param_2 is nonzero, clears matching actor fields at +0xa8 and
- *     +0x1e0 when actor word +0x6c is 0xc.
- *   - Finishes and returns on a match, logging the fixed string when the
- *     trace byte at 0x5aca5f is nonzero.
- *
- * Record offsets remain raw because their semantic field names are not
- * established by this function. */
-void ai_conversation_unit_died(int unit_handle, char param_2)
-{
-  data_iter_t iterator;
-  char *conversation;
-  char *definition;
-  char *actor;
-  int conversation_index;
-  int actor_handle;
-  char unit_matches;
-
-  data_iterator_new(&iterator, *(data_t **)0x6324ec);
-  conversation = (char *)data_iterator_next(&iterator);
-  if (conversation != (char *)0) {
-    do {
-      definition = (char *)tag_block_get_element(
-        (char *)global_scenario_get() + 0x468,
-        (int)*(int16_t *)(conversation + 0x02), 0x74);
-
-      unit_matches = 0;
-      if (*(int32_t *)(conversation + 0x54) == unit_handle) {
-        unit_matches = 1;
-        *(uint8_t *)(conversation + 0x63) = 1;
-        *(int32_t *)(conversation + 0x54) = -1;
-      }
-      if (*(int32_t *)(conversation + 0x58) == unit_handle) {
-        unit_matches = 1;
-        *(int32_t *)(conversation + 0x58) = -1;
-      }
-      if (*(int32_t *)(conversation + 0x10) == unit_handle) {
-        unit_matches = 1;
-        *(int32_t *)(conversation + 0x10) = -1;
-      }
-
-      if (param_2 != 0 || (*(uint8_t *)(definition + 0x20) & 1) != 0) {
-        conversation_index = 0;
-        if (*(int32_t *)(definition + 0x50) > 0) {
-          do {
-            if ((*(uint32_t *)(conversation + 0x14) &
-                 (1u << conversation_index)) != 0) {
-              actor_handle =
-                *(int32_t *)(conversation + 0x28 + conversation_index * 4);
-              if (actor_handle != -1) {
-                actor = (char *)datum_get(*(data_t **)0x6325a4, actor_handle);
-                if (*(int32_t *)(actor + 0x18) == unit_handle) {
-                  unit_matches = 1;
-                }
-                if (param_2 != 0) {
-                  if (*(int16_t *)(actor + 0x6c) == 0xc &&
-                      *(int32_t *)(actor + 0xa8) == unit_handle) {
-                    *(int32_t *)(actor + 0xa8) = -1;
-                  }
-                  if (*(int32_t *)(actor + 0x1e0) == unit_handle) {
-                    *(int32_t *)(actor + 0x1e0) = -1;
-                  }
-                }
-              }
-            }
-            conversation_index = conversation_index + 1;
-          } while ((int16_t)conversation_index <
-                   *(int32_t *)(definition + 0x50));
-        }
-        if (unit_matches != 0) {
-          if (*(uint8_t *)0x5aca5f != 0) {
-            console_printf(0, "%s: unit died, aborting", definition);
-          }
-          ai_conversation_finish(iterator.datum_handle, 0, 0);
-          return;
-        }
-      }
-      conversation = (char *)data_iterator_next(&iterator);
-    } while (conversation != (char *)0);
-  }
-}
-
 /* actor_communication_team (0x43270) — classify an actor's communication
  * team from its actor-type definition flags. Confirmed via disasm
  * 0x43270-0x432ac: datum_get(actor_data, actor_handle) resolves the actor
@@ -816,8 +728,8 @@ int16_t actor_communication_team(int actor_handle)
  *     trailing `CMP ESI,-1;JZ` at 0x43316 is provably dead on this path
  *     (only reachable here with ESI!=-1) but is kept as a literal condition
  *     rather than silently dropped.
- *   - Same look_buf convention as actor_conversation_control/FUN_00043360 in this file:
- *     short[8] { int16_t type; int16_t pad; int data[3]; }; only
+ *   - Same look_buf convention as actor_conversation_control/FUN_00043360 in
+ * this file: short[8] { int16_t type; int16_t pad; int data[3]; }; only
  *     look_buf[0] and *(int*)&look_buf[2] are ever written.
  *   - FUN_00027a60(EBX, [EBP+8], [EBP+0xc], &look_buf) at 0x43346: args
  *     pushed EDX(&look_buf), EAX([EBP+0xc]=priority), ECX([EBP+8]=
@@ -875,8 +787,8 @@ void FUN_000432b0(int prop_handle, int actor_handle, int object_handle,
  *   function's prologue, so EDI/ESI/BX are @<reg> parameters, not locals.
  * Confirmed: object_try_and_get_and_verify_type(ESI, -1) at 0x43378/0x4337d
  *   (cdecl, 2 args); NULL-result branch at 0x43380/0x43382.
- * Confirmed: look_buf layout matches the actor_conversation_control convention (this
- *   file's actor_looking.c, 0x14540): short[8] buffer, [0]=type tag,
+ * Confirmed: look_buf layout matches the actor_conversation_control convention
+ * (this file's actor_looking.c, 0x14540): short[8] buffer, [0]=type tag,
  *   *(int*)&buf[2]=data[0]. Here only buf[0]=6 (MOV word [EBP-0x10],0x6 at
  *   0x4338e) and *(int*)&buf[2]=ESI (MOV dword [EBP-0xc],ESI at 0x43394) are
  *   written; buf[4..7] (data[1..2]) are left uninitialized, matching the
@@ -1578,7 +1490,6 @@ void ai_communication_update_speech_timers(int unit_handle, int16_t param_2,
   }
 }
 
-
 /* ai_conversation_stop (0x44500) — iterate all conversations and finish every
  * one whose index field (+0x2) matches param_1. When the AI debug flag at
  * 0x5aca5f is set, logs the stop via console_printf with the conversation
@@ -1711,6 +1622,174 @@ void ai_conversation_actor_deleted(int actor_handle)
     }
     conversation = (char *)data_iterator_next(&iter);
   } while (conversation != 0);
+}
+
+/* ai_conversation_unit_died (0x44660).
+ *
+ * Confirmed from disassembly:
+ *   - Iterates the conversation data pool and resolves each conversation's
+ *     scenario definition from scenario+0x468 with element size 0x74.
+ *   - Clears matching unit handles at conversation offsets +0x54, +0x58,
+ *     and +0x10; a +0x54 match also sets byte +0x63.
+ *   - When param_2 is nonzero, clears matching actor fields at +0xa8 and
+ *     +0x1e0 when actor word +0x6c is 0xc.
+ *   - Finishes and returns on a match, logging the fixed string when the
+ *     trace byte at 0x5aca5f is nonzero.
+ *
+ * Record offsets remain raw because their semantic field names are not
+ * established by this function. */
+void ai_conversation_unit_died(int unit_handle, char param_2)
+{
+  data_iter_t iterator;
+  char *conversation;
+  char *definition;
+  char *actor;
+  int conversation_index;
+  int actor_handle;
+  char unit_matches;
+
+  data_iterator_new(&iterator, *(data_t **)0x6324ec);
+  conversation = (char *)data_iterator_next(&iterator);
+  if (conversation != (char *)0) {
+    do {
+      definition = (char *)tag_block_get_element(
+        (char *)global_scenario_get() + 0x468,
+        (int)*(int16_t *)(conversation + 0x02), 0x74);
+
+      unit_matches = 0;
+      if (*(int32_t *)(conversation + 0x54) == unit_handle) {
+        unit_matches = 1;
+        *(uint8_t *)(conversation + 0x63) = 1;
+        *(int32_t *)(conversation + 0x54) = -1;
+      }
+      if (*(int32_t *)(conversation + 0x58) == unit_handle) {
+        unit_matches = 1;
+        *(int32_t *)(conversation + 0x58) = -1;
+      }
+      if (*(int32_t *)(conversation + 0x10) == unit_handle) {
+        unit_matches = 1;
+        *(int32_t *)(conversation + 0x10) = -1;
+      }
+
+      if (param_2 != 0 || (*(uint8_t *)(definition + 0x20) & 1) != 0) {
+        conversation_index = 0;
+        if (*(int32_t *)(definition + 0x50) > 0) {
+          do {
+            if ((*(uint32_t *)(conversation + 0x14) &
+                 (1u << conversation_index)) != 0) {
+              actor_handle =
+                *(int32_t *)(conversation + 0x28 + conversation_index * 4);
+              if (actor_handle != -1) {
+                actor = (char *)datum_get(*(data_t **)0x6325a4, actor_handle);
+                if (*(int32_t *)(actor + 0x18) == unit_handle) {
+                  unit_matches = 1;
+                }
+                if (param_2 != 0) {
+                  if (*(int16_t *)(actor + 0x6c) == 0xc &&
+                      *(int32_t *)(actor + 0xa8) == unit_handle) {
+                    *(int32_t *)(actor + 0xa8) = -1;
+                  }
+                  if (*(int32_t *)(actor + 0x1e0) == unit_handle) {
+                    *(int32_t *)(actor + 0x1e0) = -1;
+                  }
+                }
+              }
+            }
+            conversation_index = conversation_index + 1;
+          } while ((int16_t)conversation_index <
+                   *(int32_t *)(definition + 0x50));
+        }
+        if (unit_matches != 0) {
+          if (*(uint8_t *)0x5aca5f != 0) {
+            console_printf(0, "%s: unit died, aborting", definition);
+          }
+          ai_conversation_finish(iterator.datum_handle, 0, 0);
+          return;
+        }
+      }
+      conversation = (char *)data_iterator_next(&iterator);
+    } while (conversation != (char *)0);
+  }
+}
+
+/* ai_communication_find_specific_actor_to_talk (0x45830) — scan the actors
+ * selected by one ai_index reference and return the datum handle of the
+ * best-scoring conversation partner.
+ *
+ * Same scoring shape as ai_communication_find_global_actor_to_talk (0x458f0)
+ * but driven by the ai_index actor iterator instead of the global
+ * encounter/actor walk, and with no team filtering.
+ *
+ * Confirmed (disasm 0x45830-0x458ee):
+ *   Register params: EAX = ai_index (MOV EBX,EAX at 0x45837, then CMP EBX,-1
+ *   and PUSH EBX into ai_index_actor_iterator_new at 0x45877); EDI and ESI are
+ *   never saved by the prologue (only PUSH EBX at 0x45836), so both are
+ *   inbound parameters. EDI feeds unit_get_head_position at 0x45859 and the
+ *   @<eax> arg of FUN_000454a0 (MOV EAX,EDI at 0x458b6); ESI feeds
+ *   unit_get_head_position at 0x4586b and callee arg 4 (PUSH ESI at 0x458b0).
+ *   Stack params: [EBP+0x08] param_1 .. [EBP+0x20] param_7, forwarded
+ *   unchanged as FUN_000454a0 args 6..12.
+ *   Return: EAX = [EBP-0x4] (MOV EAX,[EBP-0x4] at 0x458e7). The early-out at
+ *   0x45849 jumps past that load to 0x458ea with EAX still holding the
+ *   OR EAX,0xffffffff from 0x45839 — same -1 value, so a single C return of
+ *   best_handle is faithful.
+ * Confirmed frame (SUB ESP,0x38 = 56 bytes):
+ *   [EBP-0x38] iter        0x18 bytes — ai_index actor iterator, layout B
+ *                          (6 ints); current actor handle at iter+0x10,
+ *                          read at 0x458a8 and reloaded at 0x458ca.
+ *   [EBP-0x20] vec_a       float[3] — head position of the EDI object.
+ *   [EBP-0x14] vec_b       float[3] — head position of the ESI object.
+ *   [EBP-0x08] best_score  float
+ *   [EBP-0x04] best_handle int
+ * Confirmed: ADD ESP,0xc at 0x45886 cleans ai_index_actor_iterator_new(8) plus
+ *   the first ai_index_actor_iterator_next(4) together — cdecl cleanup
+ *   mis-grouping, not a 3-arg call (the artifact's ARG_COUNT hazard on
+ *   0x45881 is this same mis-grouping; the second call site at 0x458db has a
+ *   plain ADD ESP,0x4).
+ * Confirmed: ADD ESP,0x2c at 0x458c0 = 11 stack dwords into FUN_000454a0; the
+ *   push sequence 0x45899-0x458b5 reverses to
+ *   (iter+0x10, vec_a, ESI, vec_b, param_1..param_7).
+ * Confirmed: FCOM [EBP-0x8] / FNSTSW AX / TEST AH,0x41 / JNZ at 0x458c8 keeps
+ *   the candidate only when the returned score is strictly greater than
+ *   best_score (C3 and C0 both clear); the reject arm is FSTP ST0 at 0x458d5.
+ * Confirmed: the iterator's returned record pointer is only tested for
+ *   non-zero (TEST EAX,EAX at 0x45889 / 0x458e3); it is never dereferenced.
+ * Unknown: the meaning of param_1..param_7 — they are forwarded verbatim into
+ *   the unlifted scorer FUN_000454a0 and never inspected here.
+ */
+int ai_communication_find_specific_actor_to_talk(
+  int param_1, int param_2, int param_3, int param_4, int param_5, int param_6,
+  int param_7, unsigned int ai_index, int other_object_handle,
+  int object_handle)
+{
+  char iter[0x18];
+  float vec_a[3];
+  float vec_b[3];
+  float best_score;
+  int best_handle;
+  float score;
+
+  best_handle = -1;
+  best_score = 0.0f;
+  if (ai_index != 0xffffffff) {
+    if (object_handle != -1) {
+      unit_get_head_position(object_handle, vec_a);
+    }
+    if (other_object_handle != -1) {
+      unit_get_head_position(other_object_handle, vec_b);
+    }
+    ai_index_actor_iterator_new(ai_index, iter);
+    while (ai_index_actor_iterator_next(iter) != 0) {
+      score = FUN_000454a0(object_handle, *(int *)(iter + 0x10), vec_a,
+                           other_object_handle, vec_b, param_1, param_2,
+                           param_3, param_4, param_5, param_6, param_7);
+      if (score > best_score) {
+        best_score = score;
+        best_handle = *(int *)(iter + 0x10);
+      }
+    }
+  }
+  return best_handle;
 }
 
 /* ai_communication_find_global_actor_to_talk (0x458f0) — scan every live actor
