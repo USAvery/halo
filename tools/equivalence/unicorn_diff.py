@@ -481,7 +481,14 @@ def _load_kb() -> dict:
 
 
 def _find_kb_entry(kb: dict, func_name: str) -> Optional[dict]:
-    """Find a function entry in kb.json by name or hex address."""
+    """Find a function entry in kb.json by name or hex address.
+
+    `func_name` may carry a disambiguating "[variant]" suffix (e.g. a
+    regression_targets.json entry like "data_next_index[valid-pool]" that
+    names one of several scenarios for the same kb.json function) -- strip
+    it before matching, since kb.json only ever stores the bare name.
+    """
+    bare_name = func_name.split("[", 1)[0]
     addr_query = func_name if func_name.startswith("0x") else None
     for obj in kb.get("objects", []):
         for fn in obj.get("functions", []):
@@ -489,7 +496,7 @@ def _find_kb_entry(kb: dict, func_name: str) -> Optional[dict]:
             # Match function name in decl
             m = re.search(r'\b(\w+)\s*\(', decl)
             fn_name = m.group(1) if m else ""
-            if fn_name == func_name or fn.get("addr", "") == addr_query:
+            if fn_name == bare_name or fn.get("addr", "") == addr_query:
                 # A function-level "source" overrides the object default: a
                 # few objects (e.g. rasterizer.obj) aggregate several TUs, and
                 # the object's source names only the primary one.
@@ -3004,7 +3011,10 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
         try:
             lifted_slice = extract_function(str(build_path), delinked_sym)
         except CoffParseError as e2:
-            kb_name = entry.get("name", "")
+            # entry["name"] is rarely set; fall back to the bare name (the
+            # target's "[variant]" suffix stripped) which is what the linker
+            # symbol actually is for a plain decl-only kb.json entry.
+            kb_name = entry.get("name", "") or func_name.split("[", 1)[0]
             if kb_name and kb_name != func_name:
                 try:
                     lifted_slice = extract_function(str(build_path), kb_name)

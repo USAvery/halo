@@ -13323,9 +13323,9 @@
     "class": "non_leaf",
     "dir32_count": 8,
     "call_count": 3,
-    "confidence": "moderate",
-    "coverage_pct": 42.3,
-    "oracle": "delinked"
+    "confidence": "high",
+    "coverage_pct": 100.0,
+    "oracle": "xbe"
   },
   "0x1bfbf0": {
     "class": "stubbable",
@@ -35213,9 +35213,7 @@
     "call_count": 2
   },
   "0xe4ad0": {
-    "class": "stubbable",
-    "dir32_count": 2,
-    "call_count": 12
+    "class": "non_leaf"
   },
   "0xe4c70": {
     "class": "stubbable",
@@ -35226,11 +35224,6 @@
     "class": "stubbable",
     "dir32_count": 2,
     "call_count": 4
-  },
-  "0xe4ad0": {
-    "class": "non_leaf",
-    "confidence": "none",
-    "coverage_pct": 30.2
   },
   "0xe4d40": {
     "class": "stubbable",
@@ -35250,9 +35243,7 @@
     "call_count": 6
   },
   "0xe5180": {
-    "class": "stubbable",
-    "dir32_count": 2,
-    "call_count": 14
+    "class": "non_leaf"
   },
   "0xe5380": {
     "class": "leaf"
@@ -35296,11 +35287,6 @@
     "class": "stubbable",
     "dir32_count": 5,
     "call_count": 4
-  },
-  "0xe5180": {
-    "class": "non_leaf",
-    "confidence": "weak",
-    "coverage_pct": 27.5
   },
   "0xe59e0": {
     "class": "stubbable",
@@ -36421,8 +36407,7 @@
     "call_count": 4
   },
   "0xfb690": {
-    "class": "stubbable",
-    "call_count": 4
+    "class": "non_leaf"
   },
   "0xfb6e0": {
     "class": "stubbable",
@@ -36484,11 +36469,6 @@
     "dir32_count": 4,
     "call_count": 15
   },
-  "0xfb690": {
-    "class": "non_leaf",
-    "confidence": "none",
-    "coverage_pct": 100.0
-  },
   "0xfc4b0": {
     "class": "stubbable",
     "dir32_count": 4,
@@ -36537,8 +36517,7 @@
     "call_count": 8
   },
   "0xfcc90": {
-    "class": "stubbable",
-    "call_count": 8
+    "class": "non_leaf"
   },
   "0xfcd10": {
     "class": "stubbable",
@@ -36554,11 +36533,6 @@
     "class": "stubbable",
     "dir32_count": 2,
     "call_count": 3
-  },
-  "0xfcc90": {
-    "class": "non_leaf",
-    "confidence": "none",
-    "coverage_pct": 100.0
   },
   "0xfcec0": {
     "class": "stubbable",

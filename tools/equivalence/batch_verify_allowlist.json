@@ -519,7 +519,7 @@
       ],
       "oracle": "delinked"
     },
-    "FUN_000153e0": {
+    "action_flee_at_flee_position": {
       "statuses": [
         "*"
       ],
@@ -538,7 +538,7 @@
         "RETRIED artifacts/equivalence/allowlist_retry_xbe_oracle_unmappable.{csv,json} (2026-09-14) under --oracle=xbe, 20 seeds: returns inconclusive/domain_skipped -- all seeds escape to callback/exit. Kept excused: retiring it would trade an honest infra excuse for a permanently grey row."
       ]
     },
-    "FUN_00016ff0": {
+    "action_obey_flush_command_indices": {
       "statuses": [
         "*"
       ],
@@ -548,7 +548,7 @@
       ],
       "oracle": "delinked"
     },
-    "FUN_00017090": {
+    "action_obey_advance_command_list": {
       "statuses": [
         "*"
       ],
@@ -558,7 +558,7 @@
       ],
       "oracle": "delinked"
     },
-    "FUN_00028ed0": {
+    "actor_look_idle_new_minor_direction": {
       "statuses": [
         "*"
       ],
@@ -2713,7 +2713,7 @@
         "no-delinked-ref: lifted_extract_failed could not be extracted for diff (registration/export gap)"
       ]
     },
-    "FUN_000210f0": {
+    "actor_get_weapon_definition": {
       "statuses": [
         "*"
       ],
@@ -2731,7 +2731,7 @@
       ],
       "oracle": "delinked"
     },
-    "FUN_00015bb0": {
+    "action_guard_speak_post_combat": {
       "statuses": [
         "*"
       ],
@@ -2739,7 +2739,7 @@
         "no-delinked-ref: lifted_extract_failed could not be extracted for diff (registration/export gap)"
       ]
     },
-    "FUN_00028660": {
+    "actor_look_decode_direction": {
       "statuses": [
         "*"
       ],
