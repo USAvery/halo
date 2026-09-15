@@ -1278,16 +1278,16 @@
     "D3DResource_IsBusy": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 88.9,
+      "abi_modeled_mnemonic_pct": 91.1,
       "addr": "0x1ed980",
       "end": "0x1eda0d",
       "kind": "auto",
       "n_r": 49,
-      "opnd_percent": 46.5,
-      "raw_mnemonic_pct": 88.9,
+      "opnd_percent": 47.5,
+      "raw_mnemonic_pct": 91.1,
       "ref": "synth",
       "ref_sha": "47dc7717de6aaf8a",
-      "score": 88.9,
+      "score": 91.1,
       "source": "src/halo/rasterizer/xbox/d3d_resource.c"
     },
     "D3DResource_Register": {
@@ -1458,16 +1458,16 @@
     "D3D_BlockOnResource": {
       "abi_model": "raw",
       "abi_model_items": 0,
-      "abi_modeled_mnemonic_pct": 88.1,
+      "abi_modeled_mnemonic_pct": 95.5,
       "addr": "0x1efd80",
       "end": "0x1efe01",
       "kind": "auto",
       "n_r": 46,
-      "opnd_percent": 61.9,
-      "raw_mnemonic_pct": 88.1,
+      "opnd_percent": 90.9,
+      "raw_mnemonic_pct": 95.5,
       "ref": "synth",
       "ref_sha": "c91985d0f76ef92f",
-      "score": 88.1,
+      "score": 95.5,
       "source": "src/halo/rasterizer/xbox/d3d_resource.c"
     },
     "D3D_BlockOnTime": {
