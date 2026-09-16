@@ -1,0 +1,14 @@
+{
+  "description": "bitmap_mipmap_width bitmap mip levels 0..5 (compressed); valid synthetic bitmap header",
+  "build_label": "halo-debug-2276-synthetic",
+  "arg_overrides": {
+    "bitmap": "00000000200010000000000000000200000000000500",
+    "mipmap_index": [
+      0,
+      5
+    ]
+  },
+  "stub_returns": {
+    "bitmap_verify": 1
+  }
+}

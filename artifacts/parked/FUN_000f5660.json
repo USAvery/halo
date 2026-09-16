@@ -4,7 +4,7 @@
   "obj": "items.obj",
   "source_path": "src/halo/items/items.c",
   "best_score": 74.4,
-  "best_patch": "artifacts/parked/patches/FUN_000f5660-20260721-181729.patch",
+  "best_patch": "artifacts/parked/patches/FUN_000f5660-20260711-101041.patch",
   "status": "parked",
   "first_parked": "2026-07-11T10:10:41+00:00",
   "last_updated": "2026-07-22T05:54:29+00:00",

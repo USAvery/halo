@@ -2,6 +2,147 @@
   "description": "Curated high-risk ported functions for fast regression testing. Run with: python3 tools/equivalence/regression_test.py",
   "targets": [
     {
+      "addr": "0x10b9c0",
+      "name": "FUN_0010b9c0",
+      "label": "quaternion_multiply[finite-corpus]",
+      "obj": "random_math.obj",
+      "seeds": 20,
+      "flags": [
+        "--mem-trace",
+        "--no-leaf-cache"
+      ],
+      "reason": "pure quaternion multiply; 20/20 finite seeded inputs with 73.5% high-confidence coverage"
+    },
+    {
+      "addr": "0x7d6e0",
+      "name": "bitmap_mipmap_width",
+      "label": "bitmap_mipmap_width[plain-0..5]",
+      "obj": "bitmaps.obj",
+      "seeds": 20,
+      "env": {"BIPED_SIBLING_RESOLVE": "1"},
+      "flags": [
+        "--state-snapshot", "tools/equivalence/regression_snapshots/bitmap_mipmap_width_plain_range.json",
+        "--allow-stubs",
+        "--no-real-callees",
+        "--mem-trace",
+        "--no-concolic",
+        "--no-leaf-cache"
+      ],
+      "reason": "plain 32x16 bitmap across mip levels 0..5; sibling-resolved bitmap verification"
+    },
+    {
+      "addr": "0x7d6e0",
+      "name": "bitmap_mipmap_width",
+      "label": "bitmap_mipmap_width[compressed-0..5]",
+      "obj": "bitmaps.obj",
+      "seeds": 20,
+      "env": {"BIPED_SIBLING_RESOLVE": "1"},
+      "flags": [
+        "--state-snapshot", "tools/equivalence/regression_snapshots/bitmap_mipmap_width_compressed_range.json",
+        "--allow-stubs",
+        "--no-real-callees",
+        "--mem-trace",
+        "--no-concolic",
+        "--no-leaf-cache"
+      ],
+      "reason": "compressed 32x16 bitmap across mip levels 0..5; sibling-resolved bitmap verification"
+    },
+    {
+      "addr": "0x7d780",
+      "name": "bitmap_mipmap_get_height",
+      "label": "bitmap_mipmap_get_height[plain-0..5]",
+      "obj": "bitmaps.obj",
+      "seeds": 20,
+      "env": {"BIPED_SIBLING_RESOLVE": "1"},
+      "flags": [
+        "--state-snapshot", "tools/equivalence/regression_snapshots/bitmap_mipmap_height_plain_range.json",
+        "--allow-stubs",
+        "--no-real-callees",
+        "--mem-trace",
+        "--no-concolic",
+        "--no-leaf-cache"
+      ],
+      "reason": "plain 32x16 bitmap across mip levels 0..5; sibling-resolved bitmap verification"
+    },
+    {
+      "addr": "0x7d780",
+      "name": "bitmap_mipmap_get_height",
+      "label": "bitmap_mipmap_get_height[compressed-0..5]",
+      "obj": "bitmaps.obj",
+      "seeds": 20,
+      "env": {"BIPED_SIBLING_RESOLVE": "1"},
+      "flags": [
+        "--state-snapshot", "tools/equivalence/regression_snapshots/bitmap_mipmap_height_compressed_range.json",
+        "--allow-stubs",
+        "--no-real-callees",
+        "--mem-trace",
+        "--no-concolic",
+        "--no-leaf-cache"
+      ],
+      "reason": "compressed 32x16 bitmap across mip levels 0..5; sibling-resolved bitmap verification"
+    },
+    {
+      "addr": "0x1bfd00",
+      "name": "game_state_gpu_alloc",
+      "label": "game_state_gpu_alloc[log-existing]",
+      "obj": "game_state.obj",
+      "seeds": 20,
+      "flags": [
+        "--state-snapshot", "tools/equivalence/regression_snapshots/game_state_gpu_alloc_log_existing.json",
+        "--allow-stubs",
+        "--mem-trace",
+        "--no-concolic",
+        "--no-leaf-cache"
+      ],
+      "reason": "valid aligned GPU allocation with an existing log stream"
+    },
+    {
+      "addr": "0x1bfd00",
+      "name": "game_state_gpu_alloc",
+      "label": "game_state_gpu_alloc[log-open-success]",
+      "obj": "game_state.obj",
+      "seeds": 20,
+      "flags": [
+        "--state-snapshot", "tools/equivalence/regression_snapshots/game_state_gpu_alloc_log_open_success.json",
+        "--allow-stubs",
+        "--mem-trace",
+        "--no-concolic",
+        "--no-leaf-cache"
+      ],
+      "reason": "valid aligned GPU allocation when the log opens successfully"
+    },
+    {
+      "addr": "0x1bfd00",
+      "name": "game_state_gpu_alloc",
+      "label": "game_state_gpu_alloc[log-open-fail]",
+      "obj": "game_state.obj",
+      "seeds": 20,
+      "flags": [
+        "--state-snapshot", "tools/equivalence/regression_snapshots/game_state_gpu_alloc_log_open_fail.json",
+        "--allow-stubs",
+        "--mem-trace",
+        "--no-concolic",
+        "--no-leaf-cache"
+      ],
+      "reason": "allocation and checksum still complete when the log cannot be opened"
+    },
+    {
+      "addr": "0x131790",
+      "name": "antenna_debug_data_update_all",
+      "label": "antenna_debug_data_update_all[one-record-terminating]",
+      "obj": "telnet_console.obj",
+      "seeds": 20,
+      "flags": [
+        "--state-snapshot", "tools/equivalence/regression_snapshots/antenna_debug_data_update_all_bounded.json",
+        "--allow-stubs",
+        "--real-callees",
+        "--mem-trace",
+        "--no-concolic",
+        "--no-leaf-cache"
+      ],
+      "reason": "one valid pool record with data_next_index sequence [0, -1]; nested rope simulation is excluded"
+    },
+    {
       "addr": "0x119520",
       "name": "data_dispose",
       "obj": "data.obj",

@@ -148,9 +148,8 @@ bool game_state_reverted(void)
  * Validates a core save header against the current game state expectations.
  * If fatal is true, validation failures trigger a halt.
  *
- * The original binary had a format string bug where build_version and
- * scenario_name string pointers were printed with %d instead of %s.
- * This lift fixes those format specifiers.
+ * The original binary has a format string bug where build_version and
+ * scenario_name string pointers are printed with %d instead of %s.
  */
 bool game_state_validate_core_header(char *header, bool fatal)
 {
@@ -160,7 +159,7 @@ bool game_state_validate_core_header(char *header, bool fatal)
   if (csstrcmp(header + 0x104, "01.10.12.2276") != 0) {
     if (fatal) {
       display_assert(
-        csprintf((char *)0x5ab100, "expected build #%s but got #%s",
+        csprintf((char *)0x5ab100, "expected build #%d but got #%d",
                  "01.10.12.2276", header + 0x104),
         "c:\\halo\\SOURCE\\saved games\\game_state.c", 0x195, 1);
       system_exit(-1);

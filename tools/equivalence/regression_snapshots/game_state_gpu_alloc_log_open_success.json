@@ -1,0 +1,16 @@
+{
+  "description": "game_state_gpu_alloc: first allocation opens the game-state log successfully before recording the allocation.",
+  "build_label": "synthetic-game-state-gpu",
+  "regions": {
+    "0x4ea990": "0000000000100680000000000000000078563412000000000000000000000000",
+    "0x700000": "6c6f672d73747265616d000000000000"
+  },
+  "stub_returns": {
+    "crt_fopen": 7340032
+  },
+  "arg_overrides": {
+    "name": "67707520616c6c6f6300",
+    "a2": 7340040,
+    "size": 4096
+  }
+}

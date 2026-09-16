@@ -31,7 +31,8 @@ _UD = _HERE / "unicorn_diff.py"
 _PY = sys.executable
 
 
-def _run(target: str, oracle: str = "xbe", seeds: int = 20) -> tuple[int, dict]:
+def _run(target: str, oracle: str = "xbe", seeds: int = 20,
+         snapshot: str = None) -> tuple[int, dict]:
     with tempfile.TemporaryDirectory() as td:
         out_json = Path(td) / "out.json"
         cmd = [
@@ -42,6 +43,8 @@ def _run(target: str, oracle: str = "xbe", seeds: int = 20) -> tuple[int, dict]:
             "--quiet",
             f"--output-json={out_json}",
         ]
+        if snapshot is not None:
+            cmd.extend(["--state-snapshot", snapshot])
         proc = subprocess.run(cmd, cwd=str(_ROOT), capture_output=True, text=True)
         data = json.loads(out_json.read_text(encoding="utf-8")) if out_json.exists() else {}
         return proc.returncode, data
@@ -74,6 +77,19 @@ class TestVacuousEarlyExit(unittest.TestCase):
         self.assertTrue(data.get("applicable"))
         reason = data.get("reason", "")
         self.assertTrue(reason.startswith("vacuous_output"), reason)
+
+    def test_state_snapshot_is_not_mislabeled_as_early_exit(self):
+        """A supplied snapshot can make a deterministic path meaningful."""
+        snapshot = _ROOT / "tools" / "equivalence" / "regression_snapshots" / \
+            "sound_update_channel_attenuation_linear_mid.json"
+        code, data = _run("sound_update_channel_attenuation", "xbe", seeds=20,
+                          snapshot=str(snapshot))
+        self.assertEqual(code, 3)
+        self.assertEqual(data.get("status"), "inconclusive")
+        self.assertTrue(data.get("applicable"))
+        reason = data.get("reason", "")
+        self.assertTrue(reason.startswith("vacuous_output"), reason)
+        self.assertNotIn("oracle_vacuous_early_exit", reason)
 
 
 if __name__ == "__main__":

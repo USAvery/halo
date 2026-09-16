@@ -157,6 +157,24 @@
         "chronic timeout (game_state.obj @ 0x1bf8e0): does not terminate under differential harness within per-fn timeout; excluded to protect batch wall-clock budget"
       ]
     },
+    "game_state_lruv_cache_new": {
+      "statuses": [
+        "emulation_error"
+      ],
+      "reasons": [
+        "raw-XBE oracle crashes at unmapped EIP 0x43ffe3 on all 50 generic seeds; the initialization path needs a constrained state snapshot and real callees"
+      ],
+      "oracle": "xbe"
+    },
+    "antenna_debug_data_update_all": {
+      "statuses": [
+        "timeout"
+      ],
+      "reasons": [
+        "generic batch watchdog timeout: data_next_index never reaches its -1 terminator without a sequenced data-pool fixture"
+      ],
+      "oracle": "xbe"
+    },
     "FUN_0013b150": {
       "statuses": [
         "timeout"

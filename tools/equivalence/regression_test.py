@@ -13,6 +13,7 @@ Usage:
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import time
@@ -153,11 +154,14 @@ def run_target(target, seed_override=None):
         name,
         "--seeds", str(seeds),
     ] + flags
+    child_env = os.environ.copy()
+    child_env.update({str(k): str(v) for k, v in target.get("env", {}).items()})
 
     try:
         result = subprocess.run(
             cmd, capture_output=True, text=True, timeout=120,
             cwd=str(ROOT),
+            env=child_env,
         )
         output = result.stdout + result.stderr
 

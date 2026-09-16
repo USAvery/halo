@@ -4386,7 +4386,8 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
         # directly to ret (<10% floor, or an unexercised branch with no output
         # variation). The zero-fill raw-XBE harness cannot test this function
         # without --state-snapshot; report not_applicable rather than inconclusive.
-        if _oracle_xbe and len(oracle_seed_paths) <= 1 and coverage_pct < 100.0:
+        if (_oracle_xbe and state_snapshot is None
+                and len(oracle_seed_paths) <= 1 and coverage_pct < 100.0):
             early_exit_reason = (
                 f"oracle_vacuous_early_exit: {coverage_pct:.1f}% coverage, "
                 f"identical entry-point path across {passed} seeds"
@@ -4402,8 +4403,12 @@ def run_diff(func_name: str, num_seeds: int = 100, base_seed: int = 0,
         log(f"  INCONCLUSIVE: {vacuous_reason}")
         log("      Every seed agreed because the differential never observed "
             "differing behaviour -- this is NOT evidence of equivalence.")
-        log("      Drive the real paths with --state-snapshot (see the "
-            "lift-synthetic-equivalence skill) before trusting this target.")
+        if state_snapshot is None:
+            log("      Drive the real paths with --state-snapshot (see the "
+                "lift-synthetic-equivalence skill) before trusting this target.")
+        else:
+            log("      A state snapshot exercised the same path for every seed; "
+                "the result remains inconclusive because outputs did not vary.")
         return finish("inconclusive", True, vacuous_reason, 3, **extra)
 
     return finish("pass", True, None, 0, **extra)
