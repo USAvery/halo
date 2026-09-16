@@ -2439,8 +2439,8 @@
     },
     {
       "name": "game_state_validate_core_header",
-      "status": "error",
-      "reason": "emulation_error"
+      "status": "fail",
+      "reason": "divergence"
     },
     {
       "name": "game_state_write_to_file",
@@ -3934,6 +3934,11 @@
     },
     {
       "name": "xbox_texture_cache_setup_d3d_texture",
+      "status": "fail",
+      "reason": "divergence"
+    },
+    {
+      "name": "antenna_debug_data_simulate_rope",
       "status": "fail",
       "reason": "divergence"
     }
