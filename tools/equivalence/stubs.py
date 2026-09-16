@@ -1070,7 +1070,7 @@ class StubManager:
         """
         _SCRIPT_DIR = Path(__file__).resolve().parent
         sys.path.insert(0, str(_SCRIPT_DIR))
-        from coff_loader import extract_function, CoffParseError
+        from coff_loader import extract_function, CoffParseError, slice_looks_truncated
 
         obj_name = kb_entry.get("_obj_name", "").replace(".obj", "").replace("LIBCMT:", "")
         candidates = list(self.delinked_dir.glob(f"{obj_name}.obj"))
@@ -1107,7 +1107,7 @@ class StubManager:
             for obj_path in candidates:
                 try:
                     fs = extract_function(str(obj_path), try_sym)
-                    if fs.code:
+                    if fs.code and slice_looks_truncated(fs) is None:
                         return fs
                 except (CoffParseError, Exception):
                     continue
