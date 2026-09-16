@@ -662,7 +662,7 @@ def merge_parked_records(dst: Optional[dict], src: dict) -> dict:
         def _score(a: dict) -> float:
             s = a.get("score")
             return s if isinstance(s, (int, float)) else -1
-        best = max(attempts, key=_score)
+        best = max(attempts, key=lambda a: (_score(a), a.get("ts") or ""))
         dst["best_score"] = best.get("score", dst.get("best_score", 0))
         dst["best_patch"] = best.get("patch", dst.get("best_patch", ""))
 
