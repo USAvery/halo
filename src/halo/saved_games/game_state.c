@@ -160,7 +160,7 @@ bool game_state_validate_core_header(char *header, bool fatal)
   if (csstrcmp(header + 0x104, "01.10.12.2276") != 0) {
     if (fatal) {
       display_assert(
-        csprintf((char *)0x5ab100, "expected build #%d but got #%d",
+        csprintf((char *)0x5ab100, "expected build #%s but got #%s",
                  "01.10.12.2276", header + 0x104),
         "c:\\halo\\SOURCE\\saved games\\game_state.c", 0x195, 1);
       system_exit(-1);
